@@ -311,6 +311,10 @@ export class HeaderEngine {
     headerCell.setAttribute('data-field', field);
     headerCell.style.cssText = `width: ${width}px; min-width: ${width}px; max-width: ${width}px;`;
     
+    // Create a wrapper for text and sort icon to keep them together
+    const textGroup = document.createElement('div');
+    textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+    
     // Header text
     const headerText = document.createElement('span');
     headerText.className = 'vibegridx-header-text';
@@ -321,13 +325,16 @@ export class HeaderEngine {
     sortIcon.className = 'vibegridx-sort-icon';
     sortIcon.innerHTML = this.createSortIconSVG(sortInfo);
     
+    // Group text and sort icon together
+    textGroup.appendChild(headerText);
+    textGroup.appendChild(sortIcon);
+    
     // Resize handle
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'vibegridx-resize-handle';
     resizeHandle.setAttribute('data-column', column.id);
     
-    headerCell.appendChild(headerText);
-    headerCell.appendChild(sortIcon);
+    headerCell.appendChild(textGroup);
     headerCell.appendChild(resizeHandle);
     
     return headerCell;

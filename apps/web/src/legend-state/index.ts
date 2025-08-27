@@ -14,7 +14,10 @@ export {
   handleTableNotification,
   removeEntityFromSchema,
   entityGroups$,
+  // Common computed observables
   isLoading$,
+  currentOrg$,
+  currentSchema$,
   // Enhanced mutation utilities
   batchOperations,
   entityOperations,

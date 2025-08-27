@@ -615,6 +615,9 @@ export interface RendererOptions {
   
   // Performance: Initial viewport for virtual scrolling
   initialViewport?: ViewportInfo;
+  
+  // Feature flags
+  useReactiveOverlays?: boolean;
 }
 
 export interface RenderState {

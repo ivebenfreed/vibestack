@@ -6,6 +6,7 @@ import type {
 } from '../types';
 import type { CoordinateMapping } from '../types';
 import type { OverlayConfig, VisualCellPosition } from './OverlayTypes';
+import type { TableState } from '../state/table-state';
 
 import { SelectionOverlayDOM } from './SelectionOverlayDOM';
 import { FillHandleLayerDOM } from './FillHandleLayerDOM';
@@ -13,6 +14,7 @@ import { ClipboardOverlayDOM } from './ClipboardOverlayDOM';
 import { DragPreviewOverlayDOM } from './DragPreviewOverlayDOM';
 import { ColumnDragOverlayDOM } from './ColumnDragOverlayDOM';
 import { ColumnResizeOverlayDOM } from './ColumnResizeOverlayDOM';
+// EditingCanvasOverlayDOM removed - editing is handled by EditingOverlay.tsx (React portal)
 // EditingOverlay is already DOM-based (React portal) - handled separately
 // SelectionColumnOverlay not needed - checkboxes are DOM elements
 
@@ -33,6 +35,7 @@ export class CanvasOverlayDOM {
   private overlayContainer: HTMLDivElement | null = null;
   private config: OverlayConfig;
   private eventCallback: CanvasEventCallback | null = null;
+  private tableState: TableState;
   
   // DOM Overlay instances (lazily created)
   private selectionOverlay: SelectionOverlayDOM | null = null;
@@ -41,6 +44,7 @@ export class CanvasOverlayDOM {
   private dragPreviewOverlay: DragPreviewOverlayDOM | null = null;
   private columnDragOverlay: ColumnDragOverlayDOM | null = null;
   private columnResizeOverlay: ColumnResizeOverlayDOM | null = null;
+  private editingOverlay: EditingCanvasOverlayDOM | null = null;
   // EditingOverlay handled separately as React portal
   // SelectionColumn handled by DOM checkboxes in renderer
   
@@ -50,8 +54,9 @@ export class CanvasOverlayDOM {
   private currentSelectedCells: Set<string> = new Set();
   private isDestroyed = false;
   
-  constructor(config: OverlayConfig, eventCallback?: CanvasEventCallback) {
+  constructor(config: OverlayConfig, tableState: TableState, eventCallback?: CanvasEventCallback) {
     this.config = config;
+    this.tableState = tableState;
     this.eventCallback = eventCallback || null;
     console.log('CanvasOverlayDOM: Created with config', config);
   }
@@ -110,7 +115,8 @@ export class CanvasOverlayDOM {
           selectionBorderColor: this.config.selectionBorderColor || 'rgba(59, 130, 246, 0.5)',
           borderWidth: this.config.selectionBorderWidth || 2,
           cellHeight: this.config.cellHeight
-        }
+        },
+        this.tableState
       );
     }
     
@@ -136,6 +142,12 @@ export class CanvasOverlayDOM {
           cutColor: '#ef4444'
         }
       );
+      
+      // If we already have coordinate mapping, apply it to the newly created clipboard overlay
+      if (this.coordinateMapping) {
+        console.log('CanvasOverlayDOM: Applying existing coordinate mapping to newly created clipboard overlay');
+        this.clipboardOverlay.updateCoordinateMapping(this.coordinateMapping);
+      }
     }
     
     if (!this.clipboardOverlay) {
@@ -534,9 +546,11 @@ export class CanvasOverlayDOM {
       this.updateSelection(context.selectedCells);
     }
     
-    // TODO: Update other overlays as they're created
-    // - Fill handle
-    // - Clipboard indicator
+    // Update editing overlay if it exists
+    if (this.editingOverlay) {
+      // No specific coordinate mapping needed for editing overlay
+      console.log('CanvasOverlayDOM: Editing overlay already has access to table state');
+    }
     // - Editing overlay
     // - Drag preview
   }
@@ -612,19 +626,57 @@ export class CanvasOverlayDOM {
   }
   
   /**
+   * Get or create the editing overlay
+   */
+  private getEditingOverlay(): EditingCanvasOverlayDOM {
+    if (!this.editingOverlay && this.overlayContainer) {
+      console.log('CanvasOverlayDOM: Lazily creating EditingCanvasOverlayDOM');
+      
+      // Create editing container
+      const editingContainer = document.createElement('div');
+      editingContainer.className = 'vibegridx-editing-container';
+      editingContainer.style.position = 'relative';
+      editingContainer.style.width = '100%';
+      editingContainer.style.height = '100%';
+      this.overlayContainer.appendChild(editingContainer);
+      
+      this.editingOverlay = new EditingCanvasOverlayDOM(
+        editingContainer,
+        {
+          borderColor: '#2563eb',
+          borderWidth: 2,
+          backgroundColor: 'rgba(37, 99, 235, 0.1)'
+        },
+        this.tableState
+      );
+    }
+    
+    if (!this.editingOverlay) {
+      throw new Error('CanvasOverlayDOM: Failed to create editing overlay');
+    }
+    
+    return this.editingOverlay;
+  }
+
+  /**
    * Show editing overlay
    */
   showEditingOverlay(position: { x: number; y: number; width: number; height: number }): void {
-    // TODO: Implement when EditingCanvasOverlayDOM is created
     console.log('CanvasOverlayDOM: Show editing overlay requested', position);
+    
+    const editingOverlay = this.getEditingOverlay();
+    editingOverlay.showEditingOverlay(position);
   }
   
   /**
    * Hide editing overlay
    */
   hideEditingOverlay(): void {
-    // TODO: Implement when EditingCanvasOverlayDOM is created
     console.log('CanvasOverlayDOM: Hide editing overlay requested');
+    
+    if (this.editingOverlay) {
+      this.editingOverlay.hideEditingOverlay();
+    }
   }
   
   /**
@@ -678,6 +730,11 @@ export class CanvasOverlayDOM {
     if (this.columnResizeOverlay) {
       this.columnResizeOverlay.destroy();
       this.columnResizeOverlay = null;
+    }
+    
+    if (this.editingOverlay) {
+      this.editingOverlay.destroy();
+      this.editingOverlay = null;
     }
     
     // Remove container

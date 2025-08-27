@@ -48,6 +48,7 @@ export class EventSystem {
   private config: EventSystemConfig;
   private isScrolling = false;
   private isResizing = false;
+  private scrollThrottleTimeout: number | null = null;
   
   // Drag state
   private dragState = {
@@ -87,21 +88,29 @@ export class EventSystem {
     const body = domManager.getElement('body');
     const viewport = domManager.getElement('viewport');
 
-    // Scroll handling
+    // Scroll handling with throttling to prevent performance issues
     viewport.addEventListener('scroll', () => {
-      const viewportInfo = this.config.virtualGrid.calculateViewportFromScroll(
-        viewport.scrollTop,
-        viewport.clientHeight,
-        viewport.clientWidth,
-        viewport.scrollLeft
-      );
-      
-      // Sync header horizontal scroll position
+      // Immediately sync header for smooth horizontal scrolling
       if (header) {
         header.style.transform = `translateX(-${viewport.scrollLeft}px)`;
       }
       
-      this.config.callbacks.onScroll?.(viewportInfo);
+      // Throttle expensive viewport calculations
+      if (this.scrollThrottleTimeout) {
+        return;
+      }
+      
+      this.scrollThrottleTimeout = window.setTimeout(() => {
+        const viewportInfo = this.config.virtualGrid.calculateViewportFromScroll(
+          viewport.scrollTop,
+          viewport.clientHeight,
+          viewport.clientWidth,
+          viewport.scrollLeft
+        );
+        
+        this.config.callbacks.onScroll?.(viewportInfo);
+        this.scrollThrottleTimeout = null;
+      }, 16); // ~60fps throttling
     });
 
     // Cell interaction handlers

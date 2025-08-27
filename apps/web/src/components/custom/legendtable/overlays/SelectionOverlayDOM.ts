@@ -1,6 +1,7 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../types';
 import type { VisualCellPosition } from './OverlayTypes';
+import type { TableState } from '../state/table-state';
 
 // ====================================
 // DOM SELECTION OVERLAY
@@ -16,6 +17,7 @@ export interface SelectionOverlayConfig {
 export class SelectionOverlayDOM {
   private container: HTMLElement;
   private config: SelectionOverlayConfig;
+  private tableState: TableState;
   
   // Selection elements
   private selectionElements = new Map<string, HTMLDivElement>();
@@ -34,10 +36,12 @@ export class SelectionOverlayDOM {
   
   constructor(
     container: HTMLElement,
-    config: SelectionOverlayConfig
+    config: SelectionOverlayConfig,
+    tableState: TableState
   ) {
     this.container = container;
     this.config = config;
+    this.tableState = tableState;
     
     // Ensure container has relative positioning for absolute children
     if (getComputedStyle(this.container).position === 'static') {
@@ -97,11 +101,13 @@ export class SelectionOverlayDOM {
         visibleCells.add(cellKey);
         
         // Calculate position based on coordinate mapping
-        // Adjust for viewport offset
-        const viewportOffset = viewport.start * this.config.cellHeight;
+        // Convert virtual row index to viewport-relative position
+        const viewportRelativeRowIndex = rowIndex - viewport.start;
+        const viewportRelativeY = viewportRelativeRowIndex * this.config.cellHeight;
+        
         cellPositions.set(cellKey, {
           x: colCoord.offset,
-          y: rowCoord.offset - viewportOffset,
+          y: viewportRelativeY,
           width: colCoord.width,
           height: this.config.cellHeight
         });
@@ -802,8 +808,6 @@ export class SelectionOverlayDOM {
    * Execute the fill operation using Legend State
    */
   private executeFillOperation(visualCells: VisualCellPosition[], direction: 'up' | 'down', additionalRows: number): void {
-    // This would need to be connected to the Legend State table state
-    // For now, just log the operation
     console.log('[SelectionOverlayDOM] Executing fill operation', {
       visualCells: visualCells.length,
       direction,
@@ -811,14 +815,38 @@ export class SelectionOverlayDOM {
       cellKeys: visualCells.map(c => c.cellKey)
     });
     
-    // TODO: Connect to Legend State fillDown/fillUp operations
-    // Example: this.tableState.fillDown(sourceRange, fillRange)
+    // Get the current selection as source range
+    const selectedCells = this.tableState.selection.selectedCells.get();
+    if (selectedCells.size === 0) {
+      console.warn('[SelectionOverlayDOM] No cells selected for fill operation');
+      return;
+    }
+    
+    // Create fill range from visual cells
+    const fillRange = new Set(visualCells.map(cell => cell.cellKey));
+    
+    console.log('[SelectionOverlayDOM] Connecting to Legend State fill operations', {
+      sourceRange: Array.from(selectedCells),
+      fillRange: Array.from(fillRange),
+      direction
+    });
+    
+    // Execute the appropriate fill operation
+    if (direction === 'down') {
+      this.tableState.fillDown(selectedCells, fillRange);
+    } else {
+      // For now, fillUp uses the same logic as fillDown
+      // In the future, we might want different behavior for fillUp
+      this.tableState.fillDown(selectedCells, fillRange);
+    }
+    
+    console.log('[SelectionOverlayDOM] Fill operation completed');
   }
   
   /**
-   * Show fill preview with dotted border style
+   * Show fill preview with dotted border style using coordinate mapping
    */
-  showFillPreview(previewCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
+  showFillPreviewWithCells(previewCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
     console.log('SelectionOverlayDOM: Showing fill preview', {
       previewCells: Array.from(previewCells),
       hasViewport: !!viewport,
@@ -855,10 +883,13 @@ export class SelectionOverlayDOM {
         visiblePreviewCells.add(cellKey);
         
         // Calculate position based on coordinate mapping
-        const viewportOffset = viewport.start * this.config.cellHeight;
+        // Convert virtual row index to viewport-relative position
+        const viewportRelativeRowIndex = rowIndex - viewport.start;
+        const viewportRelativeY = viewportRelativeRowIndex * this.config.cellHeight;
+        
         cellPositions.set(cellKey, {
           x: colCoord.offset,
-          y: rowCoord.offset - viewportOffset,
+          y: viewportRelativeY,
           width: colCoord.width,
           height: this.config.cellHeight
         });

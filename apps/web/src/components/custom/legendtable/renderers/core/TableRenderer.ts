@@ -13,7 +13,6 @@ import { CellPipeline } from '../engines/CellPipeline';
 import { VirtualScrollManager } from '../managers/VirtualScrollManager';
 import { ColumnManager } from '../managers/ColumnManager';
 import { DOMSystem } from '../systems/DOMSystem';
-import { SelectionManager } from '../managers/SelectionManager';
 import { EventSystem, type EventCallbacks } from '../systems/EventSystem';
 import { RowEngine } from '../engines/RowEngine';
 import { HeaderEngine } from '../engines/HeaderEngine';
@@ -54,7 +53,6 @@ const CSS_CLASSES = {
 export class TableRenderer {
   private virtualGrid: VirtualScrollManager;
   private domManager: DOMSystem;
-  private selectionManager: SelectionManager;
   private eventSystem: EventSystem;
   private rowRenderingEngine: RowEngine;
   private headerRenderer: HeaderEngine;
@@ -79,13 +77,7 @@ export class TableRenderer {
     // Initialize managers
     this.domManager = new DOMSystem(options.container);
     
-    // Initialize selection manager with DOM dependencies
-    this.selectionManager = new SelectionManager({
-      getCellElement: (rowId: string, columnId: string) => this.getCellElement(rowId, columnId),
-      forEachRowElement: (callback) => this.domManager.forEachRowElement(callback),
-      getHeaderElement: () => this.domManager.getElement('header'),
-      isSelectionColumnEnabled: () => true // Selection column is always enabled
-    });
+    // SelectionManager removed - ReactiveSelectionOverlay handles all selection now
     
     // Use configured row height or default
     this.rowHeight = options.cellHeight || 40;
@@ -138,7 +130,6 @@ export class TableRenderer {
     this.rowRenderingEngine = new RowEngine({
       virtualGrid: this.virtualGrid,
       domManager: this.domManager,
-      selectionManager: this.selectionManager,
       rowHeight: this.rowHeight,
       enableSelectionColumn: true // Selection column is always enabled
     });
@@ -146,7 +137,6 @@ export class TableRenderer {
     // Initialize header renderer
     this.headerRenderer = new HeaderEngine({
       domManager: this.domManager,
-      selectionManager: this.selectionManager,
       enableSelectionColumn: true, // Selection column is always enabled
       getTotalColumnsWidth: () => this.getTotalColumnsWidth()
     });
@@ -291,9 +281,9 @@ export class TableRenderer {
     // Rows are already pre-sorted by render state extractor
     this.stateManager.setLastRenderState(state);
     
-    // Sync selection state from render state to SelectionManager
-    this.selectionManager.setSelectedCells(state.selectedCells);
-    this.selectionManager.setEditingCell(state.editingCell);
+    // Selection state now handled by ReactiveSelectionOverlay
+    // this.selectionManager.setSelectedCells(state.selectedCells);
+    // this.selectionManager.setEditingCell(state.editingCell);
     
     // Note: selectedRows is not in RenderState - it's managed separately by setSelectedRows calls
     
@@ -373,7 +363,7 @@ export class TableRenderer {
 
   
   setEditingCell(cellRef: CellRef | null): void {
-    this.selectionManager.setEditingCell(cellRef);
+    // this.selectionManager.setEditingCell(cellRef); // Moved to ReactiveSelectionOverlay
   }
   
   // ====================================
@@ -382,13 +372,13 @@ export class TableRenderer {
   
   
   setSelectedCells(selectedCells: Set<string>): void {
-    this.selectionManager.setSelectedCells(selectedCells);
+    // this.selectionManager.setSelectedCells(selectedCells); // Moved to ReactiveSelectionOverlay
   }
   
   setSelectedRows(selectedRows: Set<string>): void {
     const lastRenderState = this.stateManager.getLastRenderState();
     const allRows = lastRenderState ? lastRenderState.rows : [];
-    this.selectionManager.setSelectedRows(selectedRows, allRows);
+    // this.selectionManager.setSelectedRows(selectedRows, allRows); // Moved to ReactiveSelectionOverlay
     
     // Update header checkbox state
     this.headerRenderer.updateHeaderCheckbox(allRows.length, selectedRows.size);
@@ -399,53 +389,53 @@ export class TableRenderer {
   // ====================================
   
   getSelectedCells(): Set<string> {
-    return this.selectionManager.getSelectedCells();
+    return new Set(); // this.selectionManager.getSelectedCells(); // Moved to ReactiveSelectionOverlay
   }
   
   getSelectedRows(): Set<string> {
-    return this.selectionManager.getSelectedRows();
+    return new Set(); // this.selectionManager.getSelectedRows(); // Moved to ReactiveSelectionOverlay
   }
   
   getEditingCell(): CellRef | null {
-    return this.selectionManager.getEditingCell();
+    return null; // this.selectionManager.getEditingCell(); // Moved to ReactiveSelectionOverlay
   }
   
   isCellSelected(rowId: string, columnId: string): boolean {
-    return this.selectionManager.isCellSelected(rowId, columnId);
+    return false; // this.selectionManager.isCellSelected(rowId, columnId); // Moved to ReactiveSelectionOverlay
   }
   
   isRowSelected(rowId: string): boolean {
-    return this.selectionManager.isRowSelected(rowId);
+    return false; // this.selectionManager.isRowSelected(rowId); // Moved to ReactiveSelectionOverlay
   }
   
   isCellEditing(rowId: string, columnId: string): boolean {
-    return this.selectionManager.isCellEditing(rowId, columnId);
+    return false; // this.selectionManager.isCellEditing(rowId, columnId); // Moved to ReactiveSelectionOverlay
   }
   
   toggleCellSelection(rowId: string, columnId: string): boolean {
-    return this.selectionManager.toggleCellSelection(rowId, columnId);
+    return false; // this.selectionManager.toggleCellSelection(rowId, columnId); // Moved to ReactiveSelectionOverlay
   }
   
   toggleRowSelection(rowId: string): boolean {
     const lastRenderState = this.stateManager.getLastRenderState();
     const allRows = lastRenderState ? lastRenderState.rows : [];
-    return this.selectionManager.toggleRowSelection(rowId, allRows);
+    return false; // this.selectionManager.toggleRowSelection(rowId, allRows); // Moved to ReactiveSelectionOverlay
   }
   
   selectAllRows(): void {
     const lastRenderState = this.stateManager.getLastRenderState();
     const allRows = lastRenderState ? lastRenderState.rows : [];
-    this.selectionManager.selectAllRows(allRows);
+    // this.selectionManager.selectAllRows(allRows); // Moved to ReactiveSelectionOverlay
   }
   
   clearAllSelections(): void {
     const lastRenderState = this.stateManager.getLastRenderState();
     const allRows = lastRenderState ? lastRenderState.rows : [];
-    this.selectionManager.clearAllSelections(allRows);
+    // this.selectionManager.clearAllSelections(allRows); // Moved to ReactiveSelectionOverlay
   }
   
   getSelectionStats() {
-    return this.selectionManager.getSelectionStats();
+    return { selectedCells: 0, selectedRows: 0, hasEditingCell: false, editingCell: null }; // this.selectionManager.getSelectionStats(); // Moved to ReactiveSelectionOverlay
   }
   
   // ====================================
@@ -567,7 +557,7 @@ export class TableRenderer {
     
     this.stateManager.cleanup();
     this.domManager.clearAllCaches();
-    this.selectionManager.clearAllSelections();
+    // this.selectionManager.clearAllSelections(); // Moved to ReactiveSelectionOverlay
     
     this.domManager.getElement('container').innerHTML = '';
   }

@@ -5,6 +5,7 @@ import { SelectEditor } from './SelectEditor';
 import { MultiSelectEditor } from './MultiSelectEditor';
 import { BooleanEditor } from './BooleanEditor';
 import { DateEditor } from './DateEditor';
+import { ComboboxEditor } from './ComboboxEditor';
 import { SingleRelationshipEditor } from './SingleRelationshipEditor';
 import { MultiRelationshipEditor } from './MultiRelationshipEditor';
 import { ReferenceSelectEditor } from './ReferenceSelectEditor';
@@ -19,6 +20,7 @@ export {
   MultiSelectEditor,
   BooleanEditor, 
   DateEditor, 
+  ComboboxEditor,
   SingleRelationshipEditor, 
   MultiRelationshipEditor,
   ReferenceSelectEditor,

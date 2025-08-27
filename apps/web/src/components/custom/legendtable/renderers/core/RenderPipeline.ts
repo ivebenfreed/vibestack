@@ -61,6 +61,20 @@ export class RenderPipeline {
       const headerMetrics = this.config.headerRenderer.renderHeader(state);
       this.config.performanceMonitor.recordPhase('header', headerMetrics.renderTime);
       
+      // STEP 1.1: Update sort indicators
+      console.log('🔍 RenderPipeline: Checking sort state for indicators', {
+        hasSortBy: !!state.sortBy,
+        sortByLength: state.sortBy?.length,
+        sortBy: state.sortBy
+      });
+      
+      if (state.sortBy && state.sortBy.length > 0) {
+        console.log('🎯 RenderPipeline: Updating sort indicators with:', state.sortBy);
+        this.config.headerRenderer.updateSortIndicators(state.sortBy);
+      } else {
+        console.log('⚠️ RenderPipeline: No sort state to update indicators');
+      }
+      
       // Check if this is the first render
       if (this.isFirstRender) {
         console.log('🎨 RenderOrchestrator: First render - executing synchronously');

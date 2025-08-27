@@ -69,6 +69,7 @@ export type CanvasActorResponse =
 export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>(({ sendBack, receive }) => {
   let canvas: CanvasOverlayDOM | null = null;
   let queuedCoordinateUpdate: any = null;
+  let queuedViewportUpdate: ViewportInfo | null = null;
   
   console.log('CanvasActor: Created for DOM overlay mode');
   
@@ -135,6 +136,13 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
                 console.log('CanvasActor: Processing queued coordinate update');
                 canvas.updateCoordinateMapping(queuedCoordinateUpdate);
                 queuedCoordinateUpdate = null;
+              }
+              
+              if (queuedViewportUpdate) {
+                console.log('CanvasActor: Processing queued viewport update');
+                canvas.updateViewport(queuedViewportUpdate);
+                queuedViewportUpdate = null;
+                sendBack({ type: 'VIEWPORT_UPDATED' });
               }
               
               sendBack({ type: 'CANVAS_DEFERRED_READY' });
@@ -215,7 +223,9 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'UPDATE_VIEWPORT':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update viewport - canvas not initialized');
+            // Queue this event to be processed after initialization
+            console.log('CanvasActor: Queuing UPDATE_VIEWPORT event until canvas is initialized');
+            queuedViewportUpdate = event.viewport;
             return;
           }
           

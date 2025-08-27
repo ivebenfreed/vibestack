@@ -6,60 +6,19 @@
 import React from 'react'
 import { VibeGrid } from '@/components/custom/vibegrid'
 import { Badge } from '@/components/ui/badge'
+import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
+import { entityOperations } from '@/legend-state'
 
 export function LegendStateIntegrationDemo() {
-  const columns = [
-    {
-      id: 'title',
-      field: 'title',
-      name: 'Title',
-      cellType: 'text' as const,
-      width: 200,
-      editable: true
-    },
-    {
-      id: 'description', 
-      field: 'description',
-      name: 'Description',
-      cellType: 'text' as const,
-      width: 300,
-      editable: true
-    },
-    {
-      id: 'status',
-      field: 'status', 
-      name: 'Status',
-      cellType: 'enum' as const,
-      width: 120,
-      editable: true,
-      options: [
-        { value: 'todo', label: 'To Do' },
-        { value: 'in_progress', label: 'In Progress' },
-        { value: 'completed', label: 'Completed' }
-      ]
-    },
-    {
-      id: 'priority',
-      field: 'priority',
-      name: 'Priority', 
-      cellType: 'enum' as const,
-      width: 100,
-      editable: true,
-      options: [
-        { value: 'low', label: 'Low' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'high', label: 'High' }
-      ]
-    },
-    {
-      id: 'created_at',
-      field: 'created_at',
-      name: 'Created',
-      cellType: 'date' as const,
-      width: 150,
-      editable: false
-    }
-  ]
+  const { columns, isLoading, error } = usePrecomputedEntityColumns('Client')
+  
+  console.log('[LegendStateIntegrationDemo] Precomputed columns:', { 
+    columns, 
+    isLoading, 
+    error, 
+    referenceColumns: columns.filter(col => col.cellType?.startsWith('reference')).length,
+    totalColumns: columns.length
+  })
 
   return (
     <div className="p-6 space-y-6">
@@ -73,13 +32,45 @@ export function LegendStateIntegrationDemo() {
       </div>
 
       <div className="h-[600px] border rounded-lg">
-        <VibeGrid
-          entityType="Task"
-          columns={columns}
-          useLegendState={true}
-          tableId="debug-tasks-table"
-          className="h-full"
-        />
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="text-lg font-semibold">Loading schema...</div>
+              <div className="text-sm text-muted-foreground">Generating dynamic columns</div>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-red-600">
+              <div className="text-lg font-semibold">Schema Error</div>
+              <div className="text-sm">{error}</div>
+            </div>
+          </div>
+        ) : columns.length > 0 ? (
+          <VibeGrid
+            entityType="Client"
+            columns={columns}
+            tableId="debug-clients-table"
+            className="h-full"
+            onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
+              console.log('🔄 LegendStateIntegrationDemo: Entity update requested', { rowId, updates });
+              try {
+                await entityOperations.updateEntity('Client', rowId, updates);
+                console.log('✅ LegendStateIntegrationDemo: Entity updated successfully', { rowId, updates });
+              } catch (error) {
+                console.error('❌ LegendStateIntegrationDemo: Entity update failed', { rowId, updates, error });
+                throw error;
+              }
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-muted-foreground">
+              <div className="text-lg font-semibold">No Columns</div>
+              <div className="text-sm">No schema fields found for Client entity</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

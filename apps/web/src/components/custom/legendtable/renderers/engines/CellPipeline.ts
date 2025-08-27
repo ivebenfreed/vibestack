@@ -94,11 +94,13 @@ export class CellPipeline {
     const isEditable = column.editable !== false; // Default to true unless explicitly false
     
     // Default styles for other cell types
+    const isNameColumn = column.id === 'name' || column.field === 'name';
+    
     Object.assign(content.style, {
       width: '100%',
       overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
+      textOverflow: isNameColumn ? 'unset' : 'ellipsis',
+      whiteSpace: isNameColumn ? 'normal' : 'nowrap',
       padding: '8px 12px',
       boxSizing: 'border-box'
     });

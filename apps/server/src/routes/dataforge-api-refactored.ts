@@ -167,7 +167,9 @@ dataforgeRouter.get('/orgs/:orgId/schema',
         console.log(`[Schema Cache] 📡 Trying OrganizationActor cache first`);
         const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
         const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema'));
+        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema', {
+          headers: { 'x-org-id': security.organizationId }
+        }));
         
         if (cacheResponse.ok) {
           const cacheResult = await cacheResponse.json();
@@ -215,7 +217,7 @@ dataforgeRouter.get('/orgs/:orgId/schema',
         console.log(`[Schema Cache] 💾 Populating cache with fresh schema data (${result.data.length} entities)`);
         const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
         const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        await orgActor.fetch(new Request('https://internal/cache-org-schema', {
+        const cacheWriteResponse = await orgActor.fetch(new Request('https://internal/cache-org-schema', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -223,7 +225,14 @@ dataforgeRouter.get('/orgs/:orgId/schema',
             schema: result.data 
           })
         }));
-        console.log(`[Schema Cache] ✅ Cache populated successfully`);
+        
+        if (cacheWriteResponse.ok) {
+          const cacheWriteResult = await cacheWriteResponse.json();
+          console.log(`[Schema Cache] ✅ Cache populated successfully:`, cacheWriteResult);
+        } else {
+          const errorText = await cacheWriteResponse.text();
+          console.log(`[Schema Cache] ❌ Cache population failed:`, cacheWriteResponse.status, errorText);
+        }
       } catch (error) {
         console.log(`[Schema Cache] ⚠️ Cache population failed:`, error instanceof Error ? error.message : String(error));
       }
@@ -889,6 +898,114 @@ dataforgeRouter.delete('/orgs/:orgId/trash/:entityName/permanent',
     }
     
     return c.json(result);
+  }
+);
+
+// =============================================================================
+// SYSTEM OPTIONS ENDPOINTS - Reference data for field types
+// =============================================================================
+
+// Get system options for a specific archetype and option type
+dataforgeRouter.get('/system-options/:optionType/:archetype',
+  async (c) => {
+    const { optionType, archetype } = c.req.param();
+    
+    const { getKysely } = await import('../lib/kysely');
+    const kysely = getKysely(c.env);
+    
+    try {
+      const systemOptions = await kysely
+        .selectFrom('system_options')
+        .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
+        .select([
+          'system_options.value as option_key',
+          'system_options.label', 
+          'system_options.description',
+          'system_options.color',
+          'system_options.icon',
+          'system_options.sort_order',
+          'system_options.is_active'
+        ])
+        .where('system_option_sets.option_set_type', '=', optionType)
+        .where('system_option_sets.archetype', '=', archetype)
+        .where('system_options.is_active', '=', true)
+        .orderBy('system_options.sort_order', 'asc')
+        .orderBy('system_options.label', 'asc')
+        .execute();
+        
+      return c.json({
+        success: true,
+        data: systemOptions,
+        metadata: {
+          optionType,
+          archetype,
+          count: systemOptions.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('[System Options] Failed to fetch system options:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to fetch system options',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// Get custom options for an organization
+dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
+  requirePermission('entities:read'),
+  async (c) => {
+    const { orgId, optionSetName } = c.req.param();
+    const security = c.get('security');
+    
+    if (orgId !== security.organizationId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+    
+    const { getKysely } = await import('../lib/kysely');
+    const kysely = getKysely(c.env);
+    
+    try {
+      const customOptions = await kysely
+        .selectFrom('custom_options')
+        .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+        .select([
+          'custom_options.value as option_key',
+          'custom_options.label',
+          'custom_options.description', 
+          'custom_options.color',
+          'custom_options.icon',
+          'custom_options.sort_order',
+          'custom_options.is_active'
+        ])
+        .where('custom_option_sets.org_id', '=', orgId)
+        .where('custom_option_sets.name', '=', optionSetName)
+        .where('custom_options.is_active', '=', true)
+        .orderBy('custom_options.sort_order', 'asc')
+        .orderBy('custom_options.label', 'asc')
+        .execute();
+        
+      return c.json({
+        success: true,
+        data: customOptions,
+        metadata: {
+          organizationId: orgId,
+          optionSetName,
+          count: customOptions.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('[Custom Options] Failed to fetch custom options:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to fetch custom options',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
   }
 );
 

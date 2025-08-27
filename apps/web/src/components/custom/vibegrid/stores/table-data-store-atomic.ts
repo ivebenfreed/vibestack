@@ -876,6 +876,55 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           };
         },
         loading: true
+      },
+
+      atomicEntityUpdate: {
+        entities: (context, event: { entityId: string, entity: any }) => {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📊 TableStore: Processing atomic entity update', {
+              entityId: event.entityId,
+              entityType: context.entityType,
+              entityName: event.entity?.name,
+              source: 'render_chain_trigger'
+            });
+          }
+          
+          // Resolve entity with current relationships
+          const relationshipConfigs = discoverRelationships(columns || []);
+          const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
+          
+          return {
+            ...context.entities,
+            [event.entityId]: resolvedEntity
+          };
+        },
+        processedRows: (context, event: { entityId: string, entity: any }) => {
+          // Resolve entity with current relationships
+          const relationshipConfigs = discoverRelationships(columns || []);
+          const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
+          
+          // Update the corresponding processed row
+          const rowIndex = context.processedRows.findIndex(row => row.id === event.entityId);
+          if (rowIndex !== -1) {
+            const updatedRows = [...context.processedRows];
+            updatedRows[rowIndex] = {
+              ...updatedRows[rowIndex],
+              data: resolvedEntity
+            };
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('📊 TableStore: Updated processed row via atomic update', {
+                entityId: event.entityId,
+                rowIndex,
+                newData: resolvedEntity
+              });
+            }
+            
+            return updatedRows;
+          }
+          return context.processedRows;
+        },
+        lastProcessedAt: Date.now()
       }
     }
   });
@@ -896,9 +945,8 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     });
   }
   
-  // Use reactive approach to wait for entities to be ready
-  const entitiesMap = entities$.peek();
-  const entity$ = entitiesMap && entitiesMap[entityTableName] ? entitiesMap[entityTableName] : null;
+  // ✅ CORRECT: Use getEntity$() function directly
+  const entity$ = getEntity$(entityTableName);
   
   if (!entity$) {
     console.warn('📊 TableStore: Entity observable not ready for', entityTableName, '- waiting...');
@@ -906,8 +954,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     // Wait for entity observable to be ready instead of returning empty data
     return new Promise((resolve) => {
       const checkReady = () => {
-        const entitiesMap = entities$.peek();
-        const entity$ = entitiesMap && entitiesMap[entityTableName] ? entitiesMap[entityTableName] : null;
+        const entity$ = getEntity$(entityTableName);
         
         if (entity$) {
           console.log('📊 TableStore: Entity observable is now ready for', entityTableName);
@@ -922,11 +969,38 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     });
   }
   
-  // Get entities from Legend State observable - try different access patterns
+  // Get entities from Legend State observable - wait for data to be loaded
   let entities: any[] = [];
   try {
-    // Legend State syncedCrud has the data in the root observable
-    const entityData = entity$.peek?.() || entity$;
+    // ✅ CORRECT: Use .get() to access data and trigger loading if needed
+    const entityData = entity$.get();
+    
+    // Check if data is actually loaded (not undefined or empty on first load)
+    if (!entityData) {
+      console.log('📊 TableStore: Data not yet loaded for', entityTableName, '- waiting for sync...');
+      // Wait a bit for the initial sync to complete
+      return new Promise((resolve) => {
+        const checkDataReady = () => {
+          try {
+            const data = entity$.get();
+            if (data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
+              console.log('📊 TableStore: Data is now ready for', entityTableName);
+              // Recursively call loadInitialData now that data is ready
+              loadInitialData(entityType, columns, page).then(resolve);
+            } else {
+              // Check again in next frame
+              requestAnimationFrame(checkDataReady);
+            }
+          } catch (error) {
+            // If there's an error, try again
+            requestAnimationFrame(checkDataReady);
+          }
+        };
+        // Give it a moment for initial load, then start checking
+        setTimeout(checkDataReady, 100);
+      });
+    }
+    
     entities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});
   } catch (error) {
     console.warn('📊 TableStore: Could not access entity data, using empty array:', error.message);
@@ -978,8 +1052,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   // Load relationships and junctions in parallel using Legend State
   const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
     Promise.all(relationshipTables.map(async (tableName) => {
-      const entitiesMap = entities$.peek();
-      const relationshipEntity$ = entitiesMap && entitiesMap[tableName] ? entitiesMap[tableName] : null;
+      const relationshipEntity$ = getEntity$(tableName);
       if (!relationshipEntity$) return [];
       try {
         const data = relationshipEntity$.peek?.() || relationshipEntity$;
@@ -990,8 +1063,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
       }
     })),
     Promise.all(junctionTables.map(async (tableName) => {
-      const entitiesMap = entities$.peek();
-      const junctionEntity$ = entitiesMap && entitiesMap[tableName] ? entitiesMap[tableName] : null;
+      const junctionEntity$ = getEntity$(tableName);
       if (!junctionEntity$) return [];
       try {
         const data = junctionEntity$.peek?.() || junctionEntity$;
@@ -1140,9 +1212,8 @@ export async function loadPage(
     pageSize
   });
   
-  // Use reactive approach to wait for entities to be ready
-  const entitiesMap = entities$.peek();
-  const entity$ = entitiesMap && entitiesMap[entityTableName] ? entitiesMap[entityTableName] : null;
+  // ✅ CORRECT: Use getEntity$() function directly
+  const entity$ = getEntity$(entityTableName);
   
   if (!entity$) {
     throw new Error(`Entity ${entityTableName} not found or not ready`);
@@ -1170,8 +1241,7 @@ export async function loadPage(
   // Load relationships and junctions in parallel using Legend State
   const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
     Promise.all(relationshipTables.map(async (tableName) => {
-      const entitiesMap = entities$.peek();
-      const relationshipEntity$ = entitiesMap && entitiesMap[tableName] ? entitiesMap[tableName] : null;
+      const relationshipEntity$ = getEntity$(tableName);
       if (!relationshipEntity$) return [];
       try {
         const data = relationshipEntity$.peek?.() || relationshipEntity$;
@@ -1182,8 +1252,7 @@ export async function loadPage(
       }
     })),
     Promise.all(junctionTables.map(async (tableName) => {
-      const entitiesMap = entities$.peek();
-      const junctionEntity$ = entitiesMap && entitiesMap[tableName] ? entitiesMap[tableName] : null;
+      const junctionEntity$ = getEntity$(tableName);
       if (!junctionEntity$) return [];
       try {
         const data = junctionEntity$.peek?.() || junctionEntity$;

@@ -46,6 +46,7 @@ import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_a
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
+import { Route as AuthenticatedDebugUltraTableTestRouteImport } from './routes/_authenticated/debug/ultra-table-test'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
@@ -315,6 +316,12 @@ const AuthenticatedDebugVibegridLegendStateRoute =
     path: '/vibegrid-legend-state',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugUltraTableTestRoute =
+  AuthenticatedDebugUltraTableTestRouteImport.update({
+    id: '/ultra-table-test',
+    path: '/ultra-table-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugSystemOptionsRoute =
   AuthenticatedDebugSystemOptionsRouteImport.update({
     id: '/system-options',
@@ -384,6 +391,7 @@ export interface FileRoutesByFullPath {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -431,6 +439,7 @@ export interface FileRoutesByTo {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -482,6 +491,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/_authenticated/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -533,6 +543,7 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/system-options'
+    | '/debug/ultra-table-test'
     | '/debug/vibegrid-legend-state'
     | '/entities/$entityName'
     | '/settings/account'
@@ -580,6 +591,7 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/system-options'
+    | '/debug/ultra-table-test'
     | '/debug/vibegrid-legend-state'
     | '/entities/$entityName'
     | '/settings/account'
@@ -630,6 +642,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
+    | '/_authenticated/debug/ultra-table-test'
     | '/_authenticated/debug/vibegrid-legend-state'
     | '/_authenticated/entities/$entityName'
     | '/_authenticated/settings/account'
@@ -963,6 +976,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugVibegridLegendStateRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/ultra-table-test': {
+      id: '/_authenticated/debug/ultra-table-test'
+      path: '/ultra-table-test'
+      fullPath: '/debug/ultra-table-test'
+      preLoaderRoute: typeof AuthenticatedDebugUltraTableTestRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/system-options': {
       id: '/_authenticated/debug/system-options'
       path: '/system-options'
@@ -1022,6 +1042,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
+  AuthenticatedDebugUltraTableTestRoute: typeof AuthenticatedDebugUltraTableTestRoute
   AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
@@ -1044,6 +1065,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,
+    AuthenticatedDebugUltraTableTestRoute:
+      AuthenticatedDebugUltraTableTestRoute,
     AuthenticatedDebugVibegridLegendStateRoute:
       AuthenticatedDebugVibegridLegendStateRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,

@@ -1328,6 +1328,42 @@ export const tableBaseMachine = setup({
         ]
       },
       
+      // Atomic entity update from AtomicBridge (Legend State changes)
+      updateEntityAtomic: {
+        actions: [
+          ({ context, event, self }) => {
+            console.log('🔄 VibeGrid: Processing atomic entity update', {
+              entityType: context.entityType,
+              entityId: event.entity?.id,
+              entityName: event.entity?.name,
+              source: event.source,
+              timestamp: performance.now()
+            });
+            
+            if (!event.entity) return;
+            
+            // For surgical updates, we skip store updates to prevent full re-renders
+            // The store will be updated by the AtomicBridge already
+            console.log('🔄 VibeGrid: Skipping store update for surgical rendering - using direct renderer update');
+            
+            // CRITICAL: Use surgical update for cell-only rendering ONLY
+            console.log('🔄 VibeGrid: Triggering SURGICAL renderer update for atomic change');
+            if (context.actors.rendererActor) {
+              context.actors.rendererActor.send({
+                type: 'SURGICAL_UPDATE',
+                changes: [{
+                  operation: 'update',
+                  id: event.entity.id,
+                  data: event.entity
+                }]
+              });
+            } else {
+              console.warn('🔄 VibeGrid: No renderer actor available for atomic update render');
+            }
+          }
+        ]
+      },
+
       // Individual entity update (atomic update after initial load)
       'UPDATE_ENTITY': {
         actions: [
@@ -1552,7 +1588,7 @@ on: {
           visibleRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id),
           allRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id)
         }),
-        ({ context, self }) => {
+        ({ context, self, event }) => {
           console.log('TableMachine: STORE_DATA_UPDATED - Initial data loaded', {
             entityCount: context.entities.length,
             rowCount: context.rows.length,

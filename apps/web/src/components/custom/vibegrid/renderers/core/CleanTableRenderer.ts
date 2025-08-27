@@ -1394,6 +1394,9 @@ export class CleanTableRenderer {
     const row = this.state?.rows.find(r => r.id === rowId);
     if (!row) return;
     
+    // Store old data for comparison
+    const oldData = { ...row.data };
+    
     // Update data - this should already be fully resolved from the store
     row.data = newData;
     
@@ -1402,10 +1405,36 @@ export class CleanTableRenderer {
       hasResolvedValues: Object.keys(newData).filter(k => k.includes('__resolved_')).length > 0
     });
     
-    // Re-render cells if row is visible
+    // Surgical update: only update cells where data has changed
     const rowEl = this.rowElements.get(rowId);
     if (rowEl && this.state) {
-      this.renderCells(row, rowEl, this.state);
+      let updatedCellsCount = 0;
+      
+      // Check each column for changes
+      this.state.columns.forEach(column => {
+        const fieldName = column.field || column.id;
+        const oldValue = oldData[fieldName];
+        const newValue = newData[fieldName];
+        
+        // Compare values (deep comparison for objects)
+        const hasChanged = JSON.stringify(oldValue) !== JSON.stringify(newValue);
+        
+        if (hasChanged) {
+          const cellKey = `${rowId}:${column.id}`;
+          const cell = this.cellElements.get(cellKey);
+          
+          if (cell) {
+            this.updateCellContent(cell, row, column);
+            updatedCellsCount++;
+            console.log(`🔄 CleanTableRenderer: Surgical cell update - ${fieldName}`, {
+              oldValue: oldValue,
+              newValue: newValue
+            });
+          }
+        }
+      });
+      
+      console.log(`🔄 CleanTableRenderer: Surgical update completed - ${updatedCellsCount} cells updated out of ${this.state.columns.length} total`);
     }
   }
   

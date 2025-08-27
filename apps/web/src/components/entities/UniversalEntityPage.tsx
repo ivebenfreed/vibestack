@@ -2,7 +2,9 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { UltraTable } from '@/components/tables/UltraTable'
+import { VibeGrid } from '@/components/custom/vibegrid'
+import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
+import { entityOperations } from '@/legend-state'
 import { 
   Plus, 
   Settings, 
@@ -17,6 +19,7 @@ import {
   Layers,
   Table
 } from 'lucide-react'
+
 
 // DataForge archetype configuration
 const ARCHETYPE_CONFIG = {
@@ -51,6 +54,9 @@ export function UniversalEntityPage({
   const archetype = propArchetype || schema?.archetype || 'record'
   const archetypeConfig = ARCHETYPE_CONFIG[archetype.toLowerCase() as keyof typeof ARCHETYPE_CONFIG] || ARCHETYPE_CONFIG.record
   const Icon = archetypeConfig.icon
+  
+  // Use precomputed column configuration hook
+  const { columns, isLoading: columnsLoading, error: columnsError } = usePrecomputedEntityColumns(entityName)
   
   // Handle both plain arrays and Legend State observables
   const safeData = (() => {
@@ -212,19 +218,48 @@ export function UniversalEntityPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <UltraTable
-            entityName={entityName}
-            data={safeData}
-            schema={schema}
-            height={600}
-            options={{
-              enableSelection: true,
-              multiSelect: true,
-              overscan: 10
-            }}
-            enableEditing={true}
-            showHeader={true}
-          />
+          <div className="h-[600px]">
+            {columnsLoading ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center">
+                  <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Loading schema and generating columns...</p>
+                </div>
+              </div>
+            ) : columnsError ? (
+              <div className="flex items-center justify-center h-full text-red-600">
+                <div className="text-center">
+                  <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="font-semibold">Schema Error</p>
+                  <p className="text-sm">{columnsError}</p>
+                </div>
+              </div>
+            ) : columns.length > 0 ? (
+              <VibeGrid
+                entityType={entityName}
+                columns={columns}
+                tableId={`${entityName}-entity-table`}
+                className="h-full"
+                onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
+                  console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, rowId, updates });
+                  try {
+                    await entityOperations.updateEntity(entityName, rowId, updates);
+                    console.log('✅ UniversalEntityPage: Entity updated successfully', { entityName, rowId, updates });
+                  } catch (error) {
+                    console.error('❌ UniversalEntityPage: Entity update failed', { entityName, rowId, updates, error });
+                    throw error;
+                  }
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center">
+                  <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No columns available for {entityName}</p>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

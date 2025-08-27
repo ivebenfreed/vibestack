@@ -215,7 +215,12 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               }
             };
             
-            const container = mergedOptions.container;
+            // Get container from window object to avoid circular structure in events
+            const container = (window as any).__vibegrid_renderer_container || mergedOptions.container;
+            
+            // Update merged options with container
+            const finalOptions = { ...mergedOptions, container };
+            
             console.log('RendererActor: Creating renderer with merged options:', {
               hasStoredOptions: !!storedOptions,
               hasEventOptions: !!event.options,
@@ -234,7 +239,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               } : null
             });
             
-            renderer = new CleanTableRenderer(mergedOptions);
+            renderer = new CleanTableRenderer(finalOptions);
             isInitializing = false;
             isInitialized = true;
             

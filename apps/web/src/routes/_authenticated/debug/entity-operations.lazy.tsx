@@ -279,6 +279,12 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
         return acc
       }, {})
       
+      // Check if data exists and is an object
+      if (!data || typeof data !== 'object') {
+        addLog(`No data loaded in ${testEntityName} observable yet. Try "Query Entity Data" first.`, 'error')
+        return
+      }
+      
       const firstRecordId = Object.keys(data)[0]
       
       if (!firstRecordId) {
@@ -288,18 +294,26 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
 
       addLog(`Updating record: ${firstRecordId}`)
       
-      // Get the current record
-      const currentRecord = entityObs[firstRecordId]
+      // Get the current record using .peek() to avoid reactivity  
+      const currentRecord = data[firstRecordId]
       
-      // Update using direct assignment (same pattern as create)
+      if (!currentRecord) {
+        addLog(`Record ${firstRecordId} not found in data`, 'error')
+        return
+      }
+      
+      // Update using direct assignment to the entire data set
       const updatedRecord = {
         ...currentRecord,
-        contact_person: `${currentRecord.contact_person} (Updated at ${new Date().toLocaleTimeString()})`,
+        contact_person: `${currentRecord.contact_person || 'Unknown'} (Updated at ${new Date().toLocaleTimeString()})`,
         updated_at: new Date().toISOString()
       }
       
-      addLog(`Attempting to update record using direct assignment`)
-      entityObs[firstRecordId] = updatedRecord
+      // Update the entire observable data with the modified record
+      const newData = { ...data, [firstRecordId]: updatedRecord }
+      
+      addLog(`Attempting to update record using entity$.set()`)
+      entityObs.set(newData)
       
       addLog(`Record updated successfully: ${firstRecordId}`, 'success')
     } catch (error) {
@@ -770,6 +784,272 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
     }
   }
 
+  // NEW: Sync diagnostics for debugging the Client 11k records issue
+  const testSyncDiagnostics = async () => {
+    if (!currentOrganization?.id) {
+      addLog('No organization ID available', 'error')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      addLog(`🔍 SYNC DIAGNOSTICS: Testing ${testEntityName} with ${testEntityName === 'Client' ? '11k' : 'multiple'} records`)
+      
+      // Step 1: Get database record count via API
+      addLog(`Step 1: Querying database directly via API...`)
+      const dbResult = await fetch(`/api/dataforge/orgs/${currentOrganization.id}/data/${testEntityName}?limit=1&count=true`, {
+        credentials: 'include'
+      })
+      const dbData = await dbResult.json()
+      const dbCount = dbData.total_count || (dbData.data?.length || 0)
+      addLog(`📊 Database count: ${dbCount} records`, dbCount > 0 ? 'success' : 'error')
+      
+      // Step 2: Get Legend State observable count
+      addLog(`Step 2: Checking Legend State observable...`)
+      const entityObs = getEntity$(testEntityName)
+      let obsCount = 0
+      let obsData = null
+      
+      if (entityObs) {
+        try {
+          obsData = entityObs.get ? entityObs.get() : entityObs.peek ? entityObs.peek() : {}
+          obsCount = obsData && typeof obsData === 'object' ? Object.keys(obsData).length : 0
+          addLog(`📊 Observable count: ${obsCount} records`, obsCount > 0 ? 'success' : 'error')
+        } catch (obsError) {
+          addLog(`❌ Failed to access observable data: ${obsError}`, 'error')
+        }
+      } else {
+        addLog(`❌ Entity observable not found for ${testEntityName}`, 'error')
+      }
+      
+      // Step 3: Sync comparison
+      addLog(`Step 3: Sync comparison analysis...`)
+      const syncDiff = Math.abs(dbCount - obsCount)
+      if (syncDiff === 0) {
+        addLog(`✅ PERFECT SYNC: Database and Observable have same count (${dbCount})`, 'success')
+      } else {
+        addLog(`⚠️ SYNC MISMATCH: DB has ${dbCount}, Observable has ${obsCount} (diff: ${syncDiff})`, 'error')
+        
+        // Additional diagnostics for sync issues
+        if (dbCount > 0 && obsCount === 0) {
+          addLog(`🔍 DIAGNOSIS: Observable not initialized - data exists but not loaded`, 'error')
+          addLog(`💡 SOLUTION: Check syncedCrud initialization and differential sync`, 'info')
+        } else if (obsCount > dbCount) {
+          addLog(`🔍 DIAGNOSIS: Observable has stale/phantom records`, 'error')
+          addLog(`💡 SOLUTION: Check for failed deletions or cached data`, 'info')
+        } else if (dbCount > obsCount) {
+          addLog(`🔍 DIAGNOSIS: Missing records in observable`, 'error')
+          addLog(`💡 SOLUTION: Check last sync timestamp and differential sync`, 'info')
+        }
+      }
+      
+      // Step 4: Sample record comparison (if both have data)
+      if (dbCount > 0 && obsCount > 0) {
+        addLog(`Step 4: Sample record comparison...`)
+        try {
+          // Get sample from database
+          const sampleDbResult = await fetch(`/api/dataforge/orgs/${currentOrganization.id}/data/${testEntityName}?limit=1`, {
+            credentials: 'include'
+          })
+          const sampleDbData = await sampleDbResult.json()
+          const dbSample = sampleDbData.data?.[0]
+          
+          if (dbSample && obsData) {
+            const obsKeys = Object.keys(obsData)
+            const dbSampleId = dbSample.id
+            const obsSample = obsData[dbSampleId]
+            
+            if (obsSample) {
+              addLog(`✅ Sample record ${dbSampleId} exists in both DB and Observable`, 'success')
+              
+              // Compare key fields
+              const keyFields = ['id', 'updated_at', 'created_at', 'name', 'email']
+              let fieldMismatches = 0
+              keyFields.forEach(field => {
+                if (dbSample[field] !== obsSample[field]) {
+                  fieldMismatches++
+                  addLog(`  ⚠️ Field '${field}': DB='${dbSample[field]}' vs Obs='${obsSample[field]}'`)
+                }
+              })
+              
+              if (fieldMismatches === 0) {
+                addLog(`✅ Sample record fields match perfectly`, 'success')
+              } else {
+                addLog(`⚠️ Found ${fieldMismatches} field mismatches in sample record`, 'error')
+              }
+            } else {
+              addLog(`❌ Sample record ${dbSampleId} missing from Observable`, 'error')
+              addLog(`🔍 Observable has these IDs: ${obsKeys.slice(0, 5).join(', ')}${obsKeys.length > 5 ? '...' : ''}`)
+            }
+          }
+        } catch (sampleError) {
+          addLog(`❌ Sample comparison failed: ${sampleError}`, 'error')
+        }
+      }
+      
+      // Step 5: Check specific record that was failing earlier
+      addLog(`Step 5: Checking specific problematic record...`)
+      const problematicId = '98763f2f-72e1-4dbd-8291-376d1eaa5fe5' // From earlier error
+      try {
+        // Check in database
+        const specificDbResult = await fetch(`/api/dataforge/orgs/${currentOrganization.id}/data/${testEntityName}/${problematicId}`, {
+          credentials: 'include'
+        })
+        const specificDbData = await specificDbResult.json()
+        const dbHasRecord = specificDbData.success && specificDbData.data
+        
+        // Check in observable
+        const obsHasRecord = obsData && obsData[problematicId]
+        
+        addLog(`🎯 Record ${problematicId}:`)
+        addLog(`  Database: ${dbHasRecord ? '✅ EXISTS' : '❌ NOT FOUND'}`)
+        addLog(`  Observable: ${obsHasRecord ? '✅ EXISTS' : '❌ NOT FOUND'}`)
+        
+        if (dbHasRecord && !obsHasRecord) {
+          addLog(`⚠️ SYNC ISSUE: Record exists in DB but missing from Observable`, 'error')
+          addLog(`💡 This explains the "Record not found" error during updates`, 'info')
+        } else if (!dbHasRecord && obsHasRecord) {
+          addLog(`⚠️ STALE DATA: Record in Observable but not in DB (deleted?)`, 'error')
+        } else if (dbHasRecord && obsHasRecord) {
+          addLog(`✅ Record properly synced`, 'success')
+        } else {
+          addLog(`❌ Record not found in either source`, 'error')
+        }
+      } catch (specificError) {
+        addLog(`❌ Specific record check failed: ${specificError}`, 'error')
+      }
+      
+      // Step 6: Final recommendations
+      addLog(`Step 6: Recommendations...`)
+      if (syncDiff > 0) {
+        addLog(`🔧 RECOMMENDED ACTIONS:`)
+        addLog(`  1. Check differential sync logic and lastSync timestamps`)
+        addLog(`  2. Verify WebSocket notifications are working`)
+        addLog(`  3. Test manual sync refresh`)
+        addLog(`  4. Check for IndexedDB persistence issues`)
+        addLog(`  5. Verify syncedCrud configuration`)
+      } else {
+        addLog(`✅ Sync appears healthy - investigate other update mechanisms`)
+      }
+      
+    } catch (error) {
+      addLog(`❌ Sync diagnostics failed: ${error}`, 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // NEW: Test manual sync refresh
+  const testManualSyncRefresh = async () => {
+    try {
+      addLog(`🔄 MANUAL SYNC: Forcing refresh for ${testEntityName}`)
+      const entityObs = getEntity$(testEntityName)
+      
+      if (!entityObs) {
+        addLog(`❌ Entity observable not found`, 'error')
+        return
+      }
+      
+      addLog(`Attempting manual refresh methods...`)
+      
+      // Method 1: Check for refresh method
+      if (typeof entityObs.refresh === 'function') {
+        addLog(`Trying entityObs.refresh()...`)
+        await entityObs.refresh()
+        addLog(`✅ Refresh method succeeded`, 'success')
+      } else {
+        addLog(`⚠️ No refresh method available`, 'info')
+      }
+      
+      // Method 2: Force re-sync by clearing and reloading
+      if (currentOrganization?.id && user?.id) {
+        addLog(`Attempting context reload to force sync...`)
+        await loadOrgContext(currentOrganization.id, user.id)
+        addLog(`✅ Context reload completed`, 'success')
+      }
+      
+      // Method 3: Check if data is now available
+      setTimeout(() => {
+        try {
+          const refreshedObs = getEntity$(testEntityName)
+          if (refreshedObs) {
+            const refreshedData = refreshedObs.get ? refreshedObs.get() : refreshedObs.peek()
+            const refreshedCount = refreshedData && typeof refreshedData === 'object' ? Object.keys(refreshedData).length : 0
+            addLog(`📊 Post-refresh count: ${refreshedCount} records`, refreshedCount > 0 ? 'success' : 'error')
+          }
+        } catch (refreshError) {
+          addLog(`❌ Post-refresh check failed: ${refreshError}`, 'error')
+        }
+      }, 1000)
+      
+    } catch (error) {
+      addLog(`❌ Manual sync refresh failed: ${error}`, 'error')
+    }
+  }
+
+  // NEW: Test observable data integrity
+  const testObservableIntegrity = () => {
+    try {
+      addLog(`🔍 INTEGRITY CHECK: Testing ${testEntityName} observable internal state`)
+      const entityObs = getEntity$(testEntityName)
+      
+      if (!entityObs) {
+        addLog(`❌ Entity observable not found`, 'error')
+        return
+      }
+      
+      addLog(`Observable type: ${typeof entityObs}`)
+      addLog(`Observable constructor: ${entityObs.constructor.name}`)
+      
+      // Check internal properties
+      const allProps = Object.getOwnPropertyNames(entityObs)
+      const methods = allProps.filter(prop => typeof entityObs[prop] === 'function')
+      const dataProps = allProps.filter(prop => typeof entityObs[prop] !== 'function' && !prop.startsWith('_'))
+      
+      addLog(`Available methods: ${methods.join(', ')}`)
+      addLog(`Data properties: ${dataProps.length} found`)
+      
+      // Check if it's a syncedCrud observable
+      if (methods.includes('get') && methods.includes('set')) {
+        addLog(`✅ Detected syncedCrud observable (has get/set methods)`, 'success')
+        
+        try {
+          const rawData = entityObs.get()
+          addLog(`Raw data type: ${typeof rawData}`)
+          addLog(`Raw data is array: ${Array.isArray(rawData)}`)
+          addLog(`Raw data keys: ${rawData && typeof rawData === 'object' ? Object.keys(rawData).length : 'N/A'}`)
+          
+          if (rawData && typeof rawData === 'object') {
+            const keys = Object.keys(rawData)
+            if (keys.length > 0) {
+              const firstKey = keys[0]
+              const firstRecord = rawData[firstKey]
+              addLog(`Sample record structure: ${JSON.stringify(Object.keys(firstRecord), null, 2)}`)
+            }
+          }
+        } catch (dataError) {
+          addLog(`❌ Failed to access raw data: ${dataError}`, 'error')
+        }
+      } else {
+        addLog(`⚠️ Unknown observable type - may not be syncedCrud`, 'info')
+      }
+      
+      // Check for Legend State specific properties
+      const legendProps = allProps.filter(prop => 
+        prop.includes('$') || 
+        prop.includes('legend') || 
+        prop.includes('sync') || 
+        prop.includes('crud')
+      )
+      if (legendProps.length > 0) {
+        addLog(`Legend State properties: ${legendProps.join(', ')}`)
+      }
+      
+    } catch (error) {
+      addLog(`❌ Integrity check failed: ${error}`, 'error')
+    }
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -1115,6 +1395,56 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
               <Trash className="h-3 w-3 mr-1" />
               View Trash
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* NEW: Sync Diagnostics for Client 11k Records Issue */}
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            🔍 Sync Diagnostics (Client 11k Records Issue)
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Advanced debugging for Legend State sync issues with large datasets
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Button
+              onClick={() => testSyncDiagnostics()}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="text-xs bg-orange-100 hover:bg-orange-200"
+            >
+              <Search className="h-3 w-3 mr-1" />
+              Full Sync Analysis
+            </Button>
+            <Button
+              onClick={() => testManualSyncRefresh()}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Force Sync Refresh
+            </Button>
+            <Button
+              onClick={() => testObservableIntegrity()}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              <Database className="h-3 w-3 mr-1" />
+              Observable Integrity
+            </Button>
+          </div>
+          <div className="mt-2 text-xs text-orange-700">
+            <strong>Usage:</strong> Set Entity Name to "Client" and run "Full Sync Analysis" to diagnose the 11k records sync mismatch issue.
           </div>
         </CardContent>
       </Card>

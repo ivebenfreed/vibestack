@@ -7,6 +7,8 @@ import {
   enumValue,
   relationshipSingle,
   relationshipMulti,
+  referenceSelect,
+  referenceMulti,
 } from '../cell-renderers';
 import { relationshipMultiBadge, relationshipMultiBadgeString } from '../cell-renderers/relationship/multi-badge';
 import { relationshipSingleBadge } from '../cell-renderers/relationship/single';
@@ -34,6 +36,8 @@ export class CellPipeline {
     'relationship-single': relationshipSingle,
     'relationship-multi': relationshipMultiBadgeString, // Fallback for string rendering
     'relationship-collection': relationshipMultiBadgeString, // Fallback for string rendering
+    'reference-select': referenceSelect,
+    'reference-multi': referenceMulti,
   };
 
   /**
@@ -55,6 +59,11 @@ export class CellPipeline {
     
     // For relationship types, pass row data for pre-resolved values
     if (cellType?.startsWith('relationship')) {
+      return (renderer as any)(value, column, rowData);
+    }
+    
+    // For reference types, pass row data for option resolution
+    if (cellType?.startsWith('reference')) {
       return (renderer as any)(value, column, rowData);
     }
     

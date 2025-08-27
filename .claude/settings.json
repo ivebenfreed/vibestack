@@ -1,6 +1,31 @@
 {
   "permissions": {
-    "allow": ["*"]
+    "allow": [
+      "*"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/add-project-context.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/test-notification.sh"
+          }
+        ]
+      }
+    ]
   },
   "slashCommands": {
     "/status": {
@@ -23,27 +48,5 @@
       "description": "Show the session start context that's automatically added",
       "command": ".claude/commands/show-context.sh"
     }
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/add-project-context.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "clear",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/add-project-context.sh"
-          }
-        ]
-      }
-    ]
   }
 }

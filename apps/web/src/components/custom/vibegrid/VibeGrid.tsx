@@ -4,6 +4,7 @@ import { useActorRef, useSelector } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector';
 import { toast } from 'sonner';
+// import { useEntityRowChanges } from './hooks/use-entity-row-changes'; // Replaced by atomic bridge
 // InitializationRefs type moved inline since VibeGridXCore was removed
 type InitializationRefs = {
   rendererRef: React.MutableRefObject<any>;
@@ -30,8 +31,8 @@ import * as dexieDomains from '@/domain';
 // Import provider utilities
 import type { RelationshipOptionsProvider } from './types';
 import { createGenericRelationshipProvider } from './providers/generic-relationship-provider';
-// Entity type for VibeGrid
-type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment';
+// Entity type for VibeGrid - accepts any string since entities are dynamic per organization
+type VibeGridXEntityType = string;
 import { applyColumnDefaults } from './column-defaults';
 import { addRelationshipProvidersToColumns } from './providers/relationship-provider-factory';
 
@@ -48,6 +49,7 @@ interface VibeGridProps<T = any> {
   
   // Column configuration (required - no more auto-generation)
   columns: Column<T>[];  // Explicit columns with type checking
+  
   
   // Common options
   className?: string;
@@ -311,8 +313,63 @@ export function VibeGrid<T extends Record<string, any> = any>(
     return options;
   }, [machineConfig]);
   
+  // Always create the XState machine - it's the core of the architecture
   const tableActor = useActorRef(tableBaseMachine, tableActorOptions);
   const tableSend = tableActor.send;
+  
+  // OPTIMAL: Use atomic Legend State bridge for change detection
+  // This replaces useEntityRowChanges entirely with atomic observe() patterns
+  const atomicBridge = React.useRef<(() => void) | null>(null);
+  
+  React.useEffect(() => {
+    // Clean up previous bridge if it exists
+    if (atomicBridge.current) {
+      console.log('🔗 VibeGrid: Cleaning up previous atomic bridge for', entityType);
+      atomicBridge.current();
+      atomicBridge.current = null;
+    }
+    
+    // Dynamically import and setup new atomic bridge
+    const setupAtomicBridge = async () => {
+      try {
+        const bridge = await import('./stores/legend-state-atomic-bridge');
+        
+        console.log('🔗 VibeGrid: Setting up atomic bridge for', entityType);
+        
+        // Create atomic observer with proper event handling
+        const cleanup = bridge.createAtomicObservableBridge(entityType, (event) => {
+          console.log('🔄 VibeGrid: Atomic change detected via bridge', {
+            entityType,
+            eventType: event.type,
+            entityCount: event.entities?.length || 0,
+            source: event.source,
+            timestamp: Date.now()
+          });
+          
+          // Send atomic updates to table machine
+          tableSend(event);
+        });
+        
+        // Store cleanup function in ref
+        atomicBridge.current = cleanup;
+        
+        console.log('✅ VibeGrid: Atomic bridge active for', entityType);
+      } catch (error) {
+        console.error('❌ VibeGrid: Failed to setup atomic bridge:', error);
+      }
+    };
+    
+    setupAtomicBridge();
+    
+    // Cleanup on unmount or entityType change
+    return () => {
+      if (atomicBridge.current) {
+        console.log('🔗 VibeGrid: Cleaning up atomic bridge for', entityType);
+        atomicBridge.current();
+        atomicBridge.current = null;
+      }
+    };
+  }, [entityType, tableSend]);
   
   // The table machine handles persistence internally via persistSnapshot action
   // No need for duplicate persistence logic here
@@ -354,12 +411,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
         });
       }
       
-      const optionsWithContainer = {
-        ...pendingRendererOptionsRef.current,
-        container: node
-      };
-      
-      (window as any).__vibegrid_renderer_options = optionsWithContainer;
+      // Store container separately to avoid circular structure in XState events
+      (window as any).__vibegrid_renderer_container = node;
+      (window as any).__vibegrid_renderer_options = pendingRendererOptionsRef.current;
       
       if (process.env.NODE_ENV === 'development') {
         console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER synchronously:', {
@@ -370,7 +424,11 @@ export function VibeGrid<T extends Record<string, any> = any>(
       requestAnimationFrame(() => {
         tableSend({
           type: 'INITIALIZE_RENDERER',
-          options: optionsWithContainer
+          // Don't include container in event payload to prevent circular JSON structure
+          options: {
+            ...pendingRendererOptionsRef.current,
+            containerAvailable: true // Signal that container is available on window
+          }
         });
         
         rendererInitializedRef.current = true;
@@ -384,6 +442,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   useEffect(() => {
     return () => {
       delete (window as any).__vibegrid_renderer_options;
+      delete (window as any).__vibegrid_renderer_container;
       delete (window as any).__vibegrid_renderer_instance;
       
       // Cleanup store if exists
@@ -430,8 +489,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
     };
   }, [tableSend, tableActor]);
 
-  // Create public API
-  const vibeGridXApi = useVibeGridXApi(tableSend, null, tableActor, null);
+  // Create public API (only for non-Legend State mode)
+  const vibeGridXApi = tableActor ? useVibeGridXApi(tableSend, null, tableActor, null) : null;
   
   // Column visibility handlers
   const handleToggleColumn = useCallback((columnId: string) => {

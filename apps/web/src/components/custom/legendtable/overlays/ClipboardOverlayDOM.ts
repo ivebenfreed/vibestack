@@ -117,10 +117,17 @@ export class ClipboardOverlayDOM {
     console.log('ClipboardOverlayDOM: updateIndicator called', {
       hasClipboardState: !!clipboardState,
       hasViewport: !!viewport,
-      cellCount: clipboardState?.copiedCells.size || 0
+      cellCount: clipboardState?.copiedCells.size || 0,
+      hasCoordinateMapping: !!this.coordinateMapping
     });
     
     if (!clipboardState || !viewport || clipboardState.copiedCells.size === 0 || !this.coordinateMapping) {
+      console.log('ClipboardOverlayDOM: Early return - missing required data', {
+        hasClipboardState: !!clipboardState,
+        hasViewport: !!viewport,
+        cellCount: clipboardState?.copiedCells.size || 0,
+        hasCoordinateMapping: !!this.coordinateMapping
+      });
       this.clear();
       return;
     }
@@ -220,7 +227,19 @@ export class ClipboardOverlayDOM {
     copiedCells: Set<string>,
     viewport: ViewportInfo
   ): { minX: number; minY: number; width: number; height: number } | null {
-    if (!this.coordinateMapping) return null;
+    if (!this.coordinateMapping) {
+      console.warn('ClipboardOverlayDOM: No coordinate mapping available');
+      return null;
+    }
+    
+    console.log('ClipboardOverlayDOM: calculateBounds called', {
+      copiedCells: Array.from(copiedCells),
+      viewport,
+      coordinateMapping: {
+        rowCount: this.coordinateMapping.rows.length,
+        columnCount: this.coordinateMapping.columns.length
+      }
+    });
     
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let hasVisibleCells = false;
@@ -230,6 +249,14 @@ export class ClipboardOverlayDOM {
       
       const rowCoord = this.coordinateMapping.rows.find(r => r.rowId === rowId);
       const colCoord = this.coordinateMapping.columns.find(c => c.columnId === columnId);
+      
+      console.log('ClipboardOverlayDOM: Processing cell', {
+        cellKey,
+        rowId,
+        columnId,
+        rowCoord: rowCoord ? 'found' : 'not found',
+        colCoord: colCoord ? 'found' : 'not found'
+      });
       
       if (!rowCoord || !colCoord) continue;
       
@@ -241,12 +268,12 @@ export class ClipboardOverlayDOM {
         
         // Calculate position adjusted for viewport
         const viewportOffset = viewport.start * this.config.cellHeight;
-        const cellY = rowCoord.y - viewportOffset;
+        const cellY = rowCoord.offset - viewportOffset;
         
-        minX = Math.min(minX, colCoord.x);
+        minX = Math.min(minX, colCoord.offset);
         minY = Math.min(minY, cellY);
-        maxX = Math.max(maxX, colCoord.x + colCoord.width);
-        maxY = Math.max(maxY, cellY + rowCoord.height);
+        maxX = Math.max(maxX, colCoord.offset + colCoord.width);
+        maxY = Math.max(maxY, cellY + this.config.cellHeight);
       }
     }
     

@@ -7,7 +7,6 @@ import { CellPipeline } from './CellPipeline';
 import type { VirtualScrollManager } from '../managers/VirtualScrollManager';
 import type { ColumnManager } from '../managers/ColumnManager';
 import type { DOMSystem } from '../systems/DOMSystem';
-import type { SelectionManager } from '../managers/SelectionManager';
 
 // ====================================
 // CONSTANTS
@@ -29,7 +28,6 @@ const CSS_CLASSES = {
 export interface RowEngineConfig {
   virtualGrid: VirtualScrollManager;
   domManager: DOMSystem;
-  selectionManager: SelectionManager;
   rowHeight: number;
   enableSelectionColumn: boolean;
 }
@@ -77,17 +75,26 @@ export class RowEngine {
   renderVisibleRows(state: RenderState): RowRenderMetrics {
     const startTime = performance.now();
     
+    // Ensure virtual grid has current row count
+    this.config.virtualGrid.setRowCount(state.rows.length);
+    
     const visibleRange = this.config.virtualGrid.getVisibleRange();
     
-    const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
+    // If we have data but visible range is empty, recalculate with proper initial viewport
+    if (visibleRange.start === visibleRange.end && state.rows.length > 0) {
+      // Force a proper initial viewport calculation
+      const viewportHeight = this.config.domManager.getElement('viewport').clientHeight || 400;
+      const viewportWidth = this.config.domManager.getElement('viewport').clientWidth || 800;
+      
+      const initialViewport = this.config.virtualGrid.calculateViewportFromScroll(0, viewportHeight, viewportWidth, 0);
+      this.config.virtualGrid.updateViewport(initialViewport, state.rows.length);
+    }
+    
+    const updatedVisibleRange = this.config.virtualGrid.getVisibleRange();
+    const visibleRows = state.rows.slice(updatedVisibleRange.start, updatedVisibleRange.end);
     
     // Update virtual dimensions (in case row count changed)
     this.updateVirtualDimensions(state);
-    
-    // Fail fast if visible rows calculation is wrong
-    if (visibleRows.length === 0 && state.rows.length > 0) {
-      throw new Error('RowEngine: Virtual scrolling returned empty visible rows when data exists - check virtual grid configuration');
-    }
     
     const rowsToRender = visibleRows;
     
@@ -95,7 +102,7 @@ export class RowEngine {
     this.cleanupInvisibleRows(rowsToRender);
     
     // Render visible rows with batched DOM updates
-    const cellCount = this.renderRowsBatched(rowsToRender, visibleRange.start, state);
+    const cellCount = this.renderRowsBatched(rowsToRender, updatedVisibleRange.start, state);
     
     const renderTime = performance.now() - startTime;
     
@@ -370,7 +377,6 @@ export class RowEngine {
   
   private createSelectionCell(row: TableRow): HTMLElement {
     const cellKey = `${row.id}:__selection`;
-    const isRowSelected = this.config.selectionManager.isRowSelected(row.id);
     
     const cell = document.createElement('div');
     cell.className = 'vibegridx-cell vibegridx-selection-cell';
@@ -410,7 +416,7 @@ export class RowEngine {
     checkbox.type = 'checkbox';
     checkbox.className = 'vibegridx-row-checkbox';
     checkbox.setAttribute('data-row-id', row.id);
-    checkbox.checked = isRowSelected;
+    // Note: checkbox state will be managed by ReactiveSelectionOverlay
     
     const span = document.createElement('span');
     span.className = 'vibegridx-checkbox-custom';
@@ -465,14 +471,10 @@ export class RowEngine {
     cell.setAttribute('data-cell-key', cellKey);
     cell.setAttribute('role', 'gridcell');
     
-    // Apply state classes
-    const isSelected = this.config.selectionManager.isCellSelected(row.id, column.id);
-    const isEditing = this.config.selectionManager.isCellEditing(row.id, column.id);
+    // State classes will be managed by ReactiveSelectionOverlay
     // Support both flat objects (entities) and wrapped TableRow format
     const isDirty = row.metadata?.isDirty || false;
     
-    if (isSelected) cell.classList.add(CSS_CLASSES.SELECTED);
-    if (isEditing) cell.classList.add(CSS_CLASSES.EDITING);
     if (isDirty) cell.classList.add(CSS_CLASSES.DIRTY);
     
     // Style cell

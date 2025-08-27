@@ -11,6 +11,7 @@ export { enumValue } from './enum';
 export { relationship } from './relationship';
 export { relationshipSingle } from './relationship/single';
 export { relationshipMulti } from './relationship/multi';
+export { referenceSelect, referenceMulti } from './reference';
 export type { RelationshipData } from './relationship';
 
 // Re-export the renderer type for convenience
@@ -34,4 +35,6 @@ export const fastRenderers = {
   'relationship-single': () => import('./relationship').then(m => m.relationship),
   'relationship-multi': () => import('./relationship').then(m => m.relationship),
   'relationship-collection': () => import('./relationship').then(m => m.relationship),
+  'reference-select': () => import('./reference').then(m => m.referenceSelect),
+  'reference-multi': () => import('./reference').then(m => m.referenceMulti),
 };

@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+*This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.*
+
+## Current Configuration
+
+**Main staging branch with default ports:**
+
+- Web application: `http://localhost:5173`
+- Server API: `http://localhost:8787`
+- Database: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
+
 ## ✅ API Authentication Testing
 
 **Working curl commands for backend API testing:**
@@ -19,17 +29,6 @@ curl -X GET "http://localhost:8787/api/organizations" -b cookies.txt
 - Correct endpoint: `/api/auth/sign-in/email` (not `/sign-in`)
 - Proper JSON escaping in bash
 - Cookie authentication works for all protected endpoints
-
-## Current Configuration
-
-**This is the main staging branch with the following default ports:**
-
-- Web application: `http://localhost:5173`
-- Server API: `http://localhost:8787`
-- Database: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
-
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Development Server Management
 
@@ -148,22 +147,14 @@ Check if your databases are in sync:
 npx tsx scripts/verify-sync-status.ts
 ```
 
-### Database Ports
-
-- **Main/Staging**: Port 5432 (default)
-- **Worktree Issue #N**: Port = 5580 + (N % 100)
-  - Example: Issue #60 uses port 5640
 
 ## Development Standards
 
-### Linting and Type Checking
+### Type Checking
 
-We use a unified ESLint and TypeScript configuration for the entire monorepo:
+We use TypeScript with strict configuration for the entire monorepo:
 
-- **Lint**: `pnpm lint` - Runs ESLint with caching
-- **Fix lint issues**: `pnpm lint:fix` - Auto-fixes what it can
 - **Type check**: `pnpm type-check` - Runs TypeScript compiler in build mode
-- **Full check**: `pnpm check` - Runs both type checking and linting
 
 #### Focused Type Checking Scripts
 
@@ -191,13 +182,6 @@ These scripts are particularly useful when:
 pnpm type-check
 ```
 
-#### ESLint Rules
-- Catches real errors: unreachable code, duplicate cases, invalid types
-- Warns on code quality issues: console.log, debugger, var usage
-- Async/Promise rules enabled to catch floating promises
-- Server code allows console.log, client code doesn't
-- All generated code and config files are ignored
-
 #### TypeScript Configuration
 - Strict mode enabled with helpful checks
 - Base configuration in `tsconfig.base.json`
@@ -206,10 +190,9 @@ pnpm type-check
 - `noImplicitOverride` requires explicit override keyword
 
 ### Before Committing
-1. Run `pnpm check` to ensure no type or lint errors
+1. Run `pnpm type-check` to ensure no type errors
 2. Fix any issues before pushing
 3. Build artifacts and generated files are ignored
-4. Run essential baseline tests (see Testing section below)
 
 ## Browser Automation with MCP Playwright Tools
 
@@ -293,8 +276,8 @@ For CI/CD pipelines or automated test suites, test files are still used. **But f
 # Run all tests (headless by default, uses saved profile)
 ./scripts/playwright-test.sh
 
-# Run specific test  
-./scripts/playwright-test.sh tests/playwright/core/test-vibegantt-ready.spec.js
+# Run specific test file
+./scripts/playwright-test.sh tests/playwright/core/my-test.spec.js
 
 # Run with browser UI visible
 ./scripts/playwright-test.sh --headed
@@ -415,59 +398,25 @@ rm -rf .playwright/profiles/profile-main/
 # Profiles are automatically created per worktree
 ```
 
-## Running Dev Servers on Main/Staging Ports
 
-When testing merge-ready branches or working on the main/staging branch, use:
 
-```bash
-# Start dev server with default main/staging ports (5173, 8787, 5432)
-Bash(command="pnpm dev", run_in_background=true)
-```
 
-This bypasses the automatic issue number detection and uses the default ports:
-- Web: http://localhost:5173
-- Server: http://localhost:8787  
-- Database: postgres://localhost:5432/vibestack_dev
-- Proxy: Port 4444
+## Current Project Focus: Sync Simplification & Legend State
 
-## Staging Server Mocking for Merge Testing
+**Active Development Areas:**
+- **Sync Architecture Simplification**: Moving away from complex WAL-based sync to simpler notification-based approach
+- **Legend State Integration**: Implementing Legend State for reactive state management and sync
+- **UltraTable Improvements**: Enhanced table component with better performance and state management
+- **Testing Infrastructure**: Sophisticated test data seeding and multi-org simulation
 
-When testing merge-ready branches (like `issue-57-pure-merge`) that need to simulate production-like conditions, you can mock the staging server configuration:
+**Key Planning Documents:**
+- `planning/active/sync-simplification/` - Core architecture changes
+- `planning/active/testing-infrastructure/` - Test system improvements
 
-### Method 1: Using MAIN_MODE (Recommended)
-```bash
-# Start dev servers with staging ports and database
-MAIN_MODE=true ./scripts/tmux-bg.sh vibestack-dev-main "pnpm dev:local"
-
-# Or use the convenience script
-./scripts/dev-main.sh
-```
-
-This configuration:
-- Uses staging database: `postgres://localhost:5432/vibestack_dev`
-- Runs web app on staging port: `http://localhost:5173`  
-- Runs API server on staging port: `http://localhost:8787`
-- Avoids port conflicts with worktree environments
-
-### Method 2: Manual Environment Override
-```bash
-# Set explicit environment variables for staging-like testing  
-SERVER_PORT=8787 WEB_PORT=5173 DB_PORT=5432 Bash(command="pnpm dev", run_in_background=true)
-```
-
-### When to Use Staging Mocking
-- **Merge testing**: Before creating PRs, test with staging-like configuration
-- **Integration testing**: Verify features work with production database schema
-- **Performance testing**: Test against the same database used in staging
-- **Branch validation**: Confirm branches work outside worktree environments
-
-### Database Considerations
-The staging mock uses the main `vibestack_dev` database, so:
-- ✅ Same schema as production staging
-- ✅ Realistic data volumes for testing  
-- ⚠️ **Caution**: Changes affect the main development database
-- 💡 **Tip**: Use database migrations to test schema changes safely
-
+**Component Organization:**
+- **UltraTable**: Restructured from flat files to organized subfolder at `apps/web/src/components/tables/UltraTable/`
+  - Main components: `UltraTable.tsx`, `UltraTableCell.tsx`, `UltraTableEditor.tsx`, `UltraTableSelection.tsx`
+  - Utilities: `utils/clipboard.ts`, `state/selection-state.ts`, `hooks/use-ultra-table-selection.ts`
 
 ## Interaction Protocol Memorization
 
@@ -476,137 +425,6 @@ The staging mock uses the main `vibestack_dev` database, so:
 - Memorize the nuanced communication patterns in the VibeStack architecture
 - Pay special attention to WebSocket message structures and sync protocols
 
-## Worktree-Specific Rules
-
-### 🔐 First-Time Worktree Setup
-
-**IMPORTANT**: When setting up a new worktree, you MUST run the initial authentication setup:
-
-```bash
-# After creating worktree and installing dependencies
-npx playwright test tests/playwright/core/initial-auth-setup.spec.js
-```
-
-This creates a persistent browser profile with authentication. Without this, all other tests will fail!
-
-### Playwright Test Organization
-
-When working in a worktree for a specific issue:
-- **ALWAYS** create new test files in `tests/playwright/issue-{number}/` folder
-- **NEVER** modify tests in `tests/playwright/core/` unless fixing a bug
-- **PREFER** using existing test helpers from `core/db-test-helpers.js`
-- **USE** `core/test-template.spec.js` as a starting point for new tests
-
-Example for Issue #25:
-```bash
-# Good - issue-specific test
-tests/playwright/issue-25/feature-validation.spec.js
-
-# Bad - adding to core without good reason
-tests/playwright/core/my-feature-test.spec.js
-```
-
-The Playwright config automatically detects the issue number and only runs:
-- All tests in `core/`
-- Tests specific to the current issue folder
-
-### Worktree Merge Strategy
-
-**Problem**: Features work in worktree but break after merging due to conflicts, missing generated files, and configuration drift.
-
-**Solution**: Create clean branches instead of complex merges.
-
-#### Method 1: Clean Branch from Staging
-```bash
-# Instead of merging staging into worktree
-cd /main/repo
-git checkout staging && git pull
-git checkout -b issue-42-clean
-
-# Cherry-pick your commits
-git cherry-pick <commit1> <commit2>...
-# OR use range: git cherry-pick <first>^..<last>
-
-# Rebuild and run type checks
-pnpm build && pnpm type-check
-
-# Force push to replace messy branch
-git push --force-with-lease origin issue-42-clean:issue-42
-```
-
-#### Method 2: Rebase onto Staging
-```bash
-# In your worktree
-git fetch origin staging
-git rebase origin/staging
-
-# Resolve conflicts once, cleanly
-# This replays your commits on top of latest staging
-```
-
-#### Before Creating PR - Always Do:
-```bash
-# 1. Ensure clean build
-pnpm build && pnpm type-check
-
-# 2. Create migrations if entities changed
-pnpm migration:generate:server -- src/migrations/server/DescriptiveName
-git add src/migrations/ && git commit -m "feat: add migration"
-
-# 3. Check for hardcoded ports
-grep -r "558\|919\|584" apps/  # Look for worktree-specific ports
-
-# 4. Test clean build
-pnpm build && pnpm type-check
-```
-
-This avoids merge conflicts, stale files, and ensures features work after merge.
-
-## Worktree Cleanup Process
-
-When issues are completed and merged, clean up the associated resources to maintain a tidy development environment.
-
-### Manual Cleanup (Selective)
-Clean up specific completed issues:
-
-```bash
-# 1. Close the GitHub issue
-gh issue close 57 --comment "Completed: Description of what was accomplished"
-
-# 2. Stop any running background processes
-# Use KillBash tool in Claude Code
-
-# 3. Clean up Docker resources  
-./scripts/cleanup-pr-docker.sh 57
-
-# 4. Remove the worktree and branch
-git worktree remove --force worktrees/issue-57
-git branch -D issue-57
-```
-
-### Automated Cleanup (All worktrees)
-⚠️ **Caution**: This removes ALL worktrees except the main repository
-
-```bash
-# Clean up everything (worktrees, Docker, tmux, branches)
-./scripts/cleanup-all-worktrees.sh
-```
-
-### Best Practices
-- **Keep active issues**: Only clean up completed/merged issues
-- **Preserve issue-60**: Currently in progress, should not be cleaned
-- **Close GitHub issues first**: This maintains the paper trail
-- **Verify before cleanup**: Check `git worktree list` and active background processes
-
-### Current Active Worktrees
-After recent cleanup, only active issues remain:
-```bash
-git worktree list
-# /home/benfreed/vibestack                     [staging]
-# /home/benfreed/vibestack/worktrees/issue-60  [issue-60]
-```
-
-All completed issues (38, 53, 57) have been cleaned up.
 
 ## Test User Credentials
 

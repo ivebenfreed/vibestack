@@ -103,6 +103,13 @@ function DebugIndexPage() {
       path: '/debug/ultra-table',
       color: 'border-teal-500/20 hover:border-teal-500/30 bg-teal-500/5 dark:border-teal-400/20 dark:hover:border-teal-400/30 dark:bg-teal-400/5',
       badge: 'ULTRA TABLE'
+    },
+    {
+      title: '🏷️ System Options Test',
+      description: 'Test system options API and Legend State hooks. Display priority, status, and category reference data for all entity archetypes.',
+      path: '/debug/system-options',
+      color: 'border-emerald-500/20 hover:border-emerald-500/30 bg-emerald-500/5 dark:border-emerald-400/20 dark:hover:border-emerald-400/30 dark:bg-emerald-400/5',
+      badge: 'SYSTEM OPTIONS'
     }
   ]
 
@@ -145,6 +152,8 @@ function DebugIndexPage() {
                   ? 'bg-violet-500/10 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 border border-violet-500/20'
                   : page.badge === 'LEGEND STATE'
                   ? 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300 border border-cyan-500/20'
+                  : page.badge === 'SYSTEM OPTIONS'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 border border-emerald-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -169,6 +178,7 @@ function DebugIndexPage() {
                    : page.badge === 'OBSERVABLES' ? '⚡ Open Entity Operations'
                    : page.badge === 'LEGEND STATE' ? '🌟 Open Legend State Test'
                    : page.badge === 'ULTRA TABLE' ? '📋 Open UltraTable Test'
+                   : page.badge === 'SYSTEM OPTIONS' ? '🏷️ Open System Options Test'
                    : 'Open Tool'}
                 </Button>
               </Link>

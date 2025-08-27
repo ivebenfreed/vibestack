@@ -27,7 +27,7 @@ export function useTableViewport(
       const target = event.target as HTMLElement;
       if (!target) return;
       
-      const totalRows = tableState$.sortedData.get().length;
+      const totalRows = tableState$.processedData.get().sortedData.length;
       const currentViewport = tableState$.viewport.get();
       
       const newViewport: ViewportInfo = {
@@ -58,7 +58,7 @@ export function useTableViewport(
       if (!container) return;
       
       const rect = container.getBoundingClientRect();
-      const totalRows = tableState$.sortedData.get().length;
+      const totalRows = tableState$.processedData.get().sortedData.length;
       const currentViewport = tableState$.viewport.get();
       
       const newViewport: ViewportInfo = {
@@ -86,7 +86,7 @@ export function useTableViewport(
     
     // Initial viewport calculation
     const rect = container.getBoundingClientRect();
-    const totalRows = tableState$.sortedData.get().length;
+    const totalRows = tableState$.processedData.get().sortedData.length;
     
     if (rect.height > 0 && rect.width > 0) {
       const initialViewport: ViewportInfo = {
@@ -119,7 +119,7 @@ export function useTableViewport(
   // Update viewport when data changes (e.g., after filtering/sorting)
   useEffect(() => {
     const cleanup = observe(() => {
-      const totalRows = tableState$.sortedData.get().length;
+      const totalRows = tableState$.processedData.get().sortedData.length;
       const currentViewport = tableState$.viewport.get();
       
       // Ensure viewport doesn't exceed data bounds

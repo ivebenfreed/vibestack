@@ -5,7 +5,6 @@
 import type { Column, RenderState, SortConfig } from '../../types';
 import type { ColumnManager } from '../managers/ColumnManager';
 import type { DOMSystem } from '../systems/DOMSystem';
-import type { SelectionManager } from '../managers/SelectionManager';
 
 // ====================================
 // TYPES
@@ -13,7 +12,6 @@ import type { SelectionManager } from '../managers/SelectionManager';
 
 export interface HeaderEngineConfig {
   domManager: DOMSystem;
-  selectionManager: SelectionManager;
   enableSelectionColumn: boolean;
   getTotalColumnsWidth: () => number;
 }
@@ -242,9 +240,9 @@ export class HeaderEngine {
   }
   
   private createSelectionHeader(state: RenderState): void {
-    const selectedRows = this.config.selectionManager.getSelectedRows();
-    const allSelected = selectedRows.size === state.rows.length && state.rows.length > 0;
-    const someSelected = selectedRows.size > 0 && selectedRows.size < state.rows.length;
+    // Selection state will be managed by ReactiveSelectionOverlay
+    const allSelected = false; // Will be updated by reactive system
+    const someSelected = false;
     
     const selectionHeader = document.createElement('div');
     selectionHeader.className = 'vibegridx-header-cell vibegridx-selection-header';

@@ -447,6 +447,149 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
 );
 
 // =============================================================================
+// 2.5. SYSTEM OPTIONS ENDPOINTS - Reference field option management
+// =============================================================================
+
+// Get system options for a specific archetype and option type
+dataforgeRouter.get('/system-options/:optionType/:archetype',
+  async (c) => {
+    try {
+      const { optionType, archetype } = c.req.param();
+      
+      const { getKysely } = await import('../lib/kysely');
+      const kysely = getKysely(c.env);
+      
+      // Get system option set and options
+      const optionSet = await kysely
+        .selectFrom('system_option_sets')
+        .select([
+          'system_option_sets.id',
+          'system_option_sets.option_set_type',
+          'system_option_sets.archetype', 
+          'system_option_sets.name',
+          'system_option_sets.description',
+          'system_option_sets.is_active',
+          'system_option_sets.sort_order'
+        ])
+        .where('system_option_sets.option_set_type', '=', optionType)
+        .where('system_option_sets.archetype', '=', archetype)
+        .where('system_option_sets.is_active', '=', true)
+        .executeTakeFirst();
+      
+      if (!optionSet) {
+        return c.json({
+          success: false,
+          error: `No system options found for ${optionType} in ${archetype} archetype`
+        }, 404);
+      }
+      
+      // Get options for this set
+      const options = await kysely
+        .selectFrom('system_options')
+        .select([
+          'value', 'label', 'description', 'color', 'icon', 'is_active', 'sort_order', 'metadata'
+        ])
+        .where('option_set_id', '=', optionSet.id)
+        .where('is_active', '=', true)
+        .orderBy('sort_order', 'asc')
+        .execute();
+      
+      return c.json({
+        success: true,
+        optionSet: {
+          id: optionSet.id,
+          optionSetType: optionSet.option_set_type,
+          archetype: optionSet.archetype,
+          name: optionSet.name,
+          description: optionSet.description,
+          options: options,
+          isActive: optionSet.is_active,
+          sortOrder: optionSet.sort_order
+        }
+      });
+    } catch (error) {
+      console.error('[DataForge] Error getting system options:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to get system options'
+      }, 500);
+    }
+  }
+);
+
+// Get custom options for organization and option set
+dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
+  requirePermission('entities:read'),
+  async (c) => {
+    try {
+      const { orgId, optionSetName } = c.req.param();
+      const security = c.get('security');
+      
+      // Verify org access
+      if (orgId !== security.organizationId) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+      
+      const { getKysely } = await import('../lib/kysely');
+      const kysely = getKysely(c.env);
+      
+      // Get custom option set and options
+      const optionSet = await kysely
+        .selectFrom('custom_option_sets')
+        .select([
+          'custom_option_sets.id',
+          'custom_option_sets.option_set_type',
+          'custom_option_sets.name',
+          'custom_option_sets.description',
+          'custom_option_sets.is_active',
+          'custom_option_sets.sort_order'
+        ])
+        .where('custom_option_sets.org_id', '=', orgId)
+        .where('custom_option_sets.name', '=', optionSetName)
+        .where('custom_option_sets.is_active', '=', true)
+        .executeTakeFirst();
+      
+      if (!optionSet) {
+        return c.json({
+          success: false,
+          error: `No custom options found for ${optionSetName} in organization`
+        }, 404);
+      }
+      
+      // Get options for this set
+      const options = await kysely
+        .selectFrom('custom_options')
+        .select([
+          'value', 'label', 'description', 'color', 'icon', 'is_active', 'sort_order', 'metadata'
+        ])
+        .where('option_set_id', '=', optionSet.id)
+        .where('is_active', '=', true)
+        .orderBy('sort_order', 'asc')
+        .execute();
+      
+      return c.json({
+        success: true,
+        optionSet: {
+          id: optionSet.id,
+          optionSetType: optionSet.option_set_type,
+          name: optionSet.name,
+          description: optionSet.description,
+          options: options,
+          isActive: optionSet.is_active,
+          sortOrder: optionSet.sort_order
+        }
+      });
+    } catch (error) {
+      console.error('[DataForge] Error getting custom options:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to get custom options'
+      }, 500);
+    }
+  }
+);
+
+// =============================================================================
 // 3. DATA ENDPOINTS - CRUD operations on entity records
 // =============================================================================
 
@@ -1163,14 +1306,23 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     const security = c.get('security');
     const startTime = Date.now();
     
-    // 1. First try OrganizationActor cache
+    // Check if cache busting is requested
+    const bustCache = c.req.query('bustCache') === 'true';
+    console.log(`[Schema Cache] 🔍 bustCache parameter:`, bustCache);
+    if (bustCache) {
+      console.log(`[Schema Cache] 🚫 Cache busting requested - skipping cache lookup`);
+    }
+    
+    // 1. First try OrganizationActor cache (unless cache busting)
     try {
-      if (c.env.ORGANIZATION_ACTOR) {
+      if (c.env.ORGANIZATION_ACTOR && !bustCache) {
         const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
         const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
         
         // Try to get schema from cache
-        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema'));
+        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema', {
+          headers: { 'x-org-id': security.organizationId }
+        }));
         
         if (cacheResponse.ok) {
           const cacheResult = await cacheResponse.json();
@@ -1235,8 +1387,15 @@ dataforgeRouter.get('/orgs/:orgId/schema',
           })
         });
         
-        await orgActor.fetch(cacheRequest);
-        console.log(`[Schema Cache] 📦 CACHE POPULATED - stored fresh schema from PostgreSQL`);
+        const cacheWriteResponse = await orgActor.fetch(cacheRequest);
+        
+        if (cacheWriteResponse.ok) {
+          const cacheWriteResult = await cacheWriteResponse.json();
+          console.log(`[Schema Cache] ✅ Cache populated successfully:`, cacheWriteResult);
+        } else {
+          const errorText = await cacheWriteResponse.text();
+          console.log(`[Schema Cache] ❌ Cache population failed:`, cacheWriteResponse.status, errorText);
+        }
       }
     } catch (populateError) {
       console.warn('[Schema Cache] Failed to populate cache:', populateError);
@@ -1316,6 +1475,115 @@ dataforgeRouter.post('/orgs/:orgId/validate/:entityName',
 // Migration status endpoints removed - now using immediate execution
 // All table creation and schema registration happens immediately in entity creation endpoint
 // No debounced migrations needed with immediate execution architecture
+
+// Clear organization schema cache
+dataforgeRouter.delete('/orgs/:orgId/schema/cache', 
+  requirePermission('entities:write'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const startTime = Date.now();
+    
+    console.log(`[Schema Cache] 🗑️ CLEARING cache for org ${security.organizationId}`);
+    
+    try {
+      if (c.env.ORGANIZATION_ACTOR) {
+        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
+        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
+        
+        // Try to clear cache
+        const clearRequest = new Request('https://internal/clear-org-schema', {
+          method: 'DELETE',
+          headers: { 'x-org-id': security.organizationId }
+        });
+        
+        const clearResponse = await orgActor.fetch(clearRequest);
+        
+        if (clearResponse.ok) {
+          const result = await clearResponse.json();
+          console.log(`[Schema Cache] ✅ Cache cleared successfully (${Date.now() - startTime}ms)`);
+          
+          return c.json({
+            success: true,
+            message: 'Schema cache cleared successfully',
+            cleared: true,
+            responseTime: Date.now() - startTime
+          });
+        } else {
+          console.log(`[Schema Cache] ⚠️ Cache clear failed, but continuing (${Date.now() - startTime}ms)`);
+        }
+      }
+    } catch (cacheError) {
+      console.warn('[Schema Cache] Cache clear failed, but continuing:', cacheError);
+    }
+    
+    return c.json({
+      success: true,
+      message: 'Cache clear attempted',
+      cleared: false,
+      responseTime: Date.now() - startTime
+    });
+  } catch (error) {
+    console.error('Schema cache clear error:', error);
+    return c.json({ 
+      error: 'Failed to clear schema cache', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+// Test endpoint to bypass cache and test schema changes (temporary)
+dataforgeRouter.get('/orgs/:orgId/schema-direct', 
+  requirePermission('entities:read'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const startTime = Date.now();
+    
+    console.log(`[Schema Direct] 🧪 TESTING - bypassing cache completely`);
+    
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
+    const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
+    const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
+
+    const kysely = getKysely(c.env);
+    const rulesEngine = new JsonRulesEngine();
+    const schemaManager = new OrgSchemaManager();
+    const schemaGenerator = new RuntimeSchemaGenerator();
+
+    const entityManager = new ArchetypeEntityManager({
+      kysely,
+      rulesEngine,
+      schemaGenerator,
+      schemaManager,
+      env: c.env
+    });
+
+    const schema = await entityManager.getOrgSyncSchema(security.organizationId);
+    
+    if (!schema) {
+      return c.json({ error: `No schema found for org ${security.organizationId}` }, 404);
+    }
+    
+    console.log(`[Schema Direct] ✅ PostgreSQL direct response served (${Date.now() - startTime}ms)`);
+    
+    return c.json({
+      success: true,
+      schema: schema,
+      cached: false,
+      source: 'postgresql_direct_test',
+      responseTime: Date.now() - startTime
+    });
+  } catch (error) {
+    console.error('Schema direct fetch error:', error);
+    return c.json({ 
+      error: 'Failed to fetch schema directly from PostgreSQL', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
 
 // Health check
 dataforgeRouter.get('/health', async (c) => {

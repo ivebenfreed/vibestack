@@ -105,6 +105,7 @@ const LegendTableDebug = observer(() => {
             enableInlineEditing={true}
             enableVirtualScrolling={true}
             persistState={true}
+            useReactiveOverlays={false}
             onCellClick={(rowId, columnId) => {
               console.log(`Cell clicked: ${rowId}:${columnId}`);
             }}

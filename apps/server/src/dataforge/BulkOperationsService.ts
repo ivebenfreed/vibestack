@@ -55,37 +55,65 @@ export class BulkOperationsService {
     const results: Array<{ index: number; id: string; data: any }> = [];
     const errors: Array<{ index: number; errors: string[]; record: any }> = [];
 
-    // Process each record using existing saveEntityData method
-    for (let i = 0; i < records.length; i++) {
-      const record = records[i];
-      
-      try {
-        const result = await this.config.saveEntityData(orgId, entityName, record);
-        
-        if (result.success) {
-          results.push({ index: i, id: result.data?.id, data: result.data });
-        } else {
-          errors.push({ index: i, errors: result.errors || ['Unknown error'], record });
-          if (options.atomic) {
-            // If atomic mode and any record fails, return error immediately
-            return {
-              success: false,
-              created: [],
-              errors: errors,
-              summary: { total: records.length, created: 0, failed: errors.length }
-            };
+    // Get entity config to build proper bulk insert
+    const config = await this.config.getEntityConfig(orgId, entityName);
+    if (!config) {
+      return {
+        success: false,
+        created: [],
+        errors: [{ index: 0, errors: [`Entity ${entityName} not found for org ${orgId}`], record: {} }],
+        summary: { total: records.length, created: 0, failed: records.length }
+      };
+    }
+
+    try {
+      // Prepare records with required fields
+      const preparedRecords = records.map((record, index) => ({
+        ...record,
+        id: record.id || crypto.randomUUID(),
+        organization_id: orgId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      // Use Kysely bulk insert - MUCH FASTER!
+      const insertedRecords = await this.config.kysely
+        .insertInto(config.tableName as any)
+        .values(preparedRecords as any)
+        .returning(['id', 'created_at', 'updated_at'])
+        .execute();
+
+      // Build results from inserted records
+      for (let i = 0; i < insertedRecords.length; i++) {
+        results.push({
+          index: i,
+          id: insertedRecords[i].id,
+          data: {
+            ...preparedRecords[i],
+            ...insertedRecords[i]
           }
-        }
-      } catch (recordError) {
-        const errorMessage = recordError instanceof Error ? recordError.message : 'Unknown error';
-        errors.push({ index: i, errors: [errorMessage], record });
-        if (options.atomic) {
-          return {
-            success: false,
-            created: [],
-            errors: errors,
-            summary: { total: records.length, created: 0, failed: errors.length }
-          };
+        });
+      }
+    } catch (bulkError) {
+      // If bulk insert fails, fall back to individual inserts
+      console.warn('[BulkOperationsService] Bulk insert failed, falling back to individual inserts:', bulkError);
+      
+      for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        
+        try {
+          const result = await this.config.saveEntityData(orgId, entityName, record);
+          
+          if (result.success) {
+            results.push({ index: i, id: result.data?.id, data: result.data });
+          } else {
+            errors.push({ index: i, errors: result.errors || ['Unknown error'], record });
+            if (options.atomic) break;
+          }
+        } catch (recordError) {
+          const errorMessage = recordError instanceof Error ? recordError.message : 'Unknown error';
+          errors.push({ index: i, errors: [errorMessage], record });
+          if (options.atomic) break;
         }
       }
     }

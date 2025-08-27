@@ -8,7 +8,6 @@
 
 import { observable, syncState, when } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
-import { synced } from '@legendapp/state/sync'
 import { configureSynced } from '@legendapp/state/sync'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
@@ -175,8 +174,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // CREATE - Add new item with enhanced error context
     create: async (item: any) => {
       try {
-        // Optional: Validate before creating
-        if (schema?.validation !== false) {
+        // Optional: Validate before creating - disabled for now since validation endpoint doesn't exist
+        if (false && schema?.validation !== false) {
           try {
             await validateItem(orgId, entityName, item, 'create')
           } catch (validationError) {
@@ -237,8 +236,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // UPDATE - Modify existing item with enhanced error context
     update: async (item: any) => {
       try {
-        // Optional: Validate before updating
-        if (schema?.validation !== false) {
+        // Optional: Validate before updating - disabled for now since validation endpoint doesn't exist
+        if (false && schema?.validation !== false) {
           try {
             await validateItem(orgId, entityName, item, 'update')
           } catch (validationError) {
@@ -406,8 +405,10 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       const handler = (e: CustomEvent) => {
         const notification = e.detail
         
-        // DEBUG: Always log notifications to see what we're getting - FORCED HMR UPDATE
-        console.log(`[Observable] ${entityName} received notification (FORCED UPDATE):`, notification)
+        // Only log notifications in development for debugging
+        if (import.meta.env.DEV && notification.test) {
+          console.log(`[Observable] ${entityName} received test notification:`, notification)
+        }
         
         // Check if notification is for this entity
         // Handle both singular and plural table names (e.g., "task" vs "tasks")
@@ -416,26 +417,15 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         const entityPlural = entityLower + 's'
         
         const isRelevantNotification = notification?.tables?.some((tableName: string) => {
-          console.log(`[Observable] ${entityName} checking table "${tableName}" against patterns`)
-          
-          // Simple check: if notification table matches the lowercase plural of entity
-          // e.g., "Task" entity → check for "tasks" table
           const expectedTableName = entityName.toLowerCase() + 's'
-          
-          if (tableName === expectedTableName) {
-            console.log(`[Observable] ${entityName} MATCH: "${tableName}" === "${expectedTableName}"`)
-            return true
-          }
-          
-          console.log(`[Observable] ${entityName} NO MATCH: "${tableName}" !== "${expectedTableName}"`)
-          return false
+          return tableName === expectedTableName
         })
         
         if (isRelevantNotification) {
-          console.log(`[Observable] WebSocket notification MATCHED for ${entityName} - triggering refresh`)
+          if (import.meta.env.DEV) {
+            console.log(`[Observable] ${entityName} sync triggered by WebSocket`)
+          }
           refresh()
-        } else {
-          console.log(`[Observable] WebSocket notification NOT MATCHED for ${entityName}`)
         }
       }
       
@@ -455,7 +445,9 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       // Return cleanup function
       return () => {
         window.removeEventListener('vibestack:table-change-notification', handler as any)
-        console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+        if (import.meta.env.DEV) {
+          console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+        }
       }
     },
 
@@ -508,32 +500,22 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     const handler = (e: CustomEvent) => {
       const notification = e.detail
       
-      // DEBUG: Always log notifications to see what we're getting - FORCED HMR UPDATE
-      console.log(`[Observable] ${entityName} received notification (OVERRIDE):`, notification)
+      // Only log notifications in development for debugging
+      if (import.meta.env.DEV && notification.test) {
+        console.log(`[Observable] ${entityName} received test notification:`, notification)
+      }
       
       // Check if notification is for this entity
-      // Handle both singular and plural table names (e.g., "task" vs "tasks")
       const isRelevantNotification = notification?.tables?.some((tableName: string) => {
-        console.log(`[Observable] ${entityName} checking table "${tableName}" against patterns`)
-        
-        // Simple check: if notification table matches the lowercase plural of entity
-        // e.g., "Task" entity → check for "tasks" table
         const expectedTableName = entityName.toLowerCase() + 's'
-        
-        if (tableName === expectedTableName) {
-          console.log(`[Observable] ${entityName} MATCH: "${tableName}" === "${expectedTableName}"`)
-          return true
-        }
-        
-        console.log(`[Observable] ${entityName} NO MATCH: "${tableName}" !== "${expectedTableName}"`)
-        return false
+        return tableName === expectedTableName
       })
       
       if (isRelevantNotification) {
-        console.log(`[Observable] WebSocket notification MATCHED for ${entityName} - triggering refresh`)
+        if (import.meta.env.DEV) {
+          console.log(`[Observable] ${entityName} sync triggered by WebSocket`)
+        }
         refresh()
-      } else {
-        console.log(`[Observable] WebSocket notification NOT MATCHED for ${entityName}`)
       }
     }
     
@@ -545,15 +527,21 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // Return cleanup function
     return () => {
       window.removeEventListener('vibestack:table-change-notification', handler as any)
-      console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+      if (import.meta.env.DEV) {
+        console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+      }
     }
   }
   
   const syncedCrudFn = syncedCrudWithPersistence || syncedCrud
   
-  console.log(`[Observable] Creating syncedCrud for ${entityName} with WebSocket sync loop prevention`)
+  if (import.meta.env.DEV) {
+    console.log(`[Observable] Creating syncedCrud for ${entityName}`)
+  }
   
-  return syncedCrudFn(crudConfig)
+  // CRITICAL FIX: syncedCrud must be wrapped in observable() to create proper observable with .get()/.set() methods
+  // The correct pattern is: observable(syncedCrud(config))
+  return observable(syncedCrudFn(crudConfig))
 }
 
 /**
@@ -644,11 +632,28 @@ export async function loadOrgContext(orgId: string, userId: string) {
       error: null,
     })
     
-    // Note: Entity observables are created lazily by getEntity$ function
-    // We don't pre-create them here to avoid proxy assignment issues
-    
+    // Pre-initialize commonly used entities to avoid race conditions with table components
+    // This triggers the lazy getters in a controlled way after schema is loaded
     const entityCount = entities && typeof entities === 'object' ? Object.keys(entities).length : 0
     console.log(`[Observable] Org context loaded with ${entityCount} entities`)
+    
+    // Pre-initialize common entities by accessing them (triggers lazy creation)
+    if (entities && typeof entities === 'object') {
+      const commonEntities = ['Task', 'Project', 'Client', 'Invoice'] // Most commonly used entities
+      commonEntities.forEach(entityName => {
+        if (entities[entityName]) {
+          try {
+            // Access the entity to trigger lazy getter initialization
+            const entityObs = entities[entityName]
+            if (entityObs) {
+              console.log(`[Observable] Pre-initialized ${entityName} entity observable`)
+            }
+          } catch (error) {
+            console.warn(`[Observable] Could not pre-initialize ${entityName}:`, error)
+          }
+        }
+      })
+    }
     
   } catch (error) {
     console.error('[Observable] Failed to load org context:', error)
@@ -739,33 +744,50 @@ export const entities$ = observable(() => {
 /**
  * Get a specific entity observable - automatically updates when schema changes
  * Returns the actual syncedCrud observable, not wrapped data
- * Directly accesses entities$ which is already reactive
+ * Always triggers lazy getter to ensure we get the observable, not the getter function
  */
 export function getEntity$(entityName: string) {
   try {
-    const allEntities = entities$.get()
-    if (!allEntities || typeof allEntities !== 'object') {
-      console.warn(`[Observable] No entities loaded yet`)
+    // Check if we have org context and schema first
+    const currentOrgId = orgContext$.orgId.peek()
+    const currentSchema = orgContext$.schema.peek()
+    
+    if (!currentOrgId || !currentSchema?.entities?.[entityName]) {
+      console.warn(`[Observable] Entity ${entityName} not available - missing context or schema`)
       return null
     }
     
-    // Access the entity to trigger lazy getter (this creates the observable)
-    const entityObs = allEntities[entityName]
+    // Use global cache directly for more reliable access
+    const cacheKey = `${currentOrgId}:${entityName}`
     
-    if (!entityObs) {
-      // Check if entity exists in schema but getter failed
-      const currentContext = orgContext$.peek()
-      const entityExists = currentContext.schema?.entities?.[entityName]
+    // Check if we already have the observable cached
+    if (globalEntityCache[cacheKey]) {
+      console.log(`[Observable] Retrieved cached ${entityName} observable`)
+      return globalEntityCache[cacheKey]
+    }
+    
+    // Create the observable directly if not cached
+    try {
+      console.log(`[Observable] Creating new observable for ${entityName}`)
+      const observable = createEntityObservable(currentOrgId, entityName, currentSchema.entities[entityName])
+      globalEntityCache[cacheKey] = observable
       
-      if (entityExists) {
-        console.debug(`[Observable] Entity ${entityName} accessed before lazy getter triggered - will be created on retry`)
-      } else {
-        console.warn(`[Observable] Entity ${entityName} not found in schema`)
-      }
+      // DEBUG: Check what we created
+      console.log(`[Observable] Created ${entityName} observable`, {
+        type: typeof observable,
+        isFunction: typeof observable === 'function',
+        hasGet: typeof observable?.get === 'function',
+        hasPeek: typeof observable?.peek === 'function',
+        hasSet: typeof observable?.set === 'function',
+        hasAssign: typeof observable?.assign === 'function',
+        constructor: observable?.constructor?.name
+      })
+      
+      return observable
+    } catch (createError) {
+      console.error(`[Observable] Error creating observable for ${entityName}:`, createError)
       return null
     }
-    
-    return entityObs
   } catch (error) {
     console.error(`[Observable] Error getting entity observable for ${entityName}:`, error)
     return null
@@ -997,15 +1019,23 @@ export const entityOperations = {
         throw new Error(`Entity ${entityName} not found`)
       }
 
-      // Pre-validate if requested
-      if (options.validate !== false) {
+      // Pre-validate if requested - disabled for now since validation endpoint doesn't exist
+      if (false && options.validate !== false) {
         const orgId = orgContext$.orgId.peek()
         if (orgId) {
           await validateItem(orgId, entityName, data, 'create')
         }
       }
 
-      const result = await entity$.create(data)
+      // According to Legend State docs, for list-based syncedCrud, create by setting with generated ID
+      // Generate a temporary ID (will be replaced by server response)
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      // Set the new record - Legend State will automatically sync to server
+      entity$[tempId].set(data)
+      
+      // Get the result (may have temporary ID initially)
+      const result = entity$[tempId].get()
       
       // Emit success event for UI feedback
       window.dispatchEvent(new CustomEvent('vibestack:entity-created', {
@@ -1023,38 +1053,55 @@ export const entityOperations = {
   },
 
   /**
-   * Safe entity update with optimistic updates
+   * Update entity observable directly - let syncedCrud handle server sync automatically
+   * This is the correct Legend State pattern: UI → Observable → syncedCrud → Server
    */
   async updateEntity(entityName: string, id: string, data: any, options: { validate?: boolean } = {}) {
     try {
+      console.log(`[Observable] Direct observable update for ${entityName}:${id}`, data)
+      
+      // Get the entity observable (this is the syncedCrud observable)
       const entity$ = getEntity$(entityName)
       if (!entity$) {
-        throw new Error(`Entity ${entityName} not found`)
+        throw new Error(`Entity ${entityName} observable not found`)
       }
-
-      const fullData = { ...data, id }
-
-      // Pre-validate if requested
-      if (options.validate !== false) {
-        const orgId = orgContext$.orgId.peek()
-        if (orgId) {
-          await validateItem(orgId, entityName, fullData, 'update')
-        }
+      
+      console.log(`[Observable] Found entity record ${entityName}:${id}, updating fields:`, Object.keys(data))
+      
+      // CORRECT PATTERN: For syncedCrud with list operations, access the record directly
+      // entity$[id] gives us the observable for that specific record
+      // entity$[id].fieldName.set(value) or entity$[id].assign({...updates})
+      
+      // FIXED: Use syncedCrud's update function directly
+      // syncedCrud observables provide CRUD operations: list, create, update, delete
+      // Don't access individual record observables, use the built-in update function
+      console.log(`[Observable] Using syncedCrud update for ${entityName}:${id}:`, data)
+      
+      // Get current data from the observable
+      const allRecords = entity$.get()
+      const currentRecord = allRecords?.[id]
+      
+      if (!currentRecord || typeof currentRecord !== 'object') {
+        throw new Error(`Record ${id} not found in ${entityName}`)
       }
-
-      const result = await entity$.update(fullData)
       
-      // Emit success event for UI feedback
-      window.dispatchEvent(new CustomEvent('vibestack:entity-updated', {
-        detail: { entityName, id, data: result }
-      }))
+      // Create updated record by merging current data with updates  
+      const updatedRecord = { ...currentRecord, ...data, updated_at: new Date().toISOString() }
+      console.log(`[Observable] Merged record data:`, updatedRecord)
       
-      return result
+      // CORRECT syncedCrud pattern: update the record in the observable data
+      // This will trigger the update function defined in the syncedCrud config and sync to server
+      const newRecords = { ...allRecords, [id]: updatedRecord }
+      entity$.set(newRecords)
+      
+      console.log(`✅ [Observable] Observable update completed for ${entityName}:${id}`)
+      // syncedCrud will automatically handle the server sync in the background
+      
+      // Return the updated record that was already merged above
+      return updatedRecord
+      
     } catch (error) {
-      // Emit error event for UI feedback
-      window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
-        detail: { entityName, operation: 'update', id, error: error.message }
-      }))
+      console.error(`❌ [Observable] Update failed for ${entityName}:${id}`, { error: error.message, data })
       throw error
     }
   },
@@ -1069,14 +1116,65 @@ export const entityOperations = {
         throw new Error(`Entity ${entityName} not found`)
       }
 
-      const result = await entity$.delete({ id })
+      // According to Legend State docs, for list-based syncedCrud:
+      // Delete by removing the record from the observable Record<string, T>
+      // This will trigger the delete function in syncedCrud
+      const currentRecords = entity$.get()
+      const recordToDelete = currentRecords[id]
+      
+      if (!recordToDelete) {
+        throw new Error(`Record with id ${id} not found in entity ${entityName}`)
+      }
+      
+      // Use the same approach as update - call syncedCrud delete function directly
+      try {
+        // Get the internal sync configuration and call delete function
+        const syncConfig = (entity$ as any)[Symbol.for('LegendState_syncedCrud')]
+        if (syncConfig && syncConfig.delete) {
+          const deleteResult = await syncConfig.delete(recordToDelete, { id })
+          console.log(`[Observable] Direct delete result:`, deleteResult)
+          return { success: true }
+        } else {
+          throw new Error('syncedCrud delete function not accessible')
+        }
+      } catch (directDeleteError) {
+        console.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
+        
+        // Fallback: trigger a manual server delete (bypass Legend State sync)
+        const orgId = orgContext$.orgId.peek()
+        if (!orgId) {
+          throw new Error('No organization context available')
+        }
+        
+        const baseUrl = `/api/dataforge/orgs/${orgId}/data/${entityName}`
+        const response = await fetch(`${baseUrl}/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Accept': 'application/json',
+          },
+          credentials: 'include'
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(`Server delete failed: ${errorData.message || response.status}`)
+        }
+        
+        // Manually trigger a refresh to get updated data
+        console.log(`[Observable] Manual server delete successful, triggering refresh`)
+        if (typeof (entity$ as any).refresh === 'function') {
+          (entity$ as any).refresh()
+        }
+        
+        return { success: true }
+      }
       
       // Emit success event for UI feedback
       window.dispatchEvent(new CustomEvent('vibestack:entity-deleted', {
         detail: { entityName, id }
       }))
       
-      return result
+      return { success: true }
     } catch (error) {
       // Emit error event for UI feedback
       window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
