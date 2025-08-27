@@ -14,6 +14,7 @@ export {
   handleTableNotification,
   removeEntityFromSchema,
   entityGroups$,
+  isLoading$,
   // Enhanced mutation utilities
   batchOperations,
   entityOperations,

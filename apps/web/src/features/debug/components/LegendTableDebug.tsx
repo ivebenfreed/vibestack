@@ -16,7 +16,10 @@ const LegendTableDebug = observer(() => {
                      entityType === 'task' ? 'Task' :
                      entityType === 'project' ? 'Project' : null;
   
-  const entityObs = entityName ? getEntity$(entityName) : null;
+  // Always call getEntity$ with a consistent parameter to avoid hooks order issues
+  const entityObs = useMemo(() => {
+    return entityName ? getEntity$(entityName) : null;
+  }, [entityName]);
   
   // Generate columns based on entity type - now using clients-specific columns
   const columns = useMemo(() => {
