@@ -201,12 +201,22 @@ export const auth = betterAuth({
 
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
-export function initializeAuth(env: Env) {
+export function initializeAuth(env: Env, request?: Request) {
   // Import our centralized Kysely configuration
   const { getKysely } = require('./kysely');
   
-  // Get configured Kysely instance
-  const kyselyInstance = getKysely(env);
+  // Get configured Kysely instance or KV-intercepted version
+  let kyselyInstance;
+  
+  if (env.USE_KV_SESSIONS && env.SESSIONS) {
+    // Use KV interceptor for session storage
+    const { createKVSessionInterceptor } = require('./kv-session-adapter');
+    kyselyInstance = createKVSessionInterceptor(env);
+    dbLogger.info('Using KV storage for sessions', {}, 'auth');
+  } else {
+    kyselyInstance = getKysely(env);
+    dbLogger.info('Using PostgreSQL for sessions', {}, 'auth');
+  }
 
   const trustedOrigins = getAllowedOrigins(env);
   
@@ -214,7 +224,9 @@ export function initializeAuth(env: Env) {
     databaseUrlType: typeof env.DATABASE_URL,
     secretType: typeof env.BETTER_AUTH_SECRET,
     trustedOrigins: trustedOrigins,
-    organizationPlugin: 'disabled - using custom system'
+    organizationPlugin: 'disabled - using custom system',
+    sessionStorage: env.SESSIONS ? 'Cloudflare KV (via better-auth-cloudflare)' : 'PostgreSQL',
+    kvNamespaceBound: !!env.SESSIONS
   }, 'auth');
 
   // Better Auth baseURL should be the server base, not including /api/auth path
@@ -227,7 +239,7 @@ export function initializeAuth(env: Env) {
       : "https://app.codevibesmatter.com";
   
   const runtimeAuthConfig = {
-    // Pass the pre-configured Kysely instance and type
+    // Database configuration (PostgreSQL via Kysely)
     database: {
       db: kyselyInstance,
       type: "postgres" as const

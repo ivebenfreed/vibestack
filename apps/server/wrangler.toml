@@ -25,6 +25,7 @@ ENVIRONMENT = "development"
 BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
 BETTER_AUTH_URL = "http://localhost:5173"
 RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
+USE_KV_SESSIONS = true
 
 # Module aliases (correct syntax)
 [alias]
@@ -87,6 +88,11 @@ binding = "CLIENT_REGISTRY"
 id = "a794cee3a313416993643848fc738281"
 preview_id = "a794cee3a313416993643848fc738281"
 
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "b35f1142406543d79f9445f1af5c6abc"
+preview_id = "b35f1142406543d79f9445f1af5c6abc"
+
 # Staging environment
 [env.staging]
 name = "vibestack-server-staging"
@@ -132,6 +138,10 @@ simple = { limit = 3, period = 3600 }
 binding = "CLIENT_REGISTRY"
 id = "a794cee3a313416993643848fc738281"
 
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "b35f1142406543d79f9445f1af5c6abc"
+
 # Production environment
 [env.production]
 name = "vibestack-server-production"
@@ -173,3 +183,7 @@ simple = { limit = 3, period = 3600 }
 [[env.production.kv_namespaces]]
 binding = "CLIENT_REGISTRY"
 id = "a794cee3a313416993643848fc738281"
+
+[[env.production.kv_namespaces]]
+binding = "SESSIONS"
+id = "b35f1142406543d79f9445f1af5c6abc"

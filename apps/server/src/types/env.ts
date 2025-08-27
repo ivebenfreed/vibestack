@@ -34,6 +34,7 @@ export interface Env {
   // Auth variables
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
+  USE_KV_SESSIONS?: boolean;  // Feature flag for KV session storage
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   RESEND_API_KEY: string;
@@ -54,6 +55,7 @@ export interface Env {
   
   // KV namespace bindings (from wrangler.toml)
   CLIENT_REGISTRY: KVNamespace;
+  SESSIONS: KVNamespace;
 
   // Rate limiting bindings (from wrangler.toml)
   auth_rate_limit?: {

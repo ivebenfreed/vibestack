@@ -148,8 +148,12 @@ export const selectOrganizationActor = fromPromise(async ({ input }: { input: { 
   console.log('[OrganizationActors] Selecting organization:', input.organizationId);
   
   try {
+    // Call switch endpoint to persist the selection
+    await organizationAPI.switchOrganization(input.organizationId);
+    
+    // Then get the full organization details
     const organization = await organizationAPI.getOrganization(input.organizationId);
-    console.log('[OrganizationActors] Selected organization:', organization);
+    console.log('[OrganizationActors] Selected and persisted organization:', organization);
     
     return {
       success: true,

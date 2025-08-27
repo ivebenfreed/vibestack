@@ -238,11 +238,15 @@ export const signInActor = fromPromise(async ({ input }: {
       new Date(session.data.session.expiresAt).toISOString() : 
       null;
     
-    console.log('[signInActor] Returning success result with user data');
+    // Extract organization data from session if available
+    const organization = (session.data.session as any)?.organization || null;
+    
+    console.log('[signInActor] Returning success result with user data and organization:', organization?.name || 'No org');
     return {
       user,
       authToken,
       sessionExpiry,
+      organization, // Include organization from session
     };
   } catch (error) {
     console.error('[signInActor] Unexpected error during sign-in:', error);
