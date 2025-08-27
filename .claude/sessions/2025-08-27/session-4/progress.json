@@ -1,8 +1,8 @@
 {
   "session_start": "2025-08-27T18:51:07-04:00",
-  "total_tasks": 12,
-  "completed_tasks": 8,
-  "in_progress": 3,
+  "total_tasks": 8,
+  "completed_tasks": 6,
+  "in_progress": 2,
   "tools_used": {},
   "files_touched": []
 }

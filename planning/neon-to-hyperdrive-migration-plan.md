@@ -314,31 +314,118 @@ export function getKysely(env: Env): Kysely<Database> {
 ```
 
 #### 3.2 Update Direct Client Usage
+
+**Option A: Migrate to postgres.js for consistency**
 ```typescript
 // apps/server/src/lib/db.ts
-import { Client } from 'pg';
+import postgres from 'postgres';
+import { Client as NeonClient, neonConfig } from '@neondatabase/serverless';
+import type { Env } from '../types/env';
+
+// Create postgres.js client with Hyperdrive
+export const getPostgresClient = (c: AppContext | MinimalContext | { env: Env }) => {
+  const env = 'env' in c ? c.env : undefined;
+  
+  if (env?.HYPERDRIVE_DB) {
+    return postgres(env.HYPERDRIVE_DB.connectionString, {
+      max: 5,
+      fetch_types: false,
+      prepare: true,
+      idle_timeout: 0,
+    });
+  }
+  
+  // Fallback to Neon for raw SQL operations
+  const url = env?.DATABASE_URL;
+  if (!url) {
+    throw new Error('No database connection available');
+  }
+  
+  // Return postgres.js client with Neon URL for consistency
+  return postgres(url, {
+    max: 5,
+    prepare: true,
+  });
+};
+
+// Wrapper for backwards compatibility
+export const sql = async <T extends QueryResultRow = QueryResultRow>(
+  c: AppContext | MinimalContext,
+  query: string,
+  params: any[] = []
+): Promise<T[]> => {
+  const client = getPostgresClient(c);
+  try {
+    const result = await client.unsafe(query, params);
+    return result as T[];
+  } catch (error) {
+    console.error('SQL query error:', error);
+    throw error;
+  }
+};
+```
+
+**Option B: Keep hybrid approach with both drivers**
+```typescript
+// apps/server/src/lib/db.ts
+import postgres from 'postgres';
 import { Client as NeonClient, neonConfig } from '@neondatabase/serverless';
 import type { Env } from '../types/env';
 
 export const getDBClient = (c: AppContext | MinimalContext | { env: Env }) => {
   const env = 'env' in c ? c.env : undefined;
   
-  // Use Hyperdrive if available
+  // Use postgres.js with Hyperdrive if available
   if (env?.HYPERDRIVE_DB) {
-    return new Client({
-      connectionString: env.HYPERDRIVE_DB.connectionString,
-    });
+    return {
+      type: 'postgres-js',
+      client: postgres(env.HYPERDRIVE_DB.connectionString, {
+        max: 5,
+        fetch_types: false,
+        prepare: true,
+      }),
+    };
   }
   
-  // Fallback to Neon
+  // Fallback to existing Neon setup
   const url = env?.DATABASE_URL;
   if (!url) {
     throw new Error('No database connection available');
   }
   
   // ... existing Neon configuration ...
-  return new NeonClient({ connectionString: url });
+  return {
+    type: 'neon',
+    client: new NeonClient({ connectionString: url }),
+  };
 };
+
+export async function sql<T extends QueryResultRow = QueryResultRow>(
+  c: AppContext | MinimalContext,
+  query: string,
+  params: any[] = []
+): Promise<T[]> {
+  const dbConnection = getDBClient(c);
+  
+  if (dbConnection.type === 'postgres-js') {
+    const result = await dbConnection.client.unsafe(query, params);
+    return result as T[];
+  } else {
+    // Existing Neon logic
+    const client = dbConnection.client;
+    try {
+      await client.connect();
+      const result = await client.query<T>(query, params);
+      return result.rows;
+    } finally {
+      try {
+        await client.end();
+      } catch (err) {
+        console.error('Error closing connection:', err);
+      }
+    }
+  }
+}
 ```
 
 ### Phase 4: Testing Strategy
@@ -390,7 +477,15 @@ export const getDBClient = (c: AppContext | MinimalContext | { env: Env }) => {
 - Document local development setup
 - Update deployment guides
 
-## Configuration Changes Summary
+## Updated Configuration Changes Summary
+
+### Driver Decision: postgres.js
+**Selected postgres.js over node-postgres (pg) for:**
+- Better performance with automatic prepared statements
+- Smaller bundle size for Cloudflare Workers
+- Native serverless environment support
+- Existing `kysely-postgres-js` dialect available
+- Optimal for Hyperdrive integration
 
 ### Environment Variables
 - Remove: `DATABASE_URL` (after full migration)
@@ -402,8 +497,8 @@ export const getDBClient = (c: AppContext | MinimalContext | { env: Env }) => {
 // Add to apps/server/package.json
 {
   "dependencies": {
-    "pg": "^8.16.3",
-    "kysely-hyperdrive": "workspace:*"
+    "postgres": "^3.4.5",
+    "kysely-postgres-js": "^2.0.0"
   }
 }
 

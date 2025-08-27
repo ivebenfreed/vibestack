@@ -81,6 +81,12 @@ simple = { limit = 100, period = 60 } # 100 requests per minute for API endpoint
 name = "signup_rate_limit"
 simple = { limit = 3, period = 3600 } # 3 signups per hour per IP
 
+# Hyperdrive configuration for PostgreSQL connection pooling
+[[hyperdrive]]
+binding = "HYPERDRIVE_DB"
+id = "placeholder-hyperdrive-id"
+localConnectionString = "postgres://postgres:postgres@localhost:5432/vibestack_dev"
+
 # KV namespace configuration
 # Development uses a local namespace
 [[kv_namespaces]]
