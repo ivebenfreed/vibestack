@@ -46,8 +46,11 @@ import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_a
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
+import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
+import { Route as AuthenticatedDebugLegendTableRouteImport } from './routes/_authenticated/debug/legend-table'
+import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
 import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
 
@@ -312,6 +315,12 @@ const AuthenticatedDebugVibegridLegendStateRoute =
     path: '/vibegrid-legend-state',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugSystemOptionsRoute =
+  AuthenticatedDebugSystemOptionsRouteImport.update({
+    id: '/system-options',
+    path: '/system-options',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugStateMachineTestRoute =
   AuthenticatedDebugStateMachineTestRouteImport.update({
     id: '/state-machine-test',
@@ -322,6 +331,18 @@ const AuthenticatedDebugReactflowPositioningRoute =
   AuthenticatedDebugReactflowPositioningRouteImport.update({
     id: '/reactflow-positioning',
     path: '/reactflow-positioning',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLegendTableRoute =
+  AuthenticatedDebugLegendTableRouteImport.update({
+    id: '/legend-table',
+    path: '/legend-table',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLegendStateTestRoute =
+  AuthenticatedDebugLegendStateTestRouteImport.update({
+    id: '/legend-state-test',
+    path: '/legend-state-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 const AuthenticatedDebugEntityRoutesTestRoute =
@@ -358,8 +379,11 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
+  '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
+  '/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -402,8 +426,11 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
+  '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
+  '/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -450,8 +477,11 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
+  '/_authenticated/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
+  '/_authenticated/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -498,8 +528,11 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/debug/entity-routes-test'
+    | '/debug/legend-state-test'
+    | '/debug/legend-table'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
     | '/entities/$entityName'
     | '/settings/account'
@@ -542,8 +575,11 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/debug/entity-routes-test'
+    | '/debug/legend-state-test'
+    | '/debug/legend-table'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
     | '/entities/$entityName'
     | '/settings/account'
@@ -589,8 +625,11 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/_authenticated/debug/entity-routes-test'
+    | '/_authenticated/debug/legend-state-test'
+    | '/_authenticated/debug/legend-table'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
+    | '/_authenticated/debug/system-options'
     | '/_authenticated/debug/vibegrid-legend-state'
     | '/_authenticated/entities/$entityName'
     | '/_authenticated/settings/account'
@@ -924,6 +963,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugVibegridLegendStateRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/system-options': {
+      id: '/_authenticated/debug/system-options'
+      path: '/system-options'
+      fullPath: '/debug/system-options'
+      preLoaderRoute: typeof AuthenticatedDebugSystemOptionsRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/state-machine-test': {
       id: '/_authenticated/debug/state-machine-test'
       path: '/state-machine-test'
@@ -936,6 +982,20 @@ declare module '@tanstack/react-router' {
       path: '/reactflow-positioning'
       fullPath: '/debug/reactflow-positioning'
       preLoaderRoute: typeof AuthenticatedDebugReactflowPositioningRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-table': {
+      id: '/_authenticated/debug/legend-table'
+      path: '/legend-table'
+      fullPath: '/debug/legend-table'
+      preLoaderRoute: typeof AuthenticatedDebugLegendTableRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-state-test': {
+      id: '/_authenticated/debug/legend-state-test'
+      path: '/legend-state-test'
+      fullPath: '/debug/legend-state-test'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStateTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
     '/_authenticated/debug/entity-routes-test': {
@@ -957,8 +1017,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugEntityRoutesTestRoute: typeof AuthenticatedDebugEntityRoutesTestRoute
+  AuthenticatedDebugLegendStateTestRoute: typeof AuthenticatedDebugLegendStateTestRoute
+  AuthenticatedDebugLegendTableRoute: typeof AuthenticatedDebugLegendTableRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
+  AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
   AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
@@ -973,10 +1036,14 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
   {
     AuthenticatedDebugEntityRoutesTestRoute:
       AuthenticatedDebugEntityRoutesTestRoute,
+    AuthenticatedDebugLegendStateTestRoute:
+      AuthenticatedDebugLegendStateTestRoute,
+    AuthenticatedDebugLegendTableRoute: AuthenticatedDebugLegendTableRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
+    AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,
     AuthenticatedDebugVibegridLegendStateRoute:
       AuthenticatedDebugVibegridLegendStateRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
