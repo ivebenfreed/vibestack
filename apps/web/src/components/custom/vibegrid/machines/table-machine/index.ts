@@ -20,6 +20,7 @@ import { editHandlers } from './event-handlers/edit-handlers';
 import { dragHandlers } from './event-handlers/drag-handlers';
 import { fillHandlers } from './event-handlers/fill-handlers';
 import { clipboardHandlers } from './event-handlers/clipboard-handlers';
+import { contextMenuHandlers } from './event-handlers/contextmenu-handlers';
 
 // Import helpers
 import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
@@ -163,6 +164,13 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Spread overlay state
     ...overlayState,
+    
+    // Context menu state
+    contextMenu: {
+      isVisible: false,
+      position: null,
+      context: null
+    },
     
     // DEPRECATED: Legacy coordinate manager - disabled in favor of unified coordinateMapping
     coordinateManager: null,
@@ -857,7 +865,8 @@ export const tableBaseMachine = setup({
             ...editHandlers,
             ...dragHandlers,
             ...fillHandlers,
-            ...clipboardHandlers
+            ...clipboardHandlers,
+            ...contextMenuHandlers
           }
         }
       },
@@ -1192,6 +1201,9 @@ export const tableBaseMachine = setup({
       // Clipboard events
       ...clipboardHandlers,
       
+      // Context menu events
+      ...contextMenuHandlers,
+      
       // Legacy edit events (now handled by edit slice)
       'edit.legacy.*': {
         actions: sendTo(
@@ -1342,11 +1354,19 @@ export const tableBaseMachine = setup({
             
             if (!event.entity) return;
             
-            // For surgical updates, we skip store updates to prevent full re-renders
-            // The store will be updated by the AtomicBridge already
-            console.log('🔄 VibeGrid: Skipping store update for surgical rendering - using direct renderer update');
+            // HYBRID APPROACH: Update store data silently + surgical rendering
+            // This maintains data consistency for sorting/filtering while avoiding full re-renders
+            console.log('🔄 VibeGrid: Updating store data silently for data consistency');
+            if (context.actors.storeActor) {
+              context.actors.storeActor.send({
+                type: 'atomicEntityUpdate',
+                entityId: event.entity.id,
+                entity: event.entity,
+                silent: true // Prevent store from triggering full re-render
+              });
+            }
             
-            // CRITICAL: Use surgical update for cell-only rendering ONLY
+            // CRITICAL: Use surgical update for cell-only rendering
             console.log('🔄 VibeGrid: Triggering SURGICAL renderer update for atomic change');
             if (context.actors.rendererActor) {
               context.actors.rendererActor.send({

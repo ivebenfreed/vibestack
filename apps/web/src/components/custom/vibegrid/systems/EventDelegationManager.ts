@@ -70,6 +70,7 @@ export class EventDelegationManager {
     handleScroll: this.handleScroll.bind(this),
     handleClick: this.handleClick.bind(this),
     handleDoubleClick: this.handleDoubleClick.bind(this),
+    handleContextMenu: this.handleContextMenu.bind(this),
     handleFocusIn: this.handleFocusIn.bind(this),
     handleFocusOut: this.handleFocusOut.bind(this)
   };
@@ -112,6 +113,7 @@ export class EventDelegationManager {
     container.addEventListener('mousedown', this.boundHandlers.handleMouseDown, { passive: false });
     container.addEventListener('click', this.boundHandlers.handleClick);
     container.addEventListener('dblclick', this.boundHandlers.handleDoubleClick);
+    container.addEventListener('contextmenu', this.boundHandlers.handleContextMenu);
     
     // Global document events (only when needed)
     document.addEventListener('mousemove', this.boundHandlers.handleMouseMove, { passive: false });
@@ -424,6 +426,111 @@ export class EventDelegationManager {
         });
       }
     }
+  }
+
+  private handleContextMenu(event: MouseEvent): void {
+    if (this.isDestroyed) return;
+    
+    // Prevent default browser context menu
+    event.preventDefault();
+    
+    const target = event.target as Element;
+    
+    // Skip events on editing overlay
+    if (target.closest('.vibegridx-editing-portal')) {
+      console.log('🎯 EventDelegationManager: Ignoring context menu on editing overlay');
+      return;
+    }
+    
+    console.log('🎯 EventDelegationManager: Context menu triggered', {
+      target: target,
+      targetClass: target.className,
+      x: event.clientX,
+      y: event.clientY
+    });
+    
+    // Check for cell right-click
+    const cell = target.closest('.vibegridx-cell') as HTMLElement;
+    console.log('🎯 EventDelegationManager: Cell detection debug', {
+      target,
+      targetClass: target.className,
+      cell,
+      cellClass: cell?.className,
+      hasCell: !!cell,
+      closestResult: target.closest('.vibegridx-cell')
+    });
+    
+    if (cell) {
+      const rowId = cell.dataset.rowId;
+      const columnId = cell.dataset.columnId;
+      
+      console.log('🎯 EventDelegationManager: Cell found, checking data attributes', {
+        rowId,
+        columnId,
+        hasRowId: !!rowId,
+        hasColumnId: !!columnId,
+        cellDataset: cell.dataset
+      });
+      
+      if (rowId && columnId) {
+        // Convert to container coordinates for consistent positioning
+        const containerCoords = this.convertToContainerCoordinates(event);
+        
+        console.log('🎯 EventDelegationManager: About to send context menu event to XState', {
+          eventType: 'contextmenu.show',
+          rowId,
+          columnId,
+          coordinates: containerCoords,
+          clientCoords: { x: event.clientX, y: event.clientY },
+          hasSendMethod: !!this.send
+        });
+        
+        // Send context menu event to table machine
+        this.send({
+          type: 'contextmenu.show',
+          rowId,
+          columnId,
+          x: containerCoords.x,
+          y: containerCoords.y,
+          clientX: event.clientX,
+          clientY: event.clientY
+        });
+        
+        console.log('🎯 EventDelegationManager: Context menu event sent to XState');
+        return;
+      }
+    }
+    
+    // Check for header right-click
+    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
+    if (headerCell) {
+      const columnId = headerCell.dataset.column;
+      
+      if (columnId) {
+        const containerCoords = this.convertToContainerCoordinates(event);
+        
+        // Send header context menu event
+        this.send({
+          type: 'contextmenu.show.header',
+          columnId,
+          x: containerCoords.x,
+          y: containerCoords.y,
+          clientX: event.clientX,
+          clientY: event.clientY
+        });
+        return;
+      }
+    }
+    
+    // General table context menu (for empty areas)
+    const containerCoords = this.convertToContainerCoordinates(event);
+    this.send({
+      type: 'contextmenu.show.general',
+      x: containerCoords.x,
+      y: containerCoords.y,
+      clientX: event.clientX,
+      clientY: event.clientY
+    });
   }
 
   private handleCellContentClick(event: MouseEvent, cell: HTMLElement): void {
@@ -1133,6 +1240,7 @@ export class EventDelegationManager {
     container.removeEventListener('mousedown', this.boundHandlers.handleMouseDown);
     container.removeEventListener('click', this.boundHandlers.handleClick);
     container.removeEventListener('dblclick', this.boundHandlers.handleDoubleClick);
+    container.removeEventListener('contextmenu', this.boundHandlers.handleContextMenu);
     container.removeEventListener('keydown', this.boundHandlers.handleKeyDown);
     container.removeEventListener('focusin', this.boundHandlers.handleFocusIn);
     container.removeEventListener('focusout', this.boundHandlers.handleFocusOut);

@@ -13,6 +13,7 @@ type InitializationRefs = {
 // PortalCanvasOverlayProvider removed - using embedded canvas approach
 // Legacy event handlers removed - using unified EventDelegationManager only
 import { EventDelegationManager, type EventDelegationConfig } from './systems/EventDelegationManager';
+import { ContextMenuRenderer } from './components/ContextMenuRenderer';
 import {
   useChangeDetection,
   useRenderStateExtractor,
@@ -23,6 +24,7 @@ import type { RenderState, TableRow, CellRef, Column, RelationshipOptionsProvide
 // CanvasOverlay removed - using DOM overlays via CanvasOverlayDOM
 // Deprecated coordinate manager removed - using dimensions-slice coordinate mapping
 import { VibeGridXHeader } from './components/VibeGridXHeader';
+// ContextMenu managed by global ContextMenuManager in contextmenu-handlers.ts
 import './vibegridx.css';
 
 // Import Dexie domain services and queries
@@ -317,6 +319,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const tableActor = useActorRef(tableBaseMachine, tableActorOptions);
   const tableSend = tableActor.send;
   
+  // Context menu state
+  // Context menu state managed directly in contextmenu-handlers.ts
+  
   // OPTIMAL: Use atomic Legend State bridge for change detection
   // This replaces useEntityRowChanges entirely with atomic observe() patterns
   const atomicBridge = React.useRef<(() => void) | null>(null);
@@ -451,10 +456,15 @@ export function VibeGrid<T extends Record<string, any> = any>(
         delete (window as any).__vibegrid_store_cleanup;
       }
       
-      // Import and call cleanupEditingOverlay to ensure global overlay is cleaned up
+      // Import and call cleanup functions to ensure global overlays are cleaned up
       import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
         cleanupEditingOverlay();
         console.log('VibeGrid: Cleaned up EditingOverlay on unmount');
+      });
+      
+      import('./machines/table-machine/event-handlers/contextmenu-handlers').then(({ cleanupContextMenuManager }) => {
+        cleanupContextMenuManager();
+        console.log('VibeGrid: Cleaned up ContextMenuManager on unmount');
       });
     };
   }, []);
@@ -504,6 +514,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const handleHideAllColumns = useCallback(() => {
     vibeGridXApi.hideAllColumns();
   }, [vibeGridXApi]);
+
+  // Context menu handlers managed directly in contextmenu-handlers.ts
 
   // Entities come from store subscription - no need to send manually
 
@@ -570,6 +582,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
         data-testid={`vibegridx-overlay-${tableId}`}
         style={{ display: 'none' }}
       />
+      
+      {/* Context Menu - render conditionally based on XState context menu state */}
+      <ContextMenuRenderer tableActor={tableActor} containerRef={containerRef} />
     </div>
   );
 }

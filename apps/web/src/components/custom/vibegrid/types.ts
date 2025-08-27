@@ -357,6 +357,17 @@ export interface TableContext {
   
   // Clipboard state (from overlay slice)
   clipboardState?: VibeGridClipboardData | null;
+  
+  // Context menu state
+  contextMenu: {
+    isVisible: boolean;
+    position: { x: number; y: number; clientX: number; clientY: number } | null;
+    context: {
+      type: 'cell' | 'header' | 'general';
+      rowId?: string;
+      columnId?: string;
+    } | null;
+  };
 }
 
 export interface SelectionContext {
@@ -447,6 +458,19 @@ export type TableEvents =
   | { type: 'keyboard.enter'; shift?: boolean }
   | { type: 'keyboard.tab'; shift?: boolean }
   | { type: 'keyboard.escape' }
+  
+  // Context menu events
+  | { type: 'contextmenu.show'; rowId: string; columnId: string; x: number; y: number; clientX: number; clientY: number }
+  | { type: 'contextmenu.show.header'; columnId: string; x: number; y: number; clientX: number; clientY: number }
+  | { type: 'contextmenu.show.general'; x: number; y: number; clientX: number; clientY: number }
+  | { type: 'contextmenu.hide' }
+  | { type: 'contextmenu.copy' }
+  | { type: 'contextmenu.paste' }
+  | { type: 'contextmenu.cut' }
+  | { type: 'contextmenu.insert.row' }
+  | { type: 'contextmenu.delete.row' }
+  | { type: 'contextmenu.insert.column' }
+  | { type: 'contextmenu.delete.column' }
   
   // View events
   | { type: 'view.group.set'; groupBy: string[] }

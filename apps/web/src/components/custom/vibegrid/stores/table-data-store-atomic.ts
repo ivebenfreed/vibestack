@@ -879,13 +879,14 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       },
 
       atomicEntityUpdate: {
-        entities: (context, event: { entityId: string, entity: any }) => {
+        entities: (context, event: { entityId: string, entity: any, silent?: boolean }) => {
           if (process.env.NODE_ENV === 'development') {
             console.log('📊 TableStore: Processing atomic entity update', {
               entityId: event.entityId,
               entityType: context.entityType,
               entityName: event.entity?.name,
-              source: 'render_chain_trigger'
+              source: 'render_chain_trigger',
+              silent: event.silent || false
             });
           }
           
@@ -898,7 +899,18 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             [event.entityId]: resolvedEntity
           };
         },
-        processedRows: (context, event: { entityId: string, entity: any }) => {
+        processedRows: (context, event: { entityId: string, entity: any, silent?: boolean }) => {
+          // If silent update, skip processedRows update to prevent full re-render
+          if (event.silent) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('📊 TableStore: Skipping processedRows update for silent atomic update', {
+                entityId: event.entityId,
+                reason: 'silent_mode_prevents_full_rerender'
+              });
+            }
+            return context.processedRows;
+          }
+          
           // Resolve entity with current relationships
           const relationshipConfigs = discoverRelationships(columns || []);
           const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
