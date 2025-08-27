@@ -64,20 +64,70 @@ export interface Env {
 }
 ```
 
-### Phase 2: Create Hyperdrive-Compatible Kysely Dialect
+### Phase 2: Driver Selection and Dialect Strategy
 
-#### 2.1 Create New Dialect Package
-Create `/packages/kysely-hyperdrive/` with:
+#### 2.1 Driver Comparison Analysis
+
+**postgres.js vs pg driver for Hyperdrive:**
+
+| Aspect | postgres.js | node-postgres (pg) |
+|--------|-------------|-------------------|
+| **Minimum Version** | 3.4.5+ | 8.16.3+ |
+| **Performance** | Faster with auto-prepared statements | Good with manual prepared statement config |
+| **Bundle Size** | Smaller, more modern | Larger, mature ecosystem |
+| **Features** | Real-time subscriptions, lazy connections | Robust ecosystem, wide adoption |
+| **Cloudflare Workers** | Native support, optimal for serverless | Requires nodejs_compat flag |
+| **Existing Kysely Support** | `kysely-postgres-js` package available | Built-in `PostgresDialect` |
+
+**Recommendation: postgres.js** for the following reasons:
+- Better performance with automatic prepared statements
+- Smaller bundle size for Workers environment
+- Native Cloudflare Workers compatibility
+- Existing `kysely-postgres-js` dialect available
+
+#### 2.2 Implementation Strategy Options
+
+**Option A: Use Existing kysely-postgres-js with Hyperdrive**
+```typescript
+// apps/server/src/lib/kysely.ts
+import { Kysely } from 'kysely';
+import { PostgresJSDialect } from 'kysely-postgres-js';
+import postgres from 'postgres';
+
+export function getKysely(env: Env): Kysely<Database> {
+  if (kyselyInstance) return kyselyInstance;
+  
+  if (env.HYPERDRIVE_DB) {
+    const sql = postgres(env.HYPERDRIVE_DB.connectionString, {
+      max: 5, // Cloudflare Workers connection limit
+      fetch_types: false, // Reduce latency
+    });
+    
+    kyselyInstance = new Kysely<Database>({
+      dialect: new PostgresJSDialect({ postgres: sql }),
+      log: (event) => { /* existing logging */ }
+    });
+  }
+  // ... fallback to Neon
+}
+```
+
+**Option B: Create Custom Hyperdrive Dialect**
+Create `/packages/kysely-hyperdrive/` for more control:
 
 ```typescript
 // packages/kysely-hyperdrive/src/hyperdrive-dialect.ts
 import { Dialect, DialectAdapter, Driver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
-import { Pool } from 'pg';
+import postgres from 'postgres';
 
 export interface HyperdriveDialectConfig {
   hyperdrive: Hyperdrive;
-  // Optional: for local development fallback
-  localConnectionString?: string;
+  // postgres.js specific options
+  options?: {
+    max?: number;
+    fetch_types?: boolean;
+    prepare?: boolean;
+  };
 }
 
 export class HyperdriveDialect implements Dialect {
@@ -88,7 +138,7 @@ export class HyperdriveDialect implements Dialect {
   }
 
   createDriver(): Driver {
-    return new HyperdriveDriver(this.config);
+    return new PostgresJSHyperdriveDriver(this.config);
   }
 
   createAdapter(): DialectAdapter {
@@ -105,14 +155,16 @@ export class HyperdriveDialect implements Dialect {
 }
 ```
 
-#### 2.2 Create Hyperdrive Driver
-```typescript
-// packages/kysely-hyperdrive/src/hyperdrive-driver.ts
-import { Driver, CompiledQuery, DatabaseConnection } from 'kysely';
-import { Pool, Client } from 'pg';
+#### 2.3 Recommended Implementation: Option A with postgres.js
 
-export class HyperdriveDriver implements Driver {
-  private pool: Pool | null = null;
+**Rationale:** Use existing `kysely-postgres-js` package for faster implementation and proven compatibility.
+
+```typescript
+// packages/kysely-hyperdrive/src/postgres-js-hyperdrive-driver.ts
+import postgres from 'postgres';
+
+export class PostgresJSHyperdriveDriver implements Driver {
+  private sql: postgres.Sql;
   private config: HyperdriveDialectConfig;
 
   constructor(config: HyperdriveDialectConfig) {
@@ -120,39 +172,69 @@ export class HyperdriveDriver implements Driver {
   }
 
   async init(): Promise<void> {
-    const connectionString = this.config.hyperdrive.connectionString;
-    
-    this.pool = new Pool({
-      connectionString,
-      max: 5, // Cloudflare Workers limit
-      idleTimeoutMillis: 0,
-      connectionTimeoutMillis: 10000,
+    this.sql = postgres(this.config.hyperdrive.connectionString, {
+      max: this.config.options?.max || 5, // Cloudflare Workers limit
+      fetch_types: this.config.options?.fetch_types || false, // Reduce latency
+      prepare: this.config.options?.prepare !== false, // Enable prepared statements
+      idle_timeout: 0,
+      connect_timeout: 10,
+      ...this.config.options,
     });
   }
 
   async acquireConnection(): Promise<DatabaseConnection> {
-    const client = await this.pool!.connect();
-    return new HyperdriveConnection(client);
+    return new PostgresJSConnection(this.sql);
   }
 
-  async beginTransaction(connection: DatabaseConnection): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('BEGIN'));
+  // ... standard transaction methods using postgres.js APIs
+}
+
+export class PostgresJSConnection implements DatabaseConnection {
+  constructor(private sql: postgres.Sql) {}
+
+  async executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
+    const { sql: queryText, parameters } = compiledQuery;
+    
+    try {
+      // postgres.js automatically handles prepared statements
+      const result = await this.sql.unsafe(queryText, parameters as any[]);
+      
+      return {
+        rows: result as R[],
+        numAffectedRows: BigInt(result.count || 0),
+      };
+    } catch (error) {
+      throw new Error(`Query failed: ${error.message}`);
+    }
   }
 
-  async commitTransaction(connection: DatabaseConnection): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('COMMIT'));
+  async *streamQuery<R>(
+    compiledQuery: CompiledQuery,
+    _chunkSize?: number
+  ): AsyncIterableIterator<QueryResult<R>> {
+    // postgres.js supports streaming via cursor
+    const result = await this.executeQuery<R>(compiledQuery);
+    yield result;
   }
+}
+```
 
-  async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('ROLLBACK'));
+#### 2.4 Package Dependencies Update
+
+```json
+// Add to apps/server/package.json
+{
+  "dependencies": {
+    "postgres": "^3.4.5",
+    "kysely-postgres-js": "^2.0.0"
   }
+}
 
-  async releaseConnection(connection: DatabaseConnection): Promise<void> {
-    await (connection as HyperdriveConnection).release();
-  }
-
-  async destroy(): Promise<void> {
-    await this.pool?.end();
+// Remove after migration
+{
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
+    "kysely-neon-http": "workspace:*"
   }
 }
 ```
@@ -163,9 +245,11 @@ export class HyperdriveDriver implements Driver {
 ```typescript
 // apps/server/src/lib/kysely.ts
 import { Kysely } from 'kysely';
-import { HyperdriveDialect } from 'kysely-hyperdrive';
+import { PostgresJSDialect } from 'kysely-postgres-js';
+import postgres from 'postgres';
 import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Env } from '../types/env';
+import { dbLogger } from '../middleware/logger';
 
 let kyselyInstance: Kysely<Database> | null = null;
 
@@ -174,14 +258,31 @@ export function getKysely(env: Env): Kysely<Database> {
     return kyselyInstance;
   }
   
-  // Use Hyperdrive if available, fallback to Neon
+  // Use Hyperdrive with postgres.js if available
   if (env.HYPERDRIVE_DB) {
+    const sql = postgres(env.HYPERDRIVE_DB.connectionString, {
+      max: 5, // Cloudflare Workers connection limit
+      fetch_types: false, // Reduce latency for better performance
+      prepare: true, // Enable prepared statements for performance
+      idle_timeout: 0, // Don't disconnect idle connections
+      connect_timeout: 10, // 10 second connection timeout
+    });
+    
     kyselyInstance = new Kysely<Database>({
-      dialect: new HyperdriveDialect({
-        hyperdrive: env.HYPERDRIVE_DB,
-      }),
+      dialect: new PostgresJSDialect({ postgres: sql }),
       log: (event) => {
-        // ... existing logging ...
+        if (event.level === 'query') {
+          console.log('🔍 KYSELY QUERY (Hyperdrive):', event.query.sql);
+          console.log('📝 PARAMETERS:', event.query.parameters);
+          dbLogger.debug('Kysely Hyperdrive Query', {
+            sql: event.query.sql,
+            parameters: event.query.parameters,
+            duration: event.queryDurationMillis
+          }, 'kysely-hyperdrive');
+        } else if (event.level === 'error') {
+          console.log('❌ KYSELY HYPERDRIVE ERROR:', event.error);
+          dbLogger.error('Kysely Hyperdrive Error', event.error, undefined, 'kysely-hyperdrive');
+        }
       }
     });
   } else {
@@ -192,7 +293,18 @@ export function getKysely(env: Env): Kysely<Database> {
         debug: env.LOG_LEVEL === 'debug',
       }),
       log: (event) => {
-        // ... existing logging ...
+        if (event.level === 'query') {
+          console.log('🔍 KYSELY QUERY (Neon):', event.query.sql);
+          console.log('📝 PARAMETERS:', event.query.parameters);
+          dbLogger.debug('Kysely Neon Query', {
+            sql: event.query.sql,
+            parameters: event.query.parameters,
+            duration: event.queryDurationMillis
+          }, 'kysely-neon');
+        } else if (event.level === 'error') {
+          console.log('❌ KYSELY NEON ERROR:', event.error);
+          dbLogger.error('Kysely Neon Error', event.error, undefined, 'kysely-neon');
+        }
       }
     });
   }
