@@ -195,6 +195,10 @@ apiApp.get('/db/kysely-test', async (c) => {
 // Mount Drizzle test router BEFORE auth middleware (unprotected for testing)
 // Drizzle test route removed - using generic API instead
 
+// Mount KV test router for testing session storage
+import { testKVRouter } from './api/test-kv';
+apiApp.route('/', testKVRouter);
+
 // Mount Polar webhook endpoints BEFORE auth middleware (webhooks must be public)
 apiApp.route('/', polarWebhooksRouter);
 

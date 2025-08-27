@@ -26,7 +26,7 @@ import { StateManager } from './state-manager';
 import { DynamicTableDiscovery } from './dynamic-table-discovery';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
-import { NeonHTTPDialect } from '@repo/kysely-neon-http';
+import { NeonHTTPDialect } from 'kysely-neon-http';
 import { neonConfig } from '@neondatabase/serverless';
 import type { Database } from '@repo/dataforge/kysely-types';
 
