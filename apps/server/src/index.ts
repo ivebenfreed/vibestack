@@ -91,6 +91,10 @@ apiApp.route('/bootstrap', bootstrapRouter);
 
 // Add public health endpoints BEFORE authMiddleware
 apiApp.get('/health', (c) => c.text('Server OK'));
+
+// Add Hyperdrive test endpoint for debugging
+import testHyperdriveApp from './test-hyperdrive-endpoint';
+apiApp.route('/', testHyperdriveApp);
 apiApp.get('/env/debug', (c) => {
   // Debug endpoint to verify which environment is being used
   const dbUrl = c.env.DATABASE_URL || 'NOT SET';

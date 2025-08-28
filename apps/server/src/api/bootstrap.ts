@@ -21,15 +21,10 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     throw new HTTPException(403, { message: 'Invalid bootstrap key.' });
   }
 
-  // Create Neon dialect with auto-configuration
-  const neonDialect = new NeonHTTPDialect({
-    connectionString: DATABASE_URL,
-    // Auto-detection handles local proxy configuration automatically
-  });
-  // Specify the database schema type if available, otherwise use 'any'
-  // For example, if you have a DB type from Kysely codegen: import type { DB } from '@repo/dataforge/generated-types';
-  // const db = new Kysely<DB>({ dialect: neonDialect });
-  const db = new Kysely<any>({ dialect: neonDialect });
+  // Use our centralized Kysely configuration which handles
+  // postgres.js for local dev and Hyperdrive for production
+  const { getKysely } = require('../lib/kysely');
+  const db = getKysely(c.env);
 
   try {
     const existingSuperAdmin = await db

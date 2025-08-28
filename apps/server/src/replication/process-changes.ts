@@ -636,25 +636,10 @@ function convertSnakeToCamelCase(obj: Record<string, unknown>): Record<string, u
  * Helper function to initialize Kysely for replication operations
  */
 function createKyselyDb(context: MinimalContext): Kysely<Database> {
-  const databaseUrl = context.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required');
-  }
-  
-  // Configure Neon for local development
-  const environment = context.env.ENVIRONMENT || context.env.NODE_ENV;
-  if (environment === "local" || environment === "development") {
-    neonConfig.fetchEndpoint = (host) => {
-      if (host === 'db.localtest.me') {
-        return 'http://db.localtest.me:4444/sql';
-      }
-      return `https://${host}/sql`;
-    };
-  }
-  
-  return new Kysely<Database>({
-    dialect: new NeonHTTPDialect({ connectionString: databaseUrl }),
-  });
+  // Use our centralized Kysely configuration which handles
+  // postgres.js for local dev and Hyperdrive for production
+  const { getKysely } = require('../lib/kysely');
+  return getKysely(context.env);
 }
 
 export async function storeChangesInHistory(

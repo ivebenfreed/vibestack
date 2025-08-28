@@ -14,6 +14,15 @@ export interface ExecutionContext {
 export type DeploymentEnv = 'development' | 'staging' | 'production' | 'local';
 export type LogLevel = 'error' | 'debug' | 'info' | 'warn';
 
+// Hyperdrive interface for connection pooling
+interface Hyperdrive {
+  connectionString: string;
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+}
+
 /**
  * Environment configuration and bindings
  * Used directly for Workers and wrapped in { Bindings: Env } for Hono routes
@@ -30,6 +39,9 @@ export interface Env {
   NEON_API_KEY: string;
   TYPEORM_LOGGING: boolean;
   NODE_ENV: string;
+  
+  // Hyperdrive binding for PostgreSQL connection pooling
+  HYPERDRIVE_DB?: Hyperdrive;
   
   // Auth variables
   BETTER_AUTH_SECRET: string;

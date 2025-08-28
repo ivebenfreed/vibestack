@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSelector } from '@xstate/store/react';
-import { shallowEqual } from '@xstate/store';
 import type { Task } from '@repo/dataforge/client-entities';
-import { domainServices } from '@/domain';
+import { getEntity$, entityOperations } from '@/legend-state';
 
 interface OptimisticTaskState {
   task: Task | null;
@@ -12,7 +10,7 @@ interface OptimisticTaskState {
 }
 
 /**
- * Hook for optimistic task updates with local state management
+ * Hook for optimistic task updates with local state management using Legend State
  * 
  * Usage:
  * ```tsx
@@ -24,12 +22,9 @@ interface OptimisticTaskState {
  * ```
  */
 export function useOptimisticTask(taskId: string | null) {
-  // Get the current task from the atom
-  const atomTask = useSelector(
-    tasksAtom,
-    (tasks) => taskId ? tasks[taskId] || null : null,
-    shallowEqual
-  );
+  // Get the current task from Legend State
+  const tasksObs = getEntity$('Task');
+  const atomTask = taskId && tasksObs ? tasksObs.get()?.[taskId] || null : null;
 
   // Local optimistic state
   const [optimisticState, setOptimisticState] = useState<OptimisticTaskState>({
@@ -82,8 +77,8 @@ export function useOptimisticTask(taskId: string | null) {
     }));
 
     try {
-      // Update database using domain services
-      await domainServices.task.updateUI(taskId, updates);
+      // Update database using Legend State entity operations
+      await entityOperations.updateEntity('Task', taskId, updates);
       
       // Keep optimistic state until live changes update the atom
       setOptimisticState(prev => ({
@@ -116,11 +111,9 @@ export function useOptimisticTask(taskId: string | null) {
  * Useful for tables and lists where multiple tasks might be updated
  */
 export function useOptimisticTasks(taskIds: string[] = []) {
-  const atomTasks = useSelector(
-    tasksAtom,
-    (tasks) => taskIds.map(id => tasks[id]).filter(Boolean) as Task[],
-    shallowEqual
-  );
+  const tasksObs = getEntity$('Task');
+  const allTasks = tasksObs?.get() || {};
+  const atomTasks = taskIds.map(id => allTasks[id]).filter(Boolean) as Task[];
 
   const [optimisticTasks, setOptimisticTasks] = useState<Record<string, Task>>({});
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set());
@@ -160,8 +153,8 @@ export function useOptimisticTasks(taskIds: string[] = []) {
     setPendingUpdates(prev => new Set([...prev, taskId]));
 
     try {
-      // Update database using domain services
-      await domainServices.task.updateUI(taskId, updates);
+      // Update database using Legend State entity operations
+      await entityOperations.updateEntity('Task', taskId, updates);
       
       // Remove from pending after successful update
       setPendingUpdates(prev => {
