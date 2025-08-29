@@ -15,21 +15,21 @@ fi
 
 # Extract tool info from stdin
 TOOL_INFO=$(cat)
-TOOL_NAME=$(echo "$TOOL_INFO" | grep -o '"tool":"[^"]*' | cut -d'"' -f4)
+TOOL_NAME=$(echo "$TOOL_INFO" | grep -o '"tool_name":"[^"]*' | cut -d'"' -f4)
 TIMESTAMP=$(date +"%H:%M:%S")
 
 # Log based on tool type
 case "$TOOL_NAME" in
     "Read")
-        FILE_PATH=$(echo "$TOOL_INFO" | grep -o '"file_path":"[^"]*' | cut -d'"' -f4)
+        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // empty')
         echo "- [$TIMESTAMP] Read: $FILE_PATH" >> "$WORK_LOG"
         ;;
     "Write"|"Edit"|"MultiEdit")
-        FILE_PATH=$(echo "$TOOL_INFO" | grep -o '"file_path":"[^"]*' | cut -d'"' -f4)
+        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // empty')
         echo "- [$TIMESTAMP] Modified: $FILE_PATH" >> "$WORK_LOG"
         ;;
     "Bash")
-        COMMAND=$(echo "$TOOL_INFO" | grep -o '"command":"[^"]*' | cut -d'"' -f4 | head -c 50)
+        COMMAND=$(echo "$TOOL_INFO" | jq -r '.tool_input.command // empty' | head -c 50)
         echo "- [$TIMESTAMP] Executed: $COMMAND..." >> "$WORK_LOG"
         ;;
     "TodoWrite")

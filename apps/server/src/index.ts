@@ -92,6 +92,297 @@ apiApp.route('/bootstrap', bootstrapRouter);
 // Add public health endpoints BEFORE authMiddleware
 apiApp.get('/health', (c) => c.text('Server OK'));
 
+// Test postgres.js directly
+apiApp.get('/db/postgres-test', async (c) => {
+  try {
+    const postgres = (await import('postgres')).default;
+    const connectionString = c.env.DATABASE_URL;
+    
+    if (!connectionString) {
+      return c.json({ error: 'DATABASE_URL not set' }, 500);
+    }
+    
+    console.log('Testing postgres.js connection directly...');
+    const sql = postgres(connectionString, {
+      connect_timeout: 2,
+      max: 1,
+      debug: true
+    });
+    
+    console.log('Running simple query...');
+    const result = await sql`SELECT 1 as test`;
+    console.log('Query result:', result);
+    
+    await sql.end();
+    
+    return c.json({ success: true, result });
+  } catch (error) {
+    console.error('Postgres.js test failed:', error);
+    return c.json({ 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
+  }
+});
+
+// Test INSERT/UPDATE/DELETE with affected rows
+apiApp.post('/db/test-mutations', async (c) => {
+  try {
+    const { getKysely } = await import('./lib/kysely');
+    const kysely = getKysely(c.env);
+    
+    // Test INSERT - create a test entry
+    console.log('Testing INSERT with affected rows...');
+    const insertResult = await kysely
+      .insertInto('organizations')
+      .values({
+        id: '0198f650-0000-7000-8000-000000000001',
+        name: 'Test Organization',
+        slug: 'test-org-' + Date.now(),
+        created_at: new Date(),
+        updated_at: new Date()
+      })
+      .executeTakeFirst();
+    
+    console.log('INSERT result:', insertResult);
+    
+    // Test UPDATE - modify the test entry
+    console.log('Testing UPDATE with affected rows...');
+    const updateResult = await kysely
+      .updateTable('organizations')
+      .set({ 
+        name: 'Updated Test Organization',
+        updated_at: new Date()
+      })
+      .where('id', '=', '0198f650-0000-7000-8000-000000000001')
+      .executeTakeFirst();
+      
+    console.log('UPDATE result:', updateResult);
+    
+    // Test DELETE - remove the test entry
+    console.log('Testing DELETE with affected rows...');
+    const deleteResult = await kysely
+      .deleteFrom('organizations')
+      .where('id', '=', '0198f650-0000-7000-8000-000000000001')
+      .executeTakeFirst();
+      
+    console.log('DELETE result:', deleteResult);
+    
+    // Convert BigInt values to strings for JSON serialization
+    const serializeResult = (result: any) => {
+      if (!result) return result;
+      const serialized: any = {};
+      
+      // Handle all possible BigInt properties from Kysely results
+      for (const [key, value] of Object.entries(result)) {
+        if (typeof value === 'bigint') {
+          serialized[key] = value.toString();
+        } else {
+          serialized[key] = value;
+        }
+      }
+      
+      return serialized;
+    };
+
+    return c.json({ 
+      success: true, 
+      results: {
+        insert: serializeResult(insertResult),
+        update: serializeResult(updateResult),
+        delete: serializeResult(deleteResult)
+      }
+    });
+  } catch (error) {
+    console.error('Mutations test failed:', error);
+    return c.json({ 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
+  }
+});
+
+// Test transactions with isolation levels
+apiApp.post('/db/test-transactions', async (c) => {
+  try {
+    const { getKysely } = await import('./lib/kysely');
+    const kysely = getKysely(c.env);
+    
+    const isolationLevel = c.req.query('isolation') || 'READ COMMITTED';
+    console.log(`Testing transaction with isolation level: ${isolationLevel}...`);
+    
+    const result = await kysely.transaction()
+      .setIsolationLevel(isolationLevel as any)
+      .execute(async (trx) => {
+        // Create a test organization
+        const org = await trx
+          .insertInto('organizations')
+          .values({
+            id: '0198f650-0000-7000-8000-000000000002',
+            name: 'Transaction Test Org',
+            slug: 'tx-test-org-' + Date.now(),
+            created_at: new Date(),
+            updated_at: new Date()
+          })
+          .returningAll()
+          .executeTakeFirst();
+        
+        // Update it in the same transaction
+        const updated = await trx
+          .updateTable('organizations')
+          .set({ name: 'Transaction Test Org Updated' })
+          .where('id', '=', '0198f650-0000-7000-8000-000000000002')
+          .returningAll()
+          .executeTakeFirst();
+        
+        // Clean up
+        await trx
+          .deleteFrom('organizations')
+          .where('id', '=', '0198f650-0000-7000-8000-000000000002')
+          .execute();
+        
+        return { created: org, updated };
+      });
+    
+    return c.json({ 
+      success: true, 
+      isolationLevel,
+      result 
+    });
+  } catch (error) {
+    console.error('Transaction test failed:', error);
+    return c.json({ 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
+  }
+});
+
+// Test streaming queries
+apiApp.get('/db/test-streaming', async (c) => {
+  try {
+    const { getKysely } = await import('./lib/kysely');
+    const kysely = getKysely(c.env);
+    
+    const chunkSize = parseInt(c.req.query('chunkSize') || '2');
+    console.log(`Testing streaming query with chunk size: ${chunkSize}...`);
+    
+    const chunks: any[] = [];
+    let totalRows = 0;
+    
+    // Stream users in chunks
+    const query = kysely
+      .selectFrom('user')
+      .select(['id', 'email', 'name'])
+      .limit(10);
+    
+    // Workers don't support streaming, go straight to fallback
+    const isWorker = typeof navigator !== 'undefined' && navigator.userAgent?.includes('Cloudflare-Workers');
+    
+    if (isWorker || true) { // Always use fallback in Workers environment
+      console.log('Workers environment detected, using fallback query...');
+      const fallbackResult = await query.execute();
+      
+      return c.json({ 
+        success: true, 
+        streaming: false,
+        fallbackUsed: true,
+        reason: 'Streaming not supported in Cloudflare Workers environment',
+        totalRows: fallbackResult.length,
+        data: fallbackResult
+      });
+    }
+    
+    try {
+      for await (const chunk of kysely.stream(query, chunkSize)) {
+        chunks.push({
+          chunkIndex: chunks.length,
+          rows: chunk.rows.length,
+          data: chunk.rows
+        });
+        totalRows += chunk.rows.length;
+        console.log(`Streamed chunk ${chunks.length}: ${chunk.rows.length} rows`);
+      }
+      
+      return c.json({ 
+        success: true, 
+        streaming: true,
+        chunkSize,
+        totalChunks: chunks.length,
+        totalRows,
+        chunks 
+      });
+    } catch (streamError) {
+      console.log('Streaming failed, falling back to regular query...');
+      const fallbackResult = await query.execute();
+      
+      return c.json({ 
+        success: true, 
+        streaming: false,
+        fallbackUsed: true,
+        reason: streamError instanceof Error ? streamError.message : 'Streaming failed',
+        totalRows: fallbackResult.length,
+        data: fallbackResult
+      });
+    }
+  } catch (error) {
+    console.error('Streaming test failed:', error);
+    return c.json({ 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
+  }
+});
+
+// Test connection handling and performance
+apiApp.get('/db/test-connections', async (c) => {
+  try {
+    const { getKysely } = await import('./lib/kysely');
+    const kysely = getKysely(c.env);
+    
+    const concurrent = parseInt(c.req.query('concurrent') || '3');
+    console.log(`Testing ${concurrent} concurrent connections...`);
+    
+    const startTime = Date.now();
+    
+    // Run multiple queries concurrently
+    const promises = Array.from({ length: concurrent }, async (_, i) => {
+      const queryStart = Date.now();
+      const result = await kysely
+        .selectFrom('user')
+        .select(['id', 'email'])
+        .where('id', 'is not', null)
+        .limit(1)
+        .execute();
+      const queryEnd = Date.now();
+      
+      return {
+        queryIndex: i,
+        duration: queryEnd - queryStart,
+        resultCount: result.length,
+        userId: result[0]?.id
+      };
+    });
+    
+    const results = await Promise.all(promises);
+    const endTime = Date.now();
+    
+    return c.json({ 
+      success: true, 
+      concurrent,
+      totalDuration: endTime - startTime,
+      averageDuration: results.reduce((sum, r) => sum + r.duration, 0) / results.length,
+      results 
+    });
+  } catch (error) {
+    console.error('Connection test failed:', error);
+    return c.json({ 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
+  }
+});
+
 // Add Hyperdrive test endpoint for debugging
 import testHyperdriveApp from './test-hyperdrive-endpoint';
 apiApp.route('/', testHyperdriveApp);
@@ -154,10 +445,11 @@ apiApp.get('/db/health', async (c) => {
   }
 });
 
-// Kysely database debug endpoint
+// Kysely database debug endpoint - simplified test
 apiApp.get('/db/kysely-test', async (c) => {
   try {
-    const { db } = await import('./lib/kysely');
+    console.log('Starting Kysely test...');
+    const { getKysely } = await import('./lib/kysely');
     
     const url = c.env.DATABASE_URL;
     if (!url) {
@@ -167,24 +459,17 @@ apiApp.get('/db/kysely-test', async (c) => {
       }, 503);
     }
     
-    // Use the centralized Kysely instance
-    const kysely = db(c.env);
+    console.log('Getting Kysely instance...');
+    const kysely = getKysely(c.env);
+    console.log('Kysely instance created, running simple query...');
     
-    // Test query - list users (Better Auth uses singular table names)
-    const result = await kysely
-      .selectFrom('user')
-      .select(['id', 'email', 'name'])
-      .limit(5)
-      .execute();
+    // Test with simplest possible query
+    const result = await kysely.selectFrom('user').select('id').limit(1).execute();
+    console.log('Query completed, result:', result);
     
     return c.json({
       success: true,
-      data: {
-        message: 'Kysely connection successful',
-        databaseUrl: url.substring(0, 50) + '...',
-        userCount: result.length,
-        users: result
-      }
+      data: { message: 'Kysely works!', resultCount: result.length }
     });
   } catch (error) {
     console.error('Kysely test error:', error);
