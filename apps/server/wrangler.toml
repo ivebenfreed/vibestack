@@ -85,8 +85,7 @@ simple = { limit = 3, period = 3600 } # 3 signups per hour per IP
 [[hyperdrive]]
 binding = "HYPERDRIVE_DB"
 id = "placeholder-hyperdrive-id"
-# Local connection string now set via environment variable:
-# WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE_DB
+localConnectionString = "postgresql://postgres:postgres@localhost:5432/vibestack_dev"
 
 # KV namespace configuration
 # Development uses a local namespace

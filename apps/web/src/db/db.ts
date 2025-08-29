@@ -19,6 +19,8 @@ import { live } from '@electric-sql/pglite/live';
 // Remove import for non-existent file
 // import { validateDatabaseSchema } from './schema-validator';
 import { checkAndApplyMigrations } from './migration-manager';
+import { dataLog } from '@/logger';
+const log = dataLog('db/db.ts');
 
 // Export the database name as a constant for use in other modules
 // IMPORTANT: Must match the value in worker.ts exactly 
@@ -88,32 +90,32 @@ let initPromise: Promise<PGliteWorker> | null = null;
 // Store instances during HMR dispose
 if (import.meta.hot) {
   import.meta.hot.dispose(async (data) => {
-    console.log("🔥 [DB] HMR Dispose: Cleaning up database connections");
-    console.log("🔥 [DB] pgliteWorkerInstance exists:", !!pgliteWorkerInstance);
-    console.log("🔥 [DB] workerInstance exists:", !!workerInstance);
-    console.log("🔥 [DB] isInitializing:", isInitializing);
+    log.info("🔥 [DB] HMR Dispose: Cleaning up database connections");
+    log.info("🔥 [DB] pgliteWorkerInstance exists:", !!pgliteWorkerInstance);
+    log.info("🔥 [DB] workerInstance exists:", !!workerInstance);
+    log.info("🔥 [DB] isInitializing:", isInitializing);
     
     // 🔥 HMR FIX: Properly terminate worker to prevent IndexedDB conflicts
     if (workerInstance) {
       try {
-        console.log("🔥 [DB] HMR: Terminating worker instance...");
+        log.info("🔥 [DB] HMR: Terminating worker instance...");
         workerInstance.terminate();
-        console.log("🔥 [DB] HMR: Worker terminated successfully");
+        log.info("🔥 [DB] HMR: Worker terminated successfully");
       } catch (error) {
-        console.warn("🔥 [DB] HMR: Error terminating worker:", error);
+        log.warn("🔥 [DB] HMR: Error terminating worker:", error);
       }
     }
     
     if (pgliteWorkerInstance) {
       try {
-        console.log("🔥 [DB] HMR: Closing PGlite worker connection...");
+        log.info("🔥 [DB] HMR: Closing PGlite worker connection...");
         // Close any open connections
         if (typeof pgliteWorkerInstance.close === 'function') {
           await pgliteWorkerInstance.close();
         }
-        console.log("🔥 [DB] HMR: PGlite worker closed successfully");
+        log.info("🔥 [DB] HMR: PGlite worker closed successfully");
       } catch (error) {
-        console.warn("🔥 [DB] HMR: Error closing PGlite worker:", error);
+        log.warn("🔥 [DB] HMR: Error closing PGlite worker:", error);
       }
     }
     
@@ -127,7 +129,7 @@ if (import.meta.hot) {
     data.timestamp = Date.now();
     data.cleanedUp = true;
     
-    console.log("🔥 [DB] HMR: Database cleanup completed");
+    log.info("🔥 [DB] HMR: Database cleanup completed");
   });
 
   // Accept hot updates for this module
@@ -162,7 +164,7 @@ export const db = pgliteWorkerInstance;
 export async function initializeDatabase(): Promise<PGliteWorker> {
   // 🔥 HMR CHANGE: No longer restore instances - always create fresh after cleanup
   if (import.meta.hot?.data.cleanedUp) {
-    console.log("🔥 [DB] HMR: Previous instance was properly cleaned up, creating fresh instance");
+    log.info("🔥 [DB] HMR: Previous instance was properly cleaned up, creating fresh instance");
   }
 
   if (pgliteWorkerInstance) {
@@ -170,13 +172,13 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
   }
   
   if (isInitializing) {
-    console.log('PGliteWorker already initializing, waiting for completion');
+    log.info('PGliteWorker already initializing, waiting for completion');
     return initPromise!;
   }
   
   isInitializing = true;
   
-  console.log('🔄 Initializing PGliteWorker...');
+  log.info('🔄 Initializing PGliteWorker...');
   
   initPromise = (async () => {
     try {
@@ -199,7 +201,7 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
       worker.addEventListener('message', (event: MessageEvent) => {
         // Avoid logging internal PGliteWorker protocol messages if too noisy
         if (!event.data?.type?.startsWith('pglite:')) {
-           console.debug('PGlite worker message:', event.data);
+           log.debug('PGlite worker message:', event.data);
         }
       });
 
@@ -218,16 +220,16 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
       // await validateDatabaseSchema(pgliteWorkerInstance);
       
       // Check and apply migrations
-      console.log('🔍 [DB] Starting migration check...');
+      log.info('🔍 [DB] Starting migration check...');
       await checkAndApplyMigrations();
-      console.log('✅ [DB] Migration check complete');
+      log.info('✅ [DB] Migration check complete');
       
-      console.log('✅ PGliteWorker initialized successfully');
+      log.info('✅ PGliteWorker initialized successfully');
       dbMessageBus.publish('initialized', { success: true });
       
       return pgliteWorkerInstance;
     } catch (error) {
-      console.error('❌ Error initializing PGliteWorker:', error);
+      log.error('❌ Error initializing PGliteWorker:', error);
       dbMessageBus.publish('error', { error });
       throw error;
     } finally {
@@ -243,7 +245,7 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
  */
 export async function clearDatabaseStorage(): Promise<boolean> {
   try {
-    console.log('🗑️ Clearing PGlite database storage...');
+    log.info('🗑️ Clearing PGlite database storage...');
     
     // Terminate current worker connection first
     if (pgliteWorkerInstance) {
@@ -253,10 +255,10 @@ export async function clearDatabaseStorage(): Promise<boolean> {
     // Clearing IndexedDB remains the same as it's a browser API
     await clearIndexedDBStorage();
     
-    console.log('✅ PGlite database storage cleared');
+    log.info('✅ PGlite database storage cleared');
     return true;
   } catch (error) {
-    console.error('❌ Error clearing PGlite database storage:', error);
+    log.error('❌ Error clearing PGlite database storage:', error);
     return false;
   }
 }
@@ -270,15 +272,15 @@ async function clearIndexedDBStorage(): Promise<void> {
       // Use the exported DB_NAME constant
       const req = indexedDB.deleteDatabase(DB_NAME);
       req.onsuccess = () => {
-        console.log(`Successfully deleted ${DB_NAME} database from IndexedDB`);
+        log.info(`Successfully deleted ${DB_NAME} database from IndexedDB`);
         resolve();
       };
       req.onerror = (event) => {
-        console.error(`Error deleting ${DB_NAME} database:`, event);
+        log.error(`Error deleting ${DB_NAME} database:`, event);
         reject(new Error(`Failed to delete ${DB_NAME} database`));
       };
       req.onblocked = () => {
-        console.warn(`Deletion of ${DB_NAME} database is blocked. Close other tabs/connections.`);
+        log.warn(`Deletion of ${DB_NAME} database is blocked. Close other tabs/connections.`);
         // Potentially reject or wait, depending on desired behavior
         reject(new Error(`Deletion of ${DB_NAME} database is blocked`));
       }
@@ -294,14 +296,14 @@ async function clearIndexedDBStorage(): Promise<void> {
 export async function terminateDatabase(): Promise<void> {
   if (workerInstance) { // Check raw worker instance
     try {
-      console.log('🛑 Terminating PGliteWorker connection...');
+      log.info('🛑 Terminating PGliteWorker connection...');
       workerInstance.terminate(); // Terminate the raw worker
       pgliteWorkerInstance = null;
       workerInstance = null; // Clear raw worker instance
       initPromise = null;
       isInitializing = false; // Reset initialization state
     } catch (error) {
-      console.error('❌ Error terminating PGliteWorker:', error);
+      log.error('❌ Error terminating PGliteWorker:', error);
     }
   }
 }
@@ -316,13 +318,13 @@ export async function validateDatabaseSchema(dbWorker: PGliteWorker): Promise<vo
     const schemaVersionExists = await checkTableExists(dbWorker, 'schema_version');
     
     if (!schemaVersionExists) {
-      console.log('Creating initial database schema via worker...');
+      log.info('Creating initial database schema via worker...');
       await createInitialSchema(dbWorker);
     } else {
-      console.log('Database schema already exists (checked via worker)');
+      log.info('Database schema already exists (checked via worker)');
     }
   } catch (error) {
-    console.error('Error validating database schema via worker:', error);
+    log.error('Error validating database schema via worker:', error);
     throw error;
   }
 }
@@ -341,7 +343,7 @@ async function checkTableExists(dbWorker: PGliteWorker, tableName: string): Prom
     
     return result.length > 0;
   } catch (error) {
-    console.error('Error checking table existence:', error);
+    log.error('Error checking table existence:', error);
     return false;
   }
 }
@@ -355,5 +357,5 @@ async function createInitialSchema(dbWorker: PGliteWorker): Promise<void> {
 
 // REMOVED: Module-level initialization call
 // initializeDatabase().catch(error => {
-//   console.error('Failed to initialize database at startup:', error);
+//   log.error('Failed to initialize database at startup:', error);
 // }); 

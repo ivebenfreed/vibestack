@@ -4,6 +4,8 @@
 
 import { use$ } from '@legendapp/state/react'
 import { OptionsManager, type SystemOption, type CustomOption } from './options-manager'
+import { stateLog } from '@/logger';
+const log = stateLog('legend-state/reference-system/hooks.ts');
 
 /**
  * Hook for system options with reactive updates
@@ -85,7 +87,7 @@ export function useReferenceOptions(config: {
   }
   
   // Fallback for invalid configuration
-  console.warn('[useReferenceOptions] Invalid configuration:', config)
+  log.warn('[useReferenceOptions] Invalid configuration:', config)
   return {
     options: [],
     isLoading: false,

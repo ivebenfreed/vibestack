@@ -1,77 +1,47 @@
-import { Client, QueryResultRow, neonConfig } from '@neondatabase/serverless';
-import type { Context } from 'hono';
+import postgres from 'postgres';
 import type { Env } from '../types/env';
 import type { AppContext, MinimalContext } from '../types/hono';
 
-/**
- * Add connect_timeout to URL if not present
- * @param url The database URL to process
- * @returns The processed URL with connect_timeout parameter
- */
-export function addConnectTimeout(url: string): string {
-  if (url.includes('connect_timeout=')) {
-    return url;
-  }
-  return url + (url.includes('?') ? '&' : '?') + 'connect_timeout=10';
+export interface QueryResultRow {
+  [column: string]: any;
 }
 
-// Initialize database client
-export const getDBClient = (c: AppContext | MinimalContext | { env: { DATABASE_URL: string } }) => {
+// Initialize database client using postgres.js (consistent with Kysely setup)
+export const getDBClient = (c: AppContext | MinimalContext | { env: Env }) => {
   try {
-    const url = 'env' in c && typeof c.env === 'object' && c.env !== null 
-      ? c.env.DATABASE_URL
+    const env = 'env' in c && typeof c.env === 'object' && c.env !== null 
+      ? c.env as Env
       : undefined;
       
-    if (!url) {
-      throw new Error('DATABASE_URL environment variable is not set');
+    if (!env) {
+      throw new Error('Environment variables not available');
     }
     
-    // Check if this is a local development URL
-    const isLocal = url.includes('localtest.me');
+    // Get connection string - prioritize Hyperdrive, fallback to DATABASE_URL  
+    const connectionString = env.HYPERDRIVE_DB?.connectionString || env.DATABASE_URL;
     
-    // Configure for local HTTP proxy if needed
-    if (isLocal) {
-      
-      // Configure for single SQL queries (HTTP)
-      neonConfig.fetchEndpoint = (host) => {
-        const [protocol, port] = host === 'db.localtest.me' ? ['http', 4444] : ['https', 443];
-        return `${protocol}://${host}:${port}/sql`;
-      };
-      neonConfig.fetchFunction = fetch;
-      
-      // Configure for Pool connections (WebSocket) - needed for replication
-      const connectionStringUrl = new URL(url);
-      neonConfig.useSecureWebSocket = connectionStringUrl.hostname !== 'db.localtest.me';
-      neonConfig.wsProxy = connectionStringUrl.hostname === 'db.localtest.me' 
-        ? (host) => `${host}:4444/v1` 
-        : undefined;
-      
-      // In Cloudflare Workers, WebSocket is available globally
-      neonConfig.webSocketConstructor = WebSocket;
+    if (!connectionString) {
+      throw new Error('No database connection available. Please provide either HYPERDRIVE_DB or DATABASE_URL');
     }
     
-    const urlWithTimeout = addConnectTimeout(url);
+    const source = env.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct';
+    console.log(`🚀 Creating postgres.js client (${source})...`);
     
-    const clientConfig: any = {
-      connectionString: urlWithTimeout,
-      ssl: !isLocal // No SSL for local connections
-    };
+    // Create postgres.js client with Workers-optimized settings
+    const sql = postgres(connectionString, {
+      fetch_types: false,    // Reduce latency
+      prepare: false,        // Let Hyperdrive handle optimization
+      connect_timeout: 10,   // Connection timeout
+    });
     
-    // For local development, force HTTP-only mode
-    if (isLocal) {
-      clientConfig.forceHttp = true;
-      clientConfig.webSocketConstructor = null;
-    }
-    
-    const client = new Client(clientConfig);
-    return client;
+    return sql;
   } catch (error) {
     console.error('Error creating database client:', error);
     throw error;
   }
 };
 
-// Direct query execution with proper connection management
+// Direct query execution using postgres.js
 export async function sql<T extends QueryResultRow = QueryResultRow>(
   c: AppContext | MinimalContext,
   query: string,
@@ -79,30 +49,27 @@ export async function sql<T extends QueryResultRow = QueryResultRow>(
 ): Promise<T[]> {
   const client = getDBClient(c);
   try {
-    await client.connect();
-    const result = await client.query<T>(query, params);
-    return result.rows;
-  } finally {
-    try {
-      await client.end();
-    } catch (err) {
-      console.error('Error closing connection:', err);
-    }
+    // postgres.js automatically handles connection management
+    const result = await client.unsafe(query, params);
+    return result as T[];
+  } catch (error) {
+    console.error('SQL query error:', error);
+    throw error;
   }
 }
 
-// Query execution helpers
+// Query execution helpers using postgres.js client
 export async function executeQuery<T extends QueryResultRow = QueryResultRow>(
-  client: Client,
+  client: ReturnType<typeof postgres>,
   query: string,
   params: any[] = []
 ): Promise<T[]> {
-  const result = await client.query<T>(query, params);
-  return result.rows;
+  const result = await client.unsafe(query, params);
+  return result as T[];
 }
 
 export async function executeQuerySingle<T extends QueryResultRow = QueryResultRow>(
-  client: Client,
+  client: ReturnType<typeof postgres>,
   query: string,
   params: any[] = []
 ): Promise<T | null> {
@@ -205,26 +172,21 @@ export const DOMAIN_TABLES = [
 // Fetch data from all domain tables
 export async function fetchDomainTableData(c: AppContext | MinimalContext): Promise<TableData[]> {
   const client = getDBClient(c);
-  try {
-    await client.connect();
-    const tableData = [];
+  const tableData = [];
 
-    // Fetch data from each domain table
-    for (const tableName of DOMAIN_TABLES) {
-      const rows = await client.query(`
-        SELECT * FROM "${tableName}";
-      `);
-      
-      tableData.push({
-        tableName,
-        rows: rows.rows
-      });
-    }
-
-    return tableData;
-  } finally {
-    await client.end();
+  // Fetch data from each domain table
+  for (const tableName of DOMAIN_TABLES) {
+    const rows = await client.unsafe(`
+      SELECT * FROM "${tableName}";
+    `);
+    
+    tableData.push({
+      tableName,
+      rows: rows as any[]
+    });
   }
+
+  return tableData;
 }
 
 // Health check
@@ -239,11 +201,10 @@ export async function checkDatabaseHealth(c: AppContext | MinimalContext): Promi
   const client = getDBClient(c);
   
   try {
-    await client.connect();
-    await client.query('SELECT 1');
+    await client.unsafe('SELECT 1');
     
     // Get table information
-    const tablesResult = await client.query<{ tablename: string }>(`
+    const tablesResult = await client.unsafe<{ tablename: string }>(`
       SELECT tablename 
       FROM pg_tables 
       WHERE schemaname = 'public'
@@ -253,12 +214,12 @@ export async function checkDatabaseHealth(c: AppContext | MinimalContext): Promi
     const tables = [];
     
     // Get row count for each table
-    for (const { tablename } of tablesResult.rows) {
-      const countResult = await client.query<{ count: number }>(`
+    for (const { tablename } of tablesResult) {
+      const countResult = await client.unsafe<{ count: number }>(`
         SELECT COUNT(*) as count FROM "${tablename}";
       `);
       
-      const rowCount = Number(countResult.rows[0]?.count || 0);
+      const rowCount = Number(countResult[0]?.count || 0);
       
       tables.push({
         name: tablename,
@@ -278,11 +239,5 @@ export async function checkDatabaseHealth(c: AppContext | MinimalContext): Promi
       latency: Date.now() - start,
       error: error instanceof Error ? error.message : 'Unknown error'
     };
-  } finally {
-    try {
-      await client.end();
-    } catch (err) {
-      console.error('Error closing connection:', err);
-    }
   }
 } 

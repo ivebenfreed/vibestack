@@ -1,5 +1,7 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/overlays/DragPreviewOverlayDOM.ts');
 
 // ====================================
 // DRAG PREVIEW OVERLAY - DOM Implementation
@@ -112,7 +114,7 @@ export class DragPreviewOverlayDOM {
       transition: 'all 100ms ease-out'
     });
     
-    console.log('DragPreviewOverlayDOM: Preview shown', { x, y, width, height });
+    log.info('DragPreviewOverlayDOM: Preview shown', { x, y, width, height });
   }
   
   /**

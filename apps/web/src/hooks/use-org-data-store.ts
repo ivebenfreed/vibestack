@@ -2,6 +2,8 @@ import { useEffect, useMemo } from 'react'
 import { useObservable } from '@legendapp/state/react'
 import { orgContext$, loadOrgContext, getEntity$, clearContext } from '@/legend-state'
 import { useAuth } from '@/state-machines'
+import { stateLog } from '@/logger';
+const log = stateLog('hooks/use-org-data-store.ts');
 
 export function useOrgDataStore() {
   const { currentOrganization, user } = useAuth()
@@ -10,7 +12,7 @@ export function useOrgDataStore() {
   useEffect(() => {
     if (currentOrganization?.id && user?.id) {
       loadOrgContext(currentOrganization.id, user.id).catch(error => {
-        console.error('[useOrgDataStore] Failed to load org context:', error)
+        log.error('[useOrgDataStore] Failed to load org context:', error)
       })
     } else {
       clearContext()

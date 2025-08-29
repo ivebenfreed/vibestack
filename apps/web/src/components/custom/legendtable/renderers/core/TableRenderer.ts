@@ -19,6 +19,8 @@ import { HeaderEngine } from '../engines/HeaderEngine';
 import { PerformanceSystem } from '../systems/PerformanceSystem';
 import { RenderPipeline } from './RenderPipeline';
 import { StateManager } from '../managers/StateManager';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/renderers/core/TableRenderer.ts');
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -206,12 +208,12 @@ export class TableRenderer {
   
   // Set or update columns - DEPRECATED: Now handled by state machine coordinate mapping
   setColumns(columns: Column[]): void {
-    console.warn('TableRenderer: setColumns is deprecated - column data comes from state machine coordinate mapping');
+    log.warn('TableRenderer: setColumns is deprecated - column data comes from state machine coordinate mapping');
   }
 
   // Set or update column visibility - DEPRECATED: Now handled by state machine coordinate mapping
   setColumnVisibility(visibility: Record<string, boolean>): void {
-    console.warn('TableRenderer: setColumnVisibility is deprecated - column visibility comes from state machine coordinate mapping');
+    log.warn('TableRenderer: setColumnVisibility is deprecated - column visibility comes from state machine coordinate mapping');
   }
   
   // Initialize renderer with complete configuration - single render
@@ -220,7 +222,7 @@ export class TableRenderer {
   }
   
   setColumnOrder(order: string[]): void {
-    console.warn('TableRenderer: setColumnOrder is deprecated - column order comes from state machine coordinate mapping');
+    log.warn('TableRenderer: setColumnOrder is deprecated - column order comes from state machine coordinate mapping');
   }
   
   
@@ -305,11 +307,11 @@ export class TableRenderer {
   updateRow(rowId: string, newData: any, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
     const lastRenderState = this.stateManager.getLastRenderState();
     if (!lastRenderState) {
-      console.warn('TableRenderer: updateRow - no render state available');
+      log.warn('TableRenderer: updateRow - no render state available');
       return;
     }
     
-    console.log('🔧 TableRenderer: Updating single row', {
+    log.info('🔧 TableRenderer: Updating single row', {
       rowId,
       hasRenderState: !!lastRenderState,
       newDataKeys: Object.keys(newData)
@@ -324,18 +326,18 @@ export class TableRenderer {
   updateCell(rowId: string, columnId: string, newValue: any, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
     const lastRenderState = this.stateManager.getLastRenderState();
     if (!lastRenderState) {
-      console.warn('TableRenderer: updateCell - no render state available');
+      log.warn('TableRenderer: updateCell - no render state available');
       return;
     }
     
     // Find the column definition
     const column = lastRenderState.columns?.find(c => c.id === columnId);
     if (!column) {
-      console.warn('TableRenderer: updateCell - column not found:', columnId);
+      log.warn('TableRenderer: updateCell - column not found:', columnId);
       return;
     }
     
-    console.log('🔧 TableRenderer: Updating single cell', {
+    log.info('🔧 TableRenderer: Updating single cell', {
       rowId,
       columnId,
       newValue,
@@ -522,7 +524,7 @@ export class TableRenderer {
   
   // Update a single column width - DEPRECATED: Use state machine coordinate mapping
   updateColumnWidth(columnId: string, width: number): void {
-    console.warn('TableRenderer: updateColumnWidth is deprecated - column updates should come from state machine');
+    log.warn('TableRenderer: updateColumnWidth is deprecated - column updates should come from state machine');
     
     // Column width updates should now go through the state machine
     // which will recalculate coordinates and send them back to the renderer
@@ -530,7 +532,7 @@ export class TableRenderer {
   }
   // CRITICAL: Accept coordinate mapping updates from state machine
   updateCoordinateMapping(coordinateMapping: any, version: number): void {
-    console.log('TableRenderer: Updating coordinate mapping from state machine:', {
+    log.info('TableRenderer: Updating coordinate mapping from state machine:', {
       version,
       columnCount: coordinateMapping.columns.length,
       authoritative: true

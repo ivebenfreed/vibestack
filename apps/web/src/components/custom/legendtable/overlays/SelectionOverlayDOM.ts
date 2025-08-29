@@ -2,6 +2,8 @@ import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../types';
 import type { VisualCellPosition } from './OverlayTypes';
 import type { TableState } from '../state/table-state';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/overlays/SelectionOverlayDOM.ts');
 
 // ====================================
 // DOM SELECTION OVERLAY
@@ -48,7 +50,7 @@ export class SelectionOverlayDOM {
       this.container.style.position = 'relative';
     }
     
-    console.log('SelectionOverlayDOM: Created', {
+    log.info('SelectionOverlayDOM: Created', {
       container: this.container,
       config: this.config
     });
@@ -58,7 +60,7 @@ export class SelectionOverlayDOM {
    * Update selection using coordinate mapping directly (pure XState approach)
    */
   updateSelectionWithMapping(selectedCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
-    console.log('SelectionOverlayDOM.updateSelectionWithMapping called', {
+    log.info('SelectionOverlayDOM.updateSelectionWithMapping called', {
       selectedCells: selectedCells.size,
       selectedCellKeys: Array.from(selectedCells),
       viewport: viewport,
@@ -74,7 +76,7 @@ export class SelectionOverlayDOM {
     }
 
     if (!viewport || !coordinateMapping) {
-      console.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for selection render', {
+      log.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for selection render', {
         hasViewport: !!viewport,
         hasCoordinateMapping: !!coordinateMapping
       });
@@ -114,7 +116,7 @@ export class SelectionOverlayDOM {
       }
     }
 
-    console.log('SelectionOverlayDOM: Visible cells calculated', {
+    log.info('SelectionOverlayDOM: Visible cells calculated', {
       totalSelected: selectedCells.size,
       visibleCount: visibleCells.size,
       viewport: {
@@ -145,7 +147,7 @@ export class SelectionOverlayDOM {
    * Update with visual cell positions directly - Excel-style unified selection
    */
   updateWithVisualPositions(visualCells: VisualCellPosition[]): void {
-    console.log('SelectionOverlayDOM.updateWithVisualPositions', {
+    log.info('SelectionOverlayDOM.updateWithVisualPositions', {
       cellCount: visualCells.length,
       containerExists: !!this.container,
       containerInDom: this.container ? document.body.contains(this.container) : false,
@@ -177,7 +179,7 @@ export class SelectionOverlayDOM {
       this.createUnifiedSelectionRectangle(visualCells);
     }
     
-    console.log('SelectionOverlayDOM: After unified selection update', {
+    log.info('SelectionOverlayDOM: After unified selection update', {
       elementCount: this.selectionElements.size,
       elementKeys: Array.from(this.selectionElements.keys())
     });
@@ -205,7 +207,7 @@ export class SelectionOverlayDOM {
     // Find the anchor cell (top-left cell in the selection)
     const anchorCell = visualCells.find(cell => cell.x === minX && cell.y === minY);
     
-    console.log('SelectionOverlayDOM: Creating Excel-style unified selection', {
+    log.info('SelectionOverlayDOM: Creating Excel-style unified selection', {
       boundingRect,
       cellCount: visualCells.length,
       anchorCell: anchorCell ? { key: anchorCell.cellKey, x: anchorCell.x, y: anchorCell.y } : null
@@ -262,7 +264,7 @@ export class SelectionOverlayDOM {
       this.container.appendChild(anchorElement);
       this.selectionElements.set('anchor-cell', anchorElement);
       
-      console.log('SelectionOverlayDOM: Anchor cell element created', {
+      log.info('SelectionOverlayDOM: Anchor cell element created', {
         position: { x: anchorCell.x, y: anchorCell.y, width: anchorCell.width, height: anchorCell.height },
         thickBorder: this.config.borderWidth,
         thinBorder: thinBorderWidth
@@ -297,7 +299,7 @@ export class SelectionOverlayDOM {
     this.container.appendChild(fillHandleElement);
     this.selectionElements.set('fill-handle', fillHandleElement);
     
-    console.log('SelectionOverlayDOM: Fill handle created', {
+    log.info('SelectionOverlayDOM: Fill handle created', {
       position: { 
         x: boundingRect.x + boundingRect.width - fillHandleSize / 2,
         y: boundingRect.y + boundingRect.height - fillHandleSize / 2 
@@ -308,7 +310,7 @@ export class SelectionOverlayDOM {
     // Initialize fill handle drag functionality
     this.initializeFillHandleDrag(fillHandleElement, boundingRect, visualCells);
     
-    console.log('SelectionOverlayDOM: Excel-style selection elements created', {
+    log.info('SelectionOverlayDOM: Excel-style selection elements created', {
       elementInDom: document.body.contains(unifiedElement),
       boundingRect,
       borderWidths: { thin: thinBorderWidth, thick: this.config.borderWidth }
@@ -328,7 +330,7 @@ export class SelectionOverlayDOM {
       fillHandleElement.style.opacity = '1';
       fillHandleElement.style.transform = 'scale(1)';
       
-      console.log('SelectionOverlayDOM: Excel-style selection animation triggered');
+      log.info('SelectionOverlayDOM: Excel-style selection animation triggered');
     });
   }
   
@@ -353,7 +355,7 @@ export class SelectionOverlayDOM {
     let element = this.selectionElements.get(cellKey);
     
     if (!element) {
-      console.log(`SelectionOverlayDOM: Creating new element for ${cellKey}`, {
+      log.info(`SelectionOverlayDOM: Creating new element for ${cellKey}`, {
         container: this.container.className,
         containerInDom: document.body.contains(this.container)
       });
@@ -379,7 +381,7 @@ export class SelectionOverlayDOM {
       this.container.appendChild(element);
       this.selectionElements.set(cellKey, element);
       
-      console.log(`SelectionOverlayDOM: Element created and appended for ${cellKey}`, {
+      log.info(`SelectionOverlayDOM: Element created and appended for ${cellKey}`, {
         elementInDom: document.body.contains(element),
         parentClass: element.parentElement?.className
       });
@@ -388,7 +390,7 @@ export class SelectionOverlayDOM {
       requestAnimationFrame(() => {
         element.style.opacity = '1';
         element.style.transform = 'scale(1)';
-        console.log(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
+        log.info(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
       });
     }
     
@@ -417,7 +419,7 @@ export class SelectionOverlayDOM {
       height: `${position.height}px`
     });
     
-    console.log(`SelectionOverlayDOM: Element positioned for ${cellKey}`, {
+    log.info(`SelectionOverlayDOM: Element positioned for ${cellKey}`, {
       left: position.x,
       top: position.y,
       width: position.width,
@@ -454,7 +456,7 @@ export class SelectionOverlayDOM {
    * Clear all selection elements
    */
   clearSelection(): void {
-    console.log('SelectionOverlayDOM: Clearing selection', {
+    log.info('SelectionOverlayDOM: Clearing selection', {
       elementCount: this.selectionElements.size
     });
     
@@ -575,14 +577,14 @@ export class SelectionOverlayDOM {
     let startY = 0;
     let fillPreviewElement: HTMLElement | null = null;
     
-    console.log('[SelectionOverlayDOM] Initializing fill handle drag events', {
+    log.info('[SelectionOverlayDOM] Initializing fill handle drag events', {
       element: fillHandleElement,
       boundingRect,
       visualCells: visualCells.length
     });
     
     const handleMouseDown = (event: MouseEvent) => {
-      console.log('[SelectionOverlayDOM] Fill handle mousedown triggered', {
+      log.info('[SelectionOverlayDOM] Fill handle mousedown triggered', {
         target: event.target,
         isFillHandle: event.target === fillHandleElement,
         className: (event.target as HTMLElement)?.className,
@@ -596,14 +598,14 @@ export class SelectionOverlayDOM {
       
       // Only proceed if this is specifically the fill handle
       if (event.target !== fillHandleElement) {
-        console.log('[SelectionOverlayDOM] Mousedown not on fill handle, ignoring');
+        log.info('[SelectionOverlayDOM] Mousedown not on fill handle, ignoring');
         return false;
       }
       
       isDragging = true;
       startY = event.clientY;
       
-      console.log('[SelectionOverlayDOM] Fill handle drag started', { startY });
+      log.info('[SelectionOverlayDOM] Fill handle drag started', { startY });
       
       // Change cursor for the entire document during drag
       document.body.style.cursor = 'ns-resize';
@@ -641,7 +643,7 @@ export class SelectionOverlayDOM {
         this.showFillPreview(boundingRect, direction, additionalRows, cellHeight);
       }
       
-      console.log('[SelectionOverlayDOM] Fill drag move', { 
+      log.info('[SelectionOverlayDOM] Fill drag move', { 
         deltaY, 
         direction, 
         fillExtent, 
@@ -673,7 +675,7 @@ export class SelectionOverlayDOM {
         this.executeFillOperation(visualCells, direction, additionalRows);
       }
       
-      console.log('[SelectionOverlayDOM] Fill handle drag completed', { 
+      log.info('[SelectionOverlayDOM] Fill handle drag completed', { 
         deltaY, 
         direction, 
         additionalRows 
@@ -682,7 +684,7 @@ export class SelectionOverlayDOM {
     
     // Listen for the custom event from the container handler to avoid conflicts
     fillHandleElement.addEventListener('fillHandleMouseDown', (event: CustomEvent) => {
-      console.log('[SelectionOverlayDOM] Fill handle custom event received - calling handler');
+      log.info('[SelectionOverlayDOM] Fill handle custom event received - calling handler');
       // Create a synthetic mousedown event from the custom event details
       const syntheticEvent = new MouseEvent('mousedown', {
         bubbles: false,
@@ -696,27 +698,27 @@ export class SelectionOverlayDOM {
     
     // Also keep the direct mousedown listener as backup
     fillHandleElement.addEventListener('mousedown', (event) => {
-      console.log('[SelectionOverlayDOM] Fill handle direct mousedown - calling handler');
+      log.info('[SelectionOverlayDOM] Fill handle direct mousedown - calling handler');
       handleMouseDown(event);
     }, { passive: false });
     fillHandleElement.addEventListener('click', (event) => {
-      console.log('[SelectionOverlayDOM] Fill handle CLICK event triggered', event);
+      log.info('[SelectionOverlayDOM] Fill handle CLICK event triggered', event);
       event.preventDefault();
       event.stopPropagation();
     }, { passive: false });
     fillHandleElement.addEventListener('mouseenter', () => {
-      console.log('[SelectionOverlayDOM] Fill handle MOUSEENTER');
+      log.info('[SelectionOverlayDOM] Fill handle MOUSEENTER');
       fillHandleElement.style.transform = 'scale(1.2)';
     });
     fillHandleElement.addEventListener('mouseleave', () => {
-      console.log('[SelectionOverlayDOM] Fill handle MOUSELEAVE');
+      log.info('[SelectionOverlayDOM] Fill handle MOUSELEAVE');
       fillHandleElement.style.transform = 'scale(1)';
     });
     
     // Add a generic event listener to capture all mouse events
     ['mousedown', 'mouseup', 'mousemove', 'click'].forEach(eventType => {
       fillHandleElement.addEventListener(eventType, (event) => {
-        console.log(`[SelectionOverlayDOM] Fill handle ${eventType.toUpperCase()} event`, {
+        log.info(`[SelectionOverlayDOM] Fill handle ${eventType.toUpperCase()} event`, {
           type: event.type,
           target: event.target,
           currentTarget: event.currentTarget,
@@ -726,7 +728,7 @@ export class SelectionOverlayDOM {
       }, { passive: false });
     });
     
-    console.log('[SelectionOverlayDOM] Fill handle drag events attached', {
+    log.info('[SelectionOverlayDOM] Fill handle drag events attached', {
       elementExists: !!fillHandleElement,
       hasMouseDownListener: true,
       hasCustomEventListener: true,
@@ -742,7 +744,7 @@ export class SelectionOverlayDOM {
     
     // Test that the custom event listener works
     setTimeout(() => {
-      console.log('[SelectionOverlayDOM] Testing custom event dispatch');
+      log.info('[SelectionOverlayDOM] Testing custom event dispatch');
       const testEvent = new CustomEvent('fillHandleMouseDown', {
         detail: { clientX: 0, clientY: 0, button: 0 },
         bubbles: false,
@@ -808,7 +810,7 @@ export class SelectionOverlayDOM {
    * Execute the fill operation using Legend State
    */
   private executeFillOperation(visualCells: VisualCellPosition[], direction: 'up' | 'down', additionalRows: number): void {
-    console.log('[SelectionOverlayDOM] Executing fill operation', {
+    log.info('[SelectionOverlayDOM] Executing fill operation', {
       visualCells: visualCells.length,
       direction,
       additionalRows,
@@ -818,14 +820,14 @@ export class SelectionOverlayDOM {
     // Get the current selection as source range
     const selectedCells = this.tableState.selection.selectedCells.get();
     if (selectedCells.size === 0) {
-      console.warn('[SelectionOverlayDOM] No cells selected for fill operation');
+      log.warn('[SelectionOverlayDOM] No cells selected for fill operation');
       return;
     }
     
     // Create fill range from visual cells
     const fillRange = new Set(visualCells.map(cell => cell.cellKey));
     
-    console.log('[SelectionOverlayDOM] Connecting to Legend State fill operations', {
+    log.info('[SelectionOverlayDOM] Connecting to Legend State fill operations', {
       sourceRange: Array.from(selectedCells),
       fillRange: Array.from(fillRange),
       direction
@@ -840,14 +842,14 @@ export class SelectionOverlayDOM {
       this.tableState.fillDown(selectedCells, fillRange);
     }
     
-    console.log('[SelectionOverlayDOM] Fill operation completed');
+    log.info('[SelectionOverlayDOM] Fill operation completed');
   }
   
   /**
    * Show fill preview with dotted border style using coordinate mapping
    */
   showFillPreviewWithCells(previewCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
-    console.log('SelectionOverlayDOM: Showing fill preview', {
+    log.info('SelectionOverlayDOM: Showing fill preview', {
       previewCells: Array.from(previewCells),
       hasViewport: !!viewport,
       hasCoordinateMapping: !!coordinateMapping
@@ -859,7 +861,7 @@ export class SelectionOverlayDOM {
     }
     
     if (!viewport || !coordinateMapping) {
-      console.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for fill preview');
+      log.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for fill preview');
       return;
     }
     
@@ -917,7 +919,7 @@ export class SelectionOverlayDOM {
    * Clear fill preview
    */
   clearFillPreview(): void {
-    console.log('SelectionOverlayDOM: Clearing fill preview');
+    log.info('SelectionOverlayDOM: Clearing fill preview');
     for (const element of this.fillPreviewElements.values()) {
       element.remove();
     }
@@ -945,7 +947,7 @@ export class SelectionOverlayDOM {
       this.container.appendChild(element);
       this.fillPreviewElements.set(cellKey, element);
       
-      console.log('SelectionOverlayDOM: Created fill preview element for', cellKey);
+      log.info('SelectionOverlayDOM: Created fill preview element for', cellKey);
     }
     
     // Update position

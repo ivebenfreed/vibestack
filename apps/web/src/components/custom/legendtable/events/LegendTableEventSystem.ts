@@ -5,6 +5,8 @@
 
 import { observable, observe, event } from '@legendapp/state';
 import type { TableState } from '../state/table-state';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/events/LegendTableEventSystem.ts');
 
 // ====================================
 // EVENT TYPES & INTERFACES
@@ -86,7 +88,7 @@ export class LegendTableEventSystem {
   // ====================================
 
   private initializeEventSystem(): void {
-    console.log('[LegendTableEventSystem] Initializing centralized event system');
+    log.info('[LegendTableEventSystem] Initializing centralized event system');
 
     // Set up DOM event listeners
     this.setupDOMListeners();
@@ -94,7 +96,7 @@ export class LegendTableEventSystem {
     // Set up reactive event handlers using Legend State observe
     this.setupReactiveHandlers();
 
-    console.log('[LegendTableEventSystem] Event system initialized');
+    log.info('[LegendTableEventSystem] Event system initialized');
   }
 
   private setupDOMListeners(): void {
@@ -110,7 +112,7 @@ export class LegendTableEventSystem {
         shiftKey: event.shiftKey
       };
 
-      console.log('[LegendTableEventSystem] Mouse down detected', { 
+      log.info('[LegendTableEventSystem] Mouse down detected', { 
         target, 
         eventData,
         coords: { x: event.clientX, y: event.clientY }
@@ -124,7 +126,7 @@ export class LegendTableEventSystem {
         target
       };
 
-      console.log('[LegendTableEventSystem] Mouse state updated', { 
+      log.info('[LegendTableEventSystem] Mouse state updated', { 
         startPos: this.mouseState.startPos,
         isDown: this.mouseState.isDown,
         target: target.type 
@@ -153,7 +155,7 @@ export class LegendTableEventSystem {
 
       const currentTool = this.currentTool$.get();
 
-      console.log('[LegendTableEventSystem] Mouse move during drag', { 
+      log.info('[LegendTableEventSystem] Mouse move during drag', { 
         currentTool, 
         deltaX, 
         deltaY,
@@ -162,7 +164,7 @@ export class LegendTableEventSystem {
 
       // Determine if we should start dragging
       if (!this.dragState$.isDragging.get() && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
-        console.log('[LegendTableEventSystem] Starting drag operation');
+        log.info('[LegendTableEventSystem] Starting drag operation');
         this.dragState$.assign({
           isDragging: true,
           dragType: currentTool === 'fillHandle' ? 'fillHandle' : 'selection'
@@ -200,12 +202,12 @@ export class LegendTableEventSystem {
         shiftKey: event.shiftKey
       };
 
-      console.log('[LegendTableEventSystem] Mouse up received');
+      log.info('[LegendTableEventSystem] Mouse up received');
       const currentTool = this.currentTool$.get();
       const dragState = this.dragState$.get();
 
       if (dragState.isDragging) {
-        console.log('[LegendTableEventSystem] Completing drag operation', { currentTool });
+        log.info('[LegendTableEventSystem] Completing drag operation', { currentTool });
         switch (currentTool) {
           case 'fillHandle':
             this.completeFillHandleDrag();
@@ -300,23 +302,23 @@ export class LegendTableEventSystem {
   private routeMouseDownEvent(target: InteractionTarget, eventData: MouseEventData): void {
     switch (target.type) {
       case 'fillHandle':
-        console.log('[LegendTableEventSystem] Routing to fill handle');
+        log.info('[LegendTableEventSystem] Routing to fill handle');
         this.currentTool$.set('fillHandle');
         this.fillHandleStart$.fire(eventData);
         break;
 
       case 'cell':
-        console.log('[LegendTableEventSystem] Routing to cell selection');
+        log.info('[LegendTableEventSystem] Routing to cell selection');
         this.currentTool$.set('select');
         this.cellSelectionStart$.fire(eventData);
         break;
 
       case 'header':
-        console.log('[LegendTableEventSystem] Header interaction - not implemented');
+        log.info('[LegendTableEventSystem] Header interaction - not implemented');
         break;
 
       case 'background':
-        console.log('[LegendTableEventSystem] Background click - clear selection');
+        log.info('[LegendTableEventSystem] Background click - clear selection');
         this.tableState.clearSelection();
         break;
     }
@@ -327,22 +329,22 @@ export class LegendTableEventSystem {
   // ====================================
 
   private setupReactiveHandlers(): void {
-    console.log('[LegendTableEventSystem] Setting up reactive event handlers');
+    log.info('[LegendTableEventSystem] Setting up reactive event handlers');
 
     // Set up direct event listeners for initial interactions
     const fillHandleDisposer = this.fillHandleStart$.on((eventData) => {
-      console.log('[LegendTableEventSystem] Fill handle drag started');
+      log.info('[LegendTableEventSystem] Fill handle drag started');
       this.handleFillHandleDrag(eventData);
     });
 
     const cellSelectionDisposer = this.cellSelectionStart$.on((eventData) => {
-      console.log('[LegendTableEventSystem] Cell selection started');
+      log.info('[LegendTableEventSystem] Cell selection started');
       this.handleCellSelection(eventData);
     });
 
     // Store disposers for cleanup
     this.disposers.push(fillHandleDisposer, cellSelectionDisposer);
-    console.log('[LegendTableEventSystem] Reactive handlers setup complete');
+    log.info('[LegendTableEventSystem] Reactive handlers setup complete');
   }
 
   // ====================================
@@ -350,7 +352,7 @@ export class LegendTableEventSystem {
   // ====================================
 
   private handleFillHandleDrag(eventData: MouseEventData): void {
-    console.log('[LegendTableEventSystem] Fill handle drag initiated');
+    log.info('[LegendTableEventSystem] Fill handle drag initiated');
     // Set cursor
     document.body.style.cursor = 'ns-resize';
   }
@@ -364,7 +366,7 @@ export class LegendTableEventSystem {
       return;
     }
 
-    console.log('[LegendTableEventSystem] Fill handle drag move', { deltaY });
+    log.info('[LegendTableEventSystem] Fill handle drag move', { deltaY });
 
     // Calculate fill direction and extent
     const direction = deltaY > 0 ? 'down' : 'up';
@@ -382,7 +384,7 @@ export class LegendTableEventSystem {
       // Show visual preview
       this.showFillPreview(previewCells);
       
-      console.log('[LegendTableEventSystem] Fill preview calculated', {
+      log.info('[LegendTableEventSystem] Fill preview calculated', {
         direction,
         additionalRows,
         previewCount: previewCells.size
@@ -441,7 +443,7 @@ export class LegendTableEventSystem {
   }
 
   private completeFillHandleDrag(): void {
-    console.log('[LegendTableEventSystem] Fill handle drag completed');
+    log.info('[LegendTableEventSystem] Fill handle drag completed');
     document.body.style.cursor = '';
     
     // Execute fill operation using Legend State methods
@@ -449,7 +451,7 @@ export class LegendTableEventSystem {
     const previewCells = dragState.previewCells;
     
     if (previewCells.size > 0) {
-      console.log('[LegendTableEventSystem] Executing fillDown operation', {
+      log.info('[LegendTableEventSystem] Executing fillDown operation', {
         previewCells: Array.from(previewCells)
       });
       
@@ -463,7 +465,7 @@ export class LegendTableEventSystem {
       const finalSelection = new Set([...selectedCells, ...previewCells]);
       this.tableState.selection.selectedCells.set(finalSelection);
       
-      console.log('[LegendTableEventSystem] Fill operation completed', {
+      log.info('[LegendTableEventSystem] Fill operation completed', {
         originalSelection: selectedCells.size,
         fillCells: previewCells.size,
         finalSelection: finalSelection.size
@@ -478,7 +480,7 @@ export class LegendTableEventSystem {
     const target = this.mouseState.target;
     if (target?.type !== 'cell' || !target.cellKey) return;
 
-    console.log('[LegendTableEventSystem] Cell selection initiated', { cellKey: target.cellKey });
+    log.info('[LegendTableEventSystem] Cell selection initiated', { cellKey: target.cellKey });
 
     if (!eventData.ctrlKey && !eventData.shiftKey) {
       // Single cell selection
@@ -493,7 +495,7 @@ export class LegendTableEventSystem {
     
     if (target.type !== 'cell' || !target.cellKey || !startCell) return;
 
-    console.log('[LegendTableEventSystem] Selection drag move', { 
+    log.info('[LegendTableEventSystem] Selection drag move', { 
       from: startCell, 
       to: target.cellKey 
     });
@@ -503,7 +505,7 @@ export class LegendTableEventSystem {
   }
 
   private completeSelectionDrag(): void {
-    console.log('[LegendTableEventSystem] Selection drag completed');
+    log.info('[LegendTableEventSystem] Selection drag completed');
   }
 
   // ====================================
@@ -512,14 +514,14 @@ export class LegendTableEventSystem {
 
   private showFillPreview(previewCells: Set<string>): void {
     if (!this.canvasOverlay) {
-      console.warn('[LegendTableEventSystem] Cannot show fill preview - no canvas overlay reference');
+      log.warn('[LegendTableEventSystem] Cannot show fill preview - no canvas overlay reference');
       return;
     }
 
     // Get the selection overlay from canvas overlay
     const selectionOverlay = this.canvasOverlay.getSelectionOverlay?.();
     if (!selectionOverlay) {
-      console.warn('[LegendTableEventSystem] Cannot show fill preview - no selection overlay');
+      log.warn('[LegendTableEventSystem] Cannot show fill preview - no selection overlay');
       return;
     }
 
@@ -547,7 +549,7 @@ export class LegendTableEventSystem {
   }
 
   public updateCanvasOverlay(canvasOverlay: any): void {
-    console.log('[LegendTableEventSystem] Updating canvas overlay reference');
+    log.info('[LegendTableEventSystem] Updating canvas overlay reference');
     this.canvasOverlay = canvasOverlay;
   }
 
@@ -556,7 +558,7 @@ export class LegendTableEventSystem {
   // ====================================
 
   public destroy(): void {
-    console.log('[LegendTableEventSystem] Cleaning up event system');
+    log.info('[LegendTableEventSystem] Cleaning up event system');
     this.disposers.forEach(dispose => dispose());
     this.disposers.length = 0;
   }

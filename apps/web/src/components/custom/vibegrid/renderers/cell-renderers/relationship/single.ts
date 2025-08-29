@@ -1,4 +1,6 @@
 import type { Column } from '../../../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/renderers/cell-renderers/relationship/single.ts');
 
 /**
  * Fast single relationship renderer - string version
@@ -10,7 +12,7 @@ export function relationshipSingle(
   rowData?: any
 ): string {
   // Debug logging disabled for performance
-  // console.log('🔍 relationshipSingle: Called', { columnId: column.id, value });
+  // log.info('🔍 relationshipSingle: Called', { columnId: column.id, value });
   
   // First check for pre-resolved value from ViewActor
   if (rowData && rowData[`__resolved_${column.id}`]) {

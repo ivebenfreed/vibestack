@@ -1,4 +1,6 @@
 import type { Column } from '../../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/renderers/systems/DOMSystem.ts');
 
 // ====================================
 // DOM STRUCTURE MANAGER
@@ -43,7 +45,7 @@ export class DOMSystem {
    * Initialize the complete DOM structure
    */
   private initializeDOM(container: HTMLElement): DOMElements {
-    console.log('🔧 DOMSystem: Starting DOM initialization');
+    log.info('🔧 DOMSystem: Starting DOM initialization');
     
     // Clear and setup container
     container.innerHTML = '';
@@ -117,7 +119,7 @@ export class DOMSystem {
     table.appendChild(viewport);
     container.appendChild(table);
     
-    console.log('🔧 DOMSystem: DOM initialization complete');
+    log.info('🔧 DOMSystem: DOM initialization complete');
     
     return {
       container,

@@ -125,3 +125,8 @@ worktrees/vibestack-env-*.tar.gz
 .docker/
 
 /marketingdata/container-main.tar
+
+# Claude Code sessions
+sessions/
+.claude/autonomous.log
+.claude/autonomous-output.log

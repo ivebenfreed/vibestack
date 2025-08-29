@@ -5,6 +5,8 @@
 
 import { observable, computed } from '@legendapp/state'
 import { orgContext$ } from '../observables'
+import { stateLog } from '@/logger';
+const log = stateLog('legend-state/reference-system/options-manager.ts');
 
 // Types
 export interface SystemOption {
@@ -95,11 +97,11 @@ async function loadSystemOptions(optionType: string, archetype: string, key: str
       options: data.data || []
     }
     
-    console.log(`[OptionsManager] Loaded system options for ${key}:`, optionSet)
+    log.info(`[OptionsManager] Loaded system options for ${key}:`, optionSet)
     optionsStore$.systemOptions[key].set(optionSet)
     
   } catch (error) {
-    console.error(`[OptionsManager] Error loading system options for ${key}:`, error)
+    log.error(`[OptionsManager] Error loading system options for ${key}:`, error)
     optionsStore$.errors[key].set(error.message)
     optionsStore$.systemOptions[key].set({
       id: key,
@@ -161,11 +163,11 @@ async function loadCustomOptions(optionSetName: string, orgId: string, key: stri
       options: data.data || []
     }
     
-    console.log(`[OptionsManager] Loaded custom options for ${key}:`, optionSet)
+    log.info(`[OptionsManager] Loaded custom options for ${key}:`, optionSet)
     optionsStore$.customOptions[key].set(optionSet)
     
   } catch (error) {
-    console.error(`[OptionsManager] Error loading custom options for ${key}:`, error)
+    log.error(`[OptionsManager] Error loading custom options for ${key}:`, error)
     optionsStore$.errors[key].set(error.message)
     optionsStore$.customOptions[key].set({
       id: key,
@@ -278,7 +280,7 @@ export const OptionsManager = {
       }
     }
     
-    console.log('[OptionsManager] Preloading system options for common combinations')
+    log.info('[OptionsManager] Preloading system options for common combinations')
   },
   
   /**
@@ -289,7 +291,7 @@ export const OptionsManager = {
     optionsStore$.customOptions.set({})
     optionsStore$.loading.set(new Set())
     optionsStore$.errors.set({})
-    console.log('[OptionsManager] Cache cleared')
+    log.info('[OptionsManager] Cache cleared')
   },
   
   // Internal observables for debugging

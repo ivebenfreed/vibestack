@@ -1,6 +1,8 @@
 import { TimeScaleEngine } from '../engines/TimeScaleEngine';
 import type { TaskDependency, TaskLayout } from '../../types';
 import { GANTT_COLORS, RENDER_CONFIG } from '../../constants';
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/vibegantt/renderers/core/DependencyRenderer.ts');
 
 interface DependencyRenderOptions {
   isCritical: boolean;
@@ -57,7 +59,7 @@ export class DependencyRenderer {
     targetLayout: TaskLayout,
     options: DependencyRenderOptions
   ): void {
-    console.log('DependencyRenderer.createDependency: Called', {
+    log.info('DependencyRenderer.createDependency: Called', {
       dependencyId: dependency.id,
       predecessorId: dependency.predecessorId,
       successorId: dependency.successorId,
@@ -73,7 +75,7 @@ export class DependencyRenderer {
     this.dependencyLayouts.set(dependency.id, { dependency, sourceLayout, targetLayout });
     
     const element = this.createDependencyElement(dependency, sourceLayout, targetLayout, options);
-    console.log('DependencyRenderer.createDependency: Created element', {
+    log.info('DependencyRenderer.createDependency: Created element', {
       dependencyId: dependency.id,
       element,
       containerChildren: this.container.children.length
@@ -82,7 +84,7 @@ export class DependencyRenderer {
     this.container.appendChild(element);
     this.dependencyElements.set(dependency.id, element);
     
-    console.log('DependencyRenderer.createDependency: Element appended', {
+    log.info('DependencyRenderer.createDependency: Element appended', {
       dependencyId: dependency.id,
       containerChildrenAfter: this.container.children.length,
       storedElements: this.dependencyElements.size
@@ -190,7 +192,7 @@ export class DependencyRenderer {
     // Add click handler to hit area
     hitArea.addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log('Path clicked for dependency:', dependency.id);
+      log.info('Path clicked for dependency:', dependency.id);
       this.handleDependencyClick(dependency.id);
     });
     
@@ -366,7 +368,7 @@ export class DependencyRenderer {
   
   // Handle dependency selection
   private handleDependencyClick(dependencyId: string): void {
-    console.log('DependencyRenderer: Dependency clicked', dependencyId);
+    log.info('DependencyRenderer: Dependency clicked', dependencyId);
     
     // Update selection state
     const wasSelected = this.selectedDependencyId === dependencyId;
@@ -419,7 +421,7 @@ export class DependencyRenderer {
     if (isSelected) {
       const dependencyId = group.getAttribute('data-dependency-id');
       if (dependencyId) {
-        console.log('DependencyRenderer: Dependency selected', dependencyId);
+        log.info('DependencyRenderer: Dependency selected', dependencyId);
         const dependencyData = this.dependencyLayouts.get(dependencyId);
         if (dependencyData) {
           this.addSelectionElements(group, dependencyData.dependency, dependencyData.sourceLayout, dependencyData.targetLayout);
@@ -530,7 +532,7 @@ export class DependencyRenderer {
     group.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      console.log('Delete button clicked for dependency:', dependencyId);
+      log.info('Delete button clicked for dependency:', dependencyId);
       this.handleDependencyDelete(dependencyId);
     });
     
@@ -541,7 +543,7 @@ export class DependencyRenderer {
   
   // Handle connection point drag start
   private startConnectionDrag(dependencyId: string, handleType: 'start' | 'end', event: MouseEvent): void {
-    console.log('DependencyRenderer: Starting connection drag', { dependencyId, handleType });
+    log.info('DependencyRenderer: Starting connection drag', { dependencyId, handleType });
     
     // Get the dependency data
     const dependencyData = this.dependencyLayouts.get(dependencyId);
@@ -589,7 +591,7 @@ export class DependencyRenderer {
       // Find drop target
       const dropTarget = this.findDropTarget(e);
       if (dropTarget) {
-        console.log('DependencyRenderer: Connection dropped on task', dropTarget);
+        log.info('DependencyRenderer: Connection dropped on task', dropTarget);
         
         // Notify parent about dependency reassignment
         if (this.eventHandler) {
@@ -603,7 +605,7 @@ export class DependencyRenderer {
           });
         }
       } else {
-        console.log('DependencyRenderer: Connection drag cancelled - no valid drop target');
+        log.info('DependencyRenderer: Connection drag cancelled - no valid drop target');
       }
     };
     
@@ -624,7 +626,7 @@ export class DependencyRenderer {
   
   // Handle dependency deletion
   private handleDependencyDelete(dependencyId: string): void {
-    console.log('DependencyRenderer: Deleting dependency', dependencyId);
+    log.info('DependencyRenderer: Deleting dependency', dependencyId);
     
     if (this.eventHandler) {
       this.eventHandler({

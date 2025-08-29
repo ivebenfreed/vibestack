@@ -14,6 +14,8 @@
 import { fromCallback } from 'xstate';
 import type { CleanTableRenderer } from '../renderers/core/CleanTableRenderer';
 import type { RenderState, RendererOptions, ViewportInfo, Column } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/actors/renderer-actor.ts');
 
 // ====================================
 // EVENT TYPES
@@ -94,7 +96,7 @@ function calculateCoordinateMapping(
   });
   
   const calculationTime = performance.now() - startTime;
-  console.log('RendererActor: Coordinate calculation completed in', calculationTime.toFixed(2) + 'ms');
+  log.info('RendererActor: Coordinate calculation completed in', calculationTime.toFixed(2) + 'ms');
   
   return {
     rows: rowMapping,
@@ -116,24 +118,24 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
   const lastRenderedVersion = -1; // Track last rendered version to prevent duplicates
   let pendingRenderEvents: Array<{ type: string; state?: RenderState; coordinateMapping?: any }> = [];
   
-  console.log('RendererActor: Created callback actor');
+  log.info('RendererActor: Created callback actor');
   
   receive(async (event) => {
-    console.log('RendererActor: Received event:', event.type, event);
+    log.info('RendererActor: Received event:', event.type, event);
     
     try {
       switch (event.type) {
         case 'INITIALIZE':
-          console.log('RendererActor: Initializing with options:', event.options);
+          log.info('RendererActor: Initializing with options:', event.options);
           
           // Prevent multiple initializations
           if (isInitializing) {
-            console.warn('RendererActor: Already initializing, ignoring duplicate INITIALIZE event');
+            log.warn('RendererActor: Already initializing, ignoring duplicate INITIALIZE event');
             return;
           }
           
           if (isInitialized) {
-            console.warn('RendererActor: Already initialized, ignoring duplicate INITIALIZE event');
+            log.warn('RendererActor: Already initialized, ignoring duplicate INITIALIZE event');
             return;
           }
           
@@ -149,12 +151,12 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               onStateChange: (state: any) => {
                 // Reduce logging for performance
                 if (state.type !== 'render.complete' || Math.random() < 0.05) {
-                  console.log('RendererActor: Received state change from TableRenderer:', state);
+                  log.info('RendererActor: Received state change from TableRenderer:', state);
                 }
                 
                 // Handle canvas container ready event
                 if (state.type === 'canvas.container.ready') {
-                  console.log('RendererActor: Canvas container ready, emitting CANVAS_CONTAINER_READY');
+                  log.info('RendererActor: Canvas container ready, emitting CANVAS_CONTAINER_READY');
                   sendBack({
                     type: 'CANVAS_CONTAINER_READY',
                     container: state.container
@@ -165,7 +167,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                 if (state.type === 'render.complete') {
                   // Only log occasionally for performance
                   if (Math.random() < 0.05) {
-                    console.log('RendererActor: Render complete, emitting RENDER_COMPLETE');
+                    log.info('RendererActor: Render complete, emitting RENDER_COMPLETE');
                   }
                   sendBack({
                     type: 'RENDER_COMPLETE',
@@ -177,7 +179,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                   // PERFORMANCE: Initialize canvas post-render to avoid blocking critical path
                   if (renderer && typeof renderer.initializeCanvasPostRender === 'function') {
                     if (Math.random() < 0.05) {
-                      console.log('RendererActor: Triggering canvas initialization post-render');
+                      log.info('RendererActor: Triggering canvas initialization post-render');
                     }
                     renderer.initializeCanvasPostRender();
                   }
@@ -221,7 +223,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             // Update merged options with container
             const finalOptions = { ...mergedOptions, container };
             
-            console.log('RendererActor: Creating renderer with merged options:', {
+            log.info('RendererActor: Creating renderer with merged options:', {
               hasStoredOptions: !!storedOptions,
               hasEventOptions: !!event.options,
               container,
@@ -246,7 +248,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             // Store renderer instance on window for access by view handlers
             (window as any).__vibegridx_renderer_instance = renderer;
             
-            console.log('RendererActor: Renderer created successfully', {
+            log.info('RendererActor: Renderer created successfully', {
               renderer,
               containerAfterInit: container ? {
                 bounds: container.getBoundingClientRect(),
@@ -262,18 +264,18 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             
             // Process any queued render events
             if (pendingRenderEvents.length > 0) {
-              console.log(`RendererActor: Processing ${pendingRenderEvents.length} queued render events`);
+              log.info(`RendererActor: Processing ${pendingRenderEvents.length} queued render events`);
               
               for (const queuedEvent of pendingRenderEvents) {
                 if (queuedEvent.type === 'RENDER' && queuedEvent.state) {
-                  console.log('RendererActor: Processing queued RENDER event');
+                  log.info('RendererActor: Processing queued RENDER event');
                   renderer.render(queuedEvent.state);
                   sendBack({
                     type: 'ROWS_RENDERED',
                     rowCount: queuedEvent.state.rows?.length || 0
                   });
                 } else if (queuedEvent.type === 'RENDER_ROWS' && queuedEvent.state) {
-                  console.log('RendererActor: Processing queued RENDER_ROWS event');
+                  log.info('RendererActor: Processing queued RENDER_ROWS event');
                   renderer.render(queuedEvent.state);
                   const actualOrder = renderer.getRenderedRowIds?.() || [];
                   const currentViewport = renderer.getCurrentViewport?.() || null;
@@ -289,8 +291,8 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               pendingRenderEvents = [];
             }
           }).catch((error) => {
-            console.error('RendererActor: Failed to create renderer:', error);
-            console.error('Full error:', error.stack);
+            log.error('RendererActor: Failed to create renderer:', error);
+            log.error('Full error:', error.stack);
             isInitializing = false; // Reset flag on error
             sendBack({ 
               type: 'RENDERER_ERROR', 
@@ -303,14 +305,14 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if (!renderer) {
             if (isInitializing) {
               // Queue the event for processing after initialization
-              console.log('RendererActor: Queueing RENDER_ROWS event during initialization');
+              log.info('RendererActor: Queueing RENDER_ROWS event during initialization');
               pendingRenderEvents.push({
                 type: 'RENDER_ROWS',
                 state: event.state
               });
               return;
             } else {
-              console.warn('RendererActor: Cannot render - renderer not initialized');
+              log.warn('RendererActor: Cannot render - renderer not initialized');
               sendBack({ 
                 type: 'RENDERER_ERROR', 
                 error: 'Renderer not initialized' 
@@ -319,7 +321,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             }
           }
           
-          console.log('RendererActor: Rendering rows:', {
+          log.info('RendererActor: Rendering rows:', {
             rowCount: event.state.rows?.length || 0,
             hasColumns: !!event.state.columns,
             hasViewport: !!event.state.viewport
@@ -332,7 +334,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           const actualOrder = renderer.getRenderedRowIds?.() || [];
           const currentViewport = renderer.getCurrentViewport?.() || null;
           
-          console.log('RendererActor: Render completed, reporting back:', {
+          log.info('RendererActor: Render completed, reporting back:', {
             actualOrderLength: actualOrder.length,
             hasViewport: !!currentViewport
           });
@@ -346,11 +348,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'UPDATE_VIEWPORT':
           if (!renderer) {
-            console.warn('RendererActor: Cannot update viewport - renderer not initialized');
+            log.warn('RendererActor: Cannot update viewport - renderer not initialized');
             return;
           }
           
-          console.log('RendererActor: Updating viewport:', event.viewport);
+          log.info('RendererActor: Updating viewport:', event.viewport);
           
           // Update renderer viewport
           if (renderer.updateViewport) {
@@ -366,11 +368,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'UPDATE_COLUMNS':
           if (!renderer) {
-            console.warn('RendererActor: Cannot update columns - renderer not initialized');
+            log.warn('RendererActor: Cannot update columns - renderer not initialized');
             return;
           }
           
-          console.log('RendererActor: Updating columns:', event.columns.length);
+          log.info('RendererActor: Updating columns:', event.columns.length);
           
           // Update renderer columns if method exists
           if (renderer.updateColumns) {
@@ -384,11 +386,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'UPDATE_COORDINATES':
           if (!renderer) {
-            console.warn('RendererActor: Cannot update coordinates - renderer not initialized');
+            log.warn('RendererActor: Cannot update coordinates - renderer not initialized');
             return;
           }
           
-          console.log('RendererActor: Updating coordinates from state machine:', {
+          log.info('RendererActor: Updating coordinates from state machine:', {
             version: event.version,
             columnCount: event.mapping.columns.length
           });
@@ -397,7 +399,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if (renderer.updateCoordinateMapping) {
             renderer.updateCoordinateMapping(event.mapping, event.version);
           } else {
-            console.warn('RendererActor: Renderer does not support updateCoordinateMapping');
+            log.warn('RendererActor: Renderer does not support updateCoordinateMapping');
           }
           
           sendBack({ type: 'COORDINATES_UPDATED' });
@@ -405,7 +407,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           
         case 'RENDER':
-          console.log('RendererActor: RENDER event received', {
+          log.info('RendererActor: RENDER event received', {
             hasRenderer: !!renderer,
             isInitialized,
             isInitializing,
@@ -417,7 +419,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if (!renderer) {
             if (isInitializing) {
               // Queue the event for processing after initialization
-              console.log('RendererActor: Queueing RENDER event during initialization');
+              log.info('RendererActor: Queueing RENDER event during initialization');
               pendingRenderEvents.push({
                 type: 'RENDER',
                 state: event.state,
@@ -425,7 +427,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               });
               return;
             } else {
-              console.warn('RendererActor: Cannot render - renderer not initialized', {
+              log.warn('RendererActor: Cannot render - renderer not initialized', {
                 isInitializing,
                 isInitialized
               });
@@ -434,13 +436,13 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           }
           
           if (!event.state) {
-            console.warn('RendererActor: Cannot render - no state provided');
+            log.warn('RendererActor: Cannot render - no state provided');
             return;
           }
           
           // Note: Removed version checking - we want to render whenever data changes
           
-          console.log('RendererActor: Rendering with state:', {
+          log.info('RendererActor: Rendering with state:', {
             rows: event.state.rows?.length,
             columns: event.state.columns?.length,
             version: event.state.version
@@ -451,13 +453,13 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           try {
             // Render with the new state
-            console.log('RendererActor: About to call renderer.render()');
+            log.info('RendererActor: About to call renderer.render()');
             renderer.render(event.state);
-            console.log('RendererActor: renderer.render() completed successfully');
+            log.info('RendererActor: renderer.render() completed successfully');
             
             // Version tracking removed - we render on data changes
           } catch (renderError) {
-            console.error('RendererActor: Error in renderer.render():', renderError);
+            log.error('RendererActor: Error in renderer.render():', renderError);
             throw renderError;
           }
           
@@ -470,11 +472,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'UPDATE_SELECTED_ROWS':
           if (!renderer) {
-            console.warn('RendererActor: Cannot update selected rows - renderer not initialized');
+            log.warn('RendererActor: Cannot update selected rows - renderer not initialized');
             return;
           }
           
-          console.log('RendererActor: Updating selected rows:', {
+          log.info('RendererActor: Updating selected rows:', {
             selectedRowsSize: event.selectedRows.size,
             selectedRowIds: Array.from(event.selectedRows)
           });
@@ -483,7 +485,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if (renderer.setSelectedRows) {
             renderer.setSelectedRows(event.selectedRows);
           } else {
-            console.warn('RendererActor: setSelectedRows method not available on renderer');
+            log.warn('RendererActor: setSelectedRows method not available on renderer');
           }
           
           sendBack({ type: 'SELECTED_ROWS_UPDATED' });
@@ -491,11 +493,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'REMOVE_ROW':
           if (!renderer) {
-            console.warn('RendererActor: Cannot remove row - renderer not initialized');
+            log.warn('RendererActor: Cannot remove row - renderer not initialized');
             return;
           }
           
-          console.log('RendererActor: Removing row:', {
+          log.info('RendererActor: Removing row:', {
             rowId: event.rowId
           });
           
@@ -518,11 +520,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'SURGICAL_UPDATE':
           if (!renderer) {
-            console.warn('RendererActor: Cannot perform surgical update - renderer not initialized');
+            log.warn('RendererActor: Cannot perform surgical update - renderer not initialized');
             return;
           }
           
-          console.log('RendererActor: Performing surgical update:', {
+          log.info('RendererActor: Performing surgical update:', {
             changesCount: event.changes.length,
             changeTypes: event.changes.map(c => `${c.operation}:${c.id}`)
           });
@@ -537,12 +539,12 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             }
           }
           
-          console.log('RendererActor: Surgical update completed');
+          log.info('RendererActor: Surgical update completed');
           break;
           
         case 'APPLY_DRAG_PREVIEW':
           if (!renderer) {
-            console.warn('RendererActor: Cannot apply drag preview - renderer not initialized');
+            log.warn('RendererActor: Cannot apply drag preview - renderer not initialized');
             return;
           }
           
@@ -550,13 +552,13 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if ('applyDragPreview' in renderer && typeof renderer.applyDragPreview === 'function') {
             renderer.applyDragPreview(event.dragPreview);
           } else {
-            console.warn('RendererActor: Renderer does not have applyDragPreview method');
+            log.warn('RendererActor: Renderer does not have applyDragPreview method');
           }
           break;
           
         case 'UPDATE_DRAG_POSITION':
           if (!renderer) {
-            console.warn('RendererActor: Cannot update drag position - renderer not initialized');
+            log.warn('RendererActor: Cannot update drag position - renderer not initialized');
             return;
           }
           
@@ -567,13 +569,13 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               mouseY: event.mouseY
             });
           } else {
-            console.warn('RendererActor: Renderer does not have updateDragPosition method');
+            log.warn('RendererActor: Renderer does not have updateDragPosition method');
           }
           break;
           
         case 'CLEAR_DRAG_PREVIEW':
           if (!renderer) {
-            console.warn('RendererActor: Cannot clear drag preview - renderer not initialized');
+            log.warn('RendererActor: Cannot clear drag preview - renderer not initialized');
             return;
           }
           
@@ -581,12 +583,12 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if ('clearDragPreview' in renderer && typeof renderer.clearDragPreview === 'function') {
             renderer.clearDragPreview();
           } else {
-            console.warn('RendererActor: Renderer does not have clearDragPreview method');
+            log.warn('RendererActor: Renderer does not have clearDragPreview method');
           }
           break;
           
         case 'CALCULATE_COORDINATES':
-          console.log('RendererActor: Calculating coordinates', {
+          log.info('RendererActor: Calculating coordinates', {
             rowCount: event.rows.length,
             columnCount: event.columns.length,
             hasColumnWidths: !!event.columnWidths
@@ -605,7 +607,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               version: coordinateMapping.version
             });
           } catch (error) {
-            console.error('RendererActor: Error calculating coordinates:', error);
+            log.error('RendererActor: Error calculating coordinates:', error);
             sendBack({
               type: 'RENDERER_ERROR',
               error: `Failed to calculate coordinates: ${error.message}`
@@ -614,7 +616,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           break;
           
         case 'DESTROY':
-          console.log('RendererActor: Destroying renderer');
+          log.info('RendererActor: Destroying renderer');
           
           if (renderer) {
             renderer.destroy?.();
@@ -625,10 +627,10 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           break;
           
         default:
-          console.warn('RendererActor: Unknown event type:', event);
+          log.warn('RendererActor: Unknown event type:', event);
       }
     } catch (error) {
-      console.error('RendererActor: Error processing event:', error);
+      log.error('RendererActor: Error processing event:', error);
       sendBack({ 
         type: 'RENDERER_ERROR', 
         error: `Error processing ${event.type}: ${error.message}` 
@@ -638,7 +640,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
   
   // Cleanup function - called when actor is stopped
   return () => {
-    console.log('RendererActor: Cleanup - destroying renderer');
+    log.info('RendererActor: Cleanup - destroying renderer');
     
     if (renderer) {
       renderer.destroy?.();

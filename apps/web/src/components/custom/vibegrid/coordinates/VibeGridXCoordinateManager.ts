@@ -19,6 +19,9 @@
 // ====================================
 
 import type { CellRef, TableRow, Column, ViewportInfo } from '../types';
+import { uiLog } from '@/logger';
+
+const log = uiLog('components/custom/vibegrid/coordinates/VibeGridXCoordinateManager.ts');
 
 export interface CoordinatePosition {
   rowIndex: number;
@@ -139,7 +142,7 @@ export class VibeGridXCoordinateManager {
       return mapping;
     });
     
-    console.log('VibeGridXCoordinateManager.updateColumns:', {
+    log.info('VibeGridXCoordinateManager.updateColumns:', {
       columnCount: columns.length,
       columnIds: columns.map(c => c.id),
       columnMappings: newColumns.map(c => ({ id: c.columnId, index: c.index, offset: c.offset }))
@@ -174,7 +177,7 @@ export class VibeGridXCoordinateManager {
     const columnMapping = this.mapping.columns.find(c => c.columnId === cellRef.columnId);
     
     if (!rowMapping || !columnMapping) {
-      console.warn('VibeGridXCoordinateManager: Could not find mapping for cell', cellRef);
+      log.warn('VibeGridXCoordinateManager: Could not find mapping for cell', cellRef);
       return null;
     }
     
@@ -220,7 +223,7 @@ export class VibeGridXCoordinateManager {
     const rowHeight = 40;
     const y = position.rowIndex * rowHeight;
     
-    console.log('getCellPosition: Row mapping check', {
+    log.info('getCellPosition: Row mapping check', {
       rowId,
       sortedIndex: position.rowIndex,
       calculatedY: y,
@@ -270,7 +273,7 @@ export class VibeGridXCoordinateManager {
     const viewportY = absolutePos.y;
     const viewportX = absolutePos.x;
     
-    console.log('getCellPositionWithViewport: Calculating position', {
+    log.info('getCellPositionWithViewport: Calculating position', {
       rowId,
       absoluteRowIndex,
       absoluteY: absolutePos.y,
@@ -329,7 +332,7 @@ export class VibeGridXCoordinateManager {
     const columnMapping = this.mapping.columns[position.columnIndex];
     
     if (!rowMapping || !columnMapping) {
-      console.warn('VibeGridXCoordinateManager: Invalid position', position);
+      log.warn('VibeGridXCoordinateManager: Invalid position', position);
       return null;
     }
     
@@ -591,7 +594,7 @@ export class VibeGridXCoordinateManager {
    * Debug helper
    */
   debug(): void {
-    console.log('VibeGridXCoordinateManager Debug:', {
+    log.info('VibeGridXCoordinateManager Debug:', {
       version: this.version,
       rowCount: this.mapping.rows.length,
       columnCount: this.mapping.columns.length,

@@ -1,5 +1,7 @@
 import type { GanttEvent, TimeScale } from '../types';
 import { RENDER_CONFIG } from '../constants';
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/vibegantt/systems/GanttEventDelegationManager.ts');
 
 type EventHandler = (event: MouseEvent | KeyboardEvent | WheelEvent) => void;
 type GanttEventCallback = (event: GanttEvent) => void;
@@ -77,7 +79,7 @@ export class GanttEventDelegationManager {
   private handleMouseDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     
-    console.log('GanttEventDelegationManager: mousedown', {
+    log.info('GanttEventDelegationManager: mousedown', {
       target: target.tagName,
       className: target.className,
       closest: {
@@ -93,7 +95,7 @@ export class GanttEventDelegationManager {
       const taskId = taskConnector.dataset.taskId;
       const connectorType = taskConnector.dataset.connectorType as 'start' | 'finish';
       if (taskId && connectorType) {
-        console.log('GanttEventDelegationManager: Task connector mousedown', { taskId, connectorType });
+        log.info('GanttEventDelegationManager: Task connector mousedown', { taskId, connectorType });
         this.startDependencyCreation(taskId, connectorType, event);
         event.preventDefault();
         event.stopPropagation();
@@ -107,7 +109,7 @@ export class GanttEventDelegationManager {
       const dependencyId = connectionHandle.dataset.dependencyId;
       const handleType = connectionHandle.dataset.handleType as 'start' | 'end';
       if (dependencyId && handleType) {
-        console.log('GanttEventDelegationManager: Dependency handle mousedown', { 
+        log.info('GanttEventDelegationManager: Dependency handle mousedown', { 
           dependencyId, 
           handleType 
         });
@@ -148,14 +150,14 @@ export class GanttEventDelegationManager {
     // Check if clicking on dependency delete button
     const deleteButton = target.closest('.delete-button') as HTMLElement;
     if (deleteButton) {
-      console.log('GanttEventDelegationManager: Delete button found in mousedown', {
+      log.info('GanttEventDelegationManager: Delete button found in mousedown', {
         deleteButton,
         target,
         dataset: deleteButton.dataset
       });
       const dependencyId = deleteButton.dataset.dependencyId;
       if (dependencyId) {
-        console.log('GanttEventDelegationManager: Dependency delete button clicked', { dependencyId });
+        log.info('GanttEventDelegationManager: Dependency delete button clicked', { dependencyId });
         
         // Remove visual elements immediately for responsive UI
         const depGroup = document.querySelector(`.vibegantt-dependency-group[data-dependency-id="${dependencyId}"]`);
@@ -170,7 +172,7 @@ export class GanttEventDelegationManager {
         event.stopPropagation();
         event.preventDefault();
       } else {
-        console.error('GanttEventDelegationManager: Delete button has no dependencyId!');
+        log.error('GanttEventDelegationManager: Delete button has no dependencyId!');
       }
       return;
     }
@@ -192,18 +194,18 @@ export class GanttEventDelegationManager {
       const isSelected = dependencyGroup?.classList.contains('selected');
       
       if (hasControls && isSelected) {
-        console.log('GanttEventDelegationManager: Dependency already selected, ignoring click');
+        log.info('GanttEventDelegationManager: Dependency already selected, ignoring click');
         event.stopPropagation();
         event.preventDefault();
         return; // Don't allow further interaction when controls are showing
       }
       
-      console.log('GanttEventDelegationManager: Found dependency element', { 
+      log.info('GanttEventDelegationManager: Found dependency element', { 
         dependencyId, 
         element: clickedDependency,
         source: dependencyElement ? 'path' : (dependencyHitArea ? 'hitarea' : 'group')
       });
-      console.log('GanttEventDelegationManager: Dependency clicked', { dependencyId });
+      log.info('GanttEventDelegationManager: Dependency clicked', { dependencyId });
       
       // Focus the container quietly to ensure keyboard events work
       this.container.focus({ preventScroll: true });
@@ -284,18 +286,18 @@ export class GanttEventDelegationManager {
     
     // Check if this event was already handled in mousedown
     if ((event as any)._ganttHandled) {
-      console.log('GanttEventDelegationManager: Click already handled in mousedown, ignoring');
+      log.info('GanttEventDelegationManager: Click already handled in mousedown, ignoring');
       return;
     }
     
     // If we're clicking on the dependencies container itself, check if it's from a child
     if (target.classList.contains('vibegantt-dependencies')) {
       // This is a bubbled event from a child element, ignore it
-      console.log('GanttEventDelegationManager: Ignoring bubbled click on dependencies container');
+      log.info('GanttEventDelegationManager: Ignoring bubbled click on dependencies container');
       return;
     }
     
-    console.log('GanttEventDelegationManager: Click event', {
+    log.info('GanttEventDelegationManager: Click event', {
       target: target.tagName,
       className: target.className,
       closestTask: target.closest('.vibegantt-task'),
@@ -309,7 +311,7 @@ export class GanttEventDelegationManager {
     const taskElement = target.closest('.vibegantt-task') as HTMLElement;
     if (taskElement) {
       const taskId = taskElement.dataset.taskId;
-      console.log('GanttEventDelegationManager: Task element clicked', {
+      log.info('GanttEventDelegationManager: Task element clicked', {
         taskId,
         element: taskElement
       });
@@ -332,7 +334,7 @@ export class GanttEventDelegationManager {
     const dependencyControls = target.closest('.dependency-controls') as HTMLElement;
     const dependencySvg = target.closest('.vibegantt-dependencies') as HTMLElement;
     
-    console.log('GanttEventDelegationManager: Dependency element checks', {
+    log.info('GanttEventDelegationManager: Dependency element checks', {
       dependencyElement: !!dependencyElement,
       dependencyHitarea: !!dependencyHitarea,
       dependencyGroup: !!dependencyGroup,
@@ -343,7 +345,7 @@ export class GanttEventDelegationManager {
     });
     
     if (dependencyElement || dependencyHitarea || dependencyGroup || deleteButton || connectionHandle || dependencyControls) {
-      console.log('GanttEventDelegationManager: Clicking on dependency element, not clearing selection');
+      log.info('GanttEventDelegationManager: Clicking on dependency element, not clearing selection');
       return; // Don't clear selection when clicking on dependency elements
     }
     
@@ -354,7 +356,7 @@ export class GanttEventDelegationManager {
     }
     
     // Clear dependency selection when clicking on empty space
-    console.log('GanttEventDelegationManager: Clicked empty space, clearing dependency selection');
+    log.info('GanttEventDelegationManager: Clicked empty space, clearing dependency selection');
     this.sendEvent({
       type: 'DEPENDENCY_SELECT',
       dependencyId: null,
@@ -376,7 +378,7 @@ export class GanttEventDelegationManager {
   }
   
   private handleWheel(event: WheelEvent): void {
-    console.log('🖱️ Wheel event detected:', {
+    log.info('🖱️ Wheel event detected:', {
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
       deltaY: event.deltaY
@@ -388,21 +390,21 @@ export class GanttEventDelegationManager {
       
       // Send zoom request to the machine
       const direction = event.deltaY > 0 ? 'out' : 'in';
-      console.log('🔍 Zoom requested:', direction);
+      log.info('🔍 Zoom requested:', direction);
       
       // Get mouse position relative to the timeline for anchoring
       const rect = this.container.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
       
-      console.log('📤 Sending ZOOM_REQUEST event to machine...');
+      log.info('📤 Sending ZOOM_REQUEST event to machine...');
       this.sendEvent({
         type: 'ZOOM_REQUEST',
         direction,
         anchorX: mouseX
       });
-      console.log('✅ ZOOM_REQUEST event sent');
+      log.info('✅ ZOOM_REQUEST event sent');
     } else {
-      console.log('⏭️ Wheel without Ctrl/Cmd - letting native scroll handle');
+      log.info('⏭️ Wheel without Ctrl/Cmd - letting native scroll handle');
     }
     // Let native scroll handle panning
   }
@@ -418,7 +420,7 @@ export class GanttEventDelegationManager {
     if (event.altKey) modifiers.push('Alt');
     if (event.metaKey) modifiers.push('Meta');
     
-    console.log('GanttEventDelegationManager: Keyboard event', { key, modifiers });
+    log.info('GanttEventDelegationManager: Keyboard event', { key, modifiers });
     
     this.sendEvent({
       type: 'KEYBOARD_SHORTCUT',
@@ -446,7 +448,7 @@ export class GanttEventDelegationManager {
   
   // Task drag handlers
   private startTaskDrag(taskId: string, event: MouseEvent): void {
-    console.log('GanttEventDelegationManager: startTaskDrag', {
+    log.info('GanttEventDelegationManager: startTaskDrag', {
       taskId,
       startX: event.clientX,
       startY: event.clientY
@@ -476,7 +478,7 @@ export class GanttEventDelegationManager {
     
     const deltaX = event.clientX - this.dragState.startX;
     
-    console.log('GanttEventDelegationManager: updateTaskDrag', {
+    log.info('GanttEventDelegationManager: updateTaskDrag', {
       currentX: event.clientX,
       startX: this.dragState.startX,
       deltaX: deltaX
@@ -496,7 +498,7 @@ export class GanttEventDelegationManager {
     
     const deltaX = event.clientX - this.dragState.startX;
     
-    console.log('GanttEventDelegationManager: endTaskDrag', {
+    log.info('GanttEventDelegationManager: endTaskDrag', {
       endX: event.clientX,
       startX: this.dragState.startX,
       deltaX: deltaX,
@@ -613,7 +615,7 @@ export class GanttEventDelegationManager {
   
   // Dependency creation handlers
   private startDependencyCreation(sourceTaskId: string, connectorType: 'start' | 'finish', event: MouseEvent): void {
-    console.log('GanttEventDelegationManager: startDependencyCreation', {
+    log.info('GanttEventDelegationManager: startDependencyCreation', {
       sourceTaskId,
       connectorType,
       startX: event.clientX,
@@ -644,7 +646,7 @@ export class GanttEventDelegationManager {
   
   // Dependency drag handlers
   private startDependencyDrag(dependencyId: string, handleType: 'start' | 'end', event: MouseEvent): void {
-    console.log('GanttEventDelegationManager: startDependencyDrag', {
+    log.info('GanttEventDelegationManager: startDependencyDrag', {
       dependencyId,
       handleType,
       startX: event.clientX,
@@ -686,7 +688,7 @@ export class GanttEventDelegationManager {
     if (taskElement) {
       const newTaskId = taskElement.dataset.taskId;
       if (newTaskId) {
-        console.log('GanttEventDelegationManager: endDependencyDrag - reassigning to task', {
+        log.info('GanttEventDelegationManager: endDependencyDrag - reassigning to task', {
           dependencyId: this.dragState.data.dependencyId,
           handleType: this.dragState.data.handleType,
           newTaskId
@@ -762,7 +764,7 @@ export class GanttEventDelegationManager {
           dependencyType = 'start-to-finish';
         }
         
-        console.log('GanttEventDelegationManager: Creating dependency', {
+        log.info('GanttEventDelegationManager: Creating dependency', {
           sourceTaskId,
           targetTaskId,
           dependencyType

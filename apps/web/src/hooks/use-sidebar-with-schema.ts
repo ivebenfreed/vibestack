@@ -3,6 +3,8 @@ import { useAuth } from '@/lib/auth'
 import { orgContext$, loadOrgContext } from '@/legend-state'
 import { useObservable } from '@legendapp/state/react'
 import { sidebarNavigationStore } from '@/stores/sidebarNavigationStore'
+import { stateLog } from '@/logger';
+const log = stateLog('hooks/use-sidebar-with-schema.ts');
 
 export function useSidebarWithSchema() {
   const { user } = useAuth()
@@ -13,7 +15,7 @@ export function useSidebarWithSchema() {
   useEffect(() => {
     if (currentOrgId && user?.id) {
       loadOrgContext(currentOrgId, user.id).catch(error => {
-        console.error('[useSidebarWithSchema] Failed to load org context:', error)
+        log.error('[useSidebarWithSchema] Failed to load org context:', error)
       })
     }
   }, [currentOrgId, user?.id])

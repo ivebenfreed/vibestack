@@ -13,6 +13,8 @@ import { timelineSlice } from './slices/timeline-slice';
 import { taskSlice } from './slices/task-slice';
 import { interactionSlice } from './slices/interaction-slice';
 import { viewportSlice } from './slices/viewport-slice';
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/vibegantt/machines/gantt-machine/gantt-machine-store-integrated.ts');
 
 // Initial context factory
 const createInitialContext = (projectId?: string, storeActor?: any): GanttMachineContext => ({
@@ -100,7 +102,7 @@ export const ganttMachineStoreIntegrated = setup({
     subscribeToStore: ({ context, self }) => {
       if (!context.storeActor) return;
       
-      console.log('GanttMachine: Subscribing to store updates');
+      log.info('GanttMachine: Subscribing to store updates');
       
       // Subscribe to store state changes
       const subscription = context.storeActor.subscribe((snapshot: any) => {
@@ -131,7 +133,7 @@ export const ganttMachineStoreIntegrated = setup({
     updateFromStore: assign(({ event }) => {
       if (event.type !== 'STORE_DATA_UPDATED') return {};
       
-      console.log('GanttMachine: Updating from store', {
+      log.info('GanttMachine: Updating from store', {
         taskCount: event.taskTree?.length || 0,
         dependencyCount: Object.keys(event.dependencies || {}).length,
       });
@@ -253,7 +255,7 @@ export const ganttMachineStoreIntegrated = setup({
       renderer: ({ spawn, event }) => {
         if (event.type !== 'INITIALIZE_RENDERER') return undefined;
         
-        console.log('GanttMachine: Starting renderer actor');
+        log.info('GanttMachine: Starting renderer actor');
         
         // Merge stored window options with event options (VibeGridDex pattern)
         const storedOptions = (window as any).__vibegantt_renderer_options || {};

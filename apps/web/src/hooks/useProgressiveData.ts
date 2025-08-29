@@ -6,6 +6,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { stateLog } from '@/logger';
+const log = stateLog('hooks/useProgressiveData.ts');
 
 export interface ProgressiveDataState<T> {
   data: T | null;
@@ -72,20 +74,20 @@ export function useProgressiveData<T>(
 
   const loadData = async (isRefresh = false) => {
     if (!isRefresh) {
-      console.log(`[ProgressiveData:${cacheKey}] 🚀 Starting progressive load`);
+      log.info(`[ProgressiveData:${cacheKey}] 🚀 Starting progressive load`);
     }
 
     try {
       // Phase 1: Load local data immediately (show something fast)
       let localData: T | null = null;
       if (loadLocal && !isRefresh) {
-        console.log(`[ProgressiveData:${cacheKey}] 📊 Loading local data...`);
+        log.info(`[ProgressiveData:${cacheKey}] 📊 Loading local data...`);
         try {
           const localResult = await loadLocal();
           localData = localResult;
           
           if (mountedRef.current && localData) {
-            console.log(`[ProgressiveData:${cacheKey}] ✅ Local data loaded, showing immediately`);
+            log.info(`[ProgressiveData:${cacheKey}] ✅ Local data loaded, showing immediately`);
             setState(prev => ({
               ...prev,
               data: localData,
@@ -96,14 +98,14 @@ export function useProgressiveData<T>(
             }));
           }
         } catch (err) {
-          console.warn(`[ProgressiveData:${cacheKey}] ⚠️ Local data load failed:`, err);
+          log.warn(`[ProgressiveData:${cacheKey}] ⚠️ Local data load failed:`, err);
         }
       }
 
       // Phase 2: Load fresh data (background or immediate if no local)
       if (loadFresh) {
         const hasLocalData = localData !== null;
-        console.log(`[ProgressiveData:${cacheKey}] ${hasLocalData ? '🔄 Background' : '🌐 Primary'}: Loading fresh data...`);
+        log.info(`[ProgressiveData:${cacheKey}] ${hasLocalData ? '🔄 Background' : '🌐 Primary'}: Loading fresh data...`);
         
         if (!hasLocalData) {
           // No local data - show loading state
@@ -118,7 +120,7 @@ export function useProgressiveData<T>(
         const freshData = await loadFresh();
         
         if (mountedRef.current) {
-          console.log(`[ProgressiveData:${cacheKey}] ✅ Fresh data loaded${hasLocalData ? ' (background complete)' : ''}`);
+          log.info(`[ProgressiveData:${cacheKey}] ✅ Fresh data loaded${hasLocalData ? ' (background complete)' : ''}`);
           setState(prev => ({
             ...prev,
             data: freshData,
@@ -147,7 +149,7 @@ export function useProgressiveData<T>(
       }
 
     } catch (error) {
-      console.error(`[ProgressiveData:${cacheKey}] ❌ Fresh data load failed:`, error);
+      log.error(`[ProgressiveData:${cacheKey}] ❌ Fresh data load failed:`, error);
       if (mountedRef.current) {
         setState(prev => ({
           ...prev,
@@ -160,12 +162,12 @@ export function useProgressiveData<T>(
   };
 
   const refresh = async () => {
-    console.log(`[ProgressiveData:${cacheKey}] 🔄 Manual refresh triggered`);
+    log.info(`[ProgressiveData:${cacheKey}] 🔄 Manual refresh triggered`);
     await loadData(true);
   };
 
   const clearCache = () => {
-    console.log(`[ProgressiveData:${cacheKey}] 🧹 Cache cleared`);
+    log.info(`[ProgressiveData:${cacheKey}] 🧹 Cache cleared`);
     setState(prev => ({
       ...prev,
       isFresh: false,

@@ -1,5 +1,7 @@
 import { observable, batch, computed } from '@legendapp/state';
 import type { 
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/state/table-state.ts');
   TableRow, 
   Column, 
   CellRef, 
@@ -90,7 +92,7 @@ function* generateCellRange(
   const endColIndex = columns.findIndex(col => col.id === endColId);
   
   if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-    console.warn(`[generateCellRange] Invalid indices - no cells generated`, {
+    log.warn(`[generateCellRange] Invalid indices - no cells generated`, {
       startRowIndex, endRowIndex, startColIndex, endColIndex,
       startCell: startCell.substring(0, 30) + '...',
       endCell: endCell.substring(0, 30) + '...'
@@ -132,7 +134,7 @@ function calculateCellRange(
   const debugStartRow = data[startRowIndex];
   const debugEndRow = data[endRowIndex];
   
-  console.log(`[calculateCellRange] DEBUG: Index mapping validation`, {
+  log.info(`[calculateCellRange] DEBUG: Index mapping validation`, {
     startCell: startCell.substring(0, 40) + '...',
     endCell: endCell.substring(0, 40) + '...',
     startRowId: startRowId.substring(0, 20) + '...',
@@ -149,7 +151,7 @@ function calculateCellRange(
   });
 
   // CRITICAL DEBUG: Check what happens when we search for the exact row IDs
-  console.log(`[calculateCellRange] CRITICAL DEBUGGING: Searching for row IDs manually`, {
+  log.info(`[calculateCellRange] CRITICAL DEBUGGING: Searching for row IDs manually`, {
     startRowFound: data.some(row => row.id === startRowId),
     endRowFound: data.some(row => row.id === endRowId),
     startRowSampleMatch: data.find(row => row.id === startRowId)?.name || 'NOT FOUND',
@@ -163,7 +165,7 @@ function calculateCellRange(
   });
   
   if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-    console.warn(`[calculateCellRange] Invalid indices found - returning empty selection`, {
+    log.warn(`[calculateCellRange] Invalid indices found - returning empty selection`, {
       startRowIndex, endRowIndex, startColIndex, endColIndex,
       startCell, endCell, 
       dataLength: data.length,
@@ -185,7 +187,7 @@ function calculateCellRange(
   const totalCells = rowCount * colCount;
   
   // Enhanced debug logging with validation checks
-  console.log(`[calculateCellRange] Selection calculation`, {
+  log.info(`[calculateCellRange] Selection calculation`, {
     startCell: startCell.substring(0, 30) + '...',
     endCell: endCell.substring(0, 30) + '...',
     startRowIndex,
@@ -212,7 +214,7 @@ function calculateCellRange(
   
   // Warn about large selections but don't spam with huge selections
   if (totalCells > 100) {
-    console.warn(`[calculateCellRange] Large selection detected - ${totalCells} cells`);
+    log.warn(`[calculateCellRange] Large selection detected - ${totalCells} cells`);
   }
   
   // Limit array generation for performance - if selection is too large, use Set approach
@@ -537,7 +539,7 @@ export function createTableState(config: TableConfig) {
       const sorting = tableState$.sorting.get();
       const columns = tableState$.columns.get();
       
-      console.log('🔍 [dataProcessing] VIEWPORT-INDEPENDENT COMPUTATION START:', {
+      log.info('🔍 [dataProcessing] VIEWPORT-INDEPENDENT COMPUTATION START:', {
         rawDataLength: rawData.length,
         hasFilters: filters.size > 0,
         hasSearchTerm: !!searchTerm,
@@ -565,7 +567,7 @@ export function createTableState(config: TableConfig) {
       const dataProcessing = tableState$.dataProcessing.get();
       const viewport = tableState$.viewport.get();
       
-      console.log('🔍 [processedData] COORDINATE MAPPING COMPUTATION:', {
+      log.info('🔍 [processedData] COORDINATE MAPPING COMPUTATION:', {
         sortedDataLength: dataProcessing.sortedData.length,
         viewportState: viewport,
         computationTimestamp: Date.now()
@@ -609,7 +611,7 @@ export function createTableState(config: TableConfig) {
         version: Date.now() // Add versioning for change detection
       };
       
-      console.log('🔍 [processedData] COORDINATE MAPPING CREATED:', {
+      log.info('🔍 [processedData] COORDINATE MAPPING CREATED:', {
         filteredDataLength: dataProcessing.filteredData.length,
         sortedDataLength: dataProcessing.sortedData.length,
         allRowsLength: rows.length,
@@ -658,7 +660,7 @@ export function createTableState(config: TableConfig) {
         }
       };
       
-      console.log('🔍 [processedData] SINGLE PIPELINE RESULT:', {
+      log.info('🔍 [processedData] SINGLE PIPELINE RESULT:', {
         hasResult: !!result,
         hasRenderState: !!result.renderState,
         hasCoordinateMapping: !!result.coordinateMapping,
@@ -751,7 +753,7 @@ export function createTableState(config: TableConfig) {
         const data = processed.sortedData;
         const columns = tableState$.columns.get();
         
-        console.log(`[selectRange] UNIFIED PIPELINE: Cell range request`, {
+        log.info(`[selectRange] UNIFIED PIPELINE: Cell range request`, {
           startCell: startCell.substring(0, 50) + '...',
           endCell: endCell.substring(0, 50) + '...',
           dataLength: data.length,
@@ -902,7 +904,7 @@ export function createTableState(config: TableConfig) {
         // Use raw data for pattern detection, single pipeline will handle updates
         const data = [...tableState$.data.get()];
         
-        console.log('[TableState] fillSeries: Analyzing series patterns', {
+        log.info('[TableState] fillSeries: Analyzing series patterns', {
           sourceRange: Array.from(sourceRange),
           fillRange: Array.from(fillRange)
         });
@@ -912,7 +914,7 @@ export function createTableState(config: TableConfig) {
         
         if (patterns.size === 0) {
           // No patterns detected, fall back to fillDown
-          console.log('[TableState] fillSeries: No patterns detected, falling back to fillDown');
+          log.info('[TableState] fillSeries: No patterns detected, falling back to fillDown');
           tableState$.fillDown(sourceRange, fillRange);
           return;
         }
@@ -935,7 +937,7 @@ export function createTableState(config: TableConfig) {
                 }
               };
               
-              console.log('[TableState] fillSeries: Applied pattern', {
+              log.info('[TableState] fillSeries: Applied pattern', {
                 cellId,
                 pattern: pattern.type,
                 originalValue: pattern.samples[0],
@@ -962,7 +964,7 @@ export function createTableState(config: TableConfig) {
           isActive: true
         });
         
-        console.log('[TableState] Cells copied to clipboard', { count: cellsToUse.size });
+        log.info('[TableState] Cells copied to clipboard', { count: cellsToUse.size });
       });
     },
     
@@ -977,7 +979,7 @@ export function createTableState(config: TableConfig) {
           isActive: true
         });
         
-        console.log('[TableState] Cells cut to clipboard', { count: cellsToUse.size });
+        log.info('[TableState] Cells cut to clipboard', { count: cellsToUse.size });
       });
     },
     
@@ -989,7 +991,7 @@ export function createTableState(config: TableConfig) {
           isActive: false
         });
         
-        console.log('[TableState] Clipboard cleared');
+        log.info('[TableState] Clipboard cleared');
       });
     }
   });

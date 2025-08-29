@@ -3,6 +3,8 @@ import { TaskNodeData } from '../nodes/TaskNode'
 import { MilestoneNodeData } from '../nodes/MilestoneNode'
 import { TimelineLayoutConfig, TimelineSwimlane } from './timelineLayout'
 import { TimelineGrid } from './timelineGrid'
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/timeline/utils/timelineConstraints.ts');
 
 export interface ConstrainedPosition {
   x: number
@@ -158,10 +160,10 @@ export function constrainTimelinePosition(
       const correctY = originalLane.y + grid.getConfig().taskVerticalCentering
       finalY = correctY // Always snap back to original lane with proper centering
       constraintApplied = constraintApplied === 'timeGrid' ? 'both' : 'swimlane'
-      console.log(`✅ LANE CONSTRAINT: Node "${nodeId}" locked to lane "${originalLane.name}" at Y=${correctY}`)
+      log.info(`✅ LANE CONSTRAINT: Node "${nodeId}" locked to lane "${originalLane.name}" at Y=${correctY}`)
     } else {
-      console.log(`⚠️ LANE CONSTRAINT: No original lane found for node "${nodeId}"`)
-      console.log(`Available lanes:`, grid.getLanes().map(l => ({ id: l.id, name: l.name, nodeIds: l.nodes.map(n => n.id) })))
+      log.info(`⚠️ LANE CONSTRAINT: No original lane found for node "${nodeId}"`)
+      log.info(`Available lanes:`, grid.getLanes().map(l => ({ id: l.id, name: l.name, nodeIds: l.nodes.map(n => n.id) })))
     }
   }
 
@@ -209,7 +211,7 @@ export function applyTimelineConstraints(
           const snapResult = snapToTimeGrid(change.position.x, grid, constraintConfig)
           // Use the same coordinate calculation as getTaskPosition (React Flow coordinates)
           const lockedY = originalLane.y + grid.getConfig().taskVerticalCentering
-          console.log(`🔒 DRAG CONSTRAINT: Node "${change.id}" locked to lane "${originalLane.name}" Y=${lockedY} (from proposed Y=${change.position.y})`)
+          log.info(`🔒 DRAG CONSTRAINT: Node "${change.id}" locked to lane "${originalLane.name}" Y=${lockedY} (from proposed Y=${change.position.y})`)
           
           return {
             ...change,
@@ -220,8 +222,8 @@ export function applyTimelineConstraints(
           }
         } else {
           // Fallback: constrain within bounds if no lane found
-          console.log(`❌ DRAG CONSTRAINT: No lane found for node "${change.id}", using bounds constraint`)
-          console.log(`Available lanes:`, grid.getLanes().map(l => ({ id: l.id, name: l.name, nodeIds: l.nodes.map(n => n.id) })))
+          log.info(`❌ DRAG CONSTRAINT: No lane found for node "${change.id}", using bounds constraint`)
+          log.info(`Available lanes:`, grid.getLanes().map(l => ({ id: l.id, name: l.name, nodeIds: l.nodes.map(n => n.id) })))
           const snapResult = snapToTimeGrid(change.position.x, grid, constraintConfig)
           const constrainedY = Math.max(yBounds.minY, Math.min(yBounds.maxY, change.position.y))
           

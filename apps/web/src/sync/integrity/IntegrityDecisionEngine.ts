@@ -23,6 +23,8 @@ import {
   DEFAULT_VALIDATION_THRESHOLDS
 } from './IntegrityDecisionMatrix';
 import { syncLogger } from '../utils/SyncLogger';
+import { syncLog } from '@/logger';
+const log = syncLog('sync/integrity/IntegrityDecisionEngine.ts');
 
 // ============================================================================
 // Decision Engine Class
@@ -121,7 +123,7 @@ export class IntegrityDecisionEngine {
    * Evaluate a single decision matrix against context
    */
   private async evaluateMatrix(matrix: DecisionMatrix, context: ValidationContext): Promise<DecisionResult> {
-    console.log(`[DecisionEngine] 🔍 Evaluating matrix: ${matrix.id}`, {
+    log.info(`[DecisionEngine] 🔍 Evaluating matrix: ${matrix.id}`, {
       description: matrix.description,
       conditionCount: matrix.conditions.length
     });
@@ -137,14 +139,14 @@ export class IntegrityDecisionEngine {
 
       // Evaluate conditions in priority order
       for (const condition of sortedConditions) {
-        console.log(`[DecisionEngine] 🔍 Checking condition: ${condition.id}`);
+        log.info(`[DecisionEngine] 🔍 Checking condition: ${condition.id}`);
         const conditionResult = await this.evaluateCondition(condition, context);
-        console.log(`[DecisionEngine] 🔍 Condition ${condition.id} result: ${conditionResult}`);
+        log.info(`[DecisionEngine] 🔍 Condition ${condition.id} result: ${conditionResult}`);
         
         if (conditionResult) {
           const actionId = this.getActionForCondition(condition, matrix);
           const action = matrix.actions[actionId];
-          console.log(`[DecisionEngine] ✅ Condition matched! Action: ${actionId}`);
+          log.info(`[DecisionEngine] ✅ Condition matched! Action: ${actionId}`);
           
           return {
             matrixId: matrix.id,
@@ -160,7 +162,7 @@ export class IntegrityDecisionEngine {
       }
 
       // No conditions matched - use default action
-      console.log(`[DecisionEngine] ❌ No conditions matched for ${matrix.id}, using default: ${matrix.defaultAction}`);
+      log.info(`[DecisionEngine] ❌ No conditions matched for ${matrix.id}, using default: ${matrix.defaultAction}`);
       const defaultAction = matrix.actions[matrix.defaultAction];
       return {
         matrixId: matrix.id,
@@ -257,19 +259,19 @@ export class IntegrityDecisionEngine {
     const matrixMappings = conditionToActionMap[matrix.id];
     if (matrixMappings && matrixMappings[condition.id]) {
       const mappedAction = matrixMappings[condition.id];
-      console.log(`[DecisionEngine] 🎯 Mapped ${condition.id} → ${mappedAction}`);
+      log.info(`[DecisionEngine] 🎯 Mapped ${condition.id} → ${mappedAction}`);
       return mappedAction;
     }
     
     // Fallback to simple uppercase mapping
     const actionId = condition.id.toUpperCase();
     if (matrix.actions[actionId]) {
-      console.log(`[DecisionEngine] 📝 Direct mapping ${condition.id} → ${actionId}`);
+      log.info(`[DecisionEngine] 📝 Direct mapping ${condition.id} → ${actionId}`);
       return actionId;
     }
     
     // Use default action if no mapping found
-    console.log(`[DecisionEngine] ⚠️ No mapping for ${condition.id}, using default: ${matrix.defaultAction}`);
+    log.info(`[DecisionEngine] ⚠️ No mapping for ${condition.id}, using default: ${matrix.defaultAction}`);
     return matrix.defaultAction;
   }
 

@@ -18,6 +18,9 @@ import {
 import { LocalChanges } from '@repo/dataforge/client-entities';
 import { Repository, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import { syncLog } from '@/logger';
+
+const log = syncLog('sync/OutgoingChangeService.ts');
 
 // Constants for retry logic
 const INITIAL_TIMEOUT = 30000; // 30 seconds
@@ -84,7 +87,7 @@ export class OutgoingChangeService {
     }
     
     this.localChangesRepo = this.dataSource.getRepository(LocalChanges);
-    console.log('[OutgoingChangeService] Using shared DataSource from PGliteProvider context');
+    log.info('[OutgoingChangeService] Using shared DataSource from PGliteProvider context');
   }
 
   /**
@@ -107,7 +110,7 @@ export class OutgoingChangeService {
    */
   async trackEntityChange(table: string, operation: 'insert' | 'update' | 'delete', entity: any): Promise<void> {
     const entityId = entity.id || 'unknown';
-    console.log(`[OutgoingChangeService] Tracking entity change: ${table}:${operation}:${entityId}`);
+    log.info(`[OutgoingChangeService] Tracking entity change: ${table}:${operation}:${entityId}`);
     
     try {
       // Create the change data with clientId for anti-echo
@@ -131,7 +134,7 @@ export class OutgoingChangeService {
 
       await this.localChangesRepo.save(newChange);
       
-      console.log(`[OutgoingChangeService] Stored change in database: ${localChangeId} for ${table}:${entityId}`);
+      log.info(`[OutgoingChangeService] Stored change in database: ${localChangeId} for ${table}:${entityId}`);
       
       // Create TableChange for immediate processing (if enabled)
       const tableChange: TableChange = {
@@ -162,11 +165,11 @@ export class OutgoingChangeService {
           await this.sendQueuedChanges();
         }
       } else {
-        console.log(`[OutgoingChangeService] Change queued, will send when WebSocket is ready: ${localChangeId}`);
+        log.info(`[OutgoingChangeService] Change queued, will send when WebSocket is ready: ${localChangeId}`);
       }
       
     } catch (error) {
-      console.error('[OutgoingChangeService] Error tracking change:', error);
+      log.error('[OutgoingChangeService] Error tracking change:', error);
       throw error;
     }
   }
@@ -176,24 +179,24 @@ export class OutgoingChangeService {
    */
   async detectAndQueueChanges(): Promise<number> {
     if (this.isProcessing) {
-      console.log('[OutgoingChangeService] Already processing changes, skipping');
+      log.info('[OutgoingChangeService] Already processing changes, skipping');
       return 0;
     }
 
     this.isProcessing = true;
 
     try {
-      console.log('[OutgoingChangeService] Detecting local changes...');
+      log.info('[OutgoingChangeService] Detecting local changes...');
 
       // Get all unsynced changes from database
       const changes = await this.queryUnsyncedChanges();
       
       if (changes.length === 0) {
-        console.log('[OutgoingChangeService] No unsynced changes found');
+        log.info('[OutgoingChangeService] No unsynced changes found');
         return 0;
       }
 
-      console.log(`[OutgoingChangeService] Found ${changes.length} unsynced changes`);
+      log.info(`[OutgoingChangeService] Found ${changes.length} unsynced changes`);
 
       // Load actual LocalChanges records to get their IDs
       const localChanges = await this.localChangesRepo.find({
@@ -202,11 +205,11 @@ export class OutgoingChangeService {
         take: this.config.batchSize || 50
       });
 
-      console.log(`[OutgoingChangeService] Found ${localChanges.length} unprocessed LocalChanges`);
+      log.info(`[OutgoingChangeService] Found ${localChanges.length} unprocessed LocalChanges`);
 
       // Optimize changes by merging multiple changes to same entity
       const optimizedChanges = await this.optimizeOutgoingChanges(localChanges);
-      console.log(`[OutgoingChangeService] Optimized ${localChanges.length} changes to ${optimizedChanges.length}`);
+      log.info(`[OutgoingChangeService] Optimized ${localChanges.length} changes to ${optimizedChanges.length}`);
 
       // Queue optimized changes using LocalChanges IDs  
       let queuedCount = 0;
@@ -220,7 +223,7 @@ export class OutgoingChangeService {
             try {
               data = JSON.parse(data);
             } catch (e) {
-              console.error(`[OutgoingChangeService] Failed to parse LocalChanges.data for change ${localChange.id}:`, e);
+              log.error(`[OutgoingChangeService] Failed to parse LocalChanges.data for change ${localChange.id}:`, e);
               data = {};
             }
           }
@@ -255,14 +258,14 @@ export class OutgoingChangeService {
             await this.sendQueuedChanges();
           }
         } else {
-          console.log(`[OutgoingChangeService] ${queuedCount} changes queued, will send when WebSocket is ready`);
+          log.info(`[OutgoingChangeService] ${queuedCount} changes queued, will send when WebSocket is ready`);
         }
       }
 
       return queuedCount;
 
     } catch (error) {
-      console.error('[OutgoingChangeService] Error detecting changes:', error);
+      log.error('[OutgoingChangeService] Error detecting changes:', error);
       this.callbacks.onError?.(error as Error, 'detect_changes');
       return 0;
     } finally {
@@ -275,7 +278,7 @@ export class OutgoingChangeService {
    */
   async sendQueuedChanges(): Promise<void> {
     if (this.pendingChanges.size === 0) {
-      console.log('[OutgoingChangeService] No queued changes to send');
+      log.info('[OutgoingChangeService] No queued changes to send');
       return;
     }
 
@@ -286,7 +289,7 @@ export class OutgoingChangeService {
     const changes = Array.from(this.pendingChanges.values());
     const batchSize = this.config.batchSize || 50;
 
-    console.log(`[OutgoingChangeService] Sending ${changes.length} queued changes in batches of ${batchSize}`);
+    log.info(`[OutgoingChangeService] Sending ${changes.length} queued changes in batches of ${batchSize}`);
 
     // Send in batches
     for (let i = 0; i < changes.length; i += batchSize) {
@@ -297,14 +300,14 @@ export class OutgoingChangeService {
       this.callbacks.onProgress?.(Math.min(i + batchSize, changes.length), changes.length);
     }
 
-    console.log('[OutgoingChangeService] All queued changes sent');
+    log.info('[OutgoingChangeService] All queued changes sent');
   }
 
   /**
    * Acknowledge changes that were successfully processed by server
    */
   async acknowledgeChanges(changeIds: string[], serverResponse: any): Promise<void> {
-    console.log(`[OutgoingChangeService] Acknowledging ${changeIds.length} changes`);
+    log.info(`[OutgoingChangeService] Acknowledging ${changeIds.length} changes`);
 
     // Remove acknowledged changes from pending queue
     for (const changeId of changeIds) {
@@ -316,7 +319,7 @@ export class OutgoingChangeService {
       await this.markChangesAsSynced(changeIds);
       this.callbacks.onChangesAcknowledged?.(changeIds, serverResponse);
     } catch (error) {
-      console.error('[OutgoingChangeService] Error marking changes as synced:', error);
+      log.error('[OutgoingChangeService] Error marking changes as synced:', error);
       this.callbacks.onError?.(error as Error, 'acknowledge_changes');
     }
   }
@@ -329,11 +332,11 @@ export class OutgoingChangeService {
       .filter(pending => pending.attempts > 0);
 
     if (failedChanges.length === 0) {
-      console.log('[OutgoingChangeService] No failed changes to retry');
+      log.info('[OutgoingChangeService] No failed changes to retry');
       return;
     }
 
-    console.log(`[OutgoingChangeService] Retrying ${failedChanges.length} failed changes`);
+    log.info(`[OutgoingChangeService] Retrying ${failedChanges.length} failed changes`);
 
     for (const pending of failedChanges) {
       await this.sendChangeBatch([pending]);
@@ -358,7 +361,7 @@ export class OutgoingChangeService {
    * Clear all pending changes
    */
   clearPendingChanges(): void {
-    console.log(`[OutgoingChangeService] Clearing ${this.pendingChanges.size} pending changes`);
+    log.info(`[OutgoingChangeService] Clearing ${this.pendingChanges.size} pending changes`);
     this.pendingChanges.clear();
     this.stopBatchTimer();
   }
@@ -371,8 +374,8 @@ export class OutgoingChangeService {
     const receivedMessage = message as ServerReceivedMessage;
     
     // Server has acknowledged receipt, but changes are not yet applied
-    console.log(`[OutgoingChangeService] 📥 Server acknowledged receipt of ${receivedMessage.changeIds?.length || 0} changes`);
-    console.log(`[OutgoingChangeService] 📥 Received message:`, receivedMessage);
+    log.info(`[OutgoingChangeService] 📥 Server acknowledged receipt of ${receivedMessage.changeIds?.length || 0} changes`);
+    log.info(`[OutgoingChangeService] 📥 Received message:`, receivedMessage);
   }
 
   /**
@@ -380,13 +383,13 @@ export class OutgoingChangeService {
    * The server sends entity IDs, not LocalChanges IDs, so we need to find LocalChanges by entity ID
    */
   async handleChangesApplied(message: BaseServerMessage): Promise<void> {
-    console.log(`[OutgoingChangeService] 🔄 handleChangesApplied called with message type: ${message.type}`);
+    log.info(`[OutgoingChangeService] 🔄 handleChangesApplied called with message type: ${message.type}`);
     if (message.type !== 'srv_changes_applied') return;
     const appliedMessage = message as ServerAppliedMessage;
 
     const appliedEntityIds = appliedMessage.appliedChanges || []; // These are entity IDs from the server
-    console.log(`[OutgoingChangeService] ✅ Server applied changes. Success: ${appliedMessage.success}. Applied: ${appliedEntityIds.length}. Error: ${appliedMessage.error || 'None'}`);
-    console.log(`[OutgoingChangeService] ✅ Applied message:`, appliedMessage);
+    log.info(`[OutgoingChangeService] ✅ Server applied changes. Success: ${appliedMessage.success}. Applied: ${appliedEntityIds.length}. Error: ${appliedMessage.error || 'None'}`);
+    log.info(`[OutgoingChangeService] ✅ Applied message:`, appliedMessage);
 
     const successfullyAppliedLocalChangeIds: string[] = [];
     const permanentlyFailedLocalChangeIds: string[] = [];
@@ -406,7 +409,7 @@ export class OutgoingChangeService {
     } else {
       // Convert entity IDs to LocalChanges IDs for failed changes
       for (const entityId of appliedEntityIds) {
-        console.error(`[OutgoingChangeService] Server failed to apply change for entity ${entityId}: ${appliedMessage.error}`);
+        log.error(`[OutgoingChangeService] Server failed to apply change for entity ${entityId}: ${appliedMessage.error}`);
         const localChangeIds = await this.findLocalChangesByEntityId(entityId);
         permanentlyFailedLocalChangeIds.push(...localChangeIds);
         
@@ -438,7 +441,7 @@ export class OutgoingChangeService {
   handleServerError(message: ServerErrorResponseMessage | BaseServerMessage): void {
     if (message.type !== 'srv_error') return;
     const { errorCode, errorMessage, originalMessageId } = message as ServerErrorResponseMessage;
-    console.error(`[OutgoingChangeService] Received server error: ${errorCode} - ${errorMessage}. Original Msg ID: ${originalMessageId}`);
+    log.error(`[OutgoingChangeService] Received server error: ${errorCode} - ${errorMessage}. Original Msg ID: ${originalMessageId}`);
     
     this.callbacks.onError?.(new Error(`Server error: ${errorMessage}`), 'server_error');
   }
@@ -452,7 +455,7 @@ export class OutgoingChangeService {
     for (const change of localChanges) {
       const entityId = (change.data as Record<string, any>)?.id;
       if (!entityId) {
-        console.warn(`[OutgoingChangeService] Change ${change.id} missing entity_id in data during optimization.`);
+        log.warn(`[OutgoingChangeService] Change ${change.id} missing entity_id in data during optimization.`);
         continue;
       }
       const key = `${change.table}:${entityId}`;
@@ -534,7 +537,7 @@ export class OutgoingChangeService {
     }
     
     if (processedDueToOptimization.length > 0) {
-      console.log(`[OutgoingChangeService] ${processedDueToOptimization.length} changes were optimized out or merged.`);
+      log.info(`[OutgoingChangeService] ${processedDueToOptimization.length} changes were optimized out or merged.`);
       await this.markLocalChangesAsProcessed(processedDueToOptimization, true, 'optimized_merged');
     }
     
@@ -552,11 +555,11 @@ export class OutgoingChangeService {
     this.sentChanges.forEach((info, localChangeId) => {
       if (now - info.timestamp > info.timeout) {
         if (info.attempt >= MAX_RETRY_ATTEMPTS) {
-          console.error(`[OutgoingChangeService] Change ${localChangeId} permanently failed after ${info.attempt} attempts. Marking as failed.`);
+          log.error(`[OutgoingChangeService] Change ${localChangeId} permanently failed after ${info.attempt} attempts. Marking as failed.`);
           this.sentChanges.delete(localChangeId);
           permanentlyFailed.push(localChangeId);
         } else {
-          console.warn(`[OutgoingChangeService] Change ${localChangeId} timed out (attempt ${info.attempt}). Will retry.`);
+          log.warn(`[OutgoingChangeService] Change ${localChangeId} timed out (attempt ${info.attempt}). Will retry.`);
           this.sentChanges.delete(localChangeId);
           toRetry.push(localChangeId);
         }
@@ -578,7 +581,7 @@ export class OutgoingChangeService {
     if (permanentlyFailed.length > 0) {
       this.markLocalChangesAsProcessed(permanentlyFailed, false, `timeout_after_${MAX_RETRY_ATTEMPTS}_attempts`)
         .catch((error: Error) => {
-          console.error('[OutgoingChangeService] Error marking permanently failed changes:', error);
+          log.error('[OutgoingChangeService] Error marking permanently failed changes:', error);
         });
     }
 
@@ -605,7 +608,7 @@ export class OutgoingChangeService {
    * Destroy service and clean up resources
    */
   destroy(): void {
-    console.log('[OutgoingChangeService] Destroying...');
+    log.info('[OutgoingChangeService] Destroying...');
     this.clearPendingChanges();
     
     if (this.retryTimer) {
@@ -621,7 +624,7 @@ export class OutgoingChangeService {
 
   private async queryUnsyncedChanges(): Promise<TableChange[]> {
     try {
-      console.log('[OutgoingChangeService] Querying LocalChanges table for unsynced changes...');
+      log.info('[OutgoingChangeService] Querying LocalChanges table for unsynced changes...');
       
       // Query LocalChanges table for unprocessed records
       const unprocessed = await this.localChangesRepo.find({
@@ -630,7 +633,7 @@ export class OutgoingChangeService {
         take: this.config.batchSize || 50
       });
 
-      console.log(`[OutgoingChangeService] Found ${unprocessed.length} unsynced changes in LocalChanges table`);
+      log.info(`[OutgoingChangeService] Found ${unprocessed.length} unsynced changes in LocalChanges table`);
 
       // Convert LocalChanges to TableChange format
       return unprocessed.map(localChange => {
@@ -641,7 +644,7 @@ export class OutgoingChangeService {
           try {
             data = JSON.parse(data);
           } catch (e) {
-            console.error(`[OutgoingChangeService] Failed to parse LocalChanges.data for change ${localChange.id}:`, e);
+            log.error(`[OutgoingChangeService] Failed to parse LocalChanges.data for change ${localChange.id}:`, e);
             data = {};
           }
         }
@@ -656,7 +659,7 @@ export class OutgoingChangeService {
       });
       
     } catch (error) {
-      console.error('[OutgoingChangeService] Error querying unsynced changes:', error);
+      log.error('[OutgoingChangeService] Error querying unsynced changes:', error);
       throw error;
     }
   }
@@ -665,7 +668,7 @@ export class OutgoingChangeService {
     if (changeIds.length === 0) return;
 
     try {
-      console.log(`[OutgoingChangeService] Marking ${changeIds.length} LocalChanges as processed`);
+      log.info(`[OutgoingChangeService] Marking ${changeIds.length} LocalChanges as processed`);
       
       // Mark changes as processed in LocalChanges table
       await this.localChangesRepo.update(
@@ -673,10 +676,10 @@ export class OutgoingChangeService {
         { processedSync: 1 }
       );
       
-      console.log(`[OutgoingChangeService] Successfully marked ${changeIds.length} changes as processed`);
+      log.info(`[OutgoingChangeService] Successfully marked ${changeIds.length} changes as processed`);
       
     } catch (error) {
-      console.error('[OutgoingChangeService] Error marking changes as synced:', error);
+      log.error('[OutgoingChangeService] Error marking changes as synced:', error);
       throw error;
     }
   }
@@ -694,7 +697,7 @@ export class OutgoingChangeService {
 
       return changesToUpdate.map(change => change.id);
     } catch (error) {
-      console.error(`[OutgoingChangeService] Error finding LocalChanges for entity ID ${entityId}:`, error);
+      log.error(`[OutgoingChangeService] Error finding LocalChanges for entity ID ${entityId}:`, error);
       return [];
     }
   }
@@ -706,7 +709,7 @@ export class OutgoingChangeService {
     if (changeIds.length === 0) return;
 
     try {
-      console.log(`[OutgoingChangeService] Marking ${changeIds.length} LocalChanges as processed due to: ${reason}`);
+      log.info(`[OutgoingChangeService] Marking ${changeIds.length} LocalChanges as processed due to: ${reason}`);
       
       const statusToSet = success ? 1 : 0;
       await this.localChangesRepo.update(
@@ -714,7 +717,7 @@ export class OutgoingChangeService {
         { processedSync: statusToSet }
       );
       
-      console.log(`[OutgoingChangeService] Successfully marked ${changeIds.length} changes as processedSync=${statusToSet}`);
+      log.info(`[OutgoingChangeService] Successfully marked ${changeIds.length} changes as processedSync=${statusToSet}`);
       
       // Clean up tracking for processed changes
       for (const changeId of changeIds) {
@@ -723,7 +726,7 @@ export class OutgoingChangeService {
       }
       
     } catch (error) {
-      console.error(`[OutgoingChangeService] Error marking changes as processed (reason: ${reason}):`, error);
+      log.error(`[OutgoingChangeService] Error marking changes as processed (reason: ${reason}):`, error);
       throw error;
     }
   }
@@ -755,7 +758,7 @@ export class OutgoingChangeService {
           timeout: timeout 
         });
         
-        console.log(`[OutgoingChangeService] Tracking change ${pending.id} (attempt ${attempt}, timeout ${timeout}ms)`);
+        log.info(`[OutgoingChangeService] Tracking change ${pending.id} (attempt ${attempt}, timeout ${timeout}ms)`);
       }
 
       const message: ClientChangesMessage = {
@@ -770,13 +773,13 @@ export class OutgoingChangeService {
       
       this.callbacks.onChangesSent?.(batch.map(p => p.change), messageId);
       
-      console.log(`[OutgoingChangeService] Sent batch of ${batch.length} changes (${messageId})`);
+      log.info(`[OutgoingChangeService] Sent batch of ${batch.length} changes (${messageId})`);
       
       // Start retry check timer if not already running
       this.scheduleRetryCheck();
       
     } catch (error) {
-      console.error('[OutgoingChangeService] Error sending change batch:', error);
+      log.error('[OutgoingChangeService] Error sending change batch:', error);
       this.callbacks.onError?.(error as Error, 'send_batch');
       throw error;
     }
@@ -794,7 +797,7 @@ export class OutgoingChangeService {
     const timeout = this.config.batchTimeoutMs || 5000; // 5 seconds default
     this.batchTimer = setTimeout(() => {
       this.sendQueuedChanges().catch(error => {
-        console.error('[OutgoingChangeService] Error in scheduled batch send:', error);
+        log.error('[OutgoingChangeService] Error in scheduled batch send:', error);
         this.callbacks.onError?.(error, 'scheduled_send');
       });
     }, timeout);

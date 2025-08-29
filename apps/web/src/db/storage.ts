@@ -6,6 +6,8 @@
 
 import { getDatabase, clearDatabaseStorage, Results } from './db';
 import { CLIENT_DOMAIN_TABLES, CLIENT_DOMAIN_TABLE_HIERARCHY, CLIENT_JUNCTION_TABLES } from './client-entities';
+import { dataLog } from '@/logger';
+const log = dataLog('db/storage.ts');
 
 /**
  * Entity configuration for database operations
@@ -58,12 +60,12 @@ type EntityName = string;
  */
 export async function resetDatabase(): Promise<boolean> {
   try {
-    console.log('Resetting database...');
+    log.info('Resetting database...');
     const result = await clearDatabaseStorage();
-    console.log('Database reset result:', result);
+    log.info('Database reset result:', result);
     return result;
   } catch (error) {
-    console.error('Error resetting database:', error);
+    log.error('Error resetting database:', error);
     return false;
   }
 }
@@ -93,7 +95,7 @@ export async function getDatabaseStats(): Promise<Record<string, number>> {
     stats.total = total;
     return stats;
   } catch (error) {
-    console.error('Error getting database stats:', error);
+    log.error('Error getting database stats:', error);
     // Return zero stats for all entities
     const emptyStats: Record<string, number> = { total: 0 };
     for (const entityName of ENTITY_CONFIG.entities) {
@@ -113,7 +115,7 @@ async function getTableCount(db: any, tableName: string): Promise<number> {
     const resultArray = result as unknown as Array<{count: number}>;
     return resultArray[0]?.count || 0;
   } catch (error) {
-    console.error(`Error getting count for ${tableName}:`, error);
+    log.error(`Error getting count for ${tableName}:`, error);
     return 0;
   }
 }
@@ -123,7 +125,7 @@ async function getTableCount(db: any, tableName: string): Promise<number> {
  */
 export async function loadServerData(endpoint: string): Promise<any> {
   try {
-    console.log(`Loading data from server: ${endpoint}`);
+    log.info(`Loading data from server: ${endpoint}`);
     const response = await fetch(`/api/${endpoint}`, {
       credentials: 'include' // Include session cookies for authentication
     });
@@ -135,7 +137,7 @@ export async function loadServerData(endpoint: string): Promise<any> {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error loading server data:', error);
+    log.error('Error loading server data:', error);
     throw error;
   }
 }
@@ -145,7 +147,7 @@ export async function loadServerData(endpoint: string): Promise<any> {
  */
 export async function clearAllData(): Promise<boolean> {
   try {
-    console.log('Clearing all data...');
+    log.info('Clearing all data...');
     
     // Option 1: Full database storage reset (more reliable, prevents stale data issues)
     // This is a more thorough approach that will prevent sleep-related issues
@@ -154,10 +156,10 @@ export async function clearAllData(): Promise<boolean> {
     // After clearing storage, the database will be reinitialized on next access
     // This ensures we have a clean slate
     
-    console.log('All data cleared successfully through complete storage reset');
+    log.info('All data cleared successfully through complete storage reset');
     return success;
   } catch (error) {
-    console.error('Error clearing data:', error);
+    log.error('Error clearing data:', error);
     return false;
   }
 }
@@ -168,16 +170,16 @@ export async function clearAllData(): Promise<boolean> {
  */
 export async function clearAllDataKeepSchema(): Promise<boolean> {
   try {
-    console.log('Clearing all data but keeping schema...');
+    log.info('Clearing all data but keeping schema...');
     const db = await getDatabase();
     
     // Delete all data from tables in proper deletion order
     for (const tableName of ENTITY_CONFIG.deletionOrder) {
       try {
         await db.query(`DELETE FROM ${tableName}`);
-        console.log(`Cleared data from ${tableName}`);
+        log.info(`Cleared data from ${tableName}`);
       } catch (error) {
-        console.warn(`Warning: Could not clear ${tableName}:`, error);
+        log.warn(`Warning: Could not clear ${tableName}:`, error);
       }
     }
     
@@ -185,13 +187,13 @@ export async function clearAllDataKeepSchema(): Promise<boolean> {
     try {
       await db.query('COMMIT;');
     } catch (commitError) {
-      console.warn('Explicit commit failed (this may be normal):', commitError);
+      log.warn('Explicit commit failed (this may be normal):', commitError);
     }
     
-    console.log('All data cleared successfully while preserving schema');
+    log.info('All data cleared successfully while preserving schema');
     return true;
   } catch (error) {
-    console.error('Error clearing data:', error);
+    log.error('Error clearing data:', error);
     return false;
   }
 }
@@ -202,7 +204,7 @@ export async function clearAllDataKeepSchema(): Promise<boolean> {
  */
 export async function clearDomainDataOnly(): Promise<boolean> {
   try {
-    console.log('Clearing domain data only (preserving system tables)...');
+    log.info('Clearing domain data only (preserving system tables)...');
     const db = await getDatabase();
     
     // Get domain deletion order (entities + junction tables, but NOT system tables)
@@ -217,16 +219,16 @@ export async function clearDomainDataOnly(): Promise<boolean> {
     
     const domainDeletionOrder = [...ENTITY_CONFIG.junctionTables, ...sortedDomainEntities];
     
-    console.log('Domain tables to clear:', domainDeletionOrder);
-    console.log('System tables preserved:', ENTITY_CONFIG.systemTables);
+    log.info('Domain tables to clear:', domainDeletionOrder);
+    log.info('System tables preserved:', ENTITY_CONFIG.systemTables);
     
     // Delete data from domain tables only
     for (const tableName of domainDeletionOrder) {
       try {
         await db.query(`DELETE FROM ${tableName}`);
-        console.log(`Cleared domain data from ${tableName}`);
+        log.info(`Cleared domain data from ${tableName}`);
       } catch (error) {
-        console.warn(`Warning: Could not clear domain table ${tableName}:`, error);
+        log.warn(`Warning: Could not clear domain table ${tableName}:`, error);
       }
     }
     
@@ -234,13 +236,13 @@ export async function clearDomainDataOnly(): Promise<boolean> {
     try {
       await db.query('COMMIT;');
     } catch (commitError) {
-      console.warn('Explicit commit failed (this may be normal):', commitError);
+      log.warn('Explicit commit failed (this may be normal):', commitError);
     }
     
-    console.log('Domain data cleared successfully while preserving system tables');
+    log.info('Domain data cleared successfully while preserving system tables');
     return true;
   } catch (error) {
-    console.error('Error clearing domain data:', error);
+    log.error('Error clearing domain data:', error);
     return false;
   }
 }
@@ -250,37 +252,37 @@ export async function clearDomainDataOnly(): Promise<boolean> {
  */
 export async function dropAllTables(): Promise<boolean> {
   try {
-    console.log('Dropping all tables and types with CASCADE...');
+    log.info('Dropping all tables and types with CASCADE...');
     const db = await getDatabase();
 
     // First, try to get all tables from the database dynamically
     try {
-      console.log('Fetching all existing tables...');
+      log.info('Fetching all existing tables...');
       const tableResult = await db.query<{tablename: string}>(`
         SELECT tablename FROM pg_tables 
         WHERE schemaname = 'public'
       `);
       
       if (tableResult.rows.length > 0) {
-        console.log(`Found ${tableResult.rows.length} tables to drop`);
+        log.info(`Found ${tableResult.rows.length} tables to drop`);
         
         // Drop all tables found in the database
         for (const row of tableResult.rows) {
           try {
             await db.query(`DROP TABLE IF EXISTS "${row.tablename}" CASCADE`);
-            console.log(`Dropped table: ${row.tablename}`);
+            log.info(`Dropped table: ${row.tablename}`);
           } catch (dropError) {
-            console.warn(`Warning: Could not drop table ${row.tablename}:`, dropError);
+            log.warn(`Warning: Could not drop table ${row.tablename}:`, dropError);
           }
         }
       }
     } catch (tableError) {
-      console.warn('Error fetching tables dynamically:', tableError);
+      log.warn('Error fetching tables dynamically:', tableError);
     }
 
     // Then, try to get all custom types from the database dynamically
     try {
-      console.log('Fetching all existing enum types...');
+      log.info('Fetching all existing enum types...');
       const typeResult = await db.query<{typname: string}>(`
         SELECT typname FROM pg_type 
         JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
@@ -288,46 +290,46 @@ export async function dropAllTables(): Promise<boolean> {
       `);
       
       if (typeResult.rows.length > 0) {
-        console.log(`Found ${typeResult.rows.length} enum types to drop`);
+        log.info(`Found ${typeResult.rows.length} enum types to drop`);
         
         // Drop all types found in the database
         for (const row of typeResult.rows) {
           try {
             await db.query(`DROP TYPE IF EXISTS "public"."${row.typname}" CASCADE`);
-            console.log(`Dropped enum type: ${row.typname}`);
+            log.info(`Dropped enum type: ${row.typname}`);
           } catch (dropError) {
-            console.warn(`Warning: Could not drop type ${row.typname}:`, dropError);
+            log.warn(`Warning: Could not drop type ${row.typname}:`, dropError);
           }
         }
       }
     } catch (typeError) {
-      console.warn('Error fetching enum types dynamically:', typeError);
+      log.warn('Error fetching enum types dynamically:', typeError);
     }
 
     // As a fallback, manually drop known tables using configuration
-    console.log('Dropping known tables as fallback...');
+    log.info('Dropping known tables as fallback...');
     for (const table of ENTITY_CONFIG.allTables) {
       try {
         await db.query(`DROP TABLE IF EXISTS "${table}" CASCADE`);
       } catch (error) {
-        console.warn(`Warning: Could not drop table ${table}:`, error);
+        log.warn(`Warning: Could not drop table ${table}:`, error);
       }
     }
 
     // As a fallback, manually drop known types using configuration
-    console.log('Dropping known enum types as fallback...');
+    log.info('Dropping known enum types as fallback...');
     for (const type of ENTITY_CONFIG.enumTypes) {
       try {
         await db.query(`DROP TYPE IF EXISTS "public"."${type}" CASCADE`);
       } catch (error) {
-        console.warn(`Warning: Could not drop type ${type}:`, error);
+        log.warn(`Warning: Could not drop type ${type}:`, error);
       }
     }
 
-    console.log('All tables and custom types dropped successfully');
+    log.info('All tables and custom types dropped successfully');
     return true;
   } catch (error) {
-    console.error('Error in dropAllTables():', error);
+    log.error('Error in dropAllTables():', error);
     return false;
   }
 }
@@ -338,13 +340,13 @@ export async function dropAllTables(): Promise<boolean> {
  */
 export async function resetEntireDatabase(): Promise<boolean> {
   try {
-    console.log('Performing complete database reset...');
+    log.info('Performing complete database reset...');
     const db = await getDatabase();
     
     // First drop all tables and types
     const dropResult = await dropAllTables();
     if (!dropResult) {
-      console.error('Failed to drop tables, continuing with reset attempt...');
+      log.error('Failed to drop tables, continuing with reset attempt...');
     }
     
     // For a truly clean slate, also truncate migration tracking tables
@@ -353,13 +355,13 @@ export async function resetEntireDatabase(): Promise<boolean> {
       await db.query('DROP TABLE IF EXISTS schema_version CASCADE');
       await db.query('DROP TABLE IF EXISTS client_migration_status CASCADE');
     } catch (truncateError) {
-      console.warn('Error clearing migration tables:', truncateError);
+      log.warn('Error clearing migration tables:', truncateError);
     }
     
-    console.log('Database schema completely reset, migrations will run from scratch');
+    log.info('Database schema completely reset, migrations will run from scratch');
     return true;
   } catch (error) {
-    console.error('Error resetting entire database:', error);
+    log.error('Error resetting entire database:', error);
     return false;
   }
 }

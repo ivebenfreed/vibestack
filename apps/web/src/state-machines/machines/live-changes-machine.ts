@@ -1,4 +1,6 @@
 import { setup, assign, fromPromise, sendParent } from 'xstate';
+import { syncLog } from '@/logger';
+const log = syncLog('state-machines/machines/live-changes-machine.ts');
 
 // ============================================================================
 // Service Registry Pattern (matching sync machine v2)
@@ -11,11 +13,11 @@ export const initializeAuthAwareLiveChangesCleanup = () => {
   if (authCleanupInitialized) return;
   authCleanupInitialized = true;
 
-  console.log('[LiveChangesMachine] 🔐 Initializing auth-aware live changes cleanup...');
+  log.info('[LiveChangesMachine] 🔐 Initializing auth-aware live changes cleanup...');
   
   const authActor = (window as any).authMachineActor;
   if (!authActor) {
-    console.warn('[LiveChangesMachine] AuthMachine actor not available for cleanup subscription');
+    log.warn('[LiveChangesMachine] AuthMachine actor not available for cleanup subscription');
     return;
   }
 
@@ -24,7 +26,7 @@ export const initializeAuthAwareLiveChangesCleanup = () => {
     const isAuthenticated = snapshot.matches('authenticated');
     const isSigningOut = snapshot.matches('signingOut');
     
-    console.log('[LiveChangesMachine] 🔐 Auth state change:', { 
+    log.info('[LiveChangesMachine] 🔐 Auth state change:', { 
       state: snapshot.value, 
       isAuthenticated, 
       isSigningOut
@@ -32,7 +34,7 @@ export const initializeAuthAwareLiveChangesCleanup = () => {
     
     // If user is signing out or no longer authenticated, send SIGNOUT to live changes machine
     if (isSigningOut || !isAuthenticated) {
-      console.log('[LiveChangesMachine] 🔐 User signed out, sending SIGNOUT to live changes machine');
+      log.info('[LiveChangesMachine] 🔐 User signed out, sending SIGNOUT to live changes machine');
       
       // Find and send SIGNOUT to live changes machine
       const appInitActor = (window as any).appInitActor;
@@ -40,7 +42,7 @@ export const initializeAuthAwareLiveChangesCleanup = () => {
         const appInitSnapshot = appInitActor.getSnapshot();
         const liveChangesMachine = appInitSnapshot?.children?.liveChangesMachine;
         if (liveChangesMachine) {
-          console.log('[LiveChangesMachine] 🔐 Sending SIGNOUT to live changes machine');
+          log.info('[LiveChangesMachine] 🔐 Sending SIGNOUT to live changes machine');
           liveChangesMachine.send({ type: 'SIGNOUT' });
         }
       }
@@ -113,7 +115,7 @@ export const liveChangesMachine = setup({
   actors: {
     initializeLiveChanges: fromPromise(async ({ input }: { input: { entities: string[]; serviceRegistryKey: string } }) => {
       try {
-        console.log(`[LiveChangesMachine] Initializing live changes for ${input.entities.length} entities`);
+        log.info(`[LiveChangesMachine] Initializing live changes for ${input.entities.length} entities`);
         
         // Import live changes manager (using singleton pattern)
         const { liveChangesManager } = await import('@/lib/live-changes-manager');
@@ -131,10 +133,10 @@ export const liveChangesMachine = setup({
         
         await liveChangesManager.initialize(entityConfigs, dataSource);
         
-        console.log(`[LiveChangesMachine] ✅ Live changes initialization complete - returning success`);
+        log.info(`[LiveChangesMachine] ✅ Live changes initialization complete - returning success`);
         return { active: true, entities: input.entities };
       } catch (error) {
-        console.error(`[LiveChangesMachine] ❌ Live changes initialization failed:`, error);
+        log.error(`[LiveChangesMachine] ❌ Live changes initialization failed:`, error);
         throw error;
       }
     }),
@@ -144,7 +146,7 @@ export const liveChangesMachine = setup({
     }) => {
       // Process individual change - this would typically be handled
       // by the live changes manager, but we can track metrics here
-      console.log(`[LiveChangesMachine] Processing ${input.changeType} for ${input.entityType}`);
+      log.info(`[LiveChangesMachine] Processing ${input.changeType} for ${input.entityType}`);
       
       // Simulate processing time for metrics
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -154,7 +156,7 @@ export const liveChangesMachine = setup({
     
     cleanupServices: fromPromise(async ({ input }: { input: { serviceRegistryKey: string } }) => {
       try {
-        console.log('[LiveChangesMachine] Cleaning up services...');
+        log.info('[LiveChangesMachine] Cleaning up services...');
         
         const services = getLiveChangesServices({ serviceRegistryKey: input.serviceRegistryKey } as LiveChangesContext);
         if (services?.liveChangesManager) {
@@ -166,10 +168,10 @@ export const liveChangesMachine = setup({
           liveChangesServiceRegistry.delete(input.serviceRegistryKey);
         }
         
-        console.log('[LiveChangesMachine] ✅ Services cleaned up successfully');
+        log.info('[LiveChangesMachine] ✅ Services cleaned up successfully');
         return { cleaned: true };
       } catch (error) {
-        console.error('[LiveChangesMachine] ❌ Service cleanup failed:', error);
+        log.error('[LiveChangesMachine] ❌ Service cleanup failed:', error);
         throw error;
       }
     })
@@ -276,12 +278,12 @@ export const liveChangesMachine = setup({
     }),
     
     cleanupServicesAction: ({ context }) => {
-      console.log('[LiveChangesMachine] Cleaning up services...');
+      log.info('[LiveChangesMachine] Cleaning up services...');
       
       const services = getLiveChangesServices(context);
       if (services?.liveChangesManager) {
         services.liveChangesManager.stop().catch((error: any) => {
-          console.error('[LiveChangesMachine] Error stopping live changes manager:', error);
+          log.error('[LiveChangesMachine] Error stopping live changes manager:', error);
         });
         
         // Remove from registry
@@ -291,7 +293,7 @@ export const liveChangesMachine = setup({
       }
     },
     
-    logParentNotification: () => console.log('[LiveChangesMachine] 🔥 Notifying parent: LIVE_CHANGES_ACTIVE'),
+    logParentNotification: () => log.info('[LiveChangesMachine] 🔥 Notifying parent: LIVE_CHANGES_ACTIVE'),
     notifyParentActive: sendParent({ type: 'LIVE_CHANGES_ACTIVE' }),
     notifyParentInactive: sendParent({ type: 'LIVE_CHANGES_INACTIVE' }),
     notifyParentError: sendParent(({ context }) => ({ 
@@ -328,7 +330,7 @@ export const liveChangesMachine = setup({
     },
     
     starting: {
-      entry: () => console.log('[LiveChangesMachine] Entering starting state'),
+      entry: () => log.info('[LiveChangesMachine] Entering starting state'),
       invoke: {
         src: 'initializeLiveChanges',
         input: ({ context, event }) => ({
@@ -338,7 +340,7 @@ export const liveChangesMachine = setup({
         onDone: {
           target: 'active',
           actions: [
-            () => console.log('[LiveChangesMachine] ✅ Initialization successful - transitioning to active'),
+            () => log.info('[LiveChangesMachine] ✅ Initialization successful - transitioning to active'),
             'markActive', 
             'logParentNotification',
             'notifyParentActive'
@@ -347,7 +349,7 @@ export const liveChangesMachine = setup({
         onError: {
           target: 'error',
           actions: [
-            ({ event }) => console.error('[LiveChangesMachine] ❌ Initialization failed:', event.error),
+            ({ event }) => log.error('[LiveChangesMachine] ❌ Initialization failed:', event.error),
             'storeError', 
             'notifyParentError'
           ]
@@ -357,7 +359,7 @@ export const liveChangesMachine = setup({
     
     active: {
       entry: [
-        () => console.log('[LiveChangesMachine] ✅ Entering active state'),
+        () => log.info('[LiveChangesMachine] ✅ Entering active state'),
         'markActive'
       ],
       
@@ -369,7 +371,7 @@ export const liveChangesMachine = setup({
         SIGNOUT: {
           target: 'stopping',
           actions: [
-            () => console.log('[LiveChangesMachine] 🔐 SIGNOUT received in active state - cleaning up'),
+            () => log.info('[LiveChangesMachine] 🔐 SIGNOUT received in active state - cleaning up'),
             'cleanupServicesAction'
           ]
         },
@@ -430,7 +432,7 @@ export const liveChangesMachine = setup({
         SIGNOUT: {
           target: 'stopping',
           actions: [
-            () => console.log('[LiveChangesMachine] 🔐 SIGNOUT received in paused state - cleaning up'),
+            () => log.info('[LiveChangesMachine] 🔐 SIGNOUT received in paused state - cleaning up'),
             'cleanupServicesAction'
           ]
         }
@@ -438,7 +440,7 @@ export const liveChangesMachine = setup({
     },
     
     stopping: {
-      entry: () => console.log('[LiveChangesMachine] Stopping and cleaning up services...'),
+      entry: () => log.info('[LiveChangesMachine] Stopping and cleaning up services...'),
       invoke: {
         src: 'cleanupServices',
         input: ({ context }) => ({
@@ -447,7 +449,7 @@ export const liveChangesMachine = setup({
         onDone: {
           target: 'inactive',
           actions: [
-            () => console.log('[LiveChangesMachine] ✅ Services cleaned up, transitioning to inactive'),
+            () => log.info('[LiveChangesMachine] ✅ Services cleaned up, transitioning to inactive'),
             'markInactive',
             'notifyParentInactive'
           ]
@@ -455,7 +457,7 @@ export const liveChangesMachine = setup({
         onError: {
           target: 'inactive', // Still transition to inactive even if cleanup fails
           actions: [
-            ({ event }) => console.error('[LiveChangesMachine] ❌ Service cleanup failed:', event.error),
+            ({ event }) => log.error('[LiveChangesMachine] ❌ Service cleanup failed:', event.error),
             'markInactive',
             'notifyParentInactive'
           ]

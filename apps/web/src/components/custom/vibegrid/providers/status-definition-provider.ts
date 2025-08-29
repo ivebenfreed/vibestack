@@ -1,5 +1,7 @@
 import type { RelationshipOptionsProvider, RelationshipContext } from '../types';
 import type { StatusDefinition } from '@repo/dataforge/client-entities';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/providers/status-definition-provider.ts');
 
 /**
  * @deprecated This atom-based provider is deprecated.
@@ -13,6 +15,6 @@ import type { StatusDefinition } from '@repo/dataforge/client-entities';
  * - Sorted by sortOrder
  */
 export const statusDefinitionProvider: RelationshipOptionsProvider = async (context: RelationshipContext) => {
-  console.warn('⚠️ DEPRECATED: Atom-based status definition provider called. VibeGrid uses Dexie providers.');
+  log.warn('⚠️ DEPRECATED: Atom-based status definition provider called. VibeGrid uses Dexie providers.');
   return [];
 };

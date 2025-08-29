@@ -14,6 +14,8 @@ import type {
   SortConfig 
 } from '../../types';
 import { CellPipeline } from './CellPipeline';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/renderers/core/CleanTableRenderer.ts');
 
 // ====================================
 // TYPES
@@ -172,7 +174,7 @@ export class CleanTableRenderer {
   // ====================================
   
   render(state: RenderState): void {
-    console.log('CleanTableRenderer: render() called with columns:', {
+    log.info('CleanTableRenderer: render() called with columns:', {
       columnCount: state.columns?.length,
       columnIds: state.columns?.map(c => c.id),
       columnNames: state.columns?.map(c => c.name),
@@ -209,7 +211,7 @@ export class CleanTableRenderer {
   // ====================================
   
   private renderHeader(state: RenderState): void {
-    console.log('CleanTableRenderer: renderHeader called with columns:', {
+    log.info('CleanTableRenderer: renderHeader called with columns:', {
       stateColumns: state.columns?.map(c => ({ id: c.id, name: c.name })),
       coordinateMappingColumns: state.coordinateMapping?.columns?.map((c: any) => ({ 
         columnId: c.columnId, 
@@ -232,7 +234,7 @@ export class CleanTableRenderer {
     headerRow.style.width = 'fit-content';
     
     // Render columns in the order they appear in state.columns (from store)
-    console.log('CleanTableRenderer: Creating header cells in order:', state.columns.map(c => c.id));
+    log.info('CleanTableRenderer: Creating header cells in order:', state.columns.map(c => c.id));
     
     state.columns.forEach((column, index) => {
       // Find the coordinate mapping for this column to get its width
@@ -247,14 +249,14 @@ export class CleanTableRenderer {
       };
       
       const headerCell = this.createHeaderCell(column, mapping, state);
-      console.log(`CleanTableRenderer: Appending column ${column.id} at position ${index}`);
+      log.info(`CleanTableRenderer: Appending column ${column.id} at position ${index}`);
       headerRow.appendChild(headerCell);
     });
     
     this.header.appendChild(headerRow);
     
     // Log final DOM state
-    console.log('CleanTableRenderer: Final header DOM order:', 
+    log.info('CleanTableRenderer: Final header DOM order:', 
       Array.from(headerRow.children).map((el: any) => el.dataset.column));
   }
   
@@ -650,7 +652,7 @@ export class CleanTableRenderer {
     
     // Sort click
     const field = headerCell.dataset.field || columnId;
-    console.log('CleanTableRenderer: Sort click detected', {
+    log.info('CleanTableRenderer: Sort click detected', {
       field,
       columnId,
       timestamp: Date.now()
@@ -827,7 +829,7 @@ export class CleanTableRenderer {
     const column = this.state?.columns.find(col => col.id === this.dragState.columnId);
     if (!column) return;
     
-    console.log('CleanTableRenderer: Starting column drag', {
+    log.info('CleanTableRenderer: Starting column drag', {
       columnId: this.dragState.columnId,
       columnName: column.name || column.id
     });
@@ -851,7 +853,7 @@ export class CleanTableRenderer {
     // Calculate target position
     const targetIndex = this.calculateColumnDropTarget(e.clientX);
     
-    console.log('CleanTableRenderer: Updating column drag', {
+    log.info('CleanTableRenderer: Updating column drag', {
       columnId: this.dragState.columnId,
       targetIndex,
       mouseX: e.clientX
@@ -871,7 +873,7 @@ export class CleanTableRenderer {
   
   // New method to handle drag position updates from EventDelegationManager
   updateDragPosition(params: { mouseX: number; mouseY: number }): void {
-    console.log('CleanTableRenderer: updateDragPosition called', {
+    log.info('CleanTableRenderer: updateDragPosition called', {
       params,
       dragState: this.dragState,
       hasDragState: !!this.dragState,
@@ -879,7 +881,7 @@ export class CleanTableRenderer {
     });
     
     if (!this.dragState || !this.dragState.columnId) {
-      console.warn('CleanTableRenderer: No active drag state', {
+      log.warn('CleanTableRenderer: No active drag state', {
         dragState: this.dragState
       });
       return;
@@ -902,7 +904,7 @@ export class CleanTableRenderer {
     
     // Get the bounds of the dragged column
     if (draggedIndex === -1 || draggedIndex >= headerCells.length) {
-      console.warn('CleanTableRenderer: Dragged column not found in visible columns', {
+      log.warn('CleanTableRenderer: Dragged column not found in visible columns', {
         draggedColumnId: this.dragState.columnId,
         visibleColumns: visibleColumns.map(c => c.id)
       });
@@ -956,7 +958,7 @@ export class CleanTableRenderer {
       }
     }
     
-    console.log('CleanTableRenderer: updateDragPosition', {
+    log.info('CleanTableRenderer: updateDragPosition', {
       draggedColumnId: params.draggedColumnId,
       mouseX: params.mouseX,
       targetIndex: targetIndex,
@@ -986,7 +988,7 @@ export class CleanTableRenderer {
   
   calculateColumnDropTarget(mouseX: number, useStoredTarget: boolean = false): number {
     if (!this.state?.columns || !this.dragState.columnId) {
-      console.warn('CleanTableRenderer: calculateColumnDropTarget - missing required state');
+      log.warn('CleanTableRenderer: calculateColumnDropTarget - missing required state');
       return -1;
     }
     
@@ -1051,7 +1053,7 @@ export class CleanTableRenderer {
       targetIndex--;
     }
     
-    console.log('CleanTableRenderer: calculateColumnDropTarget', {
+    log.info('CleanTableRenderer: calculateColumnDropTarget', {
       mouseX,
       draggedIndex,
       targetIndex,
@@ -1072,7 +1074,7 @@ export class CleanTableRenderer {
     const currentIndex = visibleColumns.findIndex(col => col.id === this.dragState.columnId);
     if (currentIndex === -1) return;
     
-    console.log('CleanTableRenderer: Completing column drag', {
+    log.info('CleanTableRenderer: Completing column drag', {
       columnId: this.dragState.columnId,
       currentIndex,
       targetIndex
@@ -1085,7 +1087,7 @@ export class CleanTableRenderer {
       const fromIndex = currentIndex;
       const toIndex = targetIndex;
       
-      console.log('CleanTableRenderer: Column reorder needed', {
+      log.info('CleanTableRenderer: Column reorder needed', {
         columnId: this.dragState.columnId,
         fromIndex,
         toIndex
@@ -1110,7 +1112,7 @@ export class CleanTableRenderer {
   
   applyDragPreview(dragPreview: any): void {
     // Log key information about the drag preview
-    console.log('CleanTableRenderer: Applying drag preview', {
+    log.info('CleanTableRenderer: Applying drag preview', {
       draggedColumnId: dragPreview.draggedColumnId,
       columnName: dragPreview.columnName,
       mouseX: dragPreview.mouseX,
@@ -1129,7 +1131,7 @@ export class CleanTableRenderer {
       this.dragPreview = document.createElement('div');
       this.dragPreview.className = 'vibegridx-drag-preview';
       document.body.appendChild(this.dragPreview);
-      console.log('CleanTableRenderer: Created drag preview element');
+      log.info('CleanTableRenderer: Created drag preview element');
     }
     
     // Update content based on drag type
@@ -1146,7 +1148,7 @@ export class CleanTableRenderer {
           startX: dragPreview.mouseX,
           startWidth: 0
         };
-        console.log('CleanTableRenderer: Initialized drag state from EventDelegationManager', this.dragState);
+        log.info('CleanTableRenderer: Initialized drag state from EventDelegationManager', this.dragState);
       }
     } else if (isRowDrag) {
       // For row drag, show row data or summary
@@ -1161,7 +1163,7 @@ export class CleanTableRenderer {
     this.dragPreview.style.top = `${dragPreview.mouseY + 10}px`;
     this.dragPreview.style.display = 'block';
     
-    console.log('CleanTableRenderer: Drag preview positioned at', {
+    log.info('CleanTableRenderer: Drag preview positioned at', {
       left: this.dragPreview.style.left,
       top: this.dragPreview.style.top,
       display: this.dragPreview.style.display
@@ -1174,7 +1176,7 @@ export class CleanTableRenderer {
         const headerCell = this.header.querySelector(`[data-column="${dragPreview.draggedColumnId}"]`) as HTMLElement;
         if (headerCell) {
           headerCell.style.opacity = '0.3';
-          console.log('CleanTableRenderer: Made dragged column semi-transparent');
+          log.info('CleanTableRenderer: Made dragged column semi-transparent');
         }
       }
       
@@ -1195,7 +1197,7 @@ export class CleanTableRenderer {
           this._lastTargetIndex = calculatedTargetIndex;
           this._lastCalculatedTargetIndex = calculatedTargetIndex;
           
-          console.log('CleanTableRenderer: Target index changed', {
+          log.info('CleanTableRenderer: Target index changed', {
             mouseX: dragPreview.mouseX,
             targetIndex: calculatedTargetIndex,
             draggedColumn: dragPreview.draggedColumnId,
@@ -1209,7 +1211,7 @@ export class CleanTableRenderer {
       
       // Show column drop indicator
       if (!dragPreview.isInitialPreview) {
-        console.log('CleanTableRenderer: Showing column drop indicator', {
+        log.info('CleanTableRenderer: Showing column drop indicator', {
           targetIndex: dragPreview.targetIndex,
           isInitialPreview: dragPreview.isInitialPreview
         });
@@ -1267,7 +1269,7 @@ export class CleanTableRenderer {
         this.dropIndicator.style.opacity = '1';
         this.dropIndicator.style.zIndex = '1000';
         
-        console.log('CleanTableRenderer: Drop indicator positioned', {
+        log.info('CleanTableRenderer: Drop indicator positioned', {
           targetIndex: dragPreview.targetIndex,
           dropIndicatorX: dragPreview.dropIndicatorX,
           headerTop,
@@ -1279,7 +1281,7 @@ export class CleanTableRenderer {
         this.dropIndicator.style.display = 'none';
         this.dropIndicator.style.opacity = '0';
         
-        console.log('CleanTableRenderer: Drop indicator hidden - within dragged column');
+        log.info('CleanTableRenderer: Drop indicator hidden - within dragged column');
       }
     }
   }
@@ -1299,20 +1301,20 @@ export class CleanTableRenderer {
   }
   
   clearDragPreview(): void {
-    console.log('CleanTableRenderer: Clearing drag preview');
+    log.info('CleanTableRenderer: Clearing drag preview');
     
     // Remove drag preview
     if (this.dragPreview) {
       this.dragPreview.remove();
       this.dragPreview = null;
-      console.log('CleanTableRenderer: Removed drag preview element');
+      log.info('CleanTableRenderer: Removed drag preview element');
     }
     
     // Hide and remove drop indicator
     if (this.dropIndicator) {
       this.dropIndicator.remove();
       this.dropIndicator = null;
-      console.log('CleanTableRenderer: Removed drop indicator');
+      log.info('CleanTableRenderer: Removed drop indicator');
     }
     
     // Reset target index tracking
@@ -1341,7 +1343,7 @@ export class CleanTableRenderer {
         startX: 0,
         startWidth: 0
       };
-      console.log('CleanTableRenderer: Cleared drag state (deferred)');
+      log.info('CleanTableRenderer: Cleared drag state (deferred)');
     }, 100);
   }
   
@@ -1355,7 +1357,7 @@ export class CleanTableRenderer {
       this.state.coordinateMapping = mapping;
     }
     
-    console.log('CleanTableRenderer: Updated coordinate mapping', {
+    log.info('CleanTableRenderer: Updated coordinate mapping', {
       version,
       columnCount: mapping?.columns?.length
     });
@@ -1381,7 +1383,7 @@ export class CleanTableRenderer {
       });
     });
     
-    console.log('CleanTableRenderer: Applied column widths to DOM', {
+    log.info('CleanTableRenderer: Applied column widths to DOM', {
       columnCount: mapping.columns.length
     });
   }
@@ -1400,7 +1402,7 @@ export class CleanTableRenderer {
     // Update data - this should already be fully resolved from the store
     row.data = newData;
     
-    console.log('CleanTableRenderer: Row updated with store data', {
+    log.info('CleanTableRenderer: Row updated with store data', {
       rowId,
       hasResolvedValues: Object.keys(newData).filter(k => k.includes('__resolved_')).length > 0
     });
@@ -1426,7 +1428,7 @@ export class CleanTableRenderer {
           if (cell) {
             this.updateCellContent(cell, row, column);
             updatedCellsCount++;
-            console.log(`🔄 CleanTableRenderer: Surgical cell update - ${fieldName}`, {
+            log.info(`🔄 CleanTableRenderer: Surgical cell update - ${fieldName}`, {
               oldValue: oldValue,
               newValue: newValue
             });
@@ -1434,7 +1436,7 @@ export class CleanTableRenderer {
         }
       });
       
-      console.log(`🔄 CleanTableRenderer: Surgical update completed - ${updatedCellsCount} cells updated out of ${this.state.columns.length} total`);
+      log.info(`🔄 CleanTableRenderer: Surgical update completed - ${updatedCellsCount} cells updated out of ${this.state.columns.length} total`);
     }
   }
   

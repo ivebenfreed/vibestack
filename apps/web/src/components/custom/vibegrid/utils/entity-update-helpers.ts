@@ -1,6 +1,8 @@
 // Import Legend State entity operations
 import { entityOperations } from '@/legend-state';
 import type { VibeGridXEntityType } from '../hooks/useDexieEntityConfig';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/utils/entity-update-helpers.ts');
 
 /**
  * Get the appropriate update function for an entity type using Legend State
@@ -8,10 +10,10 @@ import type { VibeGridXEntityType } from '../hooks/useDexieEntityConfig';
  */
 export function getUpdateFunction(entityType: VibeGridXEntityType | null) {
   return async (id: string, updates: Record<string, any>) => {
-    console.log('[getUpdateFunction] onEntityUpdate called with Legend State', { id, updates, entityType });
+    log.info('[getUpdateFunction] onEntityUpdate called with Legend State', { id, updates, entityType });
     
     if (!entityType) {
-      console.warn('[getUpdateFunction] No entity type provided');
+      log.warn('[getUpdateFunction] No entity type provided');
       return;
     }
     
@@ -19,9 +21,9 @@ export function getUpdateFunction(entityType: VibeGridXEntityType | null) {
       // Convert entity type to proper case for Legend State entity names
       const entityName = entityType.charAt(0).toUpperCase() + entityType.slice(1);
       await entityOperations.updateEntity(entityName, id, updates);
-      console.log(`[getUpdateFunction] Successfully updated ${entityName}:${id}`);
+      log.info(`[getUpdateFunction] Successfully updated ${entityName}:${id}`);
     } catch (error) {
-      console.error(`[getUpdateFunction] Failed to update ${entityType}:${id}:`, error);
+      log.error(`[getUpdateFunction] Failed to update ${entityType}:${id}:`, error);
       throw error;
     }
   };

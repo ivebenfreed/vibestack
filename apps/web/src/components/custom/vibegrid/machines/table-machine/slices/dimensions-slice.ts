@@ -7,6 +7,8 @@
 
 import { assign } from 'xstate';
 import type { Column } from '../../../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/slices/dimensions-slice.ts');
 
 // ====================================
 // CONSTANTS
@@ -131,7 +133,7 @@ export const createInitialDimensionsState = (
     ? columnVisibility 
     : Object.fromEntries(initialColumns.map(col => [col.id, true]));
   
-  console.log('🔧 Creating initial dimensions state', {
+  log.info('🔧 Creating initial dimensions state', {
     columnsCount: initialColumns.length,
     rowCount
   });
@@ -166,7 +168,7 @@ export const dimensionActions = {
       const columnVisibility = storeSnapshot?.context?.columnVisibility || context.columnVisibility || {};
       const columnWidths = storeSnapshot?.context?.columnWidths || context.columnWidths || {};
       
-      console.log('🔄 Recalculating coordinates from store data', {
+      log.info('🔄 Recalculating coordinates from store data', {
         storeColumnsCount: storeColumns.length,
         storeColumnIds: storeColumns.map(c => c.id),
         visibilityKeys: Object.keys(columnVisibility),
@@ -181,7 +183,7 @@ export const dimensionActions = {
         columnWidths
       );
       
-      console.log('🔄 Built column coordinates', {
+      log.info('🔄 Built column coordinates', {
         coordinatesCount: columnCoordinates.length,
         coordinateIds: columnCoordinates.map(c => c.columnId)
       });

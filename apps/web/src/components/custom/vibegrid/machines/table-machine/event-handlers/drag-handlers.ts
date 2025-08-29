@@ -5,6 +5,8 @@
 import { sendTo, assign, emit } from 'xstate';
 import { dragActions } from '../slices/drag-slice';
 import { overlayActions } from '../slices/overlay-slice';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/drag-handlers.ts');
 
 export const dragHandlers = {
   'drag.start': {
@@ -22,7 +24,7 @@ export const dragHandlers = {
       })),
       
       ({ event }) => {
-        console.log('TableMachine: Drag started', {
+        log.info('TableMachine: Drag started', {
           item: event.item,
           position: { x: event.x, y: event.y }
         });
@@ -38,7 +40,7 @@ export const dragHandlers = {
       // overlayActor was supposed to handle this but was never spawned
       
       ({ event }) => {
-        console.log('TableMachine: Drag position updated', {
+        log.info('TableMachine: Drag position updated', {
           position: { x: event.x, y: event.y }
         });
       }
@@ -50,7 +52,7 @@ export const dragHandlers = {
       dragActions.setDropTarget,
       
       ({ event }) => {
-        console.log('TableMachine: Drag over target', {
+        log.info('TableMachine: Drag over target', {
           target: event.target
         });
       }
@@ -62,7 +64,7 @@ export const dragHandlers = {
       dragActions.clearDropTarget,
       
       ({ event }) => {
-        console.log('TableMachine: Drag left target', {
+        log.info('TableMachine: Drag left target', {
           target: event.target
         });
       }
@@ -84,7 +86,7 @@ export const dragHandlers = {
       overlayActions.updateShapeVisibility,
       
       ({ context }) => {
-        console.log('TableMachine: Drag completed', {
+        log.info('TableMachine: Drag completed', {
           draggedItem: context.draggedItem,
           dropTarget: context.dropTarget
         });
@@ -100,7 +102,7 @@ export const dragHandlers = {
       overlayActions.updateShapeVisibility,
       
       ({ context }) => {
-        console.log('TableMachine: Drag cancelled', {
+        log.info('TableMachine: Drag cancelled', {
           draggedItem: context.draggedItem
         });
       }
@@ -112,7 +114,7 @@ export const dragHandlers = {
       dragActions.setDragPreview,
       
       ({ event }) => {
-        console.log('TableMachine: Drag preview set', {
+        log.info('TableMachine: Drag preview set', {
           element: event.element,
           offset: event.offset
         });
@@ -125,7 +127,7 @@ export const dragHandlers = {
       dragActions.updateDragConstraints,
       
       ({ event }) => {
-        console.log('TableMachine: Drag constraints updated', {
+        log.info('TableMachine: Drag constraints updated', {
           constraints: event.constraints
         });
       }
@@ -137,7 +139,7 @@ export const dragHandlers = {
       dragActions.setDragThreshold,
       
       ({ event }) => {
-        console.log('TableMachine: Drag threshold set', {
+        log.info('TableMachine: Drag threshold set', {
           threshold: event.threshold
         });
       }
@@ -159,7 +161,7 @@ export const dragHandlers = {
       }),
       
       ({ event }) => {
-        console.log('TableMachine: Row drag started', {
+        log.info('TableMachine: Row drag started', {
           rowId: event.rowId,
           position: { x: event.x, y: event.y }
         });
@@ -180,7 +182,7 @@ export const dragHandlers = {
       dragActions.completeDrag,
       
       ({ context, event }) => {
-        console.log('TableMachine: Row drag completed', {
+        log.info('TableMachine: Row drag completed', {
           fromIndex: context.draggedItem?.index,
           toIndex: event.toIndex
         });
@@ -203,7 +205,7 @@ export const dragHandlers = {
       }),
       
       ({ event }) => {
-        console.log('TableMachine: Column drag started', {
+        log.info('TableMachine: Column drag started', {
           columnId: event.columnId,
           position: { x: event.x, y: event.y }
         });
@@ -233,7 +235,7 @@ export const dragHandlers = {
           const [removed] = newOrder.splice(fromIndex, 1);
           newOrder.splice(toIndex, 0, removed);
           
-          console.log('TableMachine: Column order updated', {
+          log.info('TableMachine: Column order updated', {
             fromIndex,
             toIndex,
             newOrder

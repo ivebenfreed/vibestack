@@ -13,6 +13,8 @@ import { ClipboardOverlayDOM } from './ClipboardOverlayDOM';
 import { DragPreviewOverlayDOM } from './DragPreviewOverlayDOM';
 import { ColumnDragOverlayDOM } from './ColumnDragOverlayDOM';
 import { ColumnResizeOverlayDOM } from './ColumnResizeOverlayDOM';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/overlays/CanvasOverlayDOM.ts');
 // EditingOverlay is already DOM-based (React portal) - handled separately
 // SelectionColumnOverlay not needed - checkboxes are DOM elements
 
@@ -53,7 +55,7 @@ export class CanvasOverlayDOM {
   constructor(config: OverlayConfig, eventCallback?: CanvasEventCallback) {
     this.config = config;
     this.eventCallback = eventCallback || null;
-    console.log('CanvasOverlayDOM: Created with config', config);
+    log.info('CanvasOverlayDOM: Created with config', config);
   }
   
   /**
@@ -61,11 +63,11 @@ export class CanvasOverlayDOM {
    */
   init(container: HTMLElement): void {
     if (this.isDestroyed) {
-      console.warn('CanvasOverlayDOM: Cannot init destroyed overlay');
+      log.warn('CanvasOverlayDOM: Cannot init destroyed overlay');
       return;
     }
     
-    console.log('CanvasOverlayDOM: Initializing in container', container);
+    log.info('CanvasOverlayDOM: Initializing in container', container);
     this.container = container;
     
     // Create overlay container
@@ -85,7 +87,7 @@ export class CanvasOverlayDOM {
     // Add to container
     this.container.appendChild(this.overlayContainer);
     
-    console.log('CanvasOverlayDOM: Overlay container created');
+    log.info('CanvasOverlayDOM: Overlay container created');
   }
   
   /**
@@ -93,7 +95,7 @@ export class CanvasOverlayDOM {
    */
   private getSelectionOverlay(): SelectionOverlayDOM {
     if (!this.selectionOverlay && this.overlayContainer) {
-      console.log('CanvasOverlayDOM: Lazily creating SelectionOverlayDOM');
+      log.info('CanvasOverlayDOM: Lazily creating SelectionOverlayDOM');
       
       // Create selection container
       const selectionContainer = document.createElement('div');
@@ -126,7 +128,7 @@ export class CanvasOverlayDOM {
    */
   private getClipboardOverlay(): ClipboardOverlayDOM {
     if (!this.clipboardOverlay && this.overlayContainer) {
-      console.log('CanvasOverlayDOM: Lazily creating ClipboardOverlayDOM');
+      log.info('CanvasOverlayDOM: Lazily creating ClipboardOverlayDOM');
       
       this.clipboardOverlay = new ClipboardOverlayDOM(
         this.overlayContainer,
@@ -150,7 +152,7 @@ export class CanvasOverlayDOM {
    */
   private getDragPreviewOverlay(): DragPreviewOverlayDOM {
     if (!this.dragPreviewOverlay && this.overlayContainer) {
-      console.log('CanvasOverlayDOM: Lazily creating DragPreviewOverlayDOM');
+      log.info('CanvasOverlayDOM: Lazily creating DragPreviewOverlayDOM');
       
       this.dragPreviewOverlay = new DragPreviewOverlayDOM(
         this.overlayContainer,
@@ -176,7 +178,7 @@ export class CanvasOverlayDOM {
    */
   private getColumnDragOverlay(): ColumnDragOverlayDOM {
     if (!this.columnDragOverlay && this.overlayContainer) {
-      console.log('CanvasOverlayDOM: Lazily creating ColumnDragOverlayDOM');
+      log.info('CanvasOverlayDOM: Lazily creating ColumnDragOverlayDOM');
       
       this.columnDragOverlay = new ColumnDragOverlayDOM(
         this.overlayContainer,
@@ -199,7 +201,7 @@ export class CanvasOverlayDOM {
    */
   private getColumnResizeOverlay(): ColumnResizeOverlayDOM {
     if (!this.columnResizeOverlay && this.overlayContainer) {
-      console.log('CanvasOverlayDOM: Lazily creating ColumnResizeOverlayDOM');
+      log.info('CanvasOverlayDOM: Lazily creating ColumnResizeOverlayDOM');
       
       const containerHeight = this.container?.offsetHeight || 600;
       this.columnResizeOverlay = new ColumnResizeOverlayDOM(
@@ -223,7 +225,7 @@ export class CanvasOverlayDOM {
    */
   private getFillHandleLayer(): FillHandleLayerDOM {
     if (!this.fillHandleLayer && this.overlayContainer) {
-      console.log('CanvasOverlayDOM: Lazily creating FillHandleLayerDOM');
+      log.info('CanvasOverlayDOM: Lazily creating FillHandleLayerDOM');
       
       this.fillHandleLayer = new FillHandleLayerDOM(
         this.overlayContainer,
@@ -233,25 +235,25 @@ export class CanvasOverlayDOM {
         },
         {
           onFillStart: (direction) => {
-            console.log('CanvasOverlayDOM: Fill start', direction);
+            log.info('CanvasOverlayDOM: Fill start', direction);
             if (this.eventCallback) {
               this.eventCallback({ type: 'FILL_START', direction });
             }
           },
           onFillPreview: (previewCells) => {
-            console.log('CanvasOverlayDOM: Fill preview', previewCells.size);
+            log.info('CanvasOverlayDOM: Fill preview', previewCells.size);
             if (this.eventCallback) {
               this.eventCallback({ type: 'FILL_PREVIEW', previewCells });
             }
           },
           onFillComplete: (fillCells) => {
-            console.log('CanvasOverlayDOM: Fill complete', fillCells.size);
+            log.info('CanvasOverlayDOM: Fill complete', fillCells.size);
             if (this.eventCallback) {
               this.eventCallback({ type: 'FILL_COMPLETE', fillCells });
             }
           },
           onFillCancel: () => {
-            console.log('CanvasOverlayDOM: Fill cancelled');
+            log.info('CanvasOverlayDOM: Fill cancelled');
             if (this.eventCallback) {
               this.eventCallback({ type: 'FILL_CANCEL' });
             }
@@ -264,12 +266,12 @@ export class CanvasOverlayDOM {
       
       // If we already have coordinate mapping, apply it to the newly created fill handle layer
       if (this.coordinateMapping) {
-        console.log('CanvasOverlayDOM: Applying existing coordinate mapping to newly created fill handle layer');
+        log.info('CanvasOverlayDOM: Applying existing coordinate mapping to newly created fill handle layer');
         this.fillHandleLayer.updateCoordinateMapping(this.coordinateMapping);
       }
       
       // Log viewport status when creating fill handle
-      console.log('CanvasOverlayDOM: Fill handle created with viewport status', {
+      log.info('CanvasOverlayDOM: Fill handle created with viewport status', {
         hasViewport: !!this.currentViewport,
         viewport: this.currentViewport
       });
@@ -286,7 +288,7 @@ export class CanvasOverlayDOM {
    * Update coordinate mapping
    */
   updateCoordinateMapping(mapping: CoordinateMapping): void {
-    console.log('CanvasOverlayDOM: Updating coordinate mapping', {
+    log.info('CanvasOverlayDOM: Updating coordinate mapping', {
       version: mapping.version,
       rowCount: mapping.rows.length,
       colCount: mapping.columns.length
@@ -300,7 +302,7 @@ export class CanvasOverlayDOM {
     }
     
     if (this.fillHandleLayer) {
-      console.log('CanvasOverlayDOM: Updating fill handle coordinate mapping');
+      log.info('CanvasOverlayDOM: Updating fill handle coordinate mapping');
       this.fillHandleLayer.updateCoordinateMapping(mapping);
     }
     
@@ -325,7 +327,7 @@ export class CanvasOverlayDOM {
    * Update viewport
    */
   updateViewport(viewport: ViewportInfo): void {
-    console.log('CanvasOverlayDOM: updateViewport called', {
+    log.info('CanvasOverlayDOM: updateViewport called', {
       oldViewport: this.currentViewport,
       newViewport: viewport,
       isDestroyed: this.isDestroyed,
@@ -334,7 +336,7 @@ export class CanvasOverlayDOM {
     
     this.currentViewport = viewport;
     
-    console.log('CanvasOverlayDOM: Viewport updated successfully', {
+    log.info('CanvasOverlayDOM: Viewport updated successfully', {
       start: viewport.start,
       end: viewport.end,
       currentViewport: this.currentViewport,
@@ -346,7 +348,7 @@ export class CanvasOverlayDOM {
    * Update selection overlay
    */
   updateSelection(selectedCells: Set<string>): void {
-    console.log('CanvasOverlayDOM.updateSelection called', {
+    log.info('CanvasOverlayDOM.updateSelection called', {
       selectedCellsSize: selectedCells.size,
       hasContainer: !!this.overlayContainer,
       hasViewport: !!this.currentViewport,
@@ -357,7 +359,7 @@ export class CanvasOverlayDOM {
     this.currentSelectedCells = new Set(selectedCells);
     
     if (!this.overlayContainer) {
-      console.warn('CanvasOverlayDOM: Container not initialized');
+      log.warn('CanvasOverlayDOM: Container not initialized');
       return;
     }
     
@@ -373,7 +375,7 @@ export class CanvasOverlayDOM {
    * Update selection with visual positions
    */
   updateSelectionWithVisualPositions(visualCells: VisualCellPosition[]): void {
-    console.log('CanvasOverlayDOM.updateSelectionWithVisualPositions called', {
+    log.info('CanvasOverlayDOM.updateSelectionWithVisualPositions called', {
       visualCellsCount: visualCells.length,
       hasContainer: !!this.overlayContainer,
       overlayContainerInDom: this.overlayContainer ? document.body.contains(this.overlayContainer) : false,
@@ -384,12 +386,12 @@ export class CanvasOverlayDOM {
     this.currentSelectedCells = new Set(visualCells.map(cell => cell.cellKey));
     
     if (!this.overlayContainer) {
-      console.warn('CanvasOverlayDOM: Container not initialized');
+      log.warn('CanvasOverlayDOM: Container not initialized');
       return;
     }
     
     const overlay = this.getSelectionOverlay();
-    console.log('CanvasOverlayDOM: Got selection overlay, calling updateWithVisualPositions');
+    log.info('CanvasOverlayDOM: Got selection overlay, calling updateWithVisualPositions');
     overlay.updateWithVisualPositions(visualCells);
   }
   
@@ -439,7 +441,7 @@ export class CanvasOverlayDOM {
    */
   renderFillHandle(visualCells: VisualCellPosition[], selectedRows?: Set<string>, viewport?: ViewportInfo): void {
     if (!this.overlayContainer) {
-      console.warn('CanvasOverlayDOM: Container not initialized for fill handle');
+      log.warn('CanvasOverlayDOM: Container not initialized for fill handle');
       return;
     }
     
@@ -447,7 +449,7 @@ export class CanvasOverlayDOM {
     
     // Use the viewport passed from table machine if available, otherwise fall back to stored viewport
     const viewportToUse = viewport || this.currentViewport;
-    console.log('CanvasOverlayDOM: renderFillHandle - using viewport', {
+    log.info('CanvasOverlayDOM: renderFillHandle - using viewport', {
       passedViewport: !!viewport,
       storedViewport: !!this.currentViewport,
       finalViewport: !!viewportToUse
@@ -484,7 +486,7 @@ export class CanvasOverlayDOM {
    */
   renderFillPreviewWithVisualPositions(visualCells: VisualCellPosition[]): void {
     if (!this.overlayContainer) {
-      console.warn('CanvasOverlayDOM: Container not initialized for fill preview');
+      log.warn('CanvasOverlayDOM: Container not initialized for fill preview');
       return;
     }
     
@@ -506,7 +508,7 @@ export class CanvasOverlayDOM {
    */
   updateFromContext(context: SelectionContext): void {
     if (!this.overlayContainer) {
-      console.warn('CanvasOverlayDOM: Container not initialized');
+      log.warn('CanvasOverlayDOM: Container not initialized');
       return;
     }
     
@@ -607,7 +609,7 @@ export class CanvasOverlayDOM {
    */
   showEditingOverlay(position: { x: number; y: number; width: number; height: number }): void {
     // TODO: Implement when EditingCanvasOverlayDOM is created
-    console.log('CanvasOverlayDOM: Show editing overlay requested', position);
+    log.info('CanvasOverlayDOM: Show editing overlay requested', position);
   }
   
   /**
@@ -615,7 +617,7 @@ export class CanvasOverlayDOM {
    */
   hideEditingOverlay(): void {
     // TODO: Implement when EditingCanvasOverlayDOM is created
-    console.log('CanvasOverlayDOM: Hide editing overlay requested');
+    log.info('CanvasOverlayDOM: Hide editing overlay requested');
   }
   
   /**
@@ -632,7 +634,7 @@ export class CanvasOverlayDOM {
    * Destroy the overlay and clean up
    */
   destroy(): void {
-    console.log('CanvasOverlayDOM: Destroying overlay', {
+    log.info('CanvasOverlayDOM: Destroying overlay', {
       timestamp: Date.now(),
       currentViewport: this.currentViewport,
       isDestroyed: this.isDestroyed

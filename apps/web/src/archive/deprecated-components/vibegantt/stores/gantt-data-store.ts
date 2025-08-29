@@ -3,6 +3,8 @@ import { db } from '../../../../db/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '../types';
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/vibegantt/stores/gantt-data-store.ts');
 
 // ====================================
 // TYPES
@@ -224,7 +226,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
     },
     on: {
       TASKS_LOADED: (context, event) => {
-        console.log('📊 GanttStore: Tasks loaded', {
+        log.info('📊 GanttStore: Tasks loaded', {
           count: event.tasks.length,
           projectId: context.projectId
         });
@@ -275,7 +277,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
         const { change } = event;
         const { id, operation, data } = change;
         
-        console.log('📊 GanttStore: Task changed', {
+        log.info('📊 GanttStore: Task changed', {
           id,
           operation,
           changedFields: change.changedFields
@@ -315,7 +317,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       },
       
       DEPENDENCIES_LOADED: (context, event) => {
-        console.log('📊 GanttStore: Dependencies loaded', {
+        log.info('📊 GanttStore: Dependencies loaded', {
           count: event.dependencies.length
         });
         
@@ -337,7 +339,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       },
       
       RESOURCES_LOADED: (context, event) => {
-        console.log('📊 GanttStore: Resources loaded', {
+        log.info('📊 GanttStore: Resources loaded', {
           count: event.resources.length
         });
         
@@ -398,7 +400,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       },
       
       UPDATE_VIEW_CONFIG: (context, event) => {
-        console.log('📊 GanttStore: View config updated for coordinate recalculation', {
+        log.info('📊 GanttStore: View config updated for coordinate recalculation', {
           dayWidth: event.timelineLayout?.dayWidth,
           zoomFactor: event.viewConfig?.zoomFactor
         });
@@ -478,7 +480,7 @@ export async function loadGanttData(
         });
       },
       error: (error) => {
-        console.error('Error loading tasks:', error);
+        log.error('Error loading tasks:', error);
         storeActor.send({ type: 'SET_ERROR', error: error.message });
       }
     });
@@ -515,7 +517,7 @@ export async function loadGanttData(
         });
       },
       error: (error) => {
-        console.error('Error loading dependencies:', error);
+        log.error('Error loading dependencies:', error);
         storeActor.send({ type: 'SET_ERROR', error: error.message });
       }
     });
@@ -543,7 +545,7 @@ export async function loadGanttData(
         });
       },
       error: (error) => {
-        console.error('Error loading resources:', error);
+        log.error('Error loading resources:', error);
         storeActor.send({ type: 'SET_ERROR', error: error.message });
       }
     });
@@ -551,7 +553,7 @@ export async function loadGanttData(
     subscriptions.push(resourcesSub);
     
   } catch (error) {
-    console.error('Error setting up subscriptions:', error);
+    log.error('Error setting up subscriptions:', error);
     storeActor.send({ type: 'SET_ERROR', error: error.message });
   }
   

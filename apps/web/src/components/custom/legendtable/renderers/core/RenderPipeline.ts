@@ -9,6 +9,8 @@ import type { DOMSystem } from '../systems/DOMSystem';
 import type { HeaderEngine } from '../engines/HeaderEngine';
 import type { RowEngine } from '../engines/RowEngine';
 import type { PerformanceSystem } from '../systems/PerformanceSystem';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/renderers/core/RenderPipeline.ts');
 
 // ====================================
 // TYPES
@@ -62,22 +64,22 @@ export class RenderPipeline {
       this.config.performanceMonitor.recordPhase('header', headerMetrics.renderTime);
       
       // STEP 1.1: Update sort indicators
-      console.log('🔍 RenderPipeline: Checking sort state for indicators', {
+      log.info('🔍 RenderPipeline: Checking sort state for indicators', {
         hasSortBy: !!state.sortBy,
         sortByLength: state.sortBy?.length,
         sortBy: state.sortBy
       });
       
       if (state.sortBy && state.sortBy.length > 0) {
-        console.log('🎯 RenderPipeline: Updating sort indicators with:', state.sortBy);
+        log.info('🎯 RenderPipeline: Updating sort indicators with:', state.sortBy);
         this.config.headerRenderer.updateSortIndicators(state.sortBy);
       } else {
-        console.log('⚠️ RenderPipeline: No sort state to update indicators');
+        log.info('⚠️ RenderPipeline: No sort state to update indicators');
       }
       
       // Check if this is the first render
       if (this.isFirstRender) {
-        console.log('🎨 RenderOrchestrator: First render - executing synchronously');
+        log.info('🎨 RenderOrchestrator: First render - executing synchronously');
         this.isFirstRender = false;
         
         // CRITICAL: Set row count BEFORE updating viewport
@@ -90,16 +92,16 @@ export class RenderPipeline {
         this.config.performanceMonitor.recordPhase('viewport', viewportTime);
         
         // Log viewport info for debugging
-        console.log('🎨 RenderOrchestrator: First render viewport info AFTER updateViewport', {
+        log.info('🎨 RenderOrchestrator: First render viewport info AFTER updateViewport', {
           visibleRange: this.config.virtualGrid.getVisibleRange(),
           metrics: this.config.virtualGrid.getMetrics()
         });
         
         // STEP 3: Render visible rows
-        console.log('🎨 RenderOrchestrator: About to render visible rows synchronously');
+        log.info('🎨 RenderOrchestrator: About to render visible rows synchronously');
         const metrics = this.config.rowRenderingEngine.renderVisibleRows(state);
         this.config.performanceMonitor.recordPhase('visibleRows', metrics.renderTime);
-        console.log('🎨 RenderOrchestrator: Visible rows rendered synchronously', metrics);
+        log.info('🎨 RenderOrchestrator: Visible rows rendered synchronously', metrics);
         
         // STEP 4: Apply optimistic operations
         const optimisticStart = performance.now();
@@ -112,7 +114,7 @@ export class RenderPipeline {
         this.config.performanceMonitor.recordPhase('total', totalTime);
         this.config.performanceMonitor.logBreakdown();
         
-        console.log('🎨 RenderOrchestrator: First render complete synchronously', {
+        log.info('🎨 RenderOrchestrator: First render complete synchronously', {
           renderTime: totalTime,
           rowCount: state.rows.length,
           timestamp: performance.now()
@@ -134,7 +136,7 @@ export class RenderPipeline {
         // Subsequent renders: use RAF for better performance
         // Reduce logging frequency for performance
         if (Math.random() < 0.1) {
-          console.log('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
+          log.info('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
             rowCount: state.rows.length,
             columnCount: state.columns?.length,
             timestamp: performance.now(),
@@ -192,7 +194,7 @@ export class RenderPipeline {
             this.pendingRenderFrame = null;
             // Reduce logging for performance
             if (Math.random() < 0.05) {
-              console.log('🎨 RenderOrchestrator: RAF callback executing', {
+              log.info('🎨 RenderOrchestrator: RAF callback executing', {
                 timestamp: performance.now()
               });
             }
@@ -245,7 +247,7 @@ export class RenderPipeline {
       viewportHeight = measurements.container.client.height || 
                        measurements.table.client.height || 
                        600; // Ultimate fallback
-      console.log('🎨 RenderOrchestrator: Using container height as viewport had no height', {
+      log.info('🎨 RenderOrchestrator: Using container height as viewport had no height', {
         viewportHeight,
         containerHeight: measurements.container.client.height,
         tableHeight: measurements.table.client.height
@@ -262,7 +264,7 @@ export class RenderPipeline {
     const scrollLeft = measurements.viewport.scroll.left;
     
     // Debug log actual measurements
-    console.log('🎨 RenderOrchestrator: updateViewport measurements', {
+    log.info('🎨 RenderOrchestrator: updateViewport measurements', {
       viewportHeight,
       viewportWidth,
       containerHeight: measurements.container.client.height,

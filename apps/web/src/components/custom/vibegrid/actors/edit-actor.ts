@@ -4,6 +4,8 @@
 
 import { fromPromise, fromCallback } from 'xstate';
 import type { Column, CellRef } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/actors/edit-actor.ts');
 
 // ====================================
 // VALIDATION HELPERS
@@ -88,7 +90,7 @@ const performEditValidation = fromPromise(async ({ input }: {
 }) => {
   const { value, column, rowId } = input;
   
-  console.log('EditActor: Validating cell value', {
+  log.info('EditActor: Validating cell value', {
     value,
     columnId: column.id,
     columnType: column.type,
@@ -108,7 +110,7 @@ const performEditValidation = fromPromise(async ({ input }: {
   // Format the value
   const formattedValue = formatCellValue(value, column);
   
-  console.log('EditActor: Validation successful', {
+  log.info('EditActor: Validation successful', {
     originalValue: value,
     formattedValue,
     columnId: column.id
@@ -131,7 +133,7 @@ const performEditCommit = fromPromise(async ({ input }: {
 }) => {
   const { value, formattedValue, cell, oldValue } = input;
   
-  console.log('EditActor: Committing edit', {
+  log.info('EditActor: Committing edit', {
     cell,
     oldValue,
     newValue: formattedValue
@@ -169,7 +171,7 @@ const performBatchEdit = fromPromise(async ({ input }: {
 }) => {
   const { operations } = input;
   
-  console.log('EditActor: Performing batch edit', {
+  log.info('EditActor: Performing batch edit', {
     operationCount: operations.length
   });
   
@@ -203,14 +205,14 @@ export const editActor = fromPromise(async ({ input }: {
 }) => {
   // Handle initial spawn input
   if (!input.event) {
-    console.log('EditActor: Initial spawn with columns', { columns: input.columns });
+    log.info('EditActor: Initial spawn with columns', { columns: input.columns });
     return { type: 'INITIALIZED' };
   }
   
   const { event } = input;
   const { type } = event;
   
-  console.log('EditActor: Processing operation', { type, event });
+  log.info('EditActor: Processing operation', { type, event });
   
   switch (type) {
     case 'VALIDATE':
@@ -223,19 +225,19 @@ export const editActor = fromPromise(async ({ input }: {
       return await performBatchEdit({ input: event });
       
     case 'COLUMNS_CHANGED':
-      console.log('EditActor: Columns updated', {
+      log.info('EditActor: Columns updated', {
         columnCount: event.columns?.length || 0
       });
       return { success: true, columns: event.columns };
       
     case 'ENTITY_TYPE_CHANGED':
-      console.log('EditActor: Entity type updated', {
+      log.info('EditActor: Entity type updated', {
         entityType: event.entityType
       });
       return { success: true, entityType: event.entityType };
       
     default:
-      console.warn('EditActor: Unknown operation type', { type });
+      log.warn('EditActor: Unknown operation type', { type });
       return { success: false, error: `Unknown operation: ${type}` };
   }
 });
@@ -266,10 +268,10 @@ export type UIEditActorResponse =
 export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>(({ sendBack, receive }) => {
   let rendererActor: any = null;
   
-  console.log('UIEditActor: Created for renderer integration');
+  log.info('UIEditActor: Created for renderer integration');
   
   receive((event) => {
-    console.log('UIEditActor: Received event:', event.type);
+    log.info('UIEditActor: Received event:', event.type);
     
     try {
       switch (event.type) {
@@ -280,12 +282,12 @@ export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>((
           
         case 'SHOW_EDITOR':
           if (!rendererActor) {
-            console.warn('UIEditActor: Cannot show editor - no renderer actor set');
+            log.warn('UIEditActor: Cannot show editor - no renderer actor set');
             sendBack({ type: 'UI_EDIT_ERROR', error: 'No renderer actor available' });
             return;
           }
           
-          console.log('UIEditActor: Forwarding show editor request to renderer actor', event);
+          log.info('UIEditActor: Forwarding show editor request to renderer actor', event);
           rendererActor.send({
             type: 'SHOW_EDITOR',
             cell: event.cell,
@@ -299,11 +301,11 @@ export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>((
           
         case 'HIDE_EDITOR':
           if (!rendererActor) {
-            console.warn('UIEditActor: Cannot hide editor - no renderer actor set');
+            log.warn('UIEditActor: Cannot hide editor - no renderer actor set');
             return;
           }
           
-          console.log('UIEditActor: Forwarding hide editor request to renderer actor');
+          log.info('UIEditActor: Forwarding hide editor request to renderer actor');
           rendererActor.send({
             type: 'HIDE_EDITOR'
           });
@@ -312,11 +314,11 @@ export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>((
           
         case 'UPDATE_EDITOR_VALUE':
           if (!rendererActor) {
-            console.warn('UIEditActor: Cannot update editor value - no renderer actor set');
+            log.warn('UIEditActor: Cannot update editor value - no renderer actor set');
             return;
           }
           
-          console.log('UIEditActor: Forwarding update editor value to renderer actor', event.value);
+          log.info('UIEditActor: Forwarding update editor value to renderer actor', event.value);
           rendererActor.send({
             type: 'UPDATE_EDITOR_VALUE',
             value: event.value
@@ -326,11 +328,11 @@ export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>((
           
         case 'UPDATE_EDITOR_VALIDATION':
           if (!rendererActor) {
-            console.warn('UIEditActor: Cannot update editor validation - no renderer actor set');
+            log.warn('UIEditActor: Cannot update editor validation - no renderer actor set');
             return;
           }
           
-          console.log('UIEditActor: Forwarding update editor validation to renderer actor', event.errors);
+          log.info('UIEditActor: Forwarding update editor validation to renderer actor', event.errors);
           rendererActor.send({
             type: 'UPDATE_EDITOR_VALIDATION',
             errors: event.errors
@@ -339,23 +341,23 @@ export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>((
           break;
           
         case 'DESTROY':
-          console.log('UIEditActor: Destroying');
+          log.info('UIEditActor: Destroying');
           rendererActor = null;
           break;
           
         default:
-          console.warn('UIEditActor: Unknown event type', event);
+          log.warn('UIEditActor: Unknown event type', event);
           sendBack({ type: 'UI_EDIT_ERROR', error: `Unknown event: ${event.type}` });
       }
     } catch (error) {
-      console.error('UIEditActor: Error handling event:', error);
+      log.error('UIEditActor: Error handling event:', error);
       sendBack({ type: 'UI_EDIT_ERROR', error: String(error) });
     }
   });
   
   // Return cleanup function
   return () => {
-    console.log('UIEditActor: Cleaning up');
+    log.info('UIEditActor: Cleaning up');
     rendererActor = null;
   };
 });

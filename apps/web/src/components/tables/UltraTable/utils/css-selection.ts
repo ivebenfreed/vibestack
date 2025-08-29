@@ -1,3 +1,5 @@
+import { uiLog } from '@/logger';
+const log = uiLog('components/tables/UltraTable/utils/css-selection.ts);
 /**
  * CSS-based selection for UltraTable
  * Updates DOM data attributes directly for zero React re-renders
@@ -10,11 +12,11 @@ export function updateCellSelection(
   activeRange: { startRow: number; endRow: number; startCol: number; endCol: number } | null
 ) {
   if (!tableContainer) {
-    console.log('[CSS Selection] No table container')
+    log.info('[CSS Selection] No table container')
     return
   }
 
-  console.log('[CSS Selection] Updating selection:', {
+  log.info('[CSS Selection] Updating selection:', {
     selectedCells: Array.from(selectedCells),
     focusedCell,
     activeRange
@@ -23,12 +25,12 @@ export function updateCellSelection(
   // Clear all existing selection states
   const allCells = tableContainer.querySelectorAll('td[data-row][data-col]')
   const allTds = tableContainer.querySelectorAll('td')
-  console.log('[CSS Selection] Found cells with data attrs:', allCells.length)
-  console.log('[CSS Selection] Found all tds:', allTds.length)
+  log.info('[CSS Selection] Found cells with data attrs:', allCells.length)
+  log.info('[CSS Selection] Found all tds:', allTds.length)
   
   // Debug: check first few cells
   if (allTds.length > 0) {
-    console.log('[CSS Selection] First td attributes:', {
+    log.info('[CSS Selection] First td attributes:', {
       dataRow: allTds[0].getAttribute('data-row'),
       dataCol: allTds[0].getAttribute('data-col'),
       allAttributes: Array.from(allTds[0].attributes).map(attr => `${attr.name}="${attr.value}"`).slice(0, 10)
@@ -45,7 +47,7 @@ export function updateCellSelection(
   selectedCells.forEach(cellKey => {
     const [row, col] = cellKey.split(':').map(Number)
     const cell = tableContainer.querySelector(`td[data-row="${row}"][data-col="${col}"]`)
-    console.log('[CSS Selection] Setting selected cell:', { 
+    log.info('[CSS Selection] Setting selected cell:', { 
       row, col, found: !!cell,
       selector: `td[data-row="${row}"][data-col="${col}"]`,
       cellAttributes: cell ? {
@@ -60,8 +62,8 @@ export function updateCellSelection(
       cell.style.setProperty('background-color', 'red', 'important')
       cell.style.setProperty('border', '5px solid blue', 'important')
       cell.style.setProperty('box-sizing', 'border-box', 'important')
-      console.log('[CSS Selection] After setting - data-selected:', cell.getAttribute('data-selected'))
-      console.log('[CSS Selection] Applied direct styles')
+      log.info('[CSS Selection] After setting - data-selected:', cell.getAttribute('data-selected'))
+      log.info('[CSS Selection] Applied direct styles')
     }
   })
 
@@ -70,7 +72,7 @@ export function updateCellSelection(
     const focusedElement = tableContainer.querySelector(
       `td[data-row="${focusedCell.row}"][data-col="${focusedCell.col}"]`
     )
-    console.log('[CSS Selection] Setting focused cell:', { focusedCell, found: !!focusedElement })
+    log.info('[CSS Selection] Setting focused cell:', { focusedCell, found: !!focusedElement })
     if (focusedElement) {
       focusedElement.setAttribute('data-focused', 'true')
     }

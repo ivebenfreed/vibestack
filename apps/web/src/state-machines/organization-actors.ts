@@ -7,6 +7,9 @@
 import { fromPromise } from 'xstate';
 import type { OrganizationInfo, CreateOrganizationInput } from './types';
 import { authClient } from '@/lib/auth';
+import { syncLog } from '@/logger';
+
+const log = syncLog('state-machines/organization-actors.ts');
 
 // Mock organization API - replace with actual API calls
 class OrganizationAPI {
@@ -95,7 +98,7 @@ export const loadOrganizationsActor = fromPromise(async () => {
     const organizations = await organizationAPI.getUserOrganizations();
     
     if (!organizations || !Array.isArray(organizations)) {
-      console.error('[OrganizationActors] Invalid organizations response format');
+      log.error('[OrganizationActors] Invalid organizations response format');
       return {
         success: false,
         organizations: [],
@@ -109,7 +112,7 @@ export const loadOrganizationsActor = fromPromise(async () => {
       error: null
     };
   } catch (error) {
-    console.error('[OrganizationActors] Failed to load organizations:', error);
+    log.error('[OrganizationActors] Failed to load organizations:', error);
     
     return {
       success: false,
@@ -121,11 +124,11 @@ export const loadOrganizationsActor = fromPromise(async () => {
 
 // Create organization actor
 export const createOrganizationActor = fromPromise(async ({ input }: { input: CreateOrganizationInput }) => {
-  console.log('[OrganizationActors] Creating organization:', input);
+  log.info('[OrganizationActors] Creating organization:', input);
   
   try {
     const organization = await organizationAPI.createOrganization(input);
-    console.log('[OrganizationActors] Created organization:', organization);
+    log.info('[OrganizationActors] Created organization:', organization);
     
     return {
       success: true,
@@ -133,7 +136,7 @@ export const createOrganizationActor = fromPromise(async ({ input }: { input: Cr
       error: null
     };
   } catch (error) {
-    console.error('[OrganizationActors] Failed to create organization:', error);
+    log.error('[OrganizationActors] Failed to create organization:', error);
     
     return {
       success: false,
@@ -145,7 +148,7 @@ export const createOrganizationActor = fromPromise(async ({ input }: { input: Cr
 
 // Select organization actor
 export const selectOrganizationActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
-  console.log('[OrganizationActors] Selecting organization:', input.organizationId);
+  log.info('[OrganizationActors] Selecting organization:', input.organizationId);
   
   try {
     // Call switch endpoint to persist the selection
@@ -153,7 +156,7 @@ export const selectOrganizationActor = fromPromise(async ({ input }: { input: { 
     
     // Then get the full organization details
     const organization = await organizationAPI.getOrganization(input.organizationId);
-    console.log('[OrganizationActors] Selected and persisted organization:', organization);
+    log.info('[OrganizationActors] Selected and persisted organization:', organization);
     
     return {
       success: true,
@@ -161,7 +164,7 @@ export const selectOrganizationActor = fromPromise(async ({ input }: { input: { 
       error: null
     };
   } catch (error) {
-    console.error('[OrganizationActors] Failed to select organization:', error);
+    log.error('[OrganizationActors] Failed to select organization:', error);
     
     return {
       success: false,
@@ -190,7 +193,7 @@ export const loadBillingActor = fromPromise(async ({ input }: { input: { organiz
   } catch (error) {
     // Billing endpoint may not exist yet (404 is expected for new orgs)
     if (error instanceof Error && !error.message.includes('404')) {
-      console.warn('[OrganizationActors] Billing info not available');
+      log.warn('[OrganizationActors] Billing info not available');
     }
     
     return {
@@ -206,7 +209,7 @@ export const loadBillingActor = fromPromise(async ({ input }: { input: { organiz
 
 // Upgrade subscription actor
 export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: { organizationId: string; planType: string; paymentData?: any } }) => {
-  console.log('[OrganizationActors] Upgrading subscription for:', input.organizationId, 'to plan:', input.planType);
+  log.info('[OrganizationActors] Upgrading subscription for:', input.organizationId, 'to plan:', input.planType);
   
   try {
     const response = await fetch(`${window.location.origin}/api/organizations/${input.organizationId}/billing/upgrade`, {
@@ -224,7 +227,7 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
     }
 
     const upgradeResult = await response.json();
-    console.log('[OrganizationActors] Upgraded subscription:', upgradeResult);
+    log.info('[OrganizationActors] Upgraded subscription:', upgradeResult);
     
     return {
       success: true,
@@ -233,7 +236,7 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
       error: null
     };
   } catch (error) {
-    console.error('[OrganizationActors] Failed to upgrade subscription:', error);
+    log.error('[OrganizationActors] Failed to upgrade subscription:', error);
     
     return {
       success: false,
@@ -246,7 +249,7 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
 
 // Simple organization switching actor
 export const switchOrganizationActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
-  console.log('[OrganizationActors] Switching to organization:', input.organizationId);
+  log.info('[OrganizationActors] Switching to organization:', input.organizationId);
   
   try {
     // 1. Call the organization switch API
@@ -285,7 +288,7 @@ export const switchOrganizationActor = fromPromise(async ({ input }: { input: { 
         new Date(session.data.session.expiresAt).toISOString() : null,
     };
   } catch (error) {
-    console.error('[OrganizationActors] Failed to switch organization:', error);
+    log.error('[OrganizationActors] Failed to switch organization:', error);
     
     return {
       success: false,

@@ -1,4 +1,6 @@
 import type { RelationshipOptionsProvider, RelationshipContext } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/providers/tag-provider.ts');
 
 /**
  * @deprecated This atom-based provider is deprecated.
@@ -12,6 +14,6 @@ import type { RelationshipOptionsProvider, RelationshipContext } from '../types'
  * - Sorted by sortOrder
  */
 export const tagProvider: RelationshipOptionsProvider = async (context: RelationshipContext) => {
-  console.warn('⚠️ DEPRECATED: Atom-based tag provider called. VibeGrid uses Dexie providers.');
+  log.warn('⚠️ DEPRECATED: Atom-based tag provider called. VibeGrid uses Dexie providers.');
   return [];
 };

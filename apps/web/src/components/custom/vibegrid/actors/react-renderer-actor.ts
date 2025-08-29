@@ -3,6 +3,8 @@ import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ReactRenderer } from '../renderers/ReactRenderer';
 import type { RenderState, ViewportInfo } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/actors/react-renderer-actor.ts');
 
 export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
   let root: Root | null = null;
@@ -10,7 +12,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
   let isInitialized = false;
   let lastRenderState: RenderState | null = null;
   
-  console.log('🚀 ReactRendererActor: Actor created');
+  log.info('🚀 ReactRendererActor: Actor created');
   
   const render = () => {
     if (!root || !container || !lastRenderState) return;
@@ -50,7 +52,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
   };
   
   receive((event) => {
-    console.log('🚀 ReactRendererActor: Event received:', event.type);
+    log.info('🚀 ReactRendererActor: Event received:', event.type);
     
     switch (event.type) {
       case 'INITIALIZE': {
@@ -65,7 +67,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
             root = createRoot(container);
             isInitialized = true;
             
-            console.log('🚀 ReactRendererActor: Initialized successfully');
+            log.info('🚀 ReactRendererActor: Initialized successfully');
             
             // Notify table machine that renderer is ready
             sendBack({ type: 'RENDERER_READY' });
@@ -81,7 +83,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
               }
             }, 0);
           } catch (error) {
-            console.error('ReactRendererActor: Failed to initialize', error);
+            log.error('ReactRendererActor: Failed to initialize', error);
             sendBack({
               type: 'RENDERER_ERROR',
               error: error instanceof Error ? error.message : 'Unknown error'
@@ -93,7 +95,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
       
       case 'RENDER': {
         if (!root || !container) {
-          console.error('ReactRendererActor: Cannot render - not initialized');
+          log.error('ReactRendererActor: Cannot render - not initialized');
           sendBack({
             type: 'RENDERER_ERROR',
             error: 'Renderer not initialized'
@@ -102,7 +104,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
         }
         
         if (!event.state) {
-          console.error('ReactRendererActor: Cannot render - no state provided');
+          log.error('ReactRendererActor: Cannot render - no state provided');
           sendBack({
             type: 'RENDERER_ERROR',
             error: 'No render state provided'
@@ -110,7 +112,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
           return;
         }
         
-        console.log('🚀 ReactRendererActor: Rendering', {
+        log.info('🚀 ReactRendererActor: Rendering', {
           rowCount: event.state.rows?.length || 0,
           columnCount: event.state.columns?.length || 0
         });
@@ -124,7 +126,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
             duration: 0 // React handles timing internally
           });
         } catch (error) {
-          console.error('🔥 ReactRendererActor: Render failed', error);
+          log.error('🔥 ReactRendererActor: Render failed', error);
           sendBack({
             type: 'RENDERER_ERROR',
             error: error instanceof Error ? error.message : 'Unknown render error'
@@ -147,7 +149,7 @@ export const reactRendererActor = fromCallback(({ sendBack, receive }) => {
   
   // Cleanup
   return () => {
-    console.log('🚀 ReactRendererActor: Cleaning up');
+    log.info('🚀 ReactRendererActor: Cleaning up');
     if (root) {
       root.unmount();
       root = null;

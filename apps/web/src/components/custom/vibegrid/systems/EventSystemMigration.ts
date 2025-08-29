@@ -10,6 +10,8 @@
 import { EventDelegationManager, type EventDelegationConfig } from './EventDelegationManager';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from '../machines/table-machine';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/systems/EventSystemMigration.ts');
 
 // ====================================
 // MIGRATION CONFIGURATION
@@ -51,7 +53,7 @@ export class EventSystemMigration {
 
   constructor(config: MigrationConfig) {
     this.config = config;
-    console.log('🔄 EventSystemMigration: Created with feature flags:', config.featureFlags);
+    log.info('🔄 EventSystemMigration: Created with feature flags:', config.featureFlags);
   }
 
   // ====================================
@@ -60,11 +62,11 @@ export class EventSystemMigration {
 
   public async startMigration(): Promise<void> {
     if (this.isActive) {
-      console.warn('🔄 EventSystemMigration: Already active');
+      log.warn('🔄 EventSystemMigration: Already active');
       return;
     }
 
-    console.log('🔄 EventSystemMigration: Starting migration...');
+    log.info('🔄 EventSystemMigration: Starting migration...');
     
     try {
       // Phase 1: Disable conflicting legacy systems
@@ -77,17 +79,17 @@ export class EventSystemMigration {
       await this.validateMigration();
       
       this.isActive = true;
-      console.log('✅ EventSystemMigration: Migration completed successfully');
+      log.info('✅ EventSystemMigration: Migration completed successfully');
       
     } catch (error) {
-      console.error('❌ EventSystemMigration: Migration failed:', error);
+      log.error('❌ EventSystemMigration: Migration failed:', error);
       await this.rollback();
       throw error;
     }
   }
 
   public async rollback(): Promise<void> {
-    console.log('🔄 EventSystemMigration: Rolling back...');
+    log.info('🔄 EventSystemMigration: Rolling back...');
     
     try {
       // Destroy unified manager
@@ -100,10 +102,10 @@ export class EventSystemMigration {
       await this.enableLegacySystems();
       
       this.isActive = false;
-      console.log('✅ EventSystemMigration: Rollback completed');
+      log.info('✅ EventSystemMigration: Rollback completed');
       
     } catch (error) {
-      console.error('❌ EventSystemMigration: Rollback failed:', error);
+      log.error('❌ EventSystemMigration: Rollback failed:', error);
     }
   }
 
@@ -118,7 +120,7 @@ export class EventSystemMigration {
       // Remove React mouse event listeners
       const viewport = this.config.container.querySelector('.vibegridx-viewport') as HTMLElement;
       if (viewport && legacySystems.reactHandlers.handleMouseDown) {
-        console.log('🔄 EventSystemMigration: Disabling React mouse handlers');
+        log.info('🔄 EventSystemMigration: Disabling React mouse handlers');
         viewport.removeEventListener('mousedown', legacySystems.reactHandlers.handleMouseDown);
         
         if (legacySystems.reactHandlers.handleMouseMove) {
@@ -134,14 +136,14 @@ export class EventSystemMigration {
     if (featureFlags.useUnifiedKeyboardEvents && legacySystems?.reactHandlers) {
       // Remove React keyboard event listeners
       if (legacySystems.reactHandlers.handleKeyDown) {
-        console.log('🔄 EventSystemMigration: Disabling React keyboard handlers');
+        log.info('🔄 EventSystemMigration: Disabling React keyboard handlers');
         this.config.container.removeEventListener('keydown', legacySystems.reactHandlers.handleKeyDown);
       }
     }
     
     if (legacySystems?.eventSystem) {
       // Disable DOM EventSystem
-      console.log('🔄 EventSystemMigration: Disabling DOM EventSystem');
+      log.info('🔄 EventSystemMigration: Disabling DOM EventSystem');
       if (typeof legacySystems.eventSystem.cleanup === 'function') {
         legacySystems.eventSystem.cleanup();
       }
@@ -153,7 +155,7 @@ export class EventSystemMigration {
     
     // Re-enable systems in reverse order
     if (legacySystems?.eventSystem) {
-      console.log('🔄 EventSystemMigration: Re-enabling DOM EventSystem');
+      log.info('🔄 EventSystemMigration: Re-enabling DOM EventSystem');
       if (typeof legacySystems.eventSystem.setupEventListeners === 'function') {
         legacySystems.eventSystem.setupEventListeners();
       }
@@ -161,7 +163,7 @@ export class EventSystemMigration {
     
     if (featureFlags.useUnifiedKeyboardEvents && legacySystems?.reactHandlers) {
       if (legacySystems.reactHandlers.handleKeyDown) {
-        console.log('🔄 EventSystemMigration: Re-enabling React keyboard handlers');
+        log.info('🔄 EventSystemMigration: Re-enabling React keyboard handlers');
         this.config.container.addEventListener('keydown', legacySystems.reactHandlers.handleKeyDown);
       }
     }
@@ -169,7 +171,7 @@ export class EventSystemMigration {
     if (featureFlags.useUnifiedMouseEvents && legacySystems?.reactHandlers) {
       const viewport = this.config.container.querySelector('.vibegridx-viewport') as HTMLElement;
       if (viewport && legacySystems.reactHandlers.handleMouseDown) {
-        console.log('🔄 EventSystemMigration: Re-enabling React mouse handlers');
+        log.info('🔄 EventSystemMigration: Re-enabling React mouse handlers');
         viewport.addEventListener('mousedown', legacySystems.reactHandlers.handleMouseDown);
         
         if (legacySystems.reactHandlers.handleMouseMove) {
@@ -188,7 +190,7 @@ export class EventSystemMigration {
   // ====================================
 
   private async initializeUnifiedManager(): Promise<void> {
-    console.log('🔄 EventSystemMigration: Initializing unified manager');
+    log.info('🔄 EventSystemMigration: Initializing unified manager');
     
     const unifiedConfig: EventDelegationConfig = {
       container: this.config.container,
@@ -196,13 +198,13 @@ export class EventSystemMigration {
       // Provide legacy callbacks for smooth transition
       legacyCallbacks: {
         onCellClick: (rowId, columnId, event) => {
-          console.log('🔄 Legacy callback: Cell click', { rowId, columnId });
+          log.info('🔄 Legacy callback: Cell click', { rowId, columnId });
         },
         onCellDoubleClick: (rowId, columnId, event) => {
-          console.log('🔄 Legacy callback: Cell double click', { rowId, columnId });
+          log.info('🔄 Legacy callback: Cell double click', { rowId, columnId });
         },
         onColumnClick: (columnId, event) => {
-          console.log('🔄 Legacy callback: Column click', { columnId });
+          log.info('🔄 Legacy callback: Column click', { columnId });
         }
       }
     };
@@ -215,7 +217,7 @@ export class EventSystemMigration {
   // ====================================
 
   private async validateMigration(): Promise<void> {
-    console.log('🔄 EventSystemMigration: Validating migration');
+    log.info('🔄 EventSystemMigration: Validating migration');
     
     // Check that unified manager is properly initialized
     if (!this.unifiedManager) {
@@ -237,7 +239,7 @@ export class EventSystemMigration {
     
     try {
       this.config.container.dispatchEvent(testEvent);
-      console.log('✅ EventSystemMigration: Event delegation test passed');
+      log.info('✅ EventSystemMigration: Event delegation test passed');
     } catch (error) {
       throw new Error(`Event delegation test failed: ${error}`);
     }
@@ -251,14 +253,14 @@ export class EventSystemMigration {
     const oldFlags = this.config.featureFlags;
     this.config.featureFlags = { ...oldFlags, ...newFlags };
     
-    console.log('🔄 EventSystemMigration: Updated feature flags:', {
+    log.info('🔄 EventSystemMigration: Updated feature flags:', {
       old: oldFlags,
       new: this.config.featureFlags
     });
     
     // If we're active, restart migration with new flags
     if (this.isActive) {
-      console.log('🔄 EventSystemMigration: Restarting with new flags');
+      log.info('🔄 EventSystemMigration: Restarting with new flags');
       this.restartMigration();
     }
   }
@@ -302,7 +304,7 @@ export class EventSystemMigration {
       this.unifiedManager = null;
     }
     this.isActive = false;
-    console.log('🔄 EventSystemMigration: Destroyed');
+    log.info('🔄 EventSystemMigration: Destroyed');
   }
 }
 

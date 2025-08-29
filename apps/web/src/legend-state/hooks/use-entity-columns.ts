@@ -7,13 +7,15 @@ import { useMemo } from 'react'
 import { use$ } from '@legendapp/state/react'
 import { orgContext$ } from '../observables'
 import type { Column } from '@/components/custom/vibegrid/column-types'
+import { stateLog } from '@/logger';
+const log = stateLog('legend-state/hooks/use-entity-columns.ts');
 
 /**
  * Generate VibeGrid columns from entity archetype (since schema doesn't have field definitions)
  * We use the archetype to generate sensible default columns
  */
 function generateColumnsFromArchetype<T>(entityName: string, archetype: string): Column<T>[] {
-  console.log('[useEntityColumns] Generating columns from archetype:', { entityName, archetype })
+  log.info('[useEntityColumns] Generating columns from archetype:', { entityName, archetype })
   
   // Base columns that most entities have
   const baseColumns: Column<T>[] = [
@@ -133,7 +135,7 @@ function generateColumnsFromArchetype<T>(entityName: string, archetype: string):
  * Generate VibeGrid columns from syncableFields in the schema
  */
 function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: string): Column<T>[] {
-  console.log('[useEntityColumns] Generating columns from syncableFields:', { entityName, syncableFields })
+  log.info('[useEntityColumns] Generating columns from syncableFields:', { entityName, syncableFields })
   
   const allColumns = Object.entries(syncableFields).map(([fieldName, fieldDef]: [string, any]) => {
     const safeFieldDef = fieldDef && typeof fieldDef === 'object' ? fieldDef : {}
@@ -193,7 +195,7 @@ function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: s
     return column
   })
   
-  console.log('[useEntityColumns] Column ordering:', {
+  log.info('[useEntityColumns] Column ordering:', {
     businessFieldCount: businessFields.length,
     systemFieldCount: systemFields.length,
     totalColumns: orderedColumns.length,
@@ -244,7 +246,7 @@ export function useEntityColumns<T = any>(entityName: string): {
         key.toLowerCase() === entityName.toLowerCase()
       )?.[1]
     
-    console.log('[useEntityColumns] Schema debug:', {
+    log.info('[useEntityColumns] Schema debug:', {
       entityName,
       hasSchemaEntities: !!schema.entities,
       availableEntities: Object.keys(schema.entities),
@@ -266,7 +268,7 @@ export function useEntityColumns<T = any>(entityName: string): {
         ? generateColumnsFromSyncableFields<T>(entityDef.syncableFields, entityName)
         : generateColumnsFromArchetype<T>(entityName, entityDef.archetype)
       
-      console.log(`[useEntityColumns] Generated ${generatedColumns.length} columns for ${entityName}`, generatedColumns)
+      log.info(`[useEntityColumns] Generated ${generatedColumns.length} columns for ${entityName}`, generatedColumns)
       return { columns: generatedColumns, error: null }
     } catch (err) {
       return { columns: [], error: `Failed to generate columns: ${err}` }

@@ -4,6 +4,8 @@
 
 import { fromPromise } from 'xstate';
 import type { DraggedItem, DropTarget } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/actors/drag-actor.ts');
 
 // ====================================
 // VALIDATION HELPERS
@@ -94,7 +96,7 @@ const performDragValidation = fromPromise(async ({ input }: {
 }) => {
   const { draggedItem, dropTarget, constraints } = input;
   
-  console.log('DragActor: Validating drop', {
+  log.info('DragActor: Validating drop', {
     draggedItem,
     dropTarget,
     constraints
@@ -125,7 +127,7 @@ const performRowReorder = fromPromise(async ({ input }: {
 }) => {
   const { draggedItem, dropTarget, rows } = input;
   
-  console.log('DragActor: Performing row reorder', {
+  log.info('DragActor: Performing row reorder', {
     draggedRowId: draggedItem.id,
     dropTargetId: dropTarget.id,
     position: dropTarget.position
@@ -165,7 +167,7 @@ const performColumnReorder = fromPromise(async ({ input }: {
 }) => {
   const { draggedItem, dropTarget, columns } = input;
   
-  console.log('DragActor: Performing column reorder', {
+  log.info('DragActor: Performing column reorder', {
     draggedColumnId: draggedItem.id,
     dropTargetId: dropTarget.id,
     position: dropTarget.position
@@ -205,7 +207,7 @@ const performCellDrag = fromPromise(async ({ input }: {
 }) => {
   const { draggedItem, dropTarget, operation } = input;
   
-  console.log('DragActor: Performing cell drag', {
+  log.info('DragActor: Performing cell drag', {
     draggedCellId: draggedItem.id,
     dropTargetId: dropTarget.id,
     operation
@@ -235,13 +237,13 @@ export const dragActor = fromPromise(async ({ input }: {
 }) => {
   // Handle initial spawn
   if (!input || !input.type) {
-    console.log('DragActor: Initial spawn');
+    log.info('DragActor: Initial spawn');
     return { type: 'INITIALIZED' };
   }
   
   const { type } = input;
   
-  console.log('DragActor: Processing operation', { type, input });
+  log.info('DragActor: Processing operation', { type, input });
   
   switch (type) {
     case 'VALIDATE_DROP':
@@ -273,7 +275,7 @@ export const dragActor = fromPromise(async ({ input }: {
       return { success: true, insertIndex };
       
     default:
-      console.warn('DragActor: Unknown operation type', { type });
+      log.warn('DragActor: Unknown operation type', { type });
       return { success: false, error: `Unknown operation: ${type}` };
   }
 });

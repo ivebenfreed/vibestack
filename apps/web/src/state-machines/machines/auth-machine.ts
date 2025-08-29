@@ -2,6 +2,8 @@ import { setup, assign } from 'xstate';
 import { checkAuthActor, signInActor, signOutActor } from '../auth-actors';
 import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor, switchOrganizationActor } from '../organization-actors';
 import type { UserInfo, OrganizationInfo, CreateOrganizationInput } from '../types';
+import { syncLog } from '@/logger';
+const log = syncLog('state-machines/machines/auth-machine.ts');
 
 export interface AuthContext {
   user: UserInfo | null;
@@ -82,7 +84,7 @@ export const authMachine = setup({
     }),
     
     dispatchAuthStateChange: ({ context }, params: { authenticated: boolean; reason: string }) => {
-      console.log('[AuthMachine] Dispatching auth state change:', { authenticated: params.authenticated, reason: params.reason });
+      log.info('[AuthMachine] Dispatching auth state change:', { authenticated: params.authenticated, reason: params.reason });
       
       // For sign-out, dispatch signout event immediately for navigation
       if (!params.authenticated && (params.reason === 'sign-out-success' || params.reason === 'sign-out-error')) {
@@ -123,16 +125,16 @@ export const authMachine = setup({
         if (context.currentOrganization) {
           const validOrg = organizations.find(org => org.id === context.currentOrganization.id);
           if (validOrg) {
-            console.log('[AuthMachine] Current organization validated against loaded organizations:', validOrg.name);
+            log.info('[AuthMachine] Current organization validated against loaded organizations:', validOrg.name);
             return validOrg; // Return the org from the list (may have updated info)
           } else {
-            console.log('[AuthMachine] Current organization no longer valid, clearing:', context.currentOrganization.id);
+            log.info('[AuthMachine] Current organization no longer valid, clearing:', context.currentOrganization.id);
             return null;
           }
         }
         
         // No current organization - don't auto-select, let the state machine handle selection logic
-        console.log('[AuthMachine] No current organization - organizations loaded for selection');
+        log.info('[AuthMachine] No current organization - organizations loaded for selection');
         return null;
       },
     }),
@@ -259,7 +261,7 @@ export const authMachine = setup({
   
   context: ({ input }: { input?: { user?: UserInfo; authToken?: string; sessionExpiry?: string } }) => {
     // Use input or defaults - snapshot restoration will handle persisted context
-    console.log('[AuthMachine] Initializing context with input:', input?.user?.email || 'no user');
+    log.info('[AuthMachine] Initializing context with input:', input?.user?.email || 'no user');
     return {
       user: input?.user || null,
       authToken: input?.authToken || null,
@@ -309,7 +311,7 @@ export const authMachine = setup({
           },
           target: 'authenticated.ready',
           actions: [
-            ({ context }) => console.log(`[AuthMachine] ✅ Restored session: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
+            ({ context }) => log.info(`[AuthMachine] ✅ Restored session: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
             { 
               type: 'dispatchAuthStateChange',
               params: { authenticated: true, reason: 'session-restored-with-org' }
@@ -331,7 +333,7 @@ export const authMachine = setup({
           },
           target: 'authenticated',
           actions: [
-            ({ context }) => console.log(`[AuthMachine] Valid session for ${context.user?.email}, loading organizations`),
+            ({ context }) => log.info(`[AuthMachine] Valid session for ${context.user?.email}, loading organizations`),
             { 
               type: 'dispatchAuthStateChange',
               params: { authenticated: true, reason: 'session-restored-needs-org' }
@@ -341,7 +343,7 @@ export const authMachine = setup({
         {
           // Otherwise, check auth
           target: 'checking',
-          actions: () => console.log('[AuthMachine] No persisted session, checking auth status')
+          actions: () => log.info('[AuthMachine] No persisted session, checking auth status')
         }
       ]
     },
@@ -522,19 +524,19 @@ export const authMachine = setup({
               guard: ({ context }) => 
                 !!context.currentOrganization && context.userOrganizations.length === 0,
               target: 'loadingOrganizations',
-              actions: () => console.log('[AuthMachine] Have current org but missing organizations list - loading organizations')
+              actions: () => log.info('[AuthMachine] Have current org but missing organizations list - loading organizations')
             },
             {
               // If we have orgs loaded but none selected, need selection
               guard: ({ context }) => 
                 context.userOrganizations.length > 0 && !context.currentOrganization,
               target: 'needsOrganizationSelection',
-              actions: () => console.log('[AuthMachine] Have organizations but none selected')
+              actions: () => log.info('[AuthMachine] Have organizations but none selected')
             },
             {
               // Otherwise, need to load organizations (fresh login, no persisted orgs)
               target: 'loadingOrganizations',
-              actions: () => console.log('[AuthMachine] Loading organizations for authenticated user')
+              actions: () => log.info('[AuthMachine] Loading organizations for authenticated user')
             }
           ]
         },
@@ -754,14 +756,14 @@ export const authMachine = setup({
             // 🔄 SYNC: Connect sync machine when auth is fully ready
             const syncActor = (window as any).simpleNotificationSyncMachineActor;
             if (syncActor && context.user?.id && context.currentOrganization?.id) {
-              console.log('[AuthMachine] ✅ Triggering sync connection - auth ready');
+              log.info('[AuthMachine] ✅ Triggering sync connection - auth ready');
               syncActor.send({ 
                 type: 'CONNECT', 
                 organizationId: context.currentOrganization.id,
                 userId: context.user.id
               });
             } else {
-              console.warn('[AuthMachine] ⚠️ Sync actor not found or missing org/user data', {
+              log.warn('[AuthMachine] ⚠️ Sync actor not found or missing org/user data', {
                 syncActor: !!syncActor,
                 userId: context.user?.id,
                 orgId: context.currentOrganization?.id
@@ -796,7 +798,7 @@ export const authMachine = setup({
     },
     
     unauthenticated: {
-      // entry: () => console.log('[AuthMachine] User not authenticated'),
+      // entry: () => log.info('[AuthMachine] User not authenticated'),
       
       on: {
         SIGN_IN: {
@@ -823,7 +825,7 @@ export const authMachine = setup({
     },
     
     signingIn: {
-      // entry: () => console.log('[AuthMachine] Starting sign-in process'),
+      // entry: () => log.info('[AuthMachine] Starting sign-in process'),
       
       invoke: {
         src: 'signIn',
@@ -879,7 +881,7 @@ export const authMachine = setup({
     },
     
     signingOut: {
-      // entry: () => console.log('[AuthMachine] Starting sign-out process'),
+      // entry: () => log.info('[AuthMachine] Starting sign-out process'),
       
       invoke: {
         src: 'signOut',
@@ -908,7 +910,7 @@ export const authMachine = setup({
     
     errorRecovery: {
       entry: ({ context }) => {
-        console.log('[AuthMachine] Entering error recovery state', {
+        log.info('[AuthMachine] Entering error recovery state', {
           error: context.authError,
           retryCount: context.errorRetryCount || 0
         });

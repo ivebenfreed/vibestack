@@ -5,6 +5,8 @@
 
 import { assign } from 'xstate';
 import type { SortConfig, FilterConfig, Column, ViewportInfo } from '../../../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/slices/view-slice.ts');
 
 // ====================================
 // TYPES
@@ -79,7 +81,7 @@ export const createInitialViewState = (
   // Calculate hidden column count from column visibility
   const hiddenColumnCount = Object.values(columnVisibility).filter(visible => !visible).length;
   
-  console.log('[ViewSlice] createInitialViewState:', {
+  log.info('[ViewSlice] createInitialViewState:', {
     entityType,
     providedColumns: columns.map(c => c.id),
     persistedColumnOrder,
@@ -118,7 +120,7 @@ export const viewActions = {
       const shiftKey = (event as any).shiftKey || false;
       
       if (!field) {
-        console.error('toggleSort: No field provided in event', event);
+        log.error('toggleSort: No field provided in event', event);
         return context.sortBy;
       }
       
@@ -143,7 +145,7 @@ export const viewActions = {
           : [{ field: field, direction: 'asc' }];
       }
       
-      console.log('toggleSort: Updating sort', { field, shiftKey, newSortBy });
+      log.info('toggleSort: Updating sort', { field, shiftKey, newSortBy });
       return newSortBy;
     }
   }),
@@ -162,7 +164,7 @@ export const viewActions = {
   toggleColumnVisibility: assign({
     columnVisibility: ({ context, event }) => {
       if (!event || !event.columnId) {
-        console.warn('toggleColumnVisibility: Invalid event', event);
+        log.warn('toggleColumnVisibility: Invalid event', event);
         return context.columnVisibility;
       }
       

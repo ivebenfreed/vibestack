@@ -8,6 +8,9 @@
 import { type Observable } from '@legendapp/state'
 import { type PersistOptions } from '@legendapp/state/sync'
 import { ObservablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
+import { stateLog } from '@/logger';
+
+const log = stateLog('legend-state/helpers/PersistenceManager.ts');
 
 export interface EntityMetadata {
   id: string
@@ -43,7 +46,7 @@ export class PersistenceManager {
     this.dbName = dbName || `vibestack_org_${organizationId.replace(/-/g, '_')}`
     this.dbVersion = dbVersion || 1
     
-    console.log('[PersistenceManager] Initialized', {
+    log.info('[PersistenceManager] Initialized', {
       organizationId,
       userId,
       dbName: this.dbName,
@@ -69,7 +72,7 @@ export class PersistenceManager {
     // Store the new version
     localStorage.setItem(versionKey, newVersion.toString())
     
-    console.log(`[PersistenceManager] Version progression: ${lastVersion} -> ${newVersion}`)
+    log.info(`[PersistenceManager] Version progression: ${lastVersion} -> ${newVersion}`)
     
     return newVersion
   }
@@ -88,8 +91,8 @@ export class PersistenceManager {
     // Generate dynamic version based on schema to trigger IndexedDB upgrades when needed
     const schemaVersion = this.generateSchemaVersion(entityNames)
     
-    console.log(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
-    console.log(`[PersistenceManager] Using dynamic schema version: ${schemaVersion} (based on entity list)`)
+    log.info(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
+    log.info(`[PersistenceManager] Using dynamic schema version: ${schemaVersion} (based on entity list)`)
     
     try {
       return new ObservablePersistIndexedDB({
@@ -98,7 +101,7 @@ export class PersistenceManager {
         tableNames: tableNames
       })
     } catch (error) {
-      console.warn(`[PersistenceManager] Failed to create IndexedDB plugin, falling back to no-op:`, error)
+      log.warn(`[PersistenceManager] Failed to create IndexedDB plugin, falling back to no-op:`, error)
       // Return a no-op plugin that doesn't break the application
       return {
         loadTable: async () => ({}),
@@ -140,7 +143,7 @@ export class PersistenceManager {
       
       this.syncStates.set(tableName, initialState)
       
-      console.log(`[PersistenceManager] Initialized sync state for table: ${tableName}`)
+      log.info(`[PersistenceManager] Initialized sync state for table: ${tableName}`)
     }
   }
   
@@ -154,7 +157,7 @@ export class PersistenceManager {
       const newState = { ...currentState, ...updates }
       this.syncStates.set(tableName, newState)
       
-      console.log(`[PersistenceManager] Updated sync state for table: ${tableName}`, {
+      log.info(`[PersistenceManager] Updated sync state for table: ${tableName}`, {
         updates,
         newState
       })
@@ -183,7 +186,7 @@ export class PersistenceManager {
       // In a full implementation, this would use the IndexedDB directly
       localStorage.setItem(stateKey, JSON.stringify(syncState))
       
-      console.log(`[PersistenceManager] Persisted sync state for table: ${tableName}`)
+      log.info(`[PersistenceManager] Persisted sync state for table: ${tableName}`)
       
     } catch (error) {
       console.error(`[PersistenceManager] Failed to persist sync state for table: ${tableName}`, error)
@@ -202,7 +205,7 @@ export class PersistenceManager {
         const parsedState = JSON.parse(storedState) as SyncState
         this.syncStates.set(tableName, parsedState)
         
-        console.log(`[PersistenceManager] Loaded sync state for table: ${tableName}`, parsedState)
+        log.info(`[PersistenceManager] Loaded sync state for table: ${tableName}`, parsedState)
         return parsedState
       }
       
@@ -235,7 +238,7 @@ export class PersistenceManager {
       
       keysToRemove.forEach(key => localStorage.removeItem(key))
       
-      console.log('[PersistenceManager] Cleared organization data', {
+      log.info('[PersistenceManager] Cleared organization data', {
         organizationId: this.organizationId,
         clearedKeys: keysToRemove.length
       })

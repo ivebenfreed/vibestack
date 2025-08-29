@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useActorRef, useSelector } from '@xstate/react';
+import { uiLog } from '@/logger';
+
+const log = uiLog('components/custom/vibegrid/VibeGrid.tsx');
 // useLiveQuery removed - handled by XState store
 import { tableBaseMachine } from './machines/table-machine';
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector';
@@ -116,7 +119,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const relationshipData = (props.initialData as any).relationshipData || {};
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 VibeGrid: Preparing preloaded data', {
+        log.debug('Preparing preloaded data', {
           entityCount: entities.length,
           relationshipDataKeys: Object.keys(relationshipData),
           hasRelationshipData: Object.keys(relationshipData).length > 0,
@@ -216,7 +219,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           
           // Only log in development
           if (process.env.NODE_ENV === 'development') {
-            console.log('🟢 VibeGridX: LOADING persisted state from localStorage', {
+            log.info('Loading persisted state from localStorage', {
               key: persistenceKey,
               tableId: tableId,
               entityType: entityType,
@@ -234,7 +237,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           persistedDataRef.current = null;
           
           if (process.env.NODE_ENV === 'development') {
-            console.log('🟡 VibeGridX: No persisted state found for', persistenceKey);
+            log.debug('No persisted state found', { persistenceKey });
           }
           return null;
         }
@@ -258,7 +261,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // Create machine configuration - XState will create store internally
   const machineConfig = useMemo(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 VibeGrid: Creating machine config', {
+      log.debug('Creating machine config', {
         entityType: entityType,
         columnCount: columns.length,
         tableId: tableId
@@ -308,7 +311,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       // Check if xstateTestInspector is available
       if (typeof window !== 'undefined' && (window as any).xstateTestInspector) {
         options.inspect = (window as any).xstateTestInspector.inspect;
-        console.log('[VibeGrid] XState inspection enabled for table machine');
+        log.info('XState inspection enabled for table machine');
       }
     }
     
@@ -329,7 +332,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   React.useEffect(() => {
     // Clean up previous bridge if it exists
     if (atomicBridge.current) {
-      console.log('🔗 VibeGrid: Cleaning up previous atomic bridge for', entityType);
+      log.debug('Cleaning up previous atomic bridge', { entityType });
       atomicBridge.current();
       atomicBridge.current = null;
     }
@@ -339,11 +342,11 @@ export function VibeGrid<T extends Record<string, any> = any>(
       try {
         const bridge = await import('./stores/legend-state-atomic-bridge');
         
-        console.log('🔗 VibeGrid: Setting up atomic bridge for', entityType);
+        log.info('Setting up atomic bridge', { entityType });
         
         // Create atomic observer with proper event handling
         const cleanup = bridge.createAtomicObservableBridge(entityType, (event) => {
-          console.log('🔄 VibeGrid: Atomic change detected via bridge', {
+          log.debug('Atomic change detected via bridge', {
             entityType,
             eventType: event.type,
             entityCount: event.entities?.length || 0,
@@ -358,7 +361,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         // Store cleanup function in ref
         atomicBridge.current = cleanup;
         
-        console.log('✅ VibeGrid: Atomic bridge active for', entityType);
+        log.info('Atomic bridge active', { entityType });
       } catch (error) {
         console.error('❌ VibeGrid: Failed to setup atomic bridge:', error);
       }
@@ -369,7 +372,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
     // Cleanup on unmount or entityType change
     return () => {
       if (atomicBridge.current) {
-        console.log('🔗 VibeGrid: Cleaning up atomic bridge for', entityType);
+        log.debug('Cleaning up atomic bridge', { entityType });
         atomicBridge.current();
         atomicBridge.current = null;
       }
@@ -386,18 +389,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
     onStateChange: (event: any) => {
       if (event.type === 'render.complete') {
         if (event.renderTime > 100) {
-          console.warn('Slow render detected:', event);
+          log.warn('Slow render detected', event);
         }
       }
     },
     onColumnClick: (field: string) => {
-      console.log('VibeGrid: Column clicked for sort:', field);
+      log.debug('Column clicked for sort', { field });
       // Send to table machine, not directly to store
       // The table machine will handle the toggle logic and update the store
       tableSend({ type: 'view.column.click', field });
     },
     onColumnDragEnd: (event: any) => {
-      console.log('VibeGrid: Column drag ended, forwarding to table machine:', event);
+      log.debug('Column drag ended, forwarding to table machine', event);
       // Forward the reorder event to the table machine
       tableSend(event);
     }
@@ -411,7 +414,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
     if (node && !rendererInitializedRef.current) {
       const initStartTime = performance.now();
       if (process.env.NODE_ENV === 'development') {
-        console.log('🚀 VibeGridX: Container attached, initializing renderer synchronously:', {
+        log.info('Container attached, initializing renderer synchronously', {
           timestamp: initStartTime
         });
       }
@@ -421,7 +424,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       (window as any).__vibegrid_renderer_options = pendingRendererOptionsRef.current;
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER synchronously:', {
+        log.debug('Sending INITIALIZE_RENDERER synchronously', {
           timestamp: performance.now()
         });
       }
@@ -459,12 +462,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
       // Import and call cleanup functions to ensure global overlays are cleaned up
       import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
         cleanupEditingOverlay();
-        console.log('VibeGrid: Cleaned up EditingOverlay on unmount');
+        log.debug('Cleaned up EditingOverlay on unmount');
       });
       
       import('./machines/table-machine/event-handlers/contextmenu-handlers').then(({ cleanupContextMenuManager }) => {
         cleanupContextMenuManager();
-        console.log('VibeGrid: Cleaned up ContextMenuManager on unmount');
+        log.debug('Cleaned up ContextMenuManager on unmount');
       });
     };
   }, []);
@@ -474,7 +477,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
     if (!containerRef.current) return;
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('🎯 VibeGridX: Initializing unified event system');
+      log.info('Initializing unified event system');
     }
     
     const delegationConfig: EventDelegationConfig = {
@@ -488,7 +491,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
     eventDelegationManagerRef.current = delegationManager;
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ VibeGridX: Unified event system active');
+      log.info('Unified event system active');
     }
     
     return () => {
@@ -525,7 +528,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
   // Check if we have columns (store will be created by XState)
   if (columns.length === 0) {
-    console.log('VibeGrid: Waiting for columns', {
+    log.debug('Waiting for columns', {
       columnCount: columns.length
     });
     return (
@@ -537,7 +540,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
   // DEBUG: Track rendering - should only happen on prop changes, not XState transitions
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎯 VibeGridX: Rendering component (container shell only)', {
+    log.debug('Rendering component (container shell only)', {
       entityType: entityType,
       renderReason: 'prop_change_or_mount',
       timestamp: performance.now()

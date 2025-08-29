@@ -8,13 +8,15 @@
 import { LiveStoreEventSyncService, createLiveStoreEventSync } from './livestore-event-sync-service';
 import type { LiveStoreInstance } from './livestore-schema-client';
 import type { TableChange } from '@repo/sync-types';
+import { uiLog } from '@/logger';
+const log = uiLog('lib/test-livestore-event-sync.ts');
 
 // Mock WebSocket sender for testing
 class MockWebSocketSender {
   public sentMessages: TableChange[] = [];
   
   async send(message: TableChange): Promise<void> {
-    console.log('📤 [MockWebSocket] Sending:', message);
+    log.info('📤 [MockWebSocket] Sending:', message);
     this.sentMessages.push(message);
   }
   
@@ -36,25 +38,25 @@ const createMockEvent = (type: string, data: any) => ({
  * Test the event sync service
  */
 export async function testLiveStoreEventSync(): Promise<void> {
-  console.log('🧪 Testing LiveStore Event Sync...');
+  log.info('🧪 Testing LiveStore Event Sync...');
   
   try {
     // Test 1: Event Type Parsing
-    console.log('\n1. Testing event type parsing...');
+    log.info('\n1. Testing event type parsing...');
     await testEventTypeParsing();
     
     // Test 2: Event to TableChange Conversion
-    console.log('\n2. Testing event conversion...');
+    log.info('\n2. Testing event conversion...');
     await testEventConversion();
     
     // Test 3: Integration Test (if LiveStore available)
-    console.log('\n3. Testing integration...');
+    log.info('\n3. Testing integration...');
     await testIntegration();
     
-    console.log('\n✅ All LiveStore Event Sync tests passed!');
+    log.info('\n✅ All LiveStore Event Sync tests passed!');
     
   } catch (error) {
-    console.error('❌ LiveStore Event Sync test failed:', error);
+    log.error('❌ LiveStore Event Sync test failed:', error);
     throw error;
   }
 }
@@ -84,14 +86,14 @@ async function testEventTypeParsing(): Promise<void> {
     // Use reflection to test private method
     const result = (eventSync as any).parseEventType(testCase.eventType);
     
-    console.log(`  ${testCase.eventType} → ${result.table}:${result.operation}`);
+    log.info(`  ${testCase.eventType} → ${result.table}:${result.operation}`);
     
     if (result.table !== testCase.expected.table || result.operation !== testCase.expected.operation) {
       throw new Error(`Event type parsing failed for ${testCase.eventType}`);
     }
   }
   
-  console.log('  ✅ Event type parsing works correctly');
+  log.info('  ✅ Event type parsing works correctly');
 }
 
 /**
@@ -115,8 +117,8 @@ async function testEventConversion(): Promise<void> {
   
   const tableChange = (eventSync as any).convertToTableChange(testEvent);
   
-  console.log('  Input event:', testEvent);
-  console.log('  Output TableChange:', tableChange);
+  log.info('  Input event:', testEvent);
+  log.info('  Output TableChange:', tableChange);
   
   // Validate conversion
   const expected = {
@@ -141,7 +143,7 @@ async function testEventConversion(): Promise<void> {
     throw new Error('Event data conversion failed');
   }
   
-  console.log('  ✅ Event conversion works correctly');
+  log.info('  ✅ Event conversion works correctly');
 }
 
 /**
@@ -182,7 +184,7 @@ async function testIntegration(): Promise<void> {
   await syncPromise;
   
   // Validate results
-  console.log('  Processed events:', mockWebSocket.sentMessages);
+  log.info('  Processed events:', mockWebSocket.sentMessages);
   
   if (mockWebSocket.sentMessages.length !== 3) {
     throw new Error(`Expected 3 events, got ${mockWebSocket.sentMessages.length}`);
@@ -205,19 +207,19 @@ async function testIntegration(): Promise<void> {
     throw new Error('Client event conversion failed');
   }
   
-  console.log('  ✅ Integration test passed');
+  log.info('  ✅ Integration test passed');
 }
 
 /**
  * Demonstrate usage with the factory function
  */
 export async function demonstrateUsage(): Promise<void> {
-  console.log('\n🎯 Demonstrating LiveStore Event Sync usage...');
+  log.info('\n🎯 Demonstrating LiveStore Event Sync usage...');
   
   const mockWebSocket = new MockWebSocketSender();
   
   // Example 1: Simple usage
-  console.log('\n📝 Example 1: Simple usage');
+  log.info('\n📝 Example 1: Simple usage');
   const mockLiveStore = {
     store: {
       async *events() {
@@ -234,33 +236,33 @@ export async function demonstrateUsage(): Promise<void> {
     autoStart: false // Don't auto-start for demo
   });
   
-  console.log('  Event sync created:', eventSync.getStatus());
+  log.info('  Event sync created:', eventSync.getStatus());
   
   // Example 2: Manual control
-  console.log('\n🎮 Example 2: Manual control');
+  log.info('\n🎮 Example 2: Manual control');
   
   // Start manually
   const syncPromise = eventSync.startEventSync();
   
   // Check status
-  console.log('  Status after start:', eventSync.getStatus());
+  log.info('  Status after start:', eventSync.getStatus());
   
   // Stop after a moment
   setTimeout(() => eventSync.stopEventSync(), 50);
   
   await syncPromise;
   
-  console.log('  Final status:', eventSync.getStatus());
-  console.log('  Messages sent:', mockWebSocket.sentMessages.length);
+  log.info('  Final status:', eventSync.getStatus());
+  log.info('  Messages sent:', mockWebSocket.sentMessages.length);
   
-  console.log('\n✅ Usage demonstration complete!');
+  log.info('\n✅ Usage demonstration complete!');
 }
 
 /**
  * Performance test
  */
 export async function testPerformance(): Promise<void> {
-  console.log('\n⚡ Testing LiveStore Event Sync performance...');
+  log.info('\n⚡ Testing LiveStore Event Sync performance...');
   
   const mockWebSocket = new MockWebSocketSender();
   
@@ -298,32 +300,32 @@ export async function testPerformance(): Promise<void> {
   const processed = mockWebSocket.sentMessages.length;
   const eventsPerSecond = Math.round((processed / duration) * 1000);
   
-  console.log(`  Processed ${processed}/${eventCount} events in ${duration}ms`);
-  console.log(`  Performance: ${eventsPerSecond} events/second`);
+  log.info(`  Processed ${processed}/${eventCount} events in ${duration}ms`);
+  log.info(`  Performance: ${eventsPerSecond} events/second`);
   
   if (processed === 0) {
     throw new Error('No events were processed');
   }
   
-  console.log('  ✅ Performance test completed');
+  log.info('  ✅ Performance test completed');
 }
 
 // Export test runner
 export async function runAllTests(): Promise<void> {
-  console.log('🚀 Running all LiveStore Event Sync tests...\n');
+  log.info('🚀 Running all LiveStore Event Sync tests...\n');
   
   await testLiveStoreEventSync();
   await demonstrateUsage();
   await testPerformance();
   
-  console.log('\n🎉 All tests completed successfully!');
-  console.log('\n📋 Summary:');
-  console.log('  ✅ Event type parsing');
-  console.log('  ✅ Event conversion');
-  console.log('  ✅ Integration test');
-  console.log('  ✅ Usage demonstration');
-  console.log('  ✅ Performance test');
-  console.log('\n🚀 Ready for production use!');
+  log.info('\n🎉 All tests completed successfully!');
+  log.info('\n📋 Summary:');
+  log.info('  ✅ Event type parsing');
+  log.info('  ✅ Event conversion');
+  log.info('  ✅ Integration test');
+  log.info('  ✅ Usage demonstration');
+  log.info('  ✅ Performance test');
+  log.info('\n🚀 Ready for production use!');
 }
 
 // Make it available globally for testing in browser

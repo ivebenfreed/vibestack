@@ -11,6 +11,8 @@
  */
 
 import type { Column } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/ultratable/core/UltraCellPipeline.ts');
 
 // ====================================
 // CELL RENDERERS
@@ -192,7 +194,7 @@ export class UltraCellPipeline {
     try {
       return renderer(value, column, rowData);
     } catch (error) {
-      console.warn('[UltraCellPipeline] Render error:', error, { value, column: column.id, cellType });
+      log.warn('[UltraCellPipeline] Render error:', error, { value, column: column.id, cellType });
       return String(value || '');
     }
   }

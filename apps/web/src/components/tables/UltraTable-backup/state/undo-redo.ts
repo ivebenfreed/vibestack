@@ -8,6 +8,8 @@
  */
 
 import { observable } from '@legendapp/state'
+import { uiLog } from '@/logger';
+const log = uiLog('components/tables/UltraTable-backup/state/undo-redo.ts');
 
 export interface UndoRedoOperation {
   type: 'cell-edit' | 'bulk-edit' | 'selection-change' | 'row-delete' | 'row-insert'
@@ -79,10 +81,10 @@ export function undoLastOperation(): boolean {
     // For now, just update the index - actual undo logic would be implemented here
     const newIndex = undoRedoState$.currentIndex.get() - 1
     undoRedoState$.currentIndex.set(newIndex)
-    console.log('[UndoRedo] Undo successful')
+    log.info('[UndoRedo] Undo successful')
     return true
   } catch (error) {
-    console.error('[UndoRedo] Undo failed:', error)
+    log.error('[UndoRedo] Undo failed:', error)
     return false
   }
 }
@@ -97,10 +99,10 @@ export function redoLastOperation(): boolean {
     // For now, just update the index - actual redo logic would be implemented here
     const newIndex = undoRedoState$.currentIndex.get() + 1
     undoRedoState$.currentIndex.set(newIndex)
-    console.log('[UndoRedo] Redo successful')
+    log.info('[UndoRedo] Redo successful')
     return true
   } catch (error) {
-    console.error('[UndoRedo] Redo failed:', error)
+    log.error('[UndoRedo] Redo failed:', error)
     return false
   }
 }
@@ -146,7 +148,7 @@ export function setupUndoRedoShortcuts(element?: HTMLElement) {
       e.preventDefault()
       const success = undoLastOperation()
       if (success) {
-        console.log('[UndoRedo] Undo successful')
+        log.info('[UndoRedo] Undo successful')
       }
       return
     }
@@ -157,7 +159,7 @@ export function setupUndoRedoShortcuts(element?: HTMLElement) {
       e.preventDefault()
       const success = redoLastOperation()
       if (success) {
-        console.log('[UndoRedo] Redo successful')
+        log.info('[UndoRedo] Redo successful')
       }
       return
     }

@@ -1,3 +1,5 @@
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/helpers/drag-preview-helpers.ts);
 // ====================================
 // DRAG PREVIEW HELPERS
 // ====================================
@@ -270,7 +272,7 @@ export function applyDragPreview(
     
     // Only log on initial creation
     if (!floatingPreview) {
-      console.log('🎯 ApplyDragPreview: Creating floating preview', {
+      log.info('🎯 ApplyDragPreview: Creating floating preview', {
         columnName: dragPreview.columnName,
         draggedColumnId: dragPreview.draggedColumnId
       });
@@ -334,7 +336,7 @@ export function applyDragPreview(
     
     // Remove excessive logging for performance
   } else {
-    console.log('🎯 ApplyDragPreview: No mouse coordinates provided', {
+    log.info('🎯 ApplyDragPreview: No mouse coordinates provided', {
       mouseX: dragPreview.mouseX,
       mouseY: dragPreview.mouseY
     });

@@ -65,6 +65,8 @@ import { dragActor } from '../../actors/drag-actor';
 import { createTableStoreLogic, loadInitialData, setupGranularSubscriptions } from '../../stores/table-data-store-atomic';
 import { createActor } from 'xstate';
 import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/index.ts');
 
 
 // ====================================
@@ -78,7 +80,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   const rowHeight = input.settings?.rowHeight || 40;
   const initialRowIds = hasInitialData ? input.initialData.processedRows?.map(row => row.id) || [] : [];
   
-  console.log('TableMachine: Creating context', {
+  log.info('TableMachine: Creating context', {
     hasInitialData,
     initialRowCount,
     entitiesCount: input.entities?.length || 0,
@@ -272,7 +274,7 @@ export const tableBaseMachine = setup({
     
     // Additional actions
     logError: ({ event, context }) => {
-      console.error('🔴 TableMachine ERROR detected:', {
+      log.error('🔴 TableMachine ERROR detected:', {
         event,
         errorType: event?.type,
         errorMessage: event?.error?.message || event?.error,
@@ -287,7 +289,7 @@ export const tableBaseMachine = setup({
     }),
     
     forwardToCanvas: ({ context, event }) => {
-      console.log('TableMachine: forwardToCanvas action', {
+      log.info('TableMachine: forwardToCanvas action', {
         hasCanvasActor: !!context.actors.canvasActor,
         eventType: event.type,
         innerEventType: (event as any).event?.type
@@ -296,12 +298,12 @@ export const tableBaseMachine = setup({
       if (context.actors.canvasActor) {
         context.actors.canvasActor.send((event as any).event);
       } else {
-        console.error('TableMachine: No canvas actor available for forwarding');
+        log.error('TableMachine: No canvas actor available for forwarding');
       }
     },
     
     forwardToRenderer: ({ context, event }) => {
-      console.log('TableMachine: forwardToRenderer action', {
+      log.info('TableMachine: forwardToRenderer action', {
         hasRendererActor: !!context.actors.rendererActor,
         eventType: event.type,
         innerEventType: (event as any).event?.type
@@ -310,7 +312,7 @@ export const tableBaseMachine = setup({
       if (context.actors.rendererActor) {
         context.actors.rendererActor.send((event as any).event);
       } else {
-        console.error('TableMachine: No renderer actor available for forwarding');
+        log.error('TableMachine: No renderer actor available for forwarding');
       }
     },
     
@@ -348,7 +350,7 @@ export const tableBaseMachine = setup({
         localStorage.setItem(key, serialized);
         
         // Enhanced logging to show what's being saved
-        console.log('🔵 TableMachine: SAVING state to localStorage', {
+        log.info('🔵 TableMachine: SAVING state to localStorage', {
           key,
           tableId: context.id,
           entityType: context.entityType,
@@ -357,8 +359,8 @@ export const tableBaseMachine = setup({
           timestamp: new Date().toISOString()
         });
       } catch (error) {
-        console.error('🔴 TableMachine: FAILED to persist snapshot:', error);
-        console.error('Error details:', error.message);
+        log.error('🔴 TableMachine: FAILED to persist snapshot:', error);
+        log.error('Error details:', error.message);
       }
     }
   }
@@ -369,7 +371,7 @@ export const tableBaseMachine = setup({
       const context = createDefaultContext(input);
       return context;
     } catch (error) {
-      console.error('TableMachine: Error creating context:', error);
+      log.error('TableMachine: Error creating context:', error);
       // Return a minimal valid context
       return {
         id: input.id,
@@ -414,7 +416,7 @@ export const tableBaseMachine = setup({
         // Create store actor with atomic mutations and Promise.all loader
         assign({
           storeActor: ({ context, self }) => {
-            console.log('TableMachine: Creating atomic store actor for', context.entityType);
+            log.info('TableMachine: Creating atomic store actor for', context.entityType);
             const storeLogic = createTableStoreLogic(context.entityType, context.columns);
             const storeActor = createActor(storeLogic);
             storeActor.start();
@@ -423,7 +425,7 @@ export const tableBaseMachine = setup({
             (window as any).__vibegrid_store_actor = storeActor;
             
             // Subscribe to store changes and forward to table machine
-            console.log('TableMachine: Setting up store subscription', { 
+            log.info('TableMachine: Setting up store subscription', { 
               hasSubscribe: typeof storeActor.subscribe === 'function',
               storeActorKeys: Object.keys(storeActor)
             });
@@ -445,7 +447,7 @@ export const tableBaseMachine = setup({
             
             // Get initial snapshot to verify structure
             const initialSnapshot = storeActor.getSnapshot();
-            console.log('🔍 TableMachine: Initial store snapshot', {
+            log.info('🔍 TableMachine: Initial store snapshot', {
               initialSnapshot,
               hasContext: !!initialSnapshot?.context,
               contextKeys: initialSnapshot?.context ? Object.keys(initialSnapshot.context) : [],
@@ -453,7 +455,7 @@ export const tableBaseMachine = setup({
             });
             
             const subscription = storeActor.subscribe((snapshot) => {
-              console.log('🔍 TableMachine: Atomic store snapshot received', {
+              log.info('🔍 TableMachine: Atomic store snapshot received', {
                 snapshot,
                 hasContext: !!snapshot?.context,
                 hasEntities: !!snapshot?.context?.entities,
@@ -469,12 +471,12 @@ export const tableBaseMachine = setup({
               });
             });
             
-            console.log('TableMachine: Store subscription created', { hasSubscription: !!subscription });
+            log.info('TableMachine: Store subscription created', { hasSubscription: !!subscription });
             
             // Load initial data with Promise.all then setup granular subscriptions
             loadInitialData(context.entityType, context.columns)
               .then(({ entities, relationships, pagination }) => {
-                console.log('TableMachine: Promise.all initial load complete', {
+                log.info('TableMachine: Promise.all initial load complete', {
                   entityCount: Object.keys(entities).length,
                   relationshipTables: Object.keys(relationships),
                   paginationEnabled: !!pagination
@@ -489,7 +491,7 @@ export const tableBaseMachine = setup({
                 }
                 
                 // SYNCHRONOUS: Send data directly to table machine (bypass subscription timing)
-                console.log('🚀 TableMachine: Sending data SYNCHRONOUSLY to avoid timing issues');
+                log.info('🚀 TableMachine: Sending data SYNCHRONOUSLY to avoid timing issues');
                 self.send({
                   type: 'STORE_DATA_UPDATED',
                   entities: Object.values(entities),
@@ -511,11 +513,11 @@ export const tableBaseMachine = setup({
                     delete (window as any).__vibegrid_store_actor;
                   };
                 } else {
-                  console.log('📊 TableMachine: Pagination mode - live queries disabled for performance');
+                  log.info('📊 TableMachine: Pagination mode - live queries disabled for performance');
                 }
               })
               .catch(error => {
-                console.error('TableMachine: Initial data load failed', error);
+                log.error('TableMachine: Initial data load failed', error);
                 storeActor.send({ type: 'setError', error: error.message });
               });
             
@@ -548,7 +550,7 @@ export const tableBaseMachine = setup({
       on: {
         INITIALIZE_RENDERER: {
           actions: ({ context, event, self }) => {
-            console.log('TableMachine: INITIALIZE_RENDERER event received', {
+            log.info('TableMachine: INITIALIZE_RENDERER event received', {
               hasRendererActor: !!context.actors.rendererActor,
               optionsKeys: Object.keys(event.options || {})
             });
@@ -571,7 +573,7 @@ export const tableBaseMachine = setup({
             // Spawn canvas actor post-render for selection handling
             assign({
               actors: ({ context, spawn }) => {
-                console.log('TableMachine: Spawning canvas actor post-render');
+                log.info('TableMachine: Spawning canvas actor post-render');
                 return {
                   ...context.actors,
                   canvasActor: spawn('canvasActor', { id: 'canvas' })
@@ -580,7 +582,7 @@ export const tableBaseMachine = setup({
             }),
             // Initialize editing actor with editing container (will be set later)
             ({ context }) => {
-              console.log('TableMachine: Editing actor spawned, waiting for editing container');
+              log.info('TableMachine: Editing actor spawned, waiting for editing container');
             }
           ]
         },
@@ -598,7 +600,7 @@ export const tableBaseMachine = setup({
       entry: [
         // Check if we have data that needs initial rendering
         ({ context, self }) => {
-          console.log('🔍 TableMachine: Entering active state', {
+          log.info('🔍 TableMachine: Entering active state', {
             hasRows: context.rows.length > 0,
             rowCount: context.rows.length,
             hasRenderer: !!context.actors.rendererActor
@@ -606,7 +608,7 @@ export const tableBaseMachine = setup({
           
           // If we have rows but haven't rendered yet, trigger initial render
           if (context.rows.length > 0 && context.actors.rendererActor) {
-            console.log('🔍 TableMachine: Triggering initial render on active entry');
+            log.info('🔍 TableMachine: Triggering initial render on active entry');
             
             // Get visible columns using centralized logic
             const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
@@ -637,7 +639,7 @@ export const tableBaseMachine = setup({
               actions: [
                 assign({
                   entities: ({ context, event }) => {
-                    console.log('TableMachine: DATA_UPDATE received', {
+                    log.info('TableMachine: DATA_UPDATE received', {
                       table: event.table,
                       oldEntityCount: context.entities.length,
                       newEntityCount: event.data?.length || 0,
@@ -651,7 +653,7 @@ export const tableBaseMachine = setup({
                 }),
                 // Batch view updates to prevent reflow during rapid sync updates
                 ({ self, context }) => {
-                  console.log('TableMachine: DATA_UPDATE - batching view actor trigger');
+                  log.info('TableMachine: DATA_UPDATE - batching view actor trigger');
                   
                   // Clear any existing pending update timer
                   if (context.pendingViewUpdateTimer) {
@@ -660,7 +662,7 @@ export const tableBaseMachine = setup({
                   
                   // Set a new timer to batch multiple updates
                   context.pendingViewUpdateTimer = setTimeout(() => {
-                    console.log('TableMachine: DATA_UPDATE - executing batched view update');
+                    log.info('TableMachine: DATA_UPDATE - executing batched view update');
                     // Data processing now handled by store subscription
                     context.pendingViewUpdateTimer = null;
                   }, 150); // 150ms batching window
@@ -674,7 +676,7 @@ export const tableBaseMachine = setup({
                 // Update specific entities based on changes
                 assign({
                   entities: ({ context, event }) => {
-                    console.log('TableMachine: DATA_CHANGES received', {
+                    log.info('TableMachine: DATA_CHANGES received', {
                       table: event.table,
                       changesCount: event.changes.length,
                       changeTypes: event.changes.map(c => `${c.operation}:${c.id}`),
@@ -717,7 +719,7 @@ export const tableBaseMachine = setup({
                 
                 // Send surgical updates to renderer
                 ({ context, event, self }) => {
-                  console.log('TableMachine: DATA_CHANGES - processing updates', {
+                  log.info('TableMachine: DATA_CHANGES - processing updates', {
                     changeCount: event.changes.length,
                     sortedBy: context.sortBy?.map(s => s.field),
                     hasSortConfig: context.sortBy?.length > 0
@@ -729,7 +731,7 @@ export const tableBaseMachine = setup({
                       return false;
                     }
                     
-                    console.log('TableMachine: Checking sort impact for change', {
+                    log.info('TableMachine: Checking sort impact for change', {
                       changeId: change.id,
                       changedFields: change.changedFields,
                       hasChangedFields: !!change.changedFields,
@@ -738,7 +740,7 @@ export const tableBaseMachine = setup({
                     
                     // If no changedFields provided, we can't determine impact
                     if (!change.changedFields || change.changedFields.length === 0) {
-                      console.warn('TableMachine: No changedFields provided, assuming sort might be affected');
+                      log.warn('TableMachine: No changedFields provided, assuming sort might be affected');
                       return true; // Conservative: assume sort is affected
                     }
                     
@@ -750,7 +752,7 @@ export const tableBaseMachine = setup({
                   
                   // For simple updates that don't affect sort order, use surgical updates
                   if (event.changes.every(c => c.operation === 'update') && !affectsSortedColumn) {
-                    console.log('TableMachine: DATA_CHANGES - sending surgical updates (no sort impact)');
+                    log.info('TableMachine: DATA_CHANGES - sending surgical updates (no sort impact)');
                     // Send surgical update event to renderer
                     if (context.actors.rendererActor) {
                       context.actors.rendererActor.send({
@@ -761,7 +763,7 @@ export const tableBaseMachine = setup({
                     }
                   } else {
                     // For inserts/deletes or updates affecting sorted columns, trigger full view update
-                    console.log('TableMachine: DATA_CHANGES - triggering full view update', {
+                    log.info('TableMachine: DATA_CHANGES - triggering full view update', {
                       hasInsertDelete: event.changes.some(c => c.operation !== 'update'),
                       affectsSortedColumn
                     });
@@ -773,7 +775,7 @@ export const tableBaseMachine = setup({
             
             DATA_SUBSCRIPTION_ERROR: {
               actions: ({ event }) => {
-                console.error('TableMachine: Data subscription error:', event);
+                log.error('TableMachine: Data subscription error:', event);
               }
             },
             
@@ -783,7 +785,7 @@ export const tableBaseMachine = setup({
                 // Update relationship resolvers with new data
                 assign({
                   relationshipResolvers: ({ context, event }) => {
-                    console.log('TableMachine: RELATIONSHIP_DATA_UPDATE received', {
+                    log.info('TableMachine: RELATIONSHIP_DATA_UPDATE received', {
                       table: event.table,
                       dataCount: event.data?.length || 0
                     });
@@ -836,11 +838,11 @@ export const tableBaseMachine = setup({
                   // Skip view refresh if we're using pre-resolved initial data
                   // The initial subscription emissions don't need to trigger re-renders
                   if (context.hasInitialData && context.viewVersion <= 10) {
-                    console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - skipping view refresh (using pre-resolved initial data)');
+                    log.info('TableMachine: RELATIONSHIP_DATA_UPDATE - skipping view refresh (using pre-resolved initial data)');
                     return;
                   }
                   
-                  console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - batching view refresh');
+                  log.info('TableMachine: RELATIONSHIP_DATA_UPDATE - batching view refresh');
                   
                   // Clear any existing pending update timer
                   if (context.pendingViewUpdateTimer) {
@@ -849,7 +851,7 @@ export const tableBaseMachine = setup({
                   
                   // Set a new timer to batch multiple updates
                   context.pendingViewUpdateTimer = setTimeout(() => {
-                    console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - executing batched view update');
+                    log.info('TableMachine: RELATIONSHIP_DATA_UPDATE - executing batched view update');
                     // Data processing now handled by store subscription
                     context.pendingViewUpdateTimer = null;
                   }, 150); // 150ms batching window
@@ -896,7 +898,7 @@ export const tableBaseMachine = setup({
           // Always render when store emits new data - store decides what changed
           ({ context, self, event }) => {
             if (!context.actors.rendererActor) {
-              console.log('🔍 TableMachine: No renderer actor available');
+              log.info('🔍 TableMachine: No renderer actor available');
               return;
             }
             
@@ -936,7 +938,7 @@ export const tableBaseMachine = setup({
               }
             }
             
-            console.log('🔍 TableMachine: Store update received, rendering', {
+            log.info('🔍 TableMachine: Store update received, rendering', {
               rowCount: context.rows.length,
               columnCount: context.columns.length,
               relationshipColumns: relationshipColumns.map(c => c.name),
@@ -1026,7 +1028,7 @@ export const tableBaseMachine = setup({
             actors: ({ context, spawn }) => {
               // Spawn canvas actor if it doesn't exist yet (post-render spawning)
               if (!context.actors.canvasActor) {
-                console.log('TableMachine: Spawning canvas actor for selection');
+                log.info('TableMachine: Spawning canvas actor for selection');
                 return {
                   ...context.actors,
                   canvasActor: spawn('canvasActor', { id: 'canvas' })
@@ -1038,7 +1040,7 @@ export const tableBaseMachine = setup({
           ({ context }) => {
             // Ensure canvas actor is initialized with container
             if (context.actors.canvasActor && context.canvasContainer) {
-              console.log('TableMachine: Ensuring canvas actor is initialized for selection');
+              log.info('TableMachine: Ensuring canvas actor is initialized for selection');
               
               // Initialize if not already done
               context.actors.canvasActor.send({
@@ -1090,7 +1092,7 @@ export const tableBaseMachine = setup({
       SPAWN_CANVAS_ACTOR: {
         actions: [
           ({ context }) => {
-            console.log('TableMachine: SPAWN_CANVAS_ACTOR called but canvas is pre-created', {
+            log.info('TableMachine: SPAWN_CANVAS_ACTOR called but canvas is pre-created', {
               hasCanvasActor: !!context.actors.canvasActor
             });
           }
@@ -1101,7 +1103,7 @@ export const tableBaseMachine = setup({
       SPAWN_CANVAS_AFTER_RENDER: {
         actions: [
           ({ context }) => {
-            console.log('TableMachine: SPAWN_CANVAS_AFTER_RENDER called but canvas is pre-created', {
+            log.info('TableMachine: SPAWN_CANVAS_AFTER_RENDER called but canvas is pre-created', {
               hasCanvasActor: !!context.actors.canvasActor
             });
           }
@@ -1112,7 +1114,7 @@ export const tableBaseMachine = setup({
       CANVAS_CONTAINER_READY: {
         actions: [
           ({ context, event }) => {
-            console.log('TableMachine: Canvas container ready post-render', {
+            log.info('TableMachine: Canvas container ready post-render', {
               container: event.container,
               version: context.version,
               hasCanvasActor: !!context.actors.canvasActor,
@@ -1122,7 +1124,7 @@ export const tableBaseMachine = setup({
             
             // Check if canvas was already initialized
             if (context.canvasContainer) {
-              console.log('TableMachine: Canvas already initialized, skipping duplicate initialization');
+              log.info('TableMachine: Canvas already initialized, skipping duplicate initialization');
               return;
             }
             
@@ -1131,7 +1133,7 @@ export const tableBaseMachine = setup({
             
             // Initialize canvas actor if it exists (spawned post-render)
             if (context.actors.canvasActor && event.container) {
-              console.log('TableMachine: Scheduling canvas initialization to not block UI');
+              log.info('TableMachine: Scheduling canvas initialization to not block UI');
               
               // Defer canvas initialization to next tick to not block the table
               requestAnimationFrame(() => {
@@ -1154,7 +1156,7 @@ export const tableBaseMachine = setup({
                 
                 // Send coordinate mapping after initialization
                 if (context.coordinateMapping) {
-                  console.log('TableMachine: Sending coordinate mapping to canvas');
+                  log.info('TableMachine: Sending coordinate mapping to canvas');
                   context.actors.canvasActor.send({
                     type: 'UPDATE_COORDINATES',
                     mapping: context.coordinateMapping
@@ -1164,7 +1166,7 @@ export const tableBaseMachine = setup({
                 // Send initial viewport to canvas after a small delay to ensure canvas is ready
                 if (context.viewport) {
                   setTimeout(() => {
-                    console.log('TableMachine: Sending initial viewport to canvas (delayed)', context.viewport);
+                    log.info('TableMachine: Sending initial viewport to canvas (delayed)', context.viewport);
                     context.actors.canvasActor.send({
                       type: 'UPDATE_VIEWPORT',
                       viewport: context.viewport
@@ -1295,7 +1297,7 @@ export const tableBaseMachine = setup({
           
           // Trigger view processing to update rows
           ({ self }) => {
-            console.log('TableMachine: SET_ENTITIES - triggering view actor');
+            log.info('TableMachine: SET_ENTITIES - triggering view actor');
             // Data processing now handled by store subscription
           }
         ]
@@ -1334,7 +1336,7 @@ export const tableBaseMachine = setup({
           
           // Trigger view refresh to update relationship displays
           ({ self }) => {
-            console.log('TableMachine: UPDATE_RELATIONSHIP_DATA - triggering view refresh');
+            log.info('TableMachine: UPDATE_RELATIONSHIP_DATA - triggering view refresh');
             // Data processing now handled by store subscription
           }
         ]
@@ -1344,7 +1346,7 @@ export const tableBaseMachine = setup({
       updateEntityAtomic: {
         actions: [
           ({ context, event, self }) => {
-            console.log('🔄 VibeGrid: Processing atomic entity update', {
+            log.info('🔄 VibeGrid: Processing atomic entity update', {
               entityType: context.entityType,
               entityId: event.entity?.id,
               entityName: event.entity?.name,
@@ -1356,7 +1358,7 @@ export const tableBaseMachine = setup({
             
             // HYBRID APPROACH: Update store data silently + surgical rendering
             // This maintains data consistency for sorting/filtering while avoiding full re-renders
-            console.log('🔄 VibeGrid: Updating store data silently for data consistency');
+            log.info('🔄 VibeGrid: Updating store data silently for data consistency');
             if (context.actors.storeActor) {
               context.actors.storeActor.send({
                 type: 'atomicEntityUpdate',
@@ -1367,7 +1369,7 @@ export const tableBaseMachine = setup({
             }
             
             // CRITICAL: Use surgical update for cell-only rendering
-            console.log('🔄 VibeGrid: Triggering SURGICAL renderer update for atomic change');
+            log.info('🔄 VibeGrid: Triggering SURGICAL renderer update for atomic change');
             if (context.actors.rendererActor) {
               context.actors.rendererActor.send({
                 type: 'SURGICAL_UPDATE',
@@ -1378,7 +1380,7 @@ export const tableBaseMachine = setup({
                 }]
               });
             } else {
-              console.warn('🔄 VibeGrid: No renderer actor available for atomic update render');
+              log.warn('🔄 VibeGrid: No renderer actor available for atomic update render');
             }
           }
         ]
@@ -1423,7 +1425,7 @@ export const tableBaseMachine = setup({
                   hasChanged = changedKeys.some(key => key !== 'updatedAt');
                   
                   if (changedKeys.length > 0 && !hasChanged) {
-                    console.log('TableMachine: UPDATE_ENTITY - only updatedAt changed, skipping update', {
+                    log.info('TableMachine: UPDATE_ENTITY - only updatedAt changed, skipping update', {
                       entityId: event.entityId,
                       changedKeys
                     });
@@ -1432,7 +1434,7 @@ export const tableBaseMachine = setup({
                 
                 // Only update if there's an actual change
                 if (hasChanged) {
-                  console.log('TableMachine: UPDATE_ENTITY - entity has changed', {
+                  log.info('TableMachine: UPDATE_ENTITY - entity has changed', {
                     entityId: event.entityId,
                     changedFields: existingKeys.filter(key => existingEntity[key] !== event.entity[key] && key !== 'updatedAt')
                   });
@@ -1442,7 +1444,7 @@ export const tableBaseMachine = setup({
                   (event as any)._entityChanged = true;
                   return newEntities;
                 } else {
-                  console.log('TableMachine: UPDATE_ENTITY - no changes detected, skipping update', {
+                  log.info('TableMachine: UPDATE_ENTITY - no changes detected, skipping update', {
                     entityId: event.entityId
                   });
                   (event as any)._entityChanged = false;
@@ -1491,13 +1493,13 @@ export const tableBaseMachine = setup({
           ({ self, event }) => {
             // Check the flag set by the previous action to see if entity changed
             if ((event as any)._entityChanged) {
-              console.log('TableMachine: UPDATE_ENTITY - triggering view processing');
+              log.info('TableMachine: UPDATE_ENTITY - triggering view processing');
               // Data processing now handled by store subscription
             }
           },
           
           ({ event }) => {
-            console.log('TableMachine: UPDATE_ENTITY - processed', {
+            log.info('TableMachine: UPDATE_ENTITY - processed', {
               entityId: event.entityId,
               timestamp: performance.now()
             });
@@ -1532,7 +1534,7 @@ export const tableBaseMachine = setup({
           
           // For now, trigger full re-render for adds (could optimize later)
           ({ self }) => {
-            console.log('TableMachine: ADD_ENTITY - triggering view refresh');
+            log.info('TableMachine: ADD_ENTITY - triggering view refresh');
             // Data processing now handled by store subscription
           }
         ]
@@ -1609,7 +1611,7 @@ on: {
           allRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id)
         }),
         ({ context, self, event }) => {
-          console.log('TableMachine: STORE_DATA_UPDATED - Initial data loaded', {
+          log.info('TableMachine: STORE_DATA_UPDATED - Initial data loaded', {
             entityCount: context.entities.length,
             rowCount: context.rows.length,
             source: (event as any).source,

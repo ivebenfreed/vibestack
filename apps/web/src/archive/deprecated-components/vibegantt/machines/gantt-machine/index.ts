@@ -22,6 +22,8 @@ import { timelineSlice } from './slices/timeline-slice';
 import { taskSlice } from './slices/task-slice';
 import { interactionSlice } from './slices/interaction-slice';
 import { viewportSlice } from './slices/viewport-slice';
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/vibegantt/machines/gantt-machine/index.ts');
 
 // Initial context factory
 const createInitialContext = (): GanttMachineContext => ({
@@ -184,7 +186,7 @@ export const ganttMachine = setup({
             
             // Check if there's any actual movement
             if (daysDelta === 0) {
-              console.log('GanttMachine: No movement detected, skipping update', {
+              log.info('GanttMachine: No movement detected, skipping update', {
                 taskId: event.taskId,
                 deltaX: event.deltaX,
                 dayWidth: dayWidth,
@@ -195,7 +197,7 @@ export const ganttMachine = setup({
             
             const task = tasks[event.taskId];
             if (task && task.startDate && task.dueDate) {
-              console.log('GanttMachine: BEFORE move calculation', {
+              log.info('GanttMachine: BEFORE move calculation', {
                 taskId: task.id,
                 originalStartDate: task.startDate,
                 originalDueDate: task.dueDate,
@@ -226,7 +228,7 @@ export const ganttMachine = setup({
               const newEndTime = newDueDate.getTime();
               
               if (originalStartTime === newStartTime && originalEndTime === newEndTime) {
-                console.log('GanttMachine: No date changes detected, skipping update', {
+                log.info('GanttMachine: No date changes detected, skipping update', {
                   taskId: task.id,
                   originalStartDate: task.startDate,
                   originalDueDate: task.dueDate,
@@ -236,7 +238,7 @@ export const ganttMachine = setup({
                 return;
               }
               
-              console.log('GanttMachine: AFTER move calculation', {
+              log.info('GanttMachine: AFTER move calculation', {
                 taskId: task.id,
                 newStartDate: newStartDate.toISOString(),
                 newDueDate: newDueDate.toISOString(),
@@ -245,7 +247,7 @@ export const ganttMachine = setup({
               
               // Only update through domain service - live query will update store automatically
               if (context.domainService?.updateTask) {
-                console.log('GanttMachine: Calling domain service updateTask', {
+                log.info('GanttMachine: Calling domain service updateTask', {
                   taskId: task.id,
                   updateData: {
                     startDate: newStartDate,
@@ -258,24 +260,24 @@ export const ganttMachine = setup({
                   startDate: newStartDate,
                   dueDate: newDueDate
                 }).then((updateResult) => {
-                  console.log('GanttMachine: Domain service updateTask SUCCESS', {
+                  log.info('GanttMachine: Domain service updateTask SUCCESS', {
                     taskId: task.id,
                     result: updateResult,
                     updatedStartDate: updateResult?.startDate,
                     updatedDueDate: updateResult?.dueDate
                   });
                 }).catch((error) => {
-                  console.error('GanttMachine: Domain service updateTask ERROR', {
+                  log.error('GanttMachine: Domain service updateTask ERROR', {
                     taskId: task.id,
                     error: error.message,
                     stack: error.stack
                   });
                 });
               } else {
-                console.error('GanttMachine: No domain service available for updateTask');
+                log.error('GanttMachine: No domain service available for updateTask');
               }
             } else {
-              console.error('GanttMachine: Invalid task data', {
+              log.error('GanttMachine: Invalid task data', {
                 taskId: event.taskId,
                 hasTask: !!task,
                 hasStartDate: task?.startDate,
@@ -318,7 +320,7 @@ export const ganttMachine = setup({
                   updates.dueDate = newDueDate;
                 }
                 
-                console.log('GanttMachine: Applying task resize via domain service', {
+                log.info('GanttMachine: Applying task resize via domain service', {
                   taskId: task.id,
                   handle: event.handle,
                   deltaX: event.deltaX,
@@ -348,7 +350,7 @@ export const ganttMachine = setup({
     
     // Queue timeline render after zoom changes
     queueTimelineRender: ({ context }) => {
-      console.log('GanttMachine: Queueing timeline render after zoom', {
+      log.info('GanttMachine: Queueing timeline render after zoom', {
         zoomLevel: context.viewConfig.zoomLevel,
         zoomFactor: context.viewConfig.zoomFactor,
         dayWidth: context.timelineLayout.dayWidth
@@ -417,7 +419,7 @@ export const ganttMachine = setup({
         const successorId = event.targetTaskId;
         const dependencyType = event.dependencyType || 'finish-to-start';
         
-        console.log('GanttMachine: Creating dependency', { predecessorId, successorId, dependencyType });
+        log.info('GanttMachine: Creating dependency', { predecessorId, successorId, dependencyType });
         
         try {
           // Import the service
@@ -432,9 +434,9 @@ export const ganttMachine = setup({
             {} // metadata
           );
           
-          console.log('GanttMachine: Dependency created successfully', newDep);
+          log.info('GanttMachine: Dependency created successfully', newDep);
         } catch (error) {
-          console.error('GanttMachine: Failed to create dependency', error);
+          log.error('GanttMachine: Failed to create dependency', error);
         }
       }
     },
@@ -465,7 +467,7 @@ export const ganttMachine = setup({
       
       // Handle Delete key
       if (event.key === 'Delete') {
-        console.log('GanttMachine: Delete key pressed', {
+        log.info('GanttMachine: Delete key pressed', {
           selectedTasks: context.selection.selectedTaskIds.size,
           selectedDependencies: context.selectedDependencyIds.size
         });
@@ -481,7 +483,7 @@ export const ganttMachine = setup({
         
         // Delete selected dependencies
         if (context.selectedDependencyIds && context.selectedDependencyIds.size > 0) {
-          console.log('GanttMachine: Deleting selected dependencies', {
+          log.info('GanttMachine: Deleting selected dependencies', {
             count: context.selectedDependencyIds.size,
             ids: Array.from(context.selectedDependencyIds)
           });
@@ -492,11 +494,11 @@ export const ganttMachine = setup({
             
             // Delete each selected dependency
             for (const depId of context.selectedDependencyIds) {
-              console.log('GanttMachine: Calling entityDependencyService.deleteUI', { depId });
+              log.info('GanttMachine: Calling entityDependencyService.deleteUI', { depId });
               await entityDependencyService.deleteUI(depId);
             }
             
-            console.log('GanttMachine: All selected dependencies deleted successfully');
+            log.info('GanttMachine: All selected dependencies deleted successfully');
             
             // Clear selection after deletion
             context.selectedDependencyIds.clear();
@@ -506,7 +508,7 @@ export const ganttMachine = setup({
               context.dataStore.send({ type: 'REFRESH' });
             }
           } catch (error) {
-            console.error('GanttMachine: Failed to delete dependencies:', error);
+            log.error('GanttMachine: Failed to delete dependencies:', error);
           }
         }
       }
@@ -561,7 +563,7 @@ export const ganttMachine = setup({
             // Start the renderer actor with merged options
             assign({
               renderer: ({ spawn, event }) => {
-                console.log('GanttMachine: Starting renderer actor');
+                log.info('GanttMachine: Starting renderer actor');
                 // Create renderer actor and send INITIALIZE event
                 const rendererRef = spawn('ganttRenderer', { id: 'renderer' });
                 
@@ -577,7 +579,7 @@ export const ganttMachine = setup({
             // Spawn the atomic data store actor
             assign({
               dataStore: ({ spawn, context }) => {
-                console.log('GanttMachine: Creating atomic data store with projectId:', context.projectId);
+                log.info('GanttMachine: Creating atomic data store with projectId:', context.projectId);
                 
                 // Create the atomic store logic with domainService and initial dayWidth
                 const storeLogic = createAtomicGanttStoreLogic(
@@ -594,7 +596,7 @@ export const ganttMachine = setup({
                 
                 // Load initial data into the store
                 loadInitialGanttData(context.projectId, context.domainService).then(({ tasks, dependencies, relationships, pagination }) => {
-                  console.log('GanttMachine: Loading initial data for store');
+                  log.info('GanttMachine: Loading initial data for store');
                   
                   // Send initial data to store
                   store.send({
@@ -617,20 +619,20 @@ export const ganttMachine = setup({
                     });
                   }
                   
-                  console.log('GanttMachine: Initial data loaded', {
+                  log.info('GanttMachine: Initial data loaded', {
                     taskCount: Object.keys(tasks).length,
                     depCount: Object.keys(dependencies).length
                   });
                   
                   // Set up live query subscriptions for reactive updates
                   if (!pagination?.enabled) {
-                    console.log('GanttMachine: Setting up live query subscriptions');
+                    log.info('GanttMachine: Setting up live query subscriptions');
                     const cleanup = setupGranularGanttSubscriptions(store, context.projectId, context.domainService);
                     // Store cleanup function for later cleanup
                     (context as any).__subscriptionsCleanup = cleanup;
                   }
                 }).catch(error => {
-                  console.error('GanttMachine: Error loading initial data', error);
+                  log.error('GanttMachine: Error loading initial data', error);
                   store.send({
                     type: 'setError',
                     error: error instanceof Error ? error.message : 'Failed to load data'
@@ -652,7 +654,7 @@ export const ganttMachine = setup({
           actions: [
             // Send initial data to renderer from store
             ({ context }) => {
-              console.log('GanttMachine: Renderer ready');
+              log.info('GanttMachine: Renderer ready');
               
               if (context.dataStore) {
                 // Get current store snapshot
@@ -661,7 +663,7 @@ export const ganttMachine = setup({
                 
                 // Check if data is still loading
                 if (storeContext.loading) {
-                  console.log('GanttMachine: Data still loading, will send when ready');
+                  log.info('GanttMachine: Data still loading, will send when ready');
                   return; // Don't send empty data, wait for store update
                 }
                 
@@ -669,7 +671,7 @@ export const ganttMachine = setup({
                 const tasks = Object.values(storeContext.tasks || {});
                 const dependencies = Object.values(storeContext.dependencies || {});
                 
-                console.log('GanttMachine: Sending data to renderer', {
+                log.info('GanttMachine: Sending data to renderer', {
                   taskCount: tasks.length,
                   depCount: dependencies.length
                 });
@@ -684,7 +686,7 @@ export const ganttMachine = setup({
                 // Send coordinate update to renderer
                 if (context.renderer) {
                   if (storeContext.coordinateMapping) {
-                    console.log('GanttMachine: Sending coordinate mapping to renderer');
+                    log.info('GanttMachine: Sending coordinate mapping to renderer');
                     context.renderer.send({
                       type: 'RENDER_COORDINATES',
                       mapping: storeContext.coordinateMapping,
@@ -692,7 +694,7 @@ export const ganttMachine = setup({
                       dependencies: storeContext.dependencies
                     });
                   } else {
-                    console.warn('GanttMachine: No coordinate mapping available yet');
+                    log.warn('GanttMachine: No coordinate mapping available yet');
                   }
                 }
               }
@@ -711,7 +713,7 @@ export const ganttMachine = setup({
         // Subscribe to store changes
         ({ context }) => {
           if (context.dataStore) {
-            console.log('GanttMachine: Setting up store subscription');
+            log.info('GanttMachine: Setting up store subscription');
             
             // Track if we've sent initial data
             let hasSentInitialData = false;
@@ -721,7 +723,7 @@ export const ganttMachine = setup({
               // Check if this is the initial data load completing
               if (!hasSentInitialData && !snapshot.context.loading && Object.keys(snapshot.context.tasks).length > 0) {
                 hasSentInitialData = true;
-                console.log('GanttMachine: Initial data loaded, sending to renderer');
+                log.info('GanttMachine: Initial data loaded, sending to renderer');
               } else if (hasSentInitialData) {
                 // Skip if we haven't changed since initial load
                 const taskCount = Object.keys(snapshot.context.tasks).length;
@@ -735,7 +737,7 @@ export const ganttMachine = setup({
               const tasks = Object.values(storeContext.tasks || {});
               const dependencies = Object.values(storeContext.dependencies || {});
               
-              console.log('GanttMachine: Store data changed, updating renderer', {
+              log.info('GanttMachine: Store data changed, updating renderer', {
                 taskCount: tasks.length,
                 depCount: dependencies.length
               });
@@ -750,7 +752,7 @@ export const ganttMachine = setup({
               // Send coordinate update to renderer
               if (context.renderer) {
                 if (storeContext.coordinateMapping) {
-                  console.log('GanttMachine: Sending updated coordinate mapping to renderer');
+                  log.info('GanttMachine: Sending updated coordinate mapping to renderer');
                   context.renderer.send({
                     type: 'RENDER_COORDINATES',
                     mapping: storeContext.coordinateMapping,
@@ -758,7 +760,7 @@ export const ganttMachine = setup({
                     dependencies: storeContext.dependencies
                   });
                 } else {
-                  console.warn('GanttMachine: No coordinate mapping in store update');
+                  log.warn('GanttMachine: No coordinate mapping in store update');
                 }
               }
             });
@@ -779,7 +781,7 @@ export const ganttMachine = setup({
         // Clean up live query subscriptions
         ({ context }) => {
           if ((context as any).__subscriptionsCleanup) {
-            console.log('GanttMachine: Cleaning up live query subscriptions');
+            log.info('GanttMachine: Cleaning up live query subscriptions');
             (context as any).__subscriptionsCleanup();
             delete (context as any).__subscriptionsCleanup;
           }
@@ -843,7 +845,7 @@ export const ganttMachine = setup({
                   actions: [
                     assign({
                       selection: ({ context, event }) => {
-                        console.log('GanttMachine: Handling TASK_SELECT event', { taskId: event.taskId, multi: event.multi });
+                        log.info('GanttMachine: Handling TASK_SELECT event', { taskId: event.taskId, multi: event.multi });
                         const newSelection = new Set(context.selection.selectedTaskIds);
                         
                         if (event.multi) {
@@ -859,7 +861,7 @@ export const ganttMachine = setup({
                           newSelection.add(event.taskId);
                         }
                         
-                        console.log('GanttMachine: Updated selection', { selectedCount: newSelection.size });
+                        log.info('GanttMachine: Updated selection', { selectedCount: newSelection.size });
                         
                         return {
                           ...context.selection,
@@ -881,13 +883,13 @@ export const ganttMachine = setup({
                   actions: [
                     assign({
                       selectedDependencyIds: ({ context, event }) => {
-                        console.log('GanttMachine: Handling DEPENDENCY_SELECT event', { dependencyId: event.dependencyId, multi: event.multi });
+                        log.info('GanttMachine: Handling DEPENDENCY_SELECT event', { dependencyId: event.dependencyId, multi: event.multi });
                         const newSelection = new Set(context.selectedDependencyIds);
                         
                         // Handle null dependencyId to clear selection
                         if (event.dependencyId === null) {
                           newSelection.clear();
-                          console.log('GanttMachine: Cleared dependency selection');
+                          log.info('GanttMachine: Cleared dependency selection');
                           return newSelection;
                         }
                         
@@ -904,7 +906,7 @@ export const ganttMachine = setup({
                           newSelection.add(event.dependencyId);
                         }
                         
-                        console.log('GanttMachine: Updated dependency selection', { selectedCount: newSelection.size });
+                        log.info('GanttMachine: Updated dependency selection', { selectedCount: newSelection.size });
                         
                         return newSelection;
                       },
@@ -912,7 +914,7 @@ export const ganttMachine = setup({
                     // Send selection update to renderer
                     ({ context, event }) => {
                       if (context.renderer && !event.skipRender) {
-                        console.log('GanttMachine: Sending dependency selection to renderer');
+                        log.info('GanttMachine: Sending dependency selection to renderer');
                         context.renderer.send({
                           type: 'UPDATE_DEPENDENCY_SELECTION',
                           dependencyId: event.dependencyId
@@ -924,7 +926,7 @@ export const ganttMachine = setup({
                 DEPENDENCY_DELETE: {
                   actions: [
                     async ({ context, event }) => {
-                      console.log('GanttMachine: Deleting dependency', event.dependencyId);
+                      log.info('GanttMachine: Deleting dependency', event.dependencyId);
                       
                       try {
                         // Import the service
@@ -933,10 +935,10 @@ export const ganttMachine = setup({
                         // Delete the dependency
                         const deleted = await entityDependencyService.deleteUI(event.dependencyId);
                         
-                        console.log('GanttMachine: Dependency deletion result:', deleted);
+                        log.info('GanttMachine: Dependency deletion result:', deleted);
                         
                         if (deleted) {
-                          console.log('GanttMachine: Dependency deleted successfully');
+                          log.info('GanttMachine: Dependency deleted successfully');
                           
                           // Clear selection after successful deletion
                           assign({
@@ -955,10 +957,10 @@ export const ganttMachine = setup({
                             });
                           }
                         } else {
-                          console.error('GanttMachine: Dependency deletion returned false');
+                          log.error('GanttMachine: Dependency deletion returned false');
                         }
                       } catch (error) {
-                        console.error('GanttMachine: Failed to delete dependency:', error);
+                        log.error('GanttMachine: Failed to delete dependency:', error);
                       }
                     },
                   ],
@@ -968,7 +970,7 @@ export const ganttMachine = setup({
                   actions: [
                     // Calculate viewport anchoring and new day width
                     ({ context, event }) => {
-                      console.log('GanttMachine: Received ZOOM_REQUEST from renderer actor', event);
+                      log.info('GanttMachine: Received ZOOM_REQUEST from renderer actor', event);
                       
                       const currentDayWidth = context.timelineLayout.dayWidth;
                       const currentScrollX = context.viewport.scrollX;
@@ -990,7 +992,7 @@ export const ganttMachine = setup({
                       const scrollRatio = newDayWidth / currentDayWidth;
                       const newScrollX = currentScrollX * scrollRatio;
                       
-                      console.log('GanttMachine: Simplified viewport anchoring', {
+                      log.info('GanttMachine: Simplified viewport anchoring', {
                         currentScrollX,
                         currentDayWidth,
                         newDayWidth,
@@ -998,8 +1000,8 @@ export const ganttMachine = setup({
                         newScrollX
                       });
                       
-                      console.log(`GanttMachine: Time Scale Zoom: ${currentDayWidth}px/day -> ${newDayWidth}px/day`);
-                      console.log(`GanttMachine: Scroll adjustment: ${currentScrollX} -> ${newScrollX} (maintaining anchor)`);
+                      log.info(`GanttMachine: Time Scale Zoom: ${currentDayWidth}px/day -> ${newDayWidth}px/day`);
+                      log.info(`GanttMachine: Scroll adjustment: ${currentScrollX} -> ${newScrollX} (maintaining anchor)`);
                       
                       // Store calculated values for use in assign actions
                       (event as any)._calculatedDayWidth = newDayWidth;
@@ -1033,14 +1035,14 @@ export const ganttMachine = setup({
                     }),
                     // Trigger coordinate recalculation in store (which will update renderer via subscription)
                     ({ context, event }) => {
-                      console.log('GanttMachine: Triggering coordinate recalculation with new time scale');
+                      log.info('GanttMachine: Triggering coordinate recalculation with new time scale');
                       
                       const newDayWidth = (event as any)._calculatedDayWidth;
                       const newScrollX = (event as any)._newScrollX;
                       
                       // Send dayWidth update to store for coordinate recalculation
                       if (context.dataStore) {
-                        console.log('GanttMachine: Sending dayWidth to store for timeline label recalculation', {
+                        log.info('GanttMachine: Sending dayWidth to store for timeline label recalculation', {
                           dayWidth: newDayWidth
                         });
                         context.dataStore.send({
@@ -1051,7 +1053,7 @@ export const ganttMachine = setup({
                       
                       // Send scroll position update directly to renderer
                       if (context.renderer) {
-                        console.log('GanttMachine: Updating renderer scroll position', {
+                        log.info('GanttMachine: Updating renderer scroll position', {
                           scrollX: newScrollX,
                           scrollY: context.viewport.scrollY
                         });
@@ -1067,7 +1069,7 @@ export const ganttMachine = setup({
                 DEPENDENCY_DRAG_START: {
                   actions: [
                     ({ context, event }) => {
-                      console.log('GanttMachine: Dependency drag started', {
+                      log.info('GanttMachine: Dependency drag started', {
                         dependencyId: event.dependencyId,
                         handleType: event.handleType,
                         x: event.x,
@@ -1080,7 +1082,7 @@ export const ganttMachine = setup({
                 DEPENDENCY_REASSIGN: {
                   actions: [
                     async ({ context, event }) => {
-                      console.log('GanttMachine: Reassigning dependency', {
+                      log.info('GanttMachine: Reassigning dependency', {
                         dependencyId: event.dependencyId,
                         handleType: event.handleType,
                         newTaskId: event.newTaskId
@@ -1098,14 +1100,14 @@ export const ganttMachine = setup({
                           event.newTaskId
                         );
                         
-                        console.log('GanttMachine: Dependency reassigned successfully');
+                        log.info('GanttMachine: Dependency reassigned successfully');
                         
                         // Trigger a data refresh to update the UI
                         if (context.dataStore) {
                           context.dataStore.send({ type: 'REFRESH' });
                         }
                       } catch (error) {
-                        console.error('GanttMachine: Failed to reassign dependency:', error);
+                        log.error('GanttMachine: Failed to reassign dependency:', error);
                       }
                     },
                   ],
@@ -1169,7 +1171,7 @@ export const ganttMachine = setup({
     ZOOM_REQUEST: {
       actions: [
         ({ context, event }) => {
-          console.log('GanttMachine: Handling ZOOM_REQUEST directly', {
+          log.info('GanttMachine: Handling ZOOM_REQUEST directly', {
             direction: event.direction,
             anchorX: event.anchorX,
             currentScrollX: context.viewport.scrollX,
@@ -1188,7 +1190,7 @@ export const ganttMachine = setup({
           
           newDayWidth = Math.max(5, Math.min(500, newDayWidth));
           
-          console.log('GanttMachine: Zoom calculation', {
+          log.info('GanttMachine: Zoom calculation', {
             currentDayWidth,
             newDayWidth,
             currentScrollX,
@@ -1199,7 +1201,7 @@ export const ganttMachine = setup({
           const scrollRatio = newDayWidth / currentDayWidth;
           const newScrollX = currentScrollX * scrollRatio;
           
-          console.log('GanttMachine: Anchoring calculation', {
+          log.info('GanttMachine: Anchoring calculation', {
             scrollRatio,
             newScrollX
           });
@@ -1213,7 +1215,7 @@ export const ganttMachine = setup({
           // Note: The coordinate recalculation and renderer updates are handled
           // in the nested ZOOM_REQUEST action within the main state machine
           
-          console.log('GanttMachine: Zoom complete, new state:', {
+          log.info('GanttMachine: Zoom complete, new state:', {
             dayWidth: context.timelineLayout.dayWidth,
             scrollX: context.viewport.scrollX
           });
@@ -1224,7 +1226,7 @@ export const ganttMachine = setup({
     // Forward events from renderer
     SELECT_TASK: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received SELECT_TASK at root level', event),
+        ({ event }) => log.info('GanttMachine: Received SELECT_TASK at root level', event),
         raise(({ event }) => ({
           type: 'TASK_SELECT',
           taskId: event.taskId,
@@ -1235,42 +1237,42 @@ export const ganttMachine = setup({
     
     TASK_DRAG_START: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received TASK_DRAG_START at root level', event),
+        ({ event }) => log.info('GanttMachine: Received TASK_DRAG_START at root level', event),
         raise(({ event }) => event)
       ]
     },
     
     TASK_DRAG_MOVE: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received TASK_DRAG_MOVE at root level', event),
+        ({ event }) => log.info('GanttMachine: Received TASK_DRAG_MOVE at root level', event),
         raise(({ event }) => event)
       ]
     },
     
     TASK_DRAG_END: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received TASK_DRAG_END at root level', event),
+        ({ event }) => log.info('GanttMachine: Received TASK_DRAG_END at root level', event),
         raise(({ event }) => event)
       ]
     },
     
     TASK_RESIZE_START: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received TASK_RESIZE_START at root level', event),
+        ({ event }) => log.info('GanttMachine: Received TASK_RESIZE_START at root level', event),
         raise(({ event }) => event)
       ]
     },
     
     TASK_RESIZE_MOVE: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received TASK_RESIZE_MOVE at root level', event),
+        ({ event }) => log.info('GanttMachine: Received TASK_RESIZE_MOVE at root level', event),
         raise(({ event }) => event)
       ]
     },
     
     TASK_RESIZE_END: {
       actions: [
-        ({ event }) => console.log('GanttMachine: Received TASK_RESIZE_END at root level', event),
+        ({ event }) => log.info('GanttMachine: Received TASK_RESIZE_END at root level', event),
         raise(({ event }) => event)
       ]
     },

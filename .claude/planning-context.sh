@@ -3,7 +3,7 @@
 # Planning Context Hook - Injects session planning context into Claude's normal flow
 # Uses UserPromptSubmit to provide planning awareness without subprocess overhead
 
-SESSION_DIR="$CLAUDE_PROJECT_DIR/.claude/sessions/$(date +%Y-%m-%d)"
+SESSION_DIR="$CLAUDE_PROJECT_DIR/sessions/$(date +%Y-%m-%d)"
 LATEST_SESSION=$(ls -d $SESSION_DIR/session-* 2>/dev/null | sort -V | tail -1)
 
 if [ -z "$LATEST_SESSION" ]; then
@@ -35,7 +35,7 @@ if [ -f "$WORK_LOG" ]; then
     RECENT_ACTIVITY=$(tail -3 "$WORK_LOG" 2>/dev/null | grep -E "\[.*\]" | sed 's/^/  /')
 fi
 
-# Create planning context
+# Create consistent planning nudge for all prompts
 PLANNING_CONTEXT="📋 **Session Planning Context**
 
 **Current Session:** $SESSION_NAME
@@ -43,9 +43,6 @@ PLANNING_CONTEXT="📋 **Session Planning Context**
 
 **Current Goals:**
 $CURRENT_GOALS
-
-**Recent Activity:** ($ACTIVITY_COUNT actions)
-$RECENT_ACTIVITY
 
 **Planning Guidance:**
 - Consider updating the session plan as you work

@@ -1,6 +1,8 @@
 import { Node } from '@xyflow/react'
 import { TaskNodeData } from '../nodes/TaskNode'
 import { MilestoneNodeData } from '../nodes/MilestoneNode'
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/timeline/utils/timelineGrid.ts');
 
 export interface TimelineGridConfig {
   startDate: Date
@@ -86,7 +88,7 @@ export class TimelineGrid {
     const taskNodes = nodes.filter(n => n.type === 'task')
     const milestoneNodes = nodes.filter(n => n.type === 'milestone')
 
-    console.log(`🔄 CONFIGURING LANES for ${taskNodes.length} tasks (reorder by start date)`)
+    log.info(`🔄 CONFIGURING LANES for ${taskNodes.length} tasks (reorder by start date)`)
 
     // Always sort tasks by start date for logical ordering
     const sortedTasks = taskNodes.sort((a, b) => {
@@ -135,7 +137,7 @@ export class TimelineGrid {
       
       this.lanes.push(taskLane)
       this.nodeToLaneMap.set(node.id, laneId)
-      console.log(`🏁 LANE ORDERED: "${taskLane.name}" at position ${taskIndex + 1} Y=${taskLane.y} (start: ${taskData.startDate})`)
+      log.info(`🏁 LANE ORDERED: "${taskLane.name}" at position ${taskIndex + 1} Y=${taskLane.y} (start: ${taskData.startDate})`)
     })
 
     return this.lanes
@@ -250,10 +252,10 @@ export class TimelineGrid {
   getLaneForNode(nodeId: string): GridLane | null {
     const foundLane = this.lanes.find(lane => lane.nodes.some(node => node.id === nodeId))
     if (foundLane) {
-      console.log(`🔍 LANE LOOKUP SUCCESS: Found lane "${foundLane.name}" for node ${nodeId}`)
+      log.info(`🔍 LANE LOOKUP SUCCESS: Found lane "${foundLane.name}" for node ${nodeId}`)
     } else {
-      console.log(`🚫 LANE LOOKUP FAILED: No lane found for node ${nodeId}`)
-      console.log(`Available lanes:`, this.lanes.map(l => ({ id: l.id, name: l.name, nodeIds: l.nodes.map(n => n.id) })))
+      log.info(`🚫 LANE LOOKUP FAILED: No lane found for node ${nodeId}`)
+      log.info(`Available lanes:`, this.lanes.map(l => ({ id: l.id, name: l.name, nodeIds: l.nodes.map(n => n.id) })))
     }
     return foundLane || null
   }
@@ -280,7 +282,7 @@ export class TimelineGrid {
    * Update timeline bounds without recreating lanes
    */
   updateBounds(startDate: Date, endDate: Date): void {
-    console.log(`📐 GRID: Updating bounds from ${this.config.startDate.toISOString().split('T')[0]} to ${startDate.toISOString().split('T')[0]} - ${endDate.toISOString().split('T')[0]}`)
+    log.info(`📐 GRID: Updating bounds from ${this.config.startDate.toISOString().split('T')[0]} to ${startDate.toISOString().split('T')[0]} - ${endDate.toISOString().split('T')[0]}`)
     this.config.startDate = startDate
     this.config.endDate = endDate
     // Note: Lane positions remain unchanged, only the date-to-X calculations are affected

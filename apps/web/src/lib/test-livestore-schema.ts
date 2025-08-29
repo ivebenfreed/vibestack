@@ -6,6 +6,8 @@
 
 import { LiveStoreDynamicSchemaGenerator, liveStoreSchemaManager } from './livestore-dynamic-schema';
 import type { OrgEntitySchema } from './schema-client';
+import { uiLog } from '@/logger';
+const log = uiLog('lib/test-livestore-schema.ts');
 
 /**
  * Sample organization schema for testing
@@ -133,17 +135,17 @@ const sampleOrgSchema: OrgEntitySchema = {
  * Test the dynamic schema generation
  */
 export async function testLiveStoreSchemaGeneration(): Promise<void> {
-  console.log('🧪 Testing LiveStore Dynamic Schema Generation...');
+  log.info('🧪 Testing LiveStore Dynamic Schema Generation...');
 
   const generator = new LiveStoreDynamicSchemaGenerator();
 
   try {
     // Test schema generation
-    console.log('\n1. Generating LiveStore schema...');
+    log.info('\n1. Generating LiveStore schema...');
     const liveStoreSchema = generator.generateSchema(sampleOrgSchema);
     
-    console.log('✅ Schema generated successfully');
-    console.log('📊 Tables created:', Object.keys(liveStoreSchema).length);
+    log.info('✅ Schema generated successfully');
+    log.info('📊 Tables created:', Object.keys(liveStoreSchema).length);
     
     // Validate expected tables exist
     const expectedTables = [
@@ -159,15 +161,15 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
       if (!liveStoreSchema[tableName]) {
         throw new Error(`Missing expected table: ${tableName}`);
       }
-      console.log(`  ✅ Table: ${tableName}`);
+      log.info(`  ✅ Table: ${tableName}`);
     }
 
     // Test event generation
-    console.log('\n2. Generating LiveStore events...');
+    log.info('\n2. Generating LiveStore events...');
     const liveStoreEvents = generator.generateEvents(sampleOrgSchema);
     
-    console.log('✅ Events generated successfully');
-    console.log('📡 Events created:', Object.keys(liveStoreEvents).length);
+    log.info('✅ Events generated successfully');
+    log.info('📡 Events created:', Object.keys(liveStoreEvents).length);
 
     // Validate expected events exist
     const expectedEvents = [
@@ -186,21 +188,21 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
       if (!liveStoreEvents[eventName]) {
         throw new Error(`Missing expected event: ${eventName}`);
       }
-      console.log(`  ✅ Event: ${eventName}`);
+      log.info(`  ✅ Event: ${eventName}`);
     }
 
     // Test schema validation
-    console.log('\n3. Validating generated schema...');
+    log.info('\n3. Validating generated schema...');
     const validation = liveStoreSchemaManager.validateSchema(liveStoreSchema);
     
     if (!validation.valid) {
       throw new Error(`Schema validation failed: ${validation.errors.join(', ')}`);
     }
     
-    console.log('✅ Schema validation passed');
+    log.info('✅ Schema validation passed');
 
     // Test specific table structure
-    console.log('\n4. Validating table structures...');
+    log.info('\n4. Validating table structures...');
     
     // Check SoftwareProject table
     const projectTable = liveStoreSchema.acme_corp_software_projects;
@@ -215,7 +217,7 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
         throw new Error(`Missing column in SoftwareProject table: ${columnName}`);
       }
     }
-    console.log('  ✅ SoftwareProject table structure valid');
+    log.info('  ✅ SoftwareProject table structure valid');
 
     // Check DevelopmentTask table
     const taskTable = liveStoreSchema.acme_corp_development_tasks;
@@ -229,10 +231,10 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
         throw new Error(`Missing column in DevelopmentTask table: ${columnName}`);
       }
     }
-    console.log('  ✅ DevelopmentTask table structure valid');
+    log.info('  ✅ DevelopmentTask table structure valid');
 
     // Test column types
-    console.log('\n5. Validating column types...');
+    log.info('\n5. Validating column types...');
     
     if (projectTable.columns.budget.type !== 'real') {
       throw new Error('Budget column should be real type');
@@ -246,10 +248,10 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
       throw new Error('JSON columns should be text type in SQLite');
     }
     
-    console.log('✅ Column types valid');
+    log.info('✅ Column types valid');
 
     // Test indexes
-    console.log('\n6. Validating indexes...');
+    log.info('\n6. Validating indexes...');
     
     if (!projectTable.indexes || projectTable.indexes.length === 0) {
       throw new Error('Project table should have indexes');
@@ -263,10 +265,10 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
       throw new Error('Project table should have organization_id index');
     }
     
-    console.log('✅ Indexes valid');
+    log.info('✅ Indexes valid');
 
     // Test schema manager caching
-    console.log('\n7. Testing schema manager...');
+    log.info('\n7. Testing schema manager...');
     
     const { schema: cachedSchema, events: cachedEvents } = 
       await liveStoreSchemaManager.loadOrgLiveStoreSchema(sampleOrgSchema.orgId, sampleOrgSchema);
@@ -275,34 +277,34 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
       throw new Error('Schema manager returned different schema');
     }
     
-    console.log('✅ Schema manager working correctly');
+    log.info('✅ Schema manager working correctly');
 
     // Test table name generation
-    console.log('\n8. Testing table name generation...');
+    log.info('\n8. Testing table name generation...');
     
     const tableName = liveStoreSchemaManager.getTableName('acme-corp', 'SoftwareProject');
     const expectedTableName = 'acme_corp_softwareprojects';
     
     if (tableName !== expectedTableName) {
-      console.log(`Expected: ${expectedTableName}, Got: ${tableName}`);
+      log.info(`Expected: ${expectedTableName}, Got: ${tableName}`);
       // Note: This might be expected behavior, just logging for now
     }
     
-    console.log('✅ Table name generation working');
+    log.info('✅ Table name generation working');
 
-    console.log('\n🎉 All tests passed! LiveStore dynamic schema generation is working correctly.');
+    log.info('\n🎉 All tests passed! LiveStore dynamic schema generation is working correctly.');
     
     // Output schema summary
-    console.log('\n📋 Schema Summary:');
-    console.log(`  - Organization: ${sampleOrgSchema.orgId}`);
-    console.log(`  - Entities: ${Object.keys(sampleOrgSchema.entities).length}`);
-    console.log(`  - Tables: ${Object.keys(liveStoreSchema).length}`);
-    console.log(`  - Events: ${Object.keys(liveStoreEvents).length}`);
+    log.info('\n📋 Schema Summary:');
+    log.info(`  - Organization: ${sampleOrgSchema.orgId}`);
+    log.info(`  - Entities: ${Object.keys(sampleOrgSchema.entities).length}`);
+    log.info(`  - Tables: ${Object.keys(liveStoreSchema).length}`);
+    log.info(`  - Events: ${Object.keys(liveStoreEvents).length}`);
     
     return;
 
   } catch (error) {
-    console.error('❌ Test failed:', error);
+    log.error('❌ Test failed:', error);
     throw error;
   }
 }
@@ -313,7 +315,7 @@ export async function testLiveStoreSchemaGeneration(): Promise<void> {
 if (typeof window !== 'undefined') {
   // Browser environment - expose test function
   (window as any).testLiveStoreSchemaGeneration = testLiveStoreSchemaGeneration;
-  console.log('🧪 LiveStore schema test available as window.testLiveStoreSchemaGeneration()');
+  log.info('🧪 LiveStore schema test available as window.testLiveStoreSchemaGeneration()');
 } else {
   // Node environment - run test directly
   testLiveStoreSchemaGeneration().catch(console.error);

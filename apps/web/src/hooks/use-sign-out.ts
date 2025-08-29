@@ -1,4 +1,6 @@
 import { useAuth } from '@/state-machines';
+import { stateLog } from '@/logger';
+const log = stateLog('hooks/use-sign-out.ts');
 
 /**
  * Simple sign-out hook that leverages the auth machine.
@@ -14,7 +16,7 @@ export function useSignOut() {
       // Route guard will detect auth change and redirect
       return true;
     } catch (error) {
-      console.error('[useSignOut] Sign-out failed:', error);
+      log.error('[useSignOut] Sign-out failed:', error);
       return false;
     }
   };

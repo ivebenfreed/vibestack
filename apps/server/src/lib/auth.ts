@@ -6,11 +6,12 @@ import { Polar } from "@polar-sh/sdk";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
-import { dbLogger } from '../middleware/logger';
+import { dbLogger } from '../middleware/logger.ts';
 import { createEmailService } from '../services/EmailService';
 import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
+import { getKysely } from './kysely.ts';
 
 // Helper function to get allowed origins based on dynamic ports
 function getAllowedOrigins(env: Env): string[] {
@@ -202,9 +203,6 @@ export const auth = betterAuth({
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
-  // Import our centralized Kysely configuration
-  const { getKysely } = require('./kysely');
-  
   // Get configured Kysely instance or KV-intercepted version
   let kyselyInstance;
   
@@ -679,12 +677,23 @@ export function initializeAuth(env: Env, request?: Request) {
     const originalHandler = authInstance.handler;
     authInstance.handler = async (request: Request) => {
       try {
+        console.log('[Auth Handler] Processing request:', request.method, request.url);
         const result = await originalHandler(request);
+        console.log('[Auth Handler] Request completed successfully');
         return result;
       } catch (error) {
         console.error('[Auth Handler] Caught error:', error);
+        console.error('[Auth Handler] Error message:', error instanceof Error ? error.message : 'Unknown error');
         console.error('[Auth Handler] Error stack:', error instanceof Error ? error.stack : 'No stack');
-        throw error;
+        
+        // Return a proper error response instead of throwing
+        return new Response(JSON.stringify({
+          error: 'Authentication failed',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     };
     

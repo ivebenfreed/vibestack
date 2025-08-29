@@ -6,6 +6,8 @@ import type { Column, RenderState, SortConfig } from '../../types';
 import type { ColumnManager } from '../managers/ColumnManager';
 import type { DOMSystem } from '../systems/DOMSystem';
 import type { SelectionManager } from '../managers/SelectionManager';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/renderers/engines/HeaderEngine.ts');
 
 // ====================================
 // TYPES
@@ -191,7 +193,7 @@ export class HeaderEngine {
     // IMPORTANT: Always use the columns from the render state as they come from the table machine
     // which has already applied column ordering and visibility logic
     if (state.columns && state.columns.length > 0) {
-      console.log('🔍 HeaderEngine: Using columns from render state (table machine ordered)', {
+      log.info('🔍 HeaderEngine: Using columns from render state (table machine ordered)', {
         columnCount: state.columns.length,
         columnIds: state.columns.map(c => c.id),
         hasColumnOrder: !!(state as any).columnOrder
@@ -201,7 +203,7 @@ export class HeaderEngine {
     
     // Fallback: Get visible columns using coordinate mapping (state machine authority)
     if (state.coordinateMapping?.columns) {
-      console.log('🔍 HeaderEngine: Fallback to coordinate mapping columns');
+      log.info('🔍 HeaderEngine: Fallback to coordinate mapping columns');
       const coordinateColumns = state.coordinateMapping.columns;
       // Convert coordinate mapping to columns
       return coordinateColumns.map((coord: any) => ({
@@ -215,7 +217,7 @@ export class HeaderEngine {
     }
     
     // Final fallback: create columns from first row data
-    console.log('🔍 HeaderEngine: Final fallback to row data columns');
+    log.info('🔍 HeaderEngine: Final fallback to row data columns');
     return Object.keys(state.rows[0].data).map(key => ({
       id: key,
       name: key,

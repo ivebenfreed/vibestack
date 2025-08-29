@@ -14,6 +14,8 @@ import type {
   LiveChangesError as LiveChangesErrorType
 } from '@/types/live-changes'
 import { LiveChangesError } from '@/types/live-changes'
+import { uiLog } from '@/logger';
+const log = uiLog('lib/live-changes-manager.ts');
 
 // ============================================================================
 // HMR-Resistant Singleton LiveChangesManager
@@ -32,7 +34,7 @@ class LiveChangesManager {
 
   constructor() {
     this.instanceId = `LCM_${Math.random().toString(36).substr(2, 9)}`
-    console.log(`[LiveChangesManager] Created instance ${this.instanceId}`)
+    log.info(`[LiveChangesManager] Created instance ${this.instanceId}`)
   }
 
   /**
@@ -40,11 +42,11 @@ class LiveChangesManager {
    */
   async initialize(entityConfigs: EntityConfig[], sharedDataSource?: any): Promise<void> {
     try {
-      console.log(`[LiveChangesManager:${this.instanceId}] Initializing with ${entityConfigs.length} entities...`)
+      log.info(`[LiveChangesManager:${this.instanceId}] Initializing with ${entityConfigs.length} entities...`)
       
       // Check if already initialized
       if (this.status === 'active') {
-        console.log(`[LiveChangesManager:${this.instanceId}] Already initialized, skipping`)
+        log.info(`[LiveChangesManager:${this.instanceId}] Already initialized, skipping`)
         return
       }
 
@@ -62,7 +64,7 @@ class LiveChangesManager {
         initialLoadPromises.set(config.entity.name, initialLoadPromise)
         
         return this.setupEntityLiveChanges(config, resolveInitialLoad).catch(error => {
-          console.error(`[LiveChangesManager:${this.instanceId}] Failed to setup ${config.entity.name}:`, error)
+          log.error(`[LiveChangesManager:${this.instanceId}] Failed to setup ${config.entity.name}:`, error)
           // Resolve the promise even on error so we don't hang
           resolveInitialLoad()
         })
@@ -75,11 +77,11 @@ class LiveChangesManager {
       await Promise.all(Array.from(initialLoadPromises.values()))
 
       this.status = 'active'
-      console.log(`[LiveChangesManager:${this.instanceId}] ✅ All ${entityConfigs.length} entities initialized successfully`)
+      log.info(`[LiveChangesManager:${this.instanceId}] ✅ All ${entityConfigs.length} entities initialized successfully`)
 
     } catch (error) {
       this.status = 'error'
-      console.error(`[LiveChangesManager:${this.instanceId}] ❌ Initialization failed:`, error)
+      log.error(`[LiveChangesManager:${this.instanceId}] ❌ Initialization failed:`, error)
       throw error
     }
   }
@@ -97,13 +99,13 @@ class LiveChangesManager {
 
     // Check if already subscribed (HMR protection)
     if (this.subscriptions.has(entityName)) {
-      console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: Already subscribed, skipping`)
+      log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: Already subscribed, skipping`)
       resolveInitialLoad()
       return
     }
 
     try {
-      console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: Setting up live changes for table "${tableName}"...`)
+      log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: Setting up live changes for table "${tableName}"...`)
 
       // Create a basic SELECT query for the entity
       const sql = `SELECT * FROM "${tableName}" ORDER BY "${primaryKey}" ASC`
@@ -130,34 +132,34 @@ class LiveChangesManager {
         (changes: ChangeEvent[]) => {
           // 🚫 Skip changes during initial load phase
           if (isInitialLoad) {
-            console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: 🚫 Skipping ${changes.length} changes during initial load phase`)
+            log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: 🚫 Skipping ${changes.length} changes during initial load phase`)
             return
           }
           
           // 🚫 Skip empty change events (common after sync operations)
           if (!changes || changes.length === 0) {
-            console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: 🚫 Skipping empty changes event`)
+            log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: 🚫 Skipping empty changes event`)
             return
           }
           
-          console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: Received ${changes.length} changes`)
+          log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: Received ${changes.length} changes`)
           this.processChanges(config, changes, primaryKey)
         }
       )
 
       // Process initial changes event to determine when ready
       if (result.initialChanges && result.initialChanges.length > 0) {
-        console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: 🚫 Skipping ${result.initialChanges.length} initial changes - route loaders handle bulk loading`)
+        log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: 🚫 Skipping ${result.initialChanges.length} initial changes - route loaders handle bulk loading`)
         hasReceivedInitialChanges = true
       } else {
-        console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: No initial changes - entity ready immediately`)
+        log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: No initial changes - entity ready immediately`)
         hasReceivedInitialChanges = true
       }
 
       // Mark initial load as complete immediately after processing initial changes
       if (hasReceivedInitialChanges) {
         isInitialLoad = false
-        console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: ✅ Initial load phase complete - live changes now active for real updates`)
+        log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: ✅ Initial load phase complete - live changes now active for real updates`)
         resolveInitialLoad() // Signal this entity is ready
       }
 
@@ -169,10 +171,10 @@ class LiveChangesManager {
         config
       })
 
-      console.log(`[LiveChangesManager:${this.instanceId}] ✅ ${entityName}: Live changes subscription active`)
+      log.info(`[LiveChangesManager:${this.instanceId}] ✅ ${entityName}: Live changes subscription active`)
 
     } catch (error) {
-      console.error(`[LiveChangesManager:${this.instanceId}] ❌ Failed to setup live changes for ${entityName}:`, error)
+      log.error(`[LiveChangesManager:${this.instanceId}] ❌ Failed to setup live changes for ${entityName}:`, error)
       resolveInitialLoad() // Don't block initialization on individual entity failures
       throw error
     }
@@ -188,7 +190,7 @@ class LiveChangesManager {
   ): Promise<void> {
     // Skip processing if paused (e.g., during bulk operations like integrity resets)
     if (this.isPaused) {
-      console.log(`[LiveChangesManager:${this.instanceId}] 🚫 Skipping ${changes.length} changes - processing is paused`)
+      log.info(`[LiveChangesManager:${this.instanceId}] 🚫 Skipping ${changes.length} changes - processing is paused`)
       return
     }
 
@@ -199,7 +201,7 @@ class LiveChangesManager {
       try {
         const itemId = change[primaryKey]
         if (!itemId) {
-          console.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: Change missing primary key ${primaryKey}:`, change)
+          log.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: Change missing primary key ${primaryKey}:`, change)
           continue
         }
 
@@ -210,14 +212,14 @@ class LiveChangesManager {
         
         // Skip if we processed this exact change within the last 100ms
         if (timeSinceLastChange < 100) {
-          console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: ⚠️ Skipping duplicate ${change.__op__} for ${itemId} (${timeSinceLastChange}ms ago)`)
+          log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: ⚠️ Skipping duplicate ${change.__op__} for ${itemId} (${timeSinceLastChange}ms ago)`)
           continue
         }
         
         // Track this change
         this.recentChanges.set(changeKey, now)
         
-        console.log(`[LiveChangesManager:${this.instanceId}] ${entityName}: Processing ${change.__op__} for ${itemId}`)
+        log.info(`[LiveChangesManager:${this.instanceId}] ${entityName}: Processing ${change.__op__} for ${itemId}`)
 
         switch (change.__op__) {
           case 'INSERT':
@@ -230,11 +232,11 @@ class LiveChangesManager {
             break
 
           default:
-            console.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: Unknown operation ${change.__op__}`)
+            log.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: Unknown operation ${change.__op__}`)
         }
 
       } catch (error) {
-        console.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: Failed to process change:`, change, error)
+        log.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: Failed to process change:`, change, error)
         // Continue processing other changes even if one fails
       }
     }
@@ -273,9 +275,9 @@ class LiveChangesManager {
         if (freshItem) {
           // Update XState atom with fresh data - centralized update
           config.atomActions.updateItem(itemId, freshItem)
-          console.log(`[LiveChangesManager:${this.instanceId}] ✅ ${entityName}: Updated XState atom for ${itemId}`)
+          log.info(`[LiveChangesManager:${this.instanceId}] ✅ ${entityName}: Updated XState atom for ${itemId}`)
         } else {
-          console.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: Item ${itemId} not found after INSERT/UPDATE`)
+          log.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: Item ${itemId} not found after INSERT/UPDATE`)
         }
         
         // Success - break out of retry loop
@@ -290,7 +292,7 @@ class LiveChangesManager {
         
         if (isRetryableError && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-          console.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy (attempt ${attempt}/${maxRetries}) - retrying in ${delay}ms for ${itemId}:`, error?.message || error);
+          log.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy (attempt ${attempt}/${maxRetries}) - retrying in ${delay}ms for ${itemId}:`, error?.message || error);
           
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -299,9 +301,9 @@ class LiveChangesManager {
         
         // Either not retryable or max retries exceeded
         if (isRetryableError) {
-          console.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy error persisted after ${maxRetries} attempts for ${itemId}:`, error?.message || error);
+          log.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy error persisted after ${maxRetries} attempts for ${itemId}:`, error?.message || error);
         } else {
-          console.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: Failed to fetch fresh data for ${itemId}:`, error);
+          log.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: Failed to fetch fresh data for ${itemId}:`, error);
         }
         
         // Don't throw - continue processing other changes
@@ -324,7 +326,7 @@ class LiveChangesManager {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         config.atomActions.removeItem(itemId)
-        console.log(`[LiveChangesManager:${this.instanceId}] ✅ ${entityName}: Removed ${itemId} from XState atoms`)
+        log.info(`[LiveChangesManager:${this.instanceId}] ✅ ${entityName}: Removed ${itemId} from XState atoms`)
         return; // Success - exit retry loop
         
       } catch (error: any) {
@@ -336,7 +338,7 @@ class LiveChangesManager {
         
         if (isRetryableError && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-          console.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy during delete (attempt ${attempt}/${maxRetries}) - retrying in ${delay}ms for ${itemId}:`, error?.message || error);
+          log.warn(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy during delete (attempt ${attempt}/${maxRetries}) - retrying in ${delay}ms for ${itemId}:`, error?.message || error);
           
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -345,9 +347,9 @@ class LiveChangesManager {
         
         // Either not retryable or max retries exceeded
         if (isRetryableError) {
-          console.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy error persisted after ${maxRetries} attempts during delete for ${itemId}:`, error?.message || error);
+          log.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: IndexedDB busy error persisted after ${maxRetries} attempts during delete for ${itemId}:`, error?.message || error);
         } else {
-          console.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: Failed to remove ${itemId}:`, error);
+          log.error(`[LiveChangesManager:${this.instanceId}] ${entityName}: Failed to remove ${itemId}:`, error);
         }
         
         // Don't throw - continue processing other changes
@@ -384,7 +386,7 @@ class LiveChangesManager {
    */
   pause(): void {
     this.isPaused = true
-    console.log(`[LiveChangesManager:${this.instanceId}] ⏸️ Live changes processing paused`)
+    log.info(`[LiveChangesManager:${this.instanceId}] ⏸️ Live changes processing paused`)
   }
 
   /**
@@ -392,7 +394,7 @@ class LiveChangesManager {
    */
   resume(): void {
     this.isPaused = false
-    console.log(`[LiveChangesManager:${this.instanceId}] ▶️ Live changes processing resumed`)
+    log.info(`[LiveChangesManager:${this.instanceId}] ▶️ Live changes processing resumed`)
   }
 
   /**
@@ -406,11 +408,11 @@ class LiveChangesManager {
    * Stop all live changes subscriptions
    */
   async stop(): Promise<void> {
-    console.log(`[LiveChangesManager:${this.instanceId}] Stopping all subscriptions...`)
+    log.info(`[LiveChangesManager:${this.instanceId}] Stopping all subscriptions...`)
     
     const stopPromises = Array.from(this.subscriptions.values()).map(subscription =>
       subscription.unsubscribe().catch(error => 
-        console.error(`[LiveChangesManager:${this.instanceId}] Failed to unsubscribe from ${subscription.entityName}:`, error)
+        log.error(`[LiveChangesManager:${this.instanceId}] Failed to unsubscribe from ${subscription.entityName}:`, error)
       )
     )
     
@@ -418,7 +420,7 @@ class LiveChangesManager {
     this.subscriptions.clear()
     this.status = 'stopped'
     
-    console.log(`[LiveChangesManager:${this.instanceId}] ✅ All subscriptions stopped`)
+    log.info(`[LiveChangesManager:${this.instanceId}] ✅ All subscriptions stopped`)
   }
 
   /**
@@ -444,10 +446,10 @@ function createOrGetSingleton(): LiveChangesManager {
   const globalStore = globalThis as any
   
   if (!globalStore[GLOBAL_KEY]) {
-    console.log('[LiveChangesManager] Creating new HMR-resistant singleton')
+    log.info('[LiveChangesManager] Creating new HMR-resistant singleton')
     globalStore[GLOBAL_KEY] = new LiveChangesManager()
   } else {
-    console.log('[LiveChangesManager] Using existing HMR-resistant singleton')
+    log.info('[LiveChangesManager] Using existing HMR-resistant singleton')
   }
   
   return globalStore[GLOBAL_KEY]
@@ -459,7 +461,7 @@ export const liveChangesManager = createOrGetSingleton()
 // HMR cleanup: Stop the old instance when this module is replaced
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    console.log('[LiveChangesManager] HMR: Disposing current instance')
+    log.info('[LiveChangesManager] HMR: Disposing current instance')
     // Don't stop the singleton - let it persist across HMR
   })
 }

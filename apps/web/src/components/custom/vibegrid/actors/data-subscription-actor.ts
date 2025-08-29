@@ -3,6 +3,8 @@ import { db } from '@repo/dataforge/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import type { EntityChange } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/actors/data-subscription-actor.ts');
 
 export interface DataSubscriptionInput {
   entityType: string;
@@ -46,7 +48,7 @@ function detectChanges(previousData: any[] = [], currentData: any[] = []): Entit
       const significantChanges = changedFields.filter(key => key !== 'updatedAt');
       
       if (significantChanges.length > 0) {
-        console.log('📊 DataSubscriptionActor: detectChanges - found changes', {
+        log.info('📊 DataSubscriptionActor: detectChanges - found changes', {
           id: current.id,
           changedFields: significantChanges,
           allChangedFields: changedFields
@@ -83,7 +85,7 @@ function detectChanges(previousData: any[] = [], currentData: any[] = []): Entit
  * Now handles both main entity data and relationship data for a unified subscription model
  */
 export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({ input, sendBack }) => {
-  console.log('📊 DataSubscriptionActor: Starting subscription', {
+  log.info('📊 DataSubscriptionActor: Starting subscription', {
     entityType: input.entityType,
     includeRelationships: input.includeRelationships
   });
@@ -96,7 +98,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
   const subscribeToTable = (tableName: string, tableKey: string, isMainEntity: boolean = false) => {
     const table = (db as any)[tableName];
     if (!table) {
-      console.warn('⚠️ DataSubscriptionActor: No table found:', tableName);
+      log.warn('⚠️ DataSubscriptionActor: No table found:', tableName);
       return;
     }
 
@@ -110,7 +112,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
           
           // Skip first emission if we have preloaded data from route loader
           if (input.skipInitialEmission) {
-            console.log('📊 DataSubscriptionActor: Skipping first emission for table:', tableKey, {
+            log.info('📊 DataSubscriptionActor: Skipping first emission for table:', tableKey, {
               entityCount: data.length,
               isMainEntity,
               reason: 'Using preloaded data from route loader'
@@ -120,7 +122,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
             return;
           }
           
-          console.log('📊 DataSubscriptionActor: First emission for table:', tableKey, {
+          log.info('📊 DataSubscriptionActor: First emission for table:', tableKey, {
             entityCount: data.length,
             isMainEntity
           });
@@ -158,7 +160,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
           if (latestData) {
             // Send targeted changes for main entity tables
             if (isMainEntity && changes.length > 0) {
-              console.log('📊 DataSubscriptionActor: Detected changes for table:', tableKey, {
+              log.info('📊 DataSubscriptionActor: Detected changes for table:', tableKey, {
                 changesCount: changes.length,
                 changeTypes: changes.map(c => `${c.operation}:${c.id}`),
                 totalEntities: latestData.length,
@@ -178,7 +180,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
               });
             } else {
               // For relationship tables or when no changes detected, use full update
-              console.log('📊 DataSubscriptionActor: Data update received (debounced)', {
+              log.info('📊 DataSubscriptionActor: Data update received (debounced)', {
                 table: tableKey,
                 entityCount: latestData.length,
                 isMainEntity,
@@ -201,7 +203,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
         debounceTimers.set(tableKey, timer);
       },
       error: (error) => {
-        console.error('❌ DataSubscriptionActor: Subscription error:', error, 'for table:', tableKey);
+        log.error('❌ DataSubscriptionActor: Subscription error:', error, 'for table:', tableKey);
         sendBack({ type: 'DATA_SUBSCRIPTION_ERROR', error, table: tableKey });
       }
     });
@@ -222,14 +224,14 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
       // Skip if this is the main table (shouldn't happen but just in case)
       if (relTable === mainTableName) return;
       
-      console.log('📊 DataSubscriptionActor: Subscribing to relationship table:', relTable);
+      log.info('📊 DataSubscriptionActor: Subscribing to relationship table:', relTable);
       subscribeToTable(relTable, relTable, false); // false = relationship table
     });
   }
 
   // Return cleanup function
   return () => {
-    console.log('🔄 DataSubscriptionActor: Cleaning up all subscriptions');
+    log.info('🔄 DataSubscriptionActor: Cleaning up all subscriptions');
     
     // Clear all pending timers
     debounceTimers.forEach(timer => clearTimeout(timer));

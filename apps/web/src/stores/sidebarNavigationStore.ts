@@ -16,6 +16,8 @@ import { shallowEqual } from '@xstate/store'
 import type { EntitySchema } from '@/lib/schema-client'
 import { useOrgSchema } from '@/hooks/use-org-data-store'
 import { useAuth } from '@/lib/auth'
+import { stateLog } from '@/logger';
+const log = stateLog('stores/sidebarNavigationStore.ts');
 
 // 🎯 TYPED: Export types for components
 export type SidebarNavigation = {
@@ -46,7 +48,7 @@ export const sidebarNavigationStore = createStore({
       const startTime = performance.now()
       
       if (import.meta.env.DEV) {
-        console.log(`[SidebarNavigationStore] Recomputing navigation for ${event.projects.length} projects...`, {
+        log.info(`[SidebarNavigationStore] Recomputing navigation for ${event.projects.length} projects...`, {
           timestamp: new Date().toISOString(),
           projectIds: event.projects.map((p: Project) => p.id).slice(0, 3)
         })
@@ -71,7 +73,7 @@ export const sidebarNavigationStore = createStore({
       const computationTime = endTime - startTime
       
       if (import.meta.env.DEV) {
-        console.log(`[SidebarNavigationStore] ✅ Navigation computed in ${computationTime.toFixed(2)}ms for ${event.projects.length} projects`)
+        log.info(`[SidebarNavigationStore] ✅ Navigation computed in ${computationTime.toFixed(2)}ms for ${event.projects.length} projects`)
       }
       
       // Create hash for change detection
@@ -98,7 +100,7 @@ export const sidebarNavigationStore = createStore({
       const startTime = performance.now()
       
       if (import.meta.env.DEV) {
-        console.log(`[SidebarNavigationStore] Recomputing navigation with schema...`, {
+        log.info(`[SidebarNavigationStore] Recomputing navigation with schema...`, {
           timestamp: new Date().toISOString(),
           projectsCount: event.projects.length,
           entitiesCount: Object.keys(event.schema?.entities || {}).length
@@ -128,7 +130,7 @@ export const sidebarNavigationStore = createStore({
       const computationTime = endTime - startTime
       
       if (import.meta.env.DEV) {
-        console.log(`[SidebarNavigationStore] ✅ Navigation with schema computed in ${computationTime.toFixed(2)}ms`)
+        log.info(`[SidebarNavigationStore] ✅ Navigation with schema computed in ${computationTime.toFixed(2)}ms`)
       }
       
       const projectsHash = event.projects.map(p => `${p.id}-${p.updatedAt}`).join(',')
@@ -160,7 +162,7 @@ async function loadProjectsForSidebar() {
     const isRouteLoading = snapshot.context.isRouteLoading || false
     
     if (isRouteLoading) {
-      console.log('[SidebarNavigation] 🔄 Route loading in progress - deferring sidebar data loading')
+      log.info('[SidebarNavigation] 🔄 Route loading in progress - deferring sidebar data loading')
       return
     }
   }
@@ -168,23 +170,23 @@ async function loadProjectsForSidebar() {
 
   
   // Atoms removed - using Dexie directly
-  console.log('[SidebarNavigation] Using Dexie for data loading')
+  log.info('[SidebarNavigation] Using Dexie for data loading')
   
   // ✅ FALLBACK: Skip global data source check (removed with LiveStore)
-  console.log('[SidebarNavigation] Global data source check skipped - using Legend State')
+  log.info('[SidebarNavigation] Global data source check skipped - using Legend State')
   
   isLoadingProjects = true
   sidebarNavigationStore.trigger.setLoading({ isLoading: true })
-  console.log('[SidebarNavigation] Atoms empty and provider ready - loading data via atoms...')
+  log.info('[SidebarNavigation] Atoms empty and provider ready - loading data via atoms...')
   
   try {
     // 🎯 Domain-xstate removed - loading handled by Dexie
-    console.log('[SidebarNavigation] Domain-xstate removed - data loaded via Dexie')
+    log.info('[SidebarNavigation] Domain-xstate removed - data loaded via Dexie')
     
-    console.log('[SidebarNavigation] ✅ All atoms loaded successfully')
+    log.info('[SidebarNavigation] ✅ All atoms loaded successfully')
     
   } catch (error) {
-    console.error('[SidebarNavigation] Failed to load data via atoms:', error)
+    log.error('[SidebarNavigation] Failed to load data via atoms:', error)
   } finally {
     isLoadingProjects = false
     sidebarNavigationStore.trigger.setLoading({ isLoading: false })

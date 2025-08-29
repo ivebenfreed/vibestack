@@ -1,3 +1,5 @@
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/renderers/systems/PerformanceSystem.ts);
 // ====================================
 // PERFORMANCE MONITOR
 // ====================================
@@ -205,7 +207,7 @@ export class PerformanceSystem {
     const perItemTime = duration / updateCount;
     
     if (perItemTime > this.targets.cellUpdate) {
-      console.warn(`Slow batch update: ${duration.toFixed(2)}ms for ${updateCount} cells (${perItemTime.toFixed(2)}ms per cell)`);
+      log.warn(`Slow batch update: ${duration.toFixed(2)}ms for ${updateCount} cells (${perItemTime.toFixed(2)}ms per cell)`);
       
       this.emitEvent({
         type: 'batch.update',
@@ -259,7 +261,7 @@ export class PerformanceSystem {
    */
   logBreakdown(): void {
     const metrics = this.getMetrics();
-    console.log('🔍 RENDER PIPELINE BREAKDOWN:', {
+    log.info('🔍 RENDER PIPELINE BREAKDOWN:', {
       'Header': `${metrics.phases.header.toFixed(2)}ms`,
       'Viewport': `${metrics.phases.viewport.toFixed(2)}ms`,
       'Visible rows': `${metrics.phases.visibleRows.toFixed(2)}ms`,

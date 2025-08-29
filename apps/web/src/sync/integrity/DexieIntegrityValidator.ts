@@ -20,6 +20,8 @@ import {
 } from './IntegrityDecisionEngine';
 import { syncLogger } from '../utils/SyncLogger';
 import { isDatabaseEmpty, getDatabaseStats } from '../../db/dexie-storage';
+import { syncLog } from '@/logger';
+const log = syncLog('sync/integrity/DexieIntegrityValidator.ts');
 
 // Re-export types that validator needs
 export interface TableFingerprint {
@@ -82,11 +84,11 @@ export class DexieIntegrityValidator {
   constructor(config: IntegrityValidationConfig) {
     this.config = config;
     
-    console.log('[DexieIntegrityValidator] Initialized with config:', config);
+    log.info('[DexieIntegrityValidator] Initialized with config:', config);
     
     // Load persisted baseline
     const baseline = this.loadBaseline();
-    console.log('[DexieIntegrityValidator] Loaded baseline:', baseline);
+    log.info('[DexieIntegrityValidator] Loaded baseline:', baseline);
   }
 
   /**
@@ -99,7 +101,7 @@ export class DexieIntegrityValidator {
         return JSON.parse(stored);
       }
     } catch (error) {
-      console.warn('[DexieIntegrityValidator] Failed to load baseline:', error);
+      log.warn('[DexieIntegrityValidator] Failed to load baseline:', error);
       localStorage.removeItem('integrity-baseline');
     }
     return null;
@@ -111,9 +113,9 @@ export class DexieIntegrityValidator {
   private saveBaseline(baseline: any): void {
     try {
       localStorage.setItem('integrity-baseline', JSON.stringify(baseline));
-      console.log('[DexieIntegrityValidator] 💾 Baseline saved:', baseline);
+      log.info('[DexieIntegrityValidator] 💾 Baseline saved:', baseline);
     } catch (error) {
-      console.warn('[DexieIntegrityValidator] Failed to save baseline:', error);
+      log.warn('[DexieIntegrityValidator] Failed to save baseline:', error);
     }
   }
 
@@ -122,7 +124,7 @@ export class DexieIntegrityValidator {
    */
   async establishBaseline(reason: string): Promise<void> {
     try {
-      console.log(`[DexieIntegrityValidator] Establishing baseline: ${reason}`);
+      log.info(`[DexieIntegrityValidator] Establishing baseline: ${reason}`);
       
       // Create baseline with current timestamp
       const newBaseline = {
@@ -134,10 +136,10 @@ export class DexieIntegrityValidator {
       };
       
       this.saveBaseline(newBaseline);
-      console.log('[DexieIntegrityValidator] ✅ Baseline established without validation');
+      log.info('[DexieIntegrityValidator] ✅ Baseline established without validation');
       
     } catch (error) {
-      console.error('[DexieIntegrityValidator] Failed to establish baseline:', error);
+      log.error('[DexieIntegrityValidator] Failed to establish baseline:', error);
       throw error;
     }
   }
@@ -154,7 +156,7 @@ export class DexieIntegrityValidator {
    */
   setMessageSender(sender: IMessageSender): void {
     this.messageSender = sender;
-    console.log('[DexieIntegrityValidator] Message sender configured');
+    log.info('[DexieIntegrityValidator] Message sender configured');
   }
 
   /**
@@ -162,7 +164,7 @@ export class DexieIntegrityValidator {
    */
   setMachineRef(machineRef: any): void {
     this.machineRef = machineRef;
-    console.log('[DexieIntegrityValidator] Machine reference set for event-driven communication');
+    log.info('[DexieIntegrityValidator] Machine reference set for event-driven communication');
   }
 
   /**
@@ -377,7 +379,7 @@ export class DexieIntegrityValidator {
       const stats = await getDatabaseStats();
       const totalRecords = stats.total || 0;
 
-      console.log(`[DexieIntegrityValidator] Empty database check:`, {
+      log.info(`[DexieIntegrityValidator] Empty database check:`, {
         isEmpty,
         totalRecords,
         stats
@@ -398,7 +400,7 @@ export class DexieIntegrityValidator {
       };
 
     } catch (error) {
-      console.error('[DexieIntegrityValidator] Error checking for empty database:', error);
+      log.error('[DexieIntegrityValidator] Error checking for empty database:', error);
       // If we can't check, assume not empty to be safe
       return {
         isEmpty: false,
@@ -420,7 +422,7 @@ export class DexieIntegrityValidator {
       let totalChanges = 0;
       const tableBreakdown: Record<string, number> = {};
 
-      console.log(`[DexieIntegrityValidator] Counting records changed since: ${sinceDate.toISOString()}`);
+      log.info(`[DexieIntegrityValidator] Counting records changed since: ${sinceDate.toISOString()}`);
 
       for (const dexieTableName of CLIENT_DOMAIN_TABLES) {
         const table = db[dexieTableName] as Table;
@@ -437,7 +439,7 @@ export class DexieIntegrityValidator {
         totalChanges += count;
       }
 
-      console.log(`[DexieIntegrityValidator] Record count since baseline:`, {
+      log.info(`[DexieIntegrityValidator] Record count since baseline:`, {
         baselineDate: sinceDate.toISOString(),
         totalChanges,
         tableBreakdown
@@ -446,7 +448,7 @@ export class DexieIntegrityValidator {
       return { totalChanges, tableBreakdown };
 
     } catch (error) {
-      console.error('[DexieIntegrityValidator] Error counting records since baseline:', error);
+      log.error('[DexieIntegrityValidator] Error counting records since baseline:', error);
       throw error;
     }
   }
@@ -461,7 +463,7 @@ export class DexieIntegrityValidator {
     
     return new Promise(async (resolve, reject) => {
       try {
-        console.log('[DexieIntegrityValidator] Requesting baseline server validation...');
+        log.info('[DexieIntegrityValidator] Requesting baseline server validation...');
         
         // Generate fingerprints for modified data since baseline
         const fingerprints = await this.generateFingerprintsSinceTimestamp(baselineTimestamp);
@@ -469,7 +471,7 @@ export class DexieIntegrityValidator {
         const validationId = crypto.randomUUID();
         const timeout = setTimeout(() => {
           this.pendingValidations.delete(validationId);
-          console.warn('[DexieIntegrityValidator] Baseline validation timeout');
+          log.warn('[DexieIntegrityValidator] Baseline validation timeout');
           reject(new Error('Baseline validation timeout'));
         }, this.config.validationTimeoutMs);
 
@@ -485,7 +487,7 @@ export class DexieIntegrityValidator {
         };
 
         // Send baseline validation request
-        console.log('[DexieIntegrityValidator] 🔍 DEBUG: About to send validation request', {
+        log.info('[DexieIntegrityValidator] 🔍 DEBUG: About to send validation request', {
           hasMessageSender: !!this.messageSender,
           messageSenderType: this.messageSender?.constructor?.name,
           validationId,
@@ -498,10 +500,10 @@ export class DexieIntegrityValidator {
           ...validationRequest
         });
 
-        console.log('[DexieIntegrityValidator] ✅ Baseline validation request sent successfully');
+        log.info('[DexieIntegrityValidator] ✅ Baseline validation request sent successfully');
 
       } catch (error) {
-        console.error('[DexieIntegrityValidator] Error requesting baseline server validation:', error);
+        log.error('[DexieIntegrityValidator] Error requesting baseline server validation:', error);
         reject(error);
       }
     });
@@ -514,7 +516,7 @@ export class DexieIntegrityValidator {
     const fingerprints: Record<string, TableFingerprint> = {};
     const sinceDate = new Date(sinceTimestamp);
     
-    console.log(`[DexieIntegrityValidator] Generating fingerprints for data since: ${sinceDate.toISOString()}`);
+    log.info(`[DexieIntegrityValidator] Generating fingerprints for data since: ${sinceDate.toISOString()}`);
 
     for (const dexieTableName of CLIENT_DOMAIN_TABLES) {
       try {
@@ -524,12 +526,12 @@ export class DexieIntegrityValidator {
           sinceDate
         );
       } catch (error) {
-        console.error(`[DexieIntegrityValidator] Error generating fingerprint for ${dexieTableName}:`, error);
+        log.error(`[DexieIntegrityValidator] Error generating fingerprint for ${dexieTableName}:`, error);
         // Continue with other tables
       }
     }
 
-    console.log(`[DexieIntegrityValidator] Generated ${Object.keys(fingerprints).length} fingerprints since baseline`);
+    log.info(`[DexieIntegrityValidator] Generated ${Object.keys(fingerprints).length} fingerprints since baseline`);
     return fingerprints;
   }
 
@@ -594,12 +596,12 @@ export class DexieIntegrityValidator {
    * Perform full validation (when no baseline available)
    */
   private async performFullValidation(reason: string): Promise<IntegrityValidationResult> {
-    console.log(`[DexieIntegrityValidator] Performing full validation: ${reason}`);
+    log.info(`[DexieIntegrityValidator] Performing full validation: ${reason}`);
 
     if (this.config.enableServerValidation && this.messageSender) {
       return await this.requestServerValidation();
     } else {
-      console.log('[DexieIntegrityValidator] Server validation disabled, performing local validation');
+      log.info('[DexieIntegrityValidator] Server validation disabled, performing local validation');
       return await this.performLocalValidation();
     }
   }
@@ -611,14 +613,14 @@ export class DexieIntegrityValidator {
     
     return new Promise(async (resolve, reject) => {
       try {
-        console.log('[DexieIntegrityValidator] Requesting full server validation...');
+        log.info('[DexieIntegrityValidator] Requesting full server validation...');
         
         const fingerprints = await this.generateLocalFingerprints();
         
         const validationId = crypto.randomUUID();
         const timeout = setTimeout(() => {
           this.pendingValidations.delete(validationId);
-          console.warn('[DexieIntegrityValidator] Full validation timeout');
+          log.warn('[DexieIntegrityValidator] Full validation timeout');
           reject(new Error('Full validation timeout'));
         }, this.config.validationTimeoutMs);
 
@@ -635,10 +637,10 @@ export class DexieIntegrityValidator {
           ...validationRequest
         });
 
-        console.log('[DexieIntegrityValidator] Full validation request sent');
+        log.info('[DexieIntegrityValidator] Full validation request sent');
 
       } catch (error) {
-        console.error('[DexieIntegrityValidator] Error requesting server validation:', error);
+        log.error('[DexieIntegrityValidator] Error requesting server validation:', error);
         reject(error);
       }
     });
@@ -649,7 +651,7 @@ export class DexieIntegrityValidator {
    */
   private async performLocalValidation(): Promise<IntegrityValidationResult> {
     try {
-      console.log('[DexieIntegrityValidator] Performing local integrity validation...');
+      log.info('[DexieIntegrityValidator] Performing local integrity validation...');
 
       // Basic local validation - check for obvious inconsistencies
       const fingerprints = await this.generateLocalFingerprints();
@@ -658,12 +660,12 @@ export class DexieIntegrityValidator {
       // Check if any tables are completely empty (might indicate issues)
       for (const [tableName, fingerprint] of Object.entries(fingerprints)) {
         if (fingerprint.recordCount === 0) {
-          console.warn(`[DexieIntegrityValidator] Warning: Table ${tableName} is empty`);
+          log.warn(`[DexieIntegrityValidator] Warning: Table ${tableName} is empty`);
           // This might be valid, so don't treat as error
         }
       }
 
-      console.log('[DexieIntegrityValidator] Local validation completed:', {
+      log.info('[DexieIntegrityValidator] Local validation completed:', {
         tablesChecked: Object.keys(fingerprints).length,
         issuesFound: issues.length
       });
@@ -679,7 +681,7 @@ export class DexieIntegrityValidator {
         };
         
         this.saveBaseline(newBaseline);
-        console.log('[DexieIntegrityValidator] ✅ Baseline established after successful validation');
+        log.info('[DexieIntegrityValidator] ✅ Baseline established after successful validation');
       }
 
       return {
@@ -690,7 +692,7 @@ export class DexieIntegrityValidator {
       };
 
     } catch (error) {
-      console.error('[DexieIntegrityValidator] Local validation error:', error);
+      log.error('[DexieIntegrityValidator] Local validation error:', error);
       return {
         isValid: false,
         issues: [{ type: 'local_validation_error', message: error instanceof Error ? error.message : 'Unknown error' }],
@@ -706,19 +708,19 @@ export class DexieIntegrityValidator {
   async generateLocalFingerprints(): Promise<Record<string, TableFingerprint>> {
     const fingerprints: Record<string, TableFingerprint> = {};
 
-    console.log('[DexieIntegrityValidator] Generating local fingerprints for all tables...');
+    log.info('[DexieIntegrityValidator] Generating local fingerprints for all tables...');
 
     for (const dexieTableName of CLIENT_DOMAIN_TABLES) {
       try {
         const dbTableName = DEXIE_TO_DB_TABLE_MAP[dexieTableName] || dexieTableName;
         fingerprints[dbTableName] = await this.generateTableFingerprint(dexieTableName);
       } catch (error) {
-        console.error(`[DexieIntegrityValidator] Error generating fingerprint for ${dexieTableName}:`, error);
+        log.error(`[DexieIntegrityValidator] Error generating fingerprint for ${dexieTableName}:`, error);
         // Continue with other tables
       }
     }
 
-    console.log(`[DexieIntegrityValidator] Generated ${Object.keys(fingerprints).length} local fingerprints`);
+    log.info(`[DexieIntegrityValidator] Generated ${Object.keys(fingerprints).length} local fingerprints`);
     return fingerprints;
   }
 
@@ -777,7 +779,7 @@ export class DexieIntegrityValidator {
    * Handle validation response from server
    */
   async handleValidationResponse(message: any): Promise<IntegrityValidationResult> {
-    console.log('[DexieIntegrityValidator] Received validation response from server:', message);
+    log.info('[DexieIntegrityValidator] Received validation response from server:', message);
     
     const result: IntegrityValidationResult = {
       isValid: message.isValid,
@@ -789,7 +791,7 @@ export class DexieIntegrityValidator {
     };
     
     // Log validation result analysis including rollback info
-    console.log('[DexieIntegrityValidator] 🔍 Validation result analysis:', {
+    log.info('[DexieIntegrityValidator] 🔍 Validation result analysis:', {
       isValid: result.isValid,
       issueCount: result.issues.length,
       recommendedAction: result.recommendedAction,
@@ -799,12 +801,12 @@ export class DexieIntegrityValidator {
 
     // If catchup is recommended with rollback LSN, notify about the rollback strategy
     if (result.recommendedAction === 'catchup' && result.rollbackToLSN) {
-      console.log(`[DexieIntegrityValidator] 🔄 Server recommends catchup with rollback to LSN ${result.rollbackToLSN}: ${result.rollbackReason}`);
+      log.info(`[DexieIntegrityValidator] 🔄 Server recommends catchup with rollback to LSN ${result.rollbackToLSN}: ${result.rollbackReason}`);
     }
     
     // Resolve any pending validation promises
     for (const [key, pending] of this.pendingValidations) {
-      console.log(`[DexieIntegrityValidator] Resolving pending validation: ${key}`);
+      log.info(`[DexieIntegrityValidator] Resolving pending validation: ${key}`);
       clearTimeout(pending.timeout);
       this.pendingValidations.delete(key);
       pending.resolve(result);
@@ -821,7 +823,7 @@ export class DexieIntegrityValidator {
       rollbackReason: result.rollbackReason
     });
     
-    console.log('[DexieIntegrityValidator] Validation response processed');
+    log.info('[DexieIntegrityValidator] Validation response processed');
     return result;
   }
 
@@ -856,9 +858,9 @@ export class DexieIntegrityValidator {
     if (this.machineRef) {
       try {
         this.machineRef.send(event);
-        console.log('[DexieIntegrityValidator] Event sent to machine:', event.type);
+        log.info('[DexieIntegrityValidator] Event sent to machine:', event.type);
       } catch (error) {
-        console.warn('[DexieIntegrityValidator] Failed to send event to machine:', error);
+        log.warn('[DexieIntegrityValidator] Failed to send event to machine:', error);
       }
     }
   }

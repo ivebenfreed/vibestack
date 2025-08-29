@@ -1,6 +1,8 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/overlays/ClipboardOverlayDOM.ts');
 
 // ====================================
 // CLIPBOARD OVERLAY - DOM Implementation
@@ -69,7 +71,7 @@ export class ClipboardOverlayDOM {
     visualCells: VisualCellPosition[],
     isCut: boolean
   ): void {
-    console.log('ClipboardOverlayDOM: Updating with visual positions', {
+    log.info('ClipboardOverlayDOM: Updating with visual positions', {
       cellCount: visualCells.length,
       isCut
     });
@@ -90,7 +92,7 @@ export class ClipboardOverlayDOM {
     }
     
     if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      console.error('ClipboardOverlayDOM: Invalid bounds calculated');
+      log.error('ClipboardOverlayDOM: Invalid bounds calculated');
       this.clear();
       return;
     }
@@ -99,7 +101,7 @@ export class ClipboardOverlayDOM {
     const height = maxY - minY;
     
     if (width <= 0 || height <= 0) {
-      console.warn('ClipboardOverlayDOM: Invalid dimensions', { width, height });
+      log.warn('ClipboardOverlayDOM: Invalid dimensions', { width, height });
       this.clear();
       return;
     }
@@ -114,7 +116,7 @@ export class ClipboardOverlayDOM {
     clipboardState: { copiedCells: Set<string>; isCut: boolean } | null,
     viewport: ViewportInfo | null
   ): void {
-    console.log('ClipboardOverlayDOM: updateIndicator called', {
+    log.info('ClipboardOverlayDOM: updateIndicator called', {
       hasClipboardState: !!clipboardState,
       hasViewport: !!viewport,
       cellCount: clipboardState?.copiedCells.size || 0
@@ -128,7 +130,7 @@ export class ClipboardOverlayDOM {
     // Calculate bounds of copied cells
     const bounds = this.calculateBounds(clipboardState.copiedCells, viewport);
     if (!bounds) {
-      console.warn('ClipboardOverlayDOM: No bounds calculated');
+      log.warn('ClipboardOverlayDOM: No bounds calculated');
       this.clear();
       return;
     }
@@ -181,7 +183,7 @@ export class ClipboardOverlayDOM {
     // Animate the dashed border
     this.startDashAnimation();
     
-    console.log('ClipboardOverlayDOM: Indicator shown', {
+    log.info('ClipboardOverlayDOM: Indicator shown', {
       x, y, width, height, isCut, color
     });
   }
@@ -271,7 +273,7 @@ export class ClipboardOverlayDOM {
       this.indicator = null;
     }
     
-    console.log('ClipboardOverlayDOM: Indicator cleared');
+    log.info('ClipboardOverlayDOM: Indicator cleared');
   }
   
   /**

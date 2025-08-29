@@ -1,4 +1,6 @@
 import type { RelationshipOptionsProvider, RelationshipContext } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/providers/user-provider.ts');
 
 /**
  * @deprecated This atom-based provider is deprecated.
@@ -10,6 +12,6 @@ import type { RelationshipOptionsProvider, RelationshipContext } from '../types'
  * Sorted by displayName/name
  */
 export const userProvider: RelationshipOptionsProvider = async (context: RelationshipContext) => {
-  console.warn('⚠️ DEPRECATED: Atom-based user provider called. VibeGrid uses Dexie providers.');
+  log.warn('⚠️ DEPRECATED: Atom-based user provider called. VibeGrid uses Dexie providers.');
   return [];
 };

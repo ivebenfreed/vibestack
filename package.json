@@ -48,7 +48,19 @@
     "logs:cull": "./scripts/cull-logs.sh",
     "ensure-docker:local": "node scripts/ensure-docker-services.js",
     "setup:env": "node scripts/setup-worktree-env.js",
-    "setup:worktree": "pnpm install && node scripts/setup-worktree-env.js && echo '✅ Worktree setup complete'"
+    "setup:worktree": "pnpm install && node scripts/setup-worktree-env.js && echo '✅ Worktree setup complete'",
+    "log:focus": "./scripts/set-log-focus.sh",
+    "log:vibegrid": "./scripts/set-log-focus.sh vibegrid",
+    "log:sync": "./scripts/set-log-focus.sh sync", 
+    "log:quiet": "./scripts/set-log-focus.sh quiet",
+    "log:quiet-except": "./scripts/set-log-focus.sh quiet-except",
+    "log:clear": "./scripts/set-log-focus.sh clear",
+    "log:analyze": "./scripts/migrate-logging.sh analyze",
+    "log:migrate": "./scripts/migrate-logging.sh migrate",
+    "log:migrate:dry": "./scripts/migrate-logging.sh migrate --dry-run",
+    "log:validate": "./scripts/migrate-logging.sh validate",
+    "log:fix": "./scripts/fix-logging-imports.sh",
+    "log:rollback": "./scripts/migrate-logging.sh rollback"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

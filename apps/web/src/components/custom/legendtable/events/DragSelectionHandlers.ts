@@ -5,6 +5,8 @@
 import { useCallback, MutableRefObject } from 'react';
 import type { TableState } from '../state/table-state';
 import type { ViewportInfo } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/events/DragSelectionHandlers.ts');
 
 // ====================================
 // TYPES
@@ -36,7 +38,7 @@ export const createMouseDownHandler = (
     // Handle fill handle specially - stop propagation to prevent conflicts
     const target = event.target as HTMLElement;
     if (target.classList.contains('vibegridx-fill-handle') || target.closest('.vibegridx-fill-handle')) {
-      console.log('[DragSelectionHandlers] Fill handle detected - stopping propagation:', target.className);
+      log.info('[DragSelectionHandlers] Fill handle detected - stopping propagation:', target.className);
       // Stop the event from propagating to prevent any conflicts
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -46,7 +48,7 @@ export const createMouseDownHandler = (
     
     if (target.classList.contains('vibegridx-selection-overlay') ||
         target.closest('.vibegridx-selection-overlay')) {
-      console.log('[DragSelectionHandlers] Ignoring mousedown on overlay element:', target.className);
+      log.info('[DragSelectionHandlers] Ignoring mousedown on overlay element:', target.className);
       return;
     }
     
@@ -63,7 +65,7 @@ export const createMouseDownHandler = (
       return;
     }
     
-    console.log('[LegendTable] Mouse down on cell:', { rowId, columnId });
+    log.info('[LegendTable] Mouse down on cell:', { rowId, columnId });
     
     // Initialize drag state
     refs.dragStateRef.current = {
@@ -115,7 +117,7 @@ export const createMouseMoveHandler = (
         // Start drag selection
         dragState.isDragging = true;
         lastCellKey = `${dragState.startCell.rowId}:${dragState.startCell.columnId}`;
-        console.log('[LegendTable] Starting drag selection from:', lastCellKey);
+        log.info('[LegendTable] Starting drag selection from:', lastCellKey);
       }
     }
     
@@ -133,7 +135,7 @@ export const createMouseMoveHandler = (
           
           // Only update selection if we've moved to a different cell
           if (currentCellKey !== lastCellKey) {
-            console.log('[LegendTable] Drag move:', { from: lastCellKey, to: currentCellKey });
+            log.info('[LegendTable] Drag move:', { from: lastCellKey, to: currentCellKey });
             lastCellKey = currentCellKey;
             
             // Calculate range selection from start to current cell
@@ -160,7 +162,7 @@ export const createMouseUpHandler = (
     const dragState = refs.dragStateRef.current;
     
     if (dragState.isDragging) {
-      console.log('[LegendTable] Drag selection complete');
+      log.info('[LegendTable] Drag selection complete');
       // Selection was already handled by drag move events
     } else if (dragState.startCell) {
       // It was a click (not a drag), handle selection

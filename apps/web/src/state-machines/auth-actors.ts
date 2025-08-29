@@ -1,11 +1,14 @@
 import { fromPromise } from 'xstate';
 import { authClient } from '@/lib/auth'; // User's existing auth client
 import type { UserInfo } from './types';
+import { syncLog } from '@/logger';
+
+const log = syncLog('state-machines/auth-actors.ts');
 
 // Actor for checking auth - handles network errors gracefully
 export const checkAuthActor = fromPromise(async () => {
   try {
-    console.log('[checkAuthActor] Checking authentication...');
+    log.info('[checkAuthActor] Checking authentication...');
     
     // Direct auth check via authClient
     const session = await authClient.getSession();
@@ -33,7 +36,7 @@ export const checkAuthActor = fromPromise(async () => {
         new Date(session.data.session.expiresAt).toISOString() : 
         null;
       
-      console.log('[checkAuthActor] Session data:', {
+      log.info('[checkAuthActor] Session data:', {
         hasUser: !!session.data.user,
         hasSession: !!session.data.session,
         hasOrganization: !!organization,
@@ -56,11 +59,11 @@ export const checkAuthActor = fromPromise(async () => {
     }
     
     // No user in session - this is a legitimate auth failure
-    console.log('[checkAuthActor] No user found in session');
+    log.info('[checkAuthActor] No user found in session');
     return { authenticated: false, shouldSignOut: true };
     
   } catch (error) {
-    console.error('[checkAuthActor] Auth check failed:', error);
+    log.error('[checkAuthActor] Auth check failed:', error);
     
     // Try to get persisted auth data before deciding what to do
     const persistedAuth = localStorage.getItem('auth-machine-state');
@@ -106,7 +109,7 @@ export const checkAuthActor = fromPromise(async () => {
     
     // If we have valid persisted auth and it's a server/network error, stay authenticated
     if ((isNetworkError || isServerError) && hasValidPersistedAuth) {
-      console.log('[checkAuthActor] Server/network error but have valid persisted auth, staying authenticated');
+      log.info('[checkAuthActor] Server/network error but have valid persisted auth, staying authenticated');
       try {
         const parsed = JSON.parse(persistedAuth!);
         return {
@@ -125,7 +128,7 @@ export const checkAuthActor = fromPromise(async () => {
     
     if (isNetworkError || isServerError) {
       // Network/server errors - don't sign out, keep trying
-      console.log('[checkAuthActor] Network/server error detected, not signing out user');
+      log.info('[checkAuthActor] Network/server error detected, not signing out user');
       return { 
         authenticated: false, 
         shouldSignOut: false, 
@@ -136,7 +139,7 @@ export const checkAuthActor = fromPromise(async () => {
     } else if (isAuthError) {
       // Actual auth errors - only sign out if we don't have valid persisted auth
       if (hasValidPersistedAuth) {
-        console.log('[checkAuthActor] Auth error but have valid persisted session, not signing out yet');
+        log.info('[checkAuthActor] Auth error but have valid persisted session, not signing out yet');
         return { 
           authenticated: false, 
           shouldSignOut: false, 
@@ -145,7 +148,7 @@ export const checkAuthActor = fromPromise(async () => {
           retryable: true
         };
       }
-      console.log('[checkAuthActor] Authentication error detected, will sign out');
+      log.info('[checkAuthActor] Authentication error detected, will sign out');
       return { 
         authenticated: false, 
         shouldSignOut: true, 
@@ -154,7 +157,7 @@ export const checkAuthActor = fromPromise(async () => {
       };
     } else {
       // Unknown errors - be conservative, don't sign out immediately
-      console.log('[checkAuthActor] Unknown error, not signing out to be safe');
+      log.info('[checkAuthActor] Unknown error, not signing out to be safe');
       return { 
         authenticated: false, 
         shouldSignOut: false, 
@@ -171,21 +174,21 @@ export const signInActor = fromPromise(async ({ input }: {
   input: { email: string; password: string } 
 }) => {
   try {
-    console.log('[signInActor] Starting sign-in process for:', input.email);
+    log.info('[signInActor] Starting sign-in process for:', input.email);
     
     const result = await authClient.signIn.email({
       email: input.email,
       password: input.password,
     });
     
-    console.log('[signInActor] Auth client result:', {
+    log.info('[signInActor] Auth client result:', {
       hasError: !!result.error,
       hasData: !!result.data,
       errorMessage: result.error?.message
     });
     
     if (result.error) {
-      console.error('[signInActor] Sign-in failed with error:', result.error.message);
+      log.error('[signInActor] Sign-in failed with error:', result.error.message);
       return {
         success: false,
         error: result.error.message,
@@ -197,10 +200,10 @@ export const signInActor = fromPromise(async ({ input }: {
     
     // CRITICAL FIX: Sign-in response may not include full user data with role
     // Get fresh session data immediately after successful sign-in to ensure we have the role
-    console.log('[signInActor] Sign-in successful, fetching full session data...');
+    log.info('[signInActor] Sign-in successful, fetching full session data...');
     const session = await authClient.getSession();
     
-    console.log('[signInActor] Session fetch result:', {
+    log.info('[signInActor] Session fetch result:', {
       hasSession: !!session,
       hasData: !!session?.data,
       hasUser: !!session?.data?.user,
@@ -208,7 +211,7 @@ export const signInActor = fromPromise(async ({ input }: {
     });
     
     if (!session?.data?.user) {
-      console.error('[signInActor] Failed to get session data after sign-in');
+      log.error('[signInActor] Failed to get session data after sign-in');
       return {
         success: false,
         error: 'Failed to get session data after sign-in',
@@ -225,7 +228,7 @@ export const signInActor = fromPromise(async ({ input }: {
       image: session.data.user.image,
     };
     
-    console.log('[signInActor] Successfully created user object:', {
+    log.info('[signInActor] Successfully created user object:', {
       userId: user.id,
       userEmail: user.email,
       userRole: user.role,
@@ -241,7 +244,7 @@ export const signInActor = fromPromise(async ({ input }: {
     // Extract organization data from session if available
     const organization = (session.data.session as any)?.organization || null;
     
-    console.log('[signInActor] Returning success result with user data and organization:', organization?.name || 'No org');
+    log.info('[signInActor] Returning success result with user data and organization:', organization?.name || 'No org');
     return {
       user,
       authToken,
@@ -249,7 +252,7 @@ export const signInActor = fromPromise(async ({ input }: {
       organization, // Include organization from session
     };
   } catch (error) {
-    console.error('[signInActor] Unexpected error during sign-in:', error);
+    log.error('[signInActor] Unexpected error during sign-in:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Sign-in failed',
@@ -269,7 +272,7 @@ export const signOutActor = fromPromise(async () => {
     // Success - auth machine will handle the state transition
     return { success: true };
   } catch (error) {
-    console.error('[signOutActor] Sign-out failed:', error);
+    log.error('[signOutActor] Sign-out failed:', error);
     
     // Even on error, clear auth state
     localStorage.removeItem('auth-machine-state');
@@ -288,7 +291,7 @@ export const validateTokenActor = fromPromise(async () => {
     const session = await authClient.getSession();
     return { valid: !!session?.data?.user };
   } catch (error) {
-    console.error('Token validation failed:', error);
+    log.error('Token validation failed:', error);
     return { valid: false };
   }
 }); 

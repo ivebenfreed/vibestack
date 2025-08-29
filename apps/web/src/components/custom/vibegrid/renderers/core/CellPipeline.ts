@@ -12,6 +12,8 @@ import {
 } from '../cell-renderers';
 import { relationshipMultiBadge, relationshipMultiBadgeString } from '../cell-renderers/relationship/multi-badge';
 import { relationshipSingleBadge } from '../cell-renderers/relationship/single';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/renderers/core/CellPipeline.ts');
 
 // ====================================
 // CELL RENDERING PIPELINE
@@ -54,7 +56,7 @@ export class CellPipeline {
     
     // Debug relationship rendering disabled for performance
     // if (cellType?.startsWith('relationship') && column.id === 'assignee') {
-    //   console.log('🔍 CellPipeline: Rendering relationship', { columnId: column.id, cellType });
+    //   log.info('🔍 CellPipeline: Rendering relationship', { columnId: column.id, cellType });
     // }
     
     // For relationship types, pass row data for pre-resolved values

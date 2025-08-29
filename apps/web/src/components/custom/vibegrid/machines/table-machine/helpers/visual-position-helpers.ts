@@ -4,6 +4,8 @@
 
 import type { ViewportInfo } from '../../../types';
 import type { VisualCellPosition } from '../../../overlays/OverlayTypes';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/helpers/visual-position-helpers.ts');
 
 /**
  * Calculate visual positions for selected cells based on viewport
@@ -14,7 +16,7 @@ export const calculateVisualPositions = (
   viewport: ViewportInfo | null,
   rowHeight: number
 ): VisualCellPosition[] => {
-  console.log('calculateVisualPositions:', {
+  log.info('calculateVisualPositions:', {
     selectedCells: Array.from(selectedCells),
     hasCoordinateMapping: !!coordinateMapping,
     viewport,
@@ -30,7 +32,7 @@ export const calculateVisualPositions = (
     
     // Debug coordinate mapping structure
     if (selectedCells.size === 1) { // Only log once
-      console.log('Coordinate mapping structure:', {
+      log.info('Coordinate mapping structure:', {
         rowsCount: coordinateMapping.rows?.length,
         firstRow: coordinateMapping.rows?.[0],
         columnsCount: coordinateMapping.columns?.length,
@@ -41,14 +43,14 @@ export const calculateVisualPositions = (
     // Find row in coordinate mapping
     const rowData = coordinateMapping.rows.find((r: any) => r.rowId === rowId);
     if (!rowData) {
-      console.log('Row not found in coordinate mapping:', rowId);
+      log.info('Row not found in coordinate mapping:', rowId);
       continue;
     }
     
     // Find column in coordinate mapping
     const colData = coordinateMapping.columns.find((c: any) => c.columnId === columnId);
     if (!colData) {
-      console.log('Column not found in coordinate mapping:', {
+      log.info('Column not found in coordinate mapping:', {
         searchingFor: columnId,
         availableColumns: coordinateMapping.columns.map((c: any) => ({ id: c.columnId, offset: c.offset }))
       });
@@ -56,7 +58,7 @@ export const calculateVisualPositions = (
     }
     
     // Debug: Log what we found
-    console.log('Column found in coordinate mapping:', {
+    log.info('Column found in coordinate mapping:', {
       columnId,
       colData,
       allColumnsWithOffsets: coordinateMapping.columns.map((c: any) => ({ 
@@ -68,11 +70,11 @@ export const calculateVisualPositions = (
     });
     
     const absoluteRowIndex = rowData.sortedIndex;
-    console.log('Row found:', { rowId, absoluteRowIndex, viewport });
+    log.info('Row found:', { rowId, absoluteRowIndex, viewport });
     
     // Allow rendering selections even when scrolled off-screen
     // Canvas transform will handle positioning correctly
-    console.log('Row position calculation (allowing off-screen):', { 
+    log.info('Row position calculation (allowing off-screen):', { 
       absoluteRowIndex, 
       viewportStart: viewport.start, 
       viewportEnd: viewport.end,
@@ -88,7 +90,7 @@ export const calculateVisualPositions = (
     const scrollCompensatedY = baseY - (viewport.scrollTop || 0);
     const scrollCompensatedX = baseX - (viewport.scrollLeft || 0);
     
-    console.log('calculateVisualPositions: Cell position calculation', {
+    log.info('calculateVisualPositions: Cell position calculation', {
       cellKey,
       absoluteRowIndex,
       baseY,

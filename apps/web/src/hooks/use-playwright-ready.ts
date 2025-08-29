@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from '@tanstack/react-router';
+import { stateLog } from '@/logger';
+const log = stateLog('hooks/use-playwright-ready.ts');
 
 /**
  * Simple hook to log when a route is ready for Playwright tests.
@@ -19,7 +21,7 @@ export function usePlaywrightReady(customMessage?: string) {
     }
     
     const message = customMessage || `[PLAYWRIGHT_READY] ${location.pathname}`;
-    console.log(message);
+    log.info(message);
     
     // Also set a data attribute on body for alternative detection
     document.body.setAttribute('data-playwright-ready', 'true');

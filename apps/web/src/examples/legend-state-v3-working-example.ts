@@ -14,6 +14,8 @@ import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { syncedFetch } from '@legendapp/state/sync-plugins/fetch'
 import { ObservablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
 import { configureObservableSync, type PersistOptions, type SyncedOptions } from '@legendapp/state/sync'
+import { uiLog } from '@/logger';
+const log = uiLog('examples/legend-state-v3-working-example.ts');
 
 // ✅ EXAMPLE 1: Basic synced observable with REST API
 export const basicSyncedExample = () => {
@@ -28,7 +30,7 @@ export const basicSyncedExample = () => {
     },
     
     set: async ({ value, changes }) => {
-      console.log('Syncing changes:', { value, changes })
+      log.info('Syncing changes:', { value, changes })
       // Handle individual changes here
       return { value }
     },
@@ -51,13 +53,13 @@ export const crudSyncedExample = (orgId: string, entityName: string) => {
   const data$ = observable(syncedCrud({
     // Fetch all items
     list: async () => {
-      console.log(`Fetching ${entityName} data...`)
+      log.info(`Fetching ${entityName} data...`)
       const response = await fetch(baseUrl, {
         credentials: 'include'
       })
       
       if (!response.ok) {
-        console.warn(`Failed to fetch ${entityName}:`, response.status)
+        log.warn(`Failed to fetch ${entityName}:`, response.status)
         return []
       }
       
@@ -67,7 +69,7 @@ export const crudSyncedExample = (orgId: string, entityName: string) => {
     
     // Create new item
     create: async (item: any) => {
-      console.log(`Creating ${entityName}:`, item)
+      log.info(`Creating ${entityName}:`, item)
       const response = await fetch(baseUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,7 +84,7 @@ export const crudSyncedExample = (orgId: string, entityName: string) => {
     
     // Update existing item
     update: async (item: any) => {
-      console.log(`Updating ${entityName}:`, item)
+      log.info(`Updating ${entityName}:`, item)
       const response = await fetch(`${baseUrl}/${item.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +99,7 @@ export const crudSyncedExample = (orgId: string, entityName: string) => {
     
     // Delete item
     delete: async (item: any) => {
-      console.log(`Deleting ${entityName}:`, item)
+      log.info(`Deleting ${entityName}:`, item)
       const response = await fetch(`${baseUrl}/${item.id}`, {
         method: 'DELETE',
         credentials: 'include'
@@ -158,7 +160,7 @@ export const configureGlobalSync = () => {
     
     // Debug mode
     onError: (error, params) => {
-      console.error('Legend State sync error:', error, params)
+      log.error('Legend State sync error:', error, params)
     }
   })
 }
@@ -217,7 +219,7 @@ export const useBasicSync = () => {
   
   // Read data
   const projects = projects$.get()
-  console.log('Projects:', projects)
+  log.info('Projects:', projects)
   
   // Update data (triggers sync)
   projects$.set([...projects, { id: '123', name: 'New Project' }])
@@ -229,7 +231,7 @@ export const useCrudSync = () => {
   
   // The syncedCrud automatically handles CRUD operations
   const projects = projects$.get()
-  console.log('Projects:', projects)
+  log.info('Projects:', projects)
   
   // Add new project (triggers create API call)
   const newProject = { name: 'New Project', description: 'Test project' }

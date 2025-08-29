@@ -1,3 +1,5 @@
+import { syncLog } from '@/logger';
+const log = syncLog('sync/utils/SyncLogger.ts);
 /**
  * SyncLogger - Centralized Logging for Sync System
  * 
@@ -90,13 +92,13 @@ export class SyncLogger {
     switch (level) {
       case 'debug':
       case 'info':
-        console.log(formatted, data ? data : '');
+        log.info(formatted, data ? data : '');
         break;
       case 'warn':
-        console.warn(formatted, data ? data : '');
+        log.warn(formatted, data ? data : '');
         break;
       case 'error':
-        console.error(formatted, data ? data : '');
+        log.error(formatted, data ? data : '');
         break;
     }
   }

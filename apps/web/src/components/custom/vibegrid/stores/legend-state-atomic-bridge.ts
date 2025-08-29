@@ -11,6 +11,9 @@ import React from 'react';
 import { observe, when, batch } from '@legendapp/state';
 import { getEntity$, orgContext$ } from '@/legend-state/observables';
 import { fromStore } from '@xstate/store';
+import { uiLog } from '@/logger';
+
+const log = uiLog('components/custom/vibegrid/stores/legend-state-atomic-bridge.ts');
 
 // ====================================
 // ATOMIC OBSERVABLE BRIDGE
@@ -24,7 +27,7 @@ export function createAtomicObservableBridge(
   entityTableName: string,
   tableSend: (event: any) => void
 ) {
-  console.log(`🔗 AtomicBridge: Creating for ${entityTableName}`);
+  log.info(`🔗 AtomicBridge: Creating for ${entityTableName}`);
   
   let isInitialized = false;
   
@@ -35,7 +38,7 @@ export function createAtomicObservableBridge(
   
   const entityDataDisposer = observe(() => {
     observerRunCount++;
-    console.log(`🔗 AtomicBridge: Manual change tracking observer running for ${entityTableName}`, {
+    log.info(`🔗 AtomicBridge: Manual change tracking observer running for ${entityTableName}`, {
       runCount: observerRunCount,
       timestamp: Date.now(),
       hasPreviousData: !!previousEntityData
@@ -45,7 +48,7 @@ export function createAtomicObservableBridge(
       // Use the fixed getEntity$ function instead of entities$.get()
       const entityObservable = getEntity$(entityTableName);
       if (!entityObservable) {
-        console.log(`🔗 AtomicBridge: Entity observable ${entityTableName} not available yet`);
+        log.info(`🔗 AtomicBridge: Entity observable ${entityTableName} not available yet`);
         return;
       }
       
@@ -56,19 +59,19 @@ export function createAtomicObservableBridge(
         // This .get() call enables Legend State tracking in the observe()
         currentEntityData = entityObservable.get();
       } catch (accessError) {
-        console.warn(`🔗 AtomicBridge: Could not access entity data (likely still initializing):`, accessError?.message || accessError);
+        log.warn(`🔗 AtomicBridge: Could not access entity data (likely still initializing):`, accessError?.message || accessError);
         return;
       }
       
       if (!currentEntityData || (typeof currentEntityData === 'object' && Object.keys(currentEntityData).length === 0)) {
-        console.log(`🔗 AtomicBridge: Entity data ${entityTableName} is empty or null`);
+        log.info(`🔗 AtomicBridge: Entity data ${entityTableName} is empty or null`);
         return;
       }
       
       // FIXED: Manual change detection with proper state tracking
       const isInitialLoad = !isInitialized || !previousEntityData;
       
-      console.log(`🔗 AtomicBridge: Manual change detection analysis`, {
+      log.info(`🔗 AtomicBridge: Manual change detection analysis`, {
         entityTableName,
         isInitialLoad,
         currentDataType: typeof currentEntityData,
@@ -86,11 +89,11 @@ export function createAtomicObservableBridge(
         } else if (Array.isArray(currentEntityData)) {
           entities = currentEntityData;
         } else {
-          console.log(`🔗 AtomicBridge: Unexpected entity data format for ${entityTableName}:`, typeof currentEntityData);
+          log.info(`🔗 AtomicBridge: Unexpected entity data format for ${entityTableName}:`, typeof currentEntityData);
           return;
         }
         
-        console.log('🚀 AtomicBridge: INITIAL LOAD - Sending all entities to table', {
+        log.info('🚀 AtomicBridge: INITIAL LOAD - Sending all entities to table', {
           entityTableName,
           entityCount: entities.length,
           timestamp: Date.now()
@@ -106,7 +109,7 @@ export function createAtomicObservableBridge(
         // Store current state for next comparison
         previousEntityData = JSON.parse(JSON.stringify(currentEntityData));
         isInitialized = true;
-        console.log(`✅ AtomicBridge: ${entityTableName} bridge initialized and working`);
+        log.info(`✅ AtomicBridge: ${entityTableName} bridge initialized and working`);
         return;
       }
       
@@ -126,13 +129,13 @@ export function createAtomicObservableBridge(
         
         if (!previousEntity) {
           // New entity
-          console.log(`🔗 AtomicBridge: NEW entity detected`, { entityId, entityTableName });
+          log.info(`🔗 AtomicBridge: NEW entity detected`, { entityId, entityTableName });
           changedEntities.push(currentEntity);
         } else {
           // Check if entity actually changed (deep comparison)
           const hasChanged = JSON.stringify(currentEntity) !== JSON.stringify(previousEntity);
           if (hasChanged) {
-            console.log(`🔗 AtomicBridge: UPDATED entity detected`, { 
+            log.info(`🔗 AtomicBridge: UPDATED entity detected`, { 
               entityId, 
               entityTableName,
               currentName: currentEntity.name,
@@ -149,14 +152,14 @@ export function createAtomicObservableBridge(
       const deletedEntityIds: string[] = [];
       Object.keys(previousEntities).forEach(entityId => {
         if (!currentEntities[entityId]) {
-          console.log(`🔗 AtomicBridge: DELETED entity detected`, { entityId, entityTableName });
+          log.info(`🔗 AtomicBridge: DELETED entity detected`, { entityId, entityTableName });
           deletedEntityIds.push(entityId);
         }
       });
       
       // Process changes
       if (changedEntities.length > 0) {
-        console.log('🚀 AtomicBridge: INCREMENTAL CHANGES DETECTED - Using atomic updates', {
+        log.info('🚀 AtomicBridge: INCREMENTAL CHANGES DETECTED - Using atomic updates', {
           entityTableName,
           changedCount: changedEntities.length,
           totalEntities: Object.keys(currentEntities).length,
@@ -183,7 +186,7 @@ export function createAtomicObservableBridge(
       }
       
       if (deletedEntityIds.length > 0) {
-        console.log('🚀 AtomicBridge: DELETIONS DETECTED - Sending full refresh', {
+        log.info('🚀 AtomicBridge: DELETIONS DETECTED - Sending full refresh', {
           entityTableName,
           deletedCount: deletedEntityIds.length,
           deletedIds: deletedEntityIds
@@ -200,7 +203,7 @@ export function createAtomicObservableBridge(
       }
       
       if (changedEntities.length === 0 && deletedEntityIds.length === 0) {
-        console.log(`🔗 AtomicBridge: No actual changes detected for ${entityTableName} (observer run ${observerRunCount})`);
+        log.info(`🔗 AtomicBridge: No actual changes detected for ${entityTableName} (observer run ${observerRunCount})`);
       }
       
       // Always update previous state for next comparison
@@ -219,7 +222,7 @@ export function createAtomicObservableBridge(
       return context.schema && !context.loading && context.orgId;
     },
     () => {
-      console.log('🔗 AtomicBridge: Schema ready, triggering initial load');
+      log.info('🔗 AtomicBridge: Schema ready, triggering initial load');
       // Schema is ready - the entity observer above will now have data
     }
   );
@@ -228,7 +231,7 @@ export function createAtomicObservableBridge(
   const errorStateDisposer = observe(() => {
     const context = orgContext$.get();
     if (context.error) {
-      console.log('🔗 AtomicBridge: Error state detected', context.error);
+      log.info('🔗 AtomicBridge: Error state detected', context.error);
       tableSend({
         type: 'STORE_ERROR',
         error: context.error
@@ -238,7 +241,7 @@ export function createAtomicObservableBridge(
   
   // Return cleanup function that disposes all observers
   return () => {
-    console.log(`🔗 AtomicBridge: Cleaning up observers for ${entityTableName}`);
+    log.info(`🔗 AtomicBridge: Cleaning up observers for ${entityTableName}`);
     
     // Safely dispose of observers only if they are functions
     if (typeof entityDataDisposer === 'function') {
@@ -304,7 +307,7 @@ export const createLegendStateAtomicStore = (entityType: string, columns?: any[]
       // ATOMIC: Set initial data from Legend State
       setInitialDataAtomic: {
         entities: (context, event: { entities: Record<string, any>, relationships: Record<string, Record<string, any>> }) => {
-          console.log('📊 AtomicStore: Setting entities atomically', {
+          log.info('📊 AtomicStore: Setting entities atomically', {
             entityCount: Object.keys(event.entities).length,
             source: 'legend_state_atomic'
           });
@@ -341,7 +344,7 @@ export const createLegendStateAtomicStore = (entityType: string, columns?: any[]
       // ATOMIC: Update single entity with optimal performance
       updateEntityAtomic: {
         entities: (context, event: { entity: any }) => {
-          console.log('📊 AtomicStore: Atomic entity update', {
+          log.info('📊 AtomicStore: Atomic entity update', {
             entityId: event.entity.id,
             entityType: context.entityType
           });
@@ -393,7 +396,7 @@ export const createLegendStateAtomicStore = (entityType: string, columns?: any[]
       // ATOMIC: Batch entity updates for optimal performance
       batchUpdateEntitiesAtomic: {
         entities: (context, event: { entities: any[] }) => {
-          console.log('📊 AtomicStore: Batch atomic update', {
+          log.info('📊 AtomicStore: Batch atomic update', {
             entityCount: event.entities.length,
             entityType: context.entityType
           });
@@ -521,7 +524,7 @@ export function saveDisplayState(entityType: string, state: any) {
       version: '1.0.0'
     };
     localStorage.setItem(key, JSON.stringify(displayState));
-    console.log('📊 AtomicStore: Saved atomic display state', { entityType });
+    log.info('📊 AtomicStore: Saved atomic display state', { entityType });
   } catch (error) {
     console.error('Failed to save atomic display state:', error);
   }
@@ -533,7 +536,7 @@ export function loadDisplayState(entityType: string): any | null {
     const stored = localStorage.getItem(key);
     if (stored) {
       const parsed = JSON.parse(stored);
-      console.log('📊 AtomicStore: Loaded atomic display state', { entityType });
+      log.info('📊 AtomicStore: Loaded atomic display state', { entityType });
       return parsed;
     }
   } catch (error) {
@@ -561,7 +564,7 @@ export function useAtomicEntityBridge(
   const { enableBatching = true, enableOptimisticUpdates = true } = options;
   
   React.useEffect(() => {
-    console.log(`🔗 AtomicBridge: Setting up atomic bridge for ${entityTableName}`);
+    log.info(`🔗 AtomicBridge: Setting up atomic bridge for ${entityTableName}`);
     
     // Create the atomic bridge with proper cleanup
     const cleanup = createAtomicObservableBridge(entityTableName, (event) => {
@@ -622,7 +625,7 @@ export function createOptimisticEntityUpdater(entityTableName: string) {
       const currentEntity = currentData[entityId];
       const originalValue = currentEntity?.[field];
       
-      console.log('🔄 OptimisticUpdater: Applying optimistic update', {
+      log.info('🔄 OptimisticUpdater: Applying optimistic update', {
         entityTableName, entityId, field, value, originalValue
       });
       
@@ -648,7 +651,7 @@ export function createOptimisticEntityUpdater(entityTableName: string) {
         
         // Return rollback function using the same pattern
         return () => {
-          console.log('🔄 OptimisticUpdater: Rolling back', { entityId, field, originalValue });
+          log.info('🔄 OptimisticUpdater: Rolling back', { entityId, field, originalValue });
           const rollbackData = entity$.get();
           const rollbackEntity = { 
             ...rollbackData[entityId], 

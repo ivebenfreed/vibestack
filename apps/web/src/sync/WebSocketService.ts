@@ -8,6 +8,8 @@
  */
 
 import { syncLogger } from './utils/SyncLogger';
+import { syncLog } from '@/logger';
+const log = syncLog('sync/WebSocketService.ts');
 
 export interface WebSocketServiceConfig {
   serverUrl?: string;
@@ -86,7 +88,7 @@ export class WebSocketService {
         if (syncMachine) {
           const snapshot = syncMachine.getSnapshot();
           const currentLSN = snapshot?.context?.currentLSN;
-          console.log('[WebSocketService] Sync machine state check:', {
+          log.info('[WebSocketService] Sync machine state check:', {
             machineExists: !!syncMachine,
             snapshotExists: !!snapshot,
             context: snapshot?.context,
@@ -96,14 +98,14 @@ export class WebSocketService {
           });
           if (currentLSN && lsnRegex.test(currentLSN) && currentLSN !== '0/0') {
             validLsn = currentLSN;
-            console.log('[WebSocketService] Using current LSN from sync machine:', validLsn);
+            log.info('[WebSocketService] Using current LSN from sync machine:', validLsn);
           }
         }
       } catch (error) {
-        console.log('[WebSocketService] Failed to get current LSN from sync machine, using config value');
+        log.info('[WebSocketService] Failed to get current LSN from sync machine, using config value');
       }
       
-      console.log('[WebSocketService] LSN validation:', {
+      log.info('[WebSocketService] LSN validation:', {
         configLsn: this.config.lsn,
         validLsn: validLsn,
         lsnType: typeof validLsn,
@@ -115,7 +117,7 @@ export class WebSocketService {
       
       // Check if it looks like a timestamp (13 digits) or is otherwise invalid
       if (/^\d{13}$/.test(validLsn) || !lsnRegex.test(validLsn)) {
-        console.log('[WebSocketService] LSN validation FAILED - defaulting to 0/0:', {
+        log.info('[WebSocketService] LSN validation FAILED - defaulting to 0/0:', {
           invalidLsn: validLsn,
           isTimestamp: /^\d{13}$/.test(validLsn),
           regexTest: lsnRegex.test(validLsn)
@@ -126,11 +128,11 @@ export class WebSocketService {
         });
         validLsn = '0/0';
       } else {
-        console.log('[WebSocketService] LSN validation PASSED:', validLsn);
+        log.info('[WebSocketService] LSN validation PASSED:', validLsn);
       }
       
       wsUrl.searchParams.set('lsn', validLsn);
-      console.log('[WebSocketService] Final WebSocket URL params:', {
+      log.info('[WebSocketService] Final WebSocket URL params:', {
         clientId: wsUrl.searchParams.get('clientId'),
         organizationId: wsUrl.searchParams.get('organizationId'),
         lsn: wsUrl.searchParams.get('lsn'),

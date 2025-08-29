@@ -8,6 +8,8 @@ import { dimensionActions } from '../slices/dimensions-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 import { applyDragPreview, clearDragPreview } from '../helpers/drag-preview-helpers';
 import type { SortConfig } from '../../../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/view-handlers.ts');
 
 export const viewHandlers = {
   'view.sort.set': {
@@ -53,7 +55,7 @@ export const viewHandlers = {
         const shiftKey = (event as any).shiftKey || false;
         
         if (!field) {
-          console.error('view.column.click: No field provided in event', event);
+          log.error('view.column.click: No field provided in event', event);
           return;
         }
         
@@ -61,7 +63,7 @@ export const viewHandlers = {
         const storeSnapshot = context.storeActor?.getSnapshot();
         const currentSortBy = storeSnapshot?.context?.sortBy || [];
         
-        console.log('view.column.click: Current sortBy state', { 
+        log.info('view.column.click: Current sortBy state', { 
           currentSortBy,
           currentSortByFields: currentSortBy.map(s => ({ field: s.field, dir: s.direction })),
           field,
@@ -71,7 +73,7 @@ export const viewHandlers = {
         });
         
         const existingSort = currentSortBy.find(s => s.field === field);
-        console.log('view.column.click: Field matching', {
+        log.info('view.column.click: Field matching', {
           searchingFor: field,
           existingSort,
           allSortFields: currentSortBy.map(s => s.field)
@@ -97,7 +99,7 @@ export const viewHandlers = {
             : [{ field: field, direction: 'asc' }];
         }
         
-        console.log('view.column.click: Calculated new sortBy', { 
+        log.info('view.column.click: Calculated new sortBy', { 
           existingSort,
           newSortBy,
           transition: existingSort 
@@ -226,7 +228,7 @@ export const viewHandlers = {
     actions: [
       // Send column reorder event to store first
       ({ context, event }) => {
-        console.log('🔄 view.columns.reorder: Sending to store', {
+        log.info('🔄 view.columns.reorder: Sending to store', {
           fromIndex: event.fromIndex,
           toIndex: event.toIndex
         });
@@ -242,7 +244,7 @@ export const viewHandlers = {
       
       // Clear drag state and restore column visibility
       ({ context }) => {
-        console.log('🔄 view.columns.reorder: Clearing drag state');
+        log.info('🔄 view.columns.reorder: Clearing drag state');
         if ((window as any).__vibegridx_renderer_instance) {
           const renderer = (window as any).__vibegridx_renderer_instance;
           const header = renderer.header;
@@ -347,14 +349,14 @@ export const viewHandlers = {
       
       // Update selection positions with scroll offset to keep them pinned to cells
       ({ context, self }) => {
-        console.log('ViewHandler: Viewport update - updating selection positions with scroll offset', {
+        log.info('ViewHandler: Viewport update - updating selection positions with scroll offset', {
           selectedCellsSize: context.selectedCells?.size || 0,
           viewportStart: context.viewport?.start,
           viewportScrollTop: context.viewport?.scrollTop
         });
         
         if (context.selectedCells && context.selectedCells.size > 0) {
-          console.log('ViewHandler: Recalculating selection positions with scroll offset');
+          log.info('ViewHandler: Recalculating selection positions with scroll offset');
           const visualPositions = calculateVisualPositions(
             context.selectedCells,
             context.coordinateMapping,
@@ -363,7 +365,7 @@ export const viewHandlers = {
           );
           
           if (context.actors.canvasActor && visualPositions.length > 0) {
-            console.log('ViewHandler: Sending scroll-adjusted visual positions to canvas actor');
+            log.info('ViewHandler: Sending scroll-adjusted visual positions to canvas actor');
             self.send({
               type: 'FORWARD_TO_CANVAS',
               event: {
@@ -384,7 +386,7 @@ export const viewHandlers = {
       dimensionActions.updateColumnWidth,
       
       ({ event }) => {
-        console.log('TableMachine: Column resized', {
+        log.info('TableMachine: Column resized', {
           columnId: event.columnId,
           newWidth: event.width
         });
@@ -413,7 +415,7 @@ export const viewHandlers = {
             isInitialPreview: true
           };
           
-          console.log('🎯 ViewHandler: Sending initial drag preview to renderer', {
+          log.info('🎯 ViewHandler: Sending initial drag preview to renderer', {
             columnId: event.columnId,
             columnName: dragPreview.columnName,
             mouseX: event.x,
@@ -467,7 +469,7 @@ export const viewHandlers = {
     actions: [
       // Use the renderer's stored target index from the drag
       ({ context, event, self }) => {
-        console.log('🎯 ViewHandler: Column drag end - using renderer target', {
+        log.info('🎯 ViewHandler: Column drag end - using renderer target', {
           columnId: event.columnId,
           clientX: event.clientX,
           clientY: event.clientY
@@ -492,7 +494,7 @@ export const viewHandlers = {
           // Get the last calculated target from the drag
           targetIndex = renderer._lastCalculatedTargetIndex >= 0 ? 
             renderer._lastCalculatedTargetIndex : currentIndex;
-          console.log('🎯 ViewHandler: Using renderer target index', {
+          log.info('🎯 ViewHandler: Using renderer target index', {
             targetIndex,
             currentIndex,
             lastCalculatedTarget: renderer._lastCalculatedTargetIndex
@@ -549,9 +551,9 @@ export const viewHandlers = {
           const domManager = (context.actors.rendererActor.getSnapshot().context as any)?.renderer?.domManager;
           if (domManager) {
             const header = domManager.getElement('header');
-            console.log('🎯 ViewHandler: Restoring column visibility');
+            log.info('🎯 ViewHandler: Restoring column visibility');
             header.querySelectorAll('.vibegridx-header-cell').forEach((el: HTMLElement) => {
-              console.log('🎯 ViewHandler: Restoring column', {
+              log.info('🎯 ViewHandler: Restoring column', {
                 column: el.dataset.column,
                 before: {
                   opacity: el.style.opacity,
@@ -593,7 +595,7 @@ export const viewHandlers = {
       // Forward updated coordinates to canvas for overlay sync
       ({ context, self }) => {
         if (context.actors?.canvasActor) {
-          console.log('ViewHandlers: Forwarding updated coordinates to canvas');
+          log.info('ViewHandlers: Forwarding updated coordinates to canvas');
           self.send({
             type: 'FORWARD_TO_CANVAS',
             event: {
@@ -607,7 +609,7 @@ export const viewHandlers = {
       // Forward updated coordinates to renderer for passive consumption
       ({ context, self }) => {
         if (context.actors?.rendererActor) {
-          console.log('ViewHandlers: Forwarding updated coordinates to renderer');
+          log.info('ViewHandlers: Forwarding updated coordinates to renderer');
           self.send({
             type: 'FORWARD_TO_RENDERER', 
             event: {
@@ -620,7 +622,7 @@ export const viewHandlers = {
       },
       
       ({ context }) => {
-        console.log('ViewHandlers: Coordinate mapping recalculated:', {
+        log.info('ViewHandlers: Coordinate mapping recalculated:', {
           version: context.coordinateMapping.version,
           columnCount: context.coordinateMapping.columns.length
         });
@@ -640,7 +642,7 @@ export const viewHandlers = {
       })),
       
       ({ event }) => {
-        console.log('TableMachine: Column resize started', {
+        log.info('TableMachine: Column resize started', {
           columnId: event.columnId,
           startX: event.x,
           startWidth: event.width
@@ -745,7 +747,7 @@ export const viewHandlers = {
     actions: [
       // Log the final state before any modifications
       ({ event }) => {
-        console.log('TableMachine: Column resize ended', {
+        log.info('TableMachine: Column resize ended', {
           columnId: event.columnId,
           finalWidth: event.width
         });
@@ -860,7 +862,7 @@ export const viewHandlers = {
       emit({ type: 'view.resize.cancelled' }),
       
       () => {
-        console.log('TableMachine: Column resize cancelled');
+        log.info('TableMachine: Column resize cancelled');
       }
     ]
   },
@@ -874,7 +876,7 @@ export const viewHandlers = {
       // Recalculate coordinate mapping AFTER the context has been updated with new columns
       ({ context, event }) => {
         const isReorderOnly = (event as any).isReorderOnly;
-        console.log('🔄 COLUMN_LAYOUT_CHANGED: Deferring coordinate recalculation', {
+        log.info('🔄 COLUMN_LAYOUT_CHANGED: Deferring coordinate recalculation', {
           isReorderOnly
         });
         // The coordinate recalculation will happen after STORE_SNAPSHOT_RECEIVED updates context.columns
@@ -887,11 +889,11 @@ export const viewHandlers = {
           
           // Skip canvas update for column-only reorder to avoid forced reflow
           if (isReorderOnly) {
-            console.log('🔄 COLUMN_LAYOUT_CHANGED: Skipping canvas update for column reorder (optimization)');
+            log.info('🔄 COLUMN_LAYOUT_CHANGED: Skipping canvas update for column reorder (optimization)');
             return;
           }
           
-          console.log('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to canvas');
+          log.info('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to canvas');
           self.send({
             type: 'FORWARD_TO_CANVAS',
             event: {

@@ -1,3 +1,5 @@
+import { uiLog } from '@/logger';
+const log = uiLog('lib/schema-client.ts);
 /**
  * Client-Side Schema Loading
  * 
@@ -69,7 +71,7 @@ export class OrgSchemaClient {
 
       const rawData = await response.json();
       
-      console.log('🔍 Schema client raw response:', rawData);
+      log.info('🔍 Schema client raw response:', rawData);
       
       // Handle the new API format - check if it's the wrapped response format
       let schemaArray: any[];
@@ -140,13 +142,13 @@ export class OrgSchemaClient {
         version: Date.now().toString(),
         entities
       };
-      console.log('🔍 Schema client processed schema:', schema);
+      log.info('🔍 Schema client processed schema:', schema);
       
       // Cache the schema
       this.cacheSchema(orgId, schema);
       
       // Schema loaded - Legend State handles initialization automatically
-      console.log('[Schema] ✅ Organization schema loaded - Legend State will handle initialization');
+      log.info('[Schema] ✅ Organization schema loaded - Legend State will handle initialization');
 
       return {
         success: true,
@@ -154,7 +156,7 @@ export class OrgSchemaClient {
         cached: false
       };
     } catch (error) {
-      console.error('Failed to load org schema:', error);
+      log.error('Failed to load org schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -327,11 +329,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      console.log(`[Schema] Successfully created entity schema: ${entityData.name}`);
+      log.info(`[Schema] Successfully created entity schema: ${entityData.name}`);
       return { success: true };
       
     } catch (error) {
-      console.error('Failed to create entity schema:', error);
+      log.error('Failed to create entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -369,14 +371,14 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      console.log(`[Schema] Successfully soft deleted entity schema: ${entityName} (recoverable)`);
+      log.info(`[Schema] Successfully soft deleted entity schema: ${entityName} (recoverable)`);
       return { 
         success: true, 
         softDeleted: result.softDeleted,
       };
       
     } catch (error) {
-      console.error('Failed to delete entity schema:', error);
+      log.error('Failed to delete entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -414,11 +416,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      console.log(`[Schema] Successfully restored entity schema: ${entityName}`);
+      log.info(`[Schema] Successfully restored entity schema: ${entityName}`);
       return { success: true };
       
     } catch (error) {
-      console.error('Failed to restore entity schema:', error);
+      log.error('Failed to restore entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -456,11 +458,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      console.log(`[Schema] Successfully permanently deleted entity schema: ${entityName} (irreversible)`);
+      log.info(`[Schema] Successfully permanently deleted entity schema: ${entityName} (irreversible)`);
       return { success: true };
       
     } catch (error) {
-      console.error('Failed to permanently delete entity schema:', error);
+      log.error('Failed to permanently delete entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -495,14 +497,14 @@ export class OrgSchemaClient {
         };
       }
 
-      console.log(`[Schema] Successfully listed ${result.data.total} deleted entities`);
+      log.info(`[Schema] Successfully listed ${result.data.total} deleted entities`);
       return { 
         success: true,
         entities: result.data.entities
       };
       
     } catch (error) {
-      console.error('Failed to list trash entities:', error);
+      log.error('Failed to list trash entities:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

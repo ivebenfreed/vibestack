@@ -2,6 +2,8 @@ import { use$, useObserve } from '@legendapp/state/react';
 import { observe } from '@legendapp/state';
 import { entities$, orgContext$ } from '@/legend-state/observables';
 import React, { useCallback, useRef } from 'react';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/hooks/use-entity-row-changes.ts');
 
 interface RowChange {
   rowId: string;
@@ -132,7 +134,7 @@ export function useEntityRowChanges({
       }
       
       if (currentRows.length > 0) {
-        console.log('🔄 useEntityRowChanges: Legend State observe() detected atomic change', {
+        log.info('🔄 useEntityRowChanges: Legend State observe() detected atomic change', {
           entityTableName,
           rowCount: currentRows.length,
           source: isInitializedRef.current ? 'legend_state_atomic_update' : 'initial_load',
@@ -153,7 +155,7 @@ export function useEntityRowChanges({
       }
     });
 
-    console.log(`🔄 useEntityRowChanges: Atomic observer created for ${entityTableName}`);
+    log.info(`🔄 useEntityRowChanges: Atomic observer created for ${entityTableName}`);
     
     // Cleanup observer on unmount or dependencies change
     return disposeObserver;

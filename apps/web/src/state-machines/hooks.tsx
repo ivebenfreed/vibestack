@@ -3,6 +3,9 @@ import { useSelector } from '@xstate/react';
 import { useNavigate } from '@tanstack/react-router';
 import { authClient } from '@/lib/auth';
 import type { UserInfo } from './types';
+import { stateLog } from '@/logger';
+
+const log = stateLog('state-machines/hooks.tsx');
 
 // Auth-focused hook - directly communicates with AuthMachine
 export function useAuth() {
@@ -51,15 +54,15 @@ export function useAuth() {
       organizationName: 'No Organization',
       
       // Auth actions
-      signIn: () => console.error('[useAuth] AuthMachine not available'),
-      signOut: () => console.error('[useAuth] AuthMachine not available'),
-      refreshAuth: () => console.error('[useAuth] AuthMachine not available'),
+      signIn: () => log.error('[useAuth] AuthMachine not available'),
+      signOut: () => log.error('[useAuth] AuthMachine not available'),
+      refreshAuth: () => log.error('[useAuth] AuthMachine not available'),
       
       // Organization actions
-      createOrganization: () => console.error('[useAuth] AuthMachine not available'),
-      selectOrganization: () => console.error('[useAuth] AuthMachine not available'),
-      switchOrganization: () => console.error('[useAuth] AuthMachine not available'),
-      reloadOrganizations: () => console.error('[useAuth] AuthMachine not available'),
+      createOrganization: () => log.error('[useAuth] AuthMachine not available'),
+      selectOrganization: () => log.error('[useAuth] AuthMachine not available'),
+      switchOrganization: () => log.error('[useAuth] AuthMachine not available'),
+      reloadOrganizations: () => log.error('[useAuth] AuthMachine not available'),
     };
   }
   
@@ -122,14 +125,14 @@ export function useAuth() {
       // Check if actor is still active before sending events
       const snapshot = authActor.getSnapshot();
       if (snapshot.status === 'stopped') {
-        console.log('[useAuth] Auth actor is stopped, skipping SIGN_IN event');
+        log.info('[useAuth] Auth actor is stopped, skipping SIGN_IN event');
         return;
       }
       
-      console.log('[useAuth] Sending SIGN_IN directly to AuthMachine');
+      log.info('[useAuth] Sending SIGN_IN directly to AuthMachine');
       authActor.send({ type: 'SIGN_IN', credentials });
     } else {
-      console.error('[useAuth] AuthMachine actor not available');
+      log.error('[useAuth] AuthMachine actor not available');
     }
   }, [authActor]);
 
@@ -138,13 +141,13 @@ export function useAuth() {
       // Check if actor is still active before sending events
       const snapshot = authActor.getSnapshot();
       if (snapshot.status === 'stopped') {
-        console.log('[useAuth] Auth actor is stopped, skipping SIGN_OUT event');
+        log.info('[useAuth] Auth actor is stopped, skipping SIGN_OUT event');
         // Just navigate since actor is stopped
         navigate({ to: '/sign-in', replace: true });
         return;
       }
       
-      console.log('[useAuth] Immediate navigation to prevent component re-rendering');
+      log.info('[useAuth] Immediate navigation to prevent component re-rendering');
       // Get current location to preserve as redirect
       const currentPath = window.location.pathname;
       // Don't redirect back to sign-in or sign-up pages
@@ -157,10 +160,10 @@ export function useAuth() {
         replace: true 
       });
       
-      console.log('[useAuth] Sending SIGN_OUT directly to AuthMachine');
+      log.info('[useAuth] Sending SIGN_OUT directly to AuthMachine');
       authActor.send({ type: 'SIGN_OUT' });
     } else {
-      console.error('[useAuth] AuthMachine actor not available');
+      log.error('[useAuth] AuthMachine actor not available');
       // Fallback navigation
       navigate({ to: '/sign-in', replace: true });
     }
@@ -168,38 +171,38 @@ export function useAuth() {
 
   const refreshAuth = useMemo(() => () => {
     if (authActor) {
-      console.log('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
+      log.info('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
       authActor.send({ type: 'CHECK_AUTH' });
     } else {
-      console.error('[useAuth] AuthMachine actor not available');
+      log.error('[useAuth] AuthMachine actor not available');
     }
   }, [authActor]);
 
   // Organization actions
   const createOrganization = useMemo(() => (organizationData: { name: string; domain?: string }) => {
     if (authActor) {
-      console.log('[useAuth] Creating organization:', organizationData);
+      log.info('[useAuth] Creating organization:', organizationData);
       authActor.send({ type: 'CREATE_ORGANIZATION', organizationData });
     }
   }, [authActor]);
 
   const selectOrganization = useMemo(() => (organizationId: string) => {
     if (authActor) {
-      console.log('[useAuth] Selecting organization:', organizationId);
+      log.info('[useAuth] Selecting organization:', organizationId);
       authActor.send({ type: 'SELECT_ORGANIZATION', organizationId });
     }
   }, [authActor]);
 
   const switchOrganization = useMemo(() => (organizationId: string) => {
     if (authActor) {
-      console.log('[useAuth] Switching organization:', organizationId);
+      log.info('[useAuth] Switching organization:', organizationId);
       authActor.send({ type: 'SWITCH_ORGANIZATION', organizationId });
     }
   }, [authActor]);
 
   const reloadOrganizations = useMemo(() => () => {
     if (authActor) {
-      console.log('[useAuth] Reloading organizations');
+      log.info('[useAuth] Reloading organizations');
       authActor.send({ type: 'REFRESH_ORGANIZATIONS' });
     }
   }, [authActor]);
@@ -306,7 +309,7 @@ export function useAppInit() {
       
       return unsubscribe;
     }).catch((err) => {
-      console.error('[useAppInit] Failed to import Legend State:', err);
+      log.error('[useAppInit] Failed to import Legend State:', err);
       setError('Failed to load Legend State');
     });
   }, []);
@@ -330,10 +333,10 @@ export function useAppInit() {
     
     // Actions (simplified - Legend State handles retries internally)
     retryInit: () => {
-      console.log('[useAppInit] Legend State handles retries automatically');
+      log.info('[useAppInit] Legend State handles retries automatically');
     },
     restartSync: () => {
-      console.log('[useAppInit] Use sync machine directly for restart');
+      log.info('[useAppInit] Use sync machine directly for restart');
       const syncActor = (window as any).simpleNotificationSyncMachineActor;
       if (syncActor) {
         syncActor.send({ type: 'RECONNECT' });
@@ -359,7 +362,7 @@ export function useSync() {
   // Get sync machine from global actor - updated for simple notification sync machine
   const syncMachine = useMemo(() => {
     const machine = (window as any).simpleNotificationSyncMachineActor || (window as any).syncMachineActor || null;
-    console.log('[useSync] Found sync machine:', !!machine, machine ? 'type: simpleNotificationSyncMachine' : 'no machine');
+    log.info('[useSync] Found sync machine:', !!machine, machine ? 'type: simpleNotificationSyncMachine' : 'no machine');
     return machine;
   }, []);
 

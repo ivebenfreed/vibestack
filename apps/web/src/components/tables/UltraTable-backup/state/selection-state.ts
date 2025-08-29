@@ -10,6 +10,8 @@
  */
 
 import { observable, batch } from '@legendapp/state'
+import { uiLog } from '@/logger';
+const log = uiLog('components/tables/UltraTable-backup/state/selection-state.ts');
 
 export interface SelectionRange {
   startRow: number
@@ -52,15 +54,15 @@ export const selectionState$ = observable({
     // Cell-level selection
     selectCell: (row: number, col: number) => {
       const cellKey = `${row}:${col}`
-      console.log('[SelectionState] selectCell called:', { row, col, cellKey })
+      log.info('[SelectionState] selectCell called:', { row, col, cellKey })
       
       // Force reactivity by using assign() instead of set()
       selectionState$.selectedCells.assign(current => {
         const newSet = new Set(current)
         newSet.add(cellKey)
-        console.log('[SelectionState] Current cells before:', Array.from(current))
-        console.log('[SelectionState] New cells after add:', Array.from(newSet))
-        console.log('[SelectionState] Selection state after update:', {
+        log.info('[SelectionState] Current cells before:', Array.from(current))
+        log.info('[SelectionState] New cells after add:', Array.from(newSet))
+        log.info('[SelectionState] Selection state after update:', {
           selectedCells: Array.from(newSet),
           hasSelection: newSet.size > 0
         })

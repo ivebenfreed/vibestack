@@ -5,6 +5,8 @@
 
 import { assign } from 'xstate';
 import type { CellRef } from '../../../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/slices/selection-slice.ts');
 
 // ====================================
 // TYPES
@@ -349,7 +351,7 @@ export const selectionActions = {
       
       const newCellKey = getCellKey(newRow.rowId, newCol.columnId);
       
-      console.log('moveSelection: Calculated new position', {
+      log.info('moveSelection: Calculated new position', {
         from: getCellKey(rowId, columnId),
         to: newCellKey,
         extend: event.extend,
@@ -364,7 +366,7 @@ export const selectionActions = {
             { rowId: newRow.rowId, columnId: newCol.columnId },
             context.coordinateMapping
           );
-          console.log('moveSelection: Extended selection with range', {
+          log.info('moveSelection: Extended selection with range', {
             anchor: context.anchor,
             newCell: { rowId: newRow.rowId, columnId: newCol.columnId },
             selectionSize: rangeSelection.size

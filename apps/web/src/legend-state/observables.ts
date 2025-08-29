@@ -11,6 +11,8 @@ import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { configureSynced } from '@legendapp/state/sync'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
+import { stateLog } from '@/logger';
+const log = stateLog('legend-state/observables.ts');
 
 // Custom error classes for better error handling
 export class ValidationError extends Error {
@@ -66,7 +68,7 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
     if (!response.ok) {
       if (response.status === 404) {
         // Validation endpoint doesn't exist - skip validation
-        console.info(`[Observable] Validation endpoint not available for ${entityName} - skipping`)
+        log.info(`[Observable] Validation endpoint not available for ${entityName} - skipping`)
         return true
       }
       
@@ -93,7 +95,7 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
       throw error
     }
     // Network errors or other issues - don't block the operation
-    console.warn(`[Observable] Validation check failed for ${entityName} ${operation}:`, error.message)
+    log.warn(`[Observable] Validation check failed for ${entityName} ${operation}:`, error.message)
     return true
   }
 }
@@ -120,7 +122,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     list: async (params: { lastSync?: number } = {}) => {
       try {
         // DEBUG: Log what Legend State is passing us
-        console.log(`[Observable] List called for ${entityName}:`, {
+        log.info(`[Observable] List called for ${entityName}:`, {
           lastSync: params?.lastSync,
           lastSyncType: typeof params?.lastSync,
           hasLastSync: !!params?.lastSync,
@@ -132,7 +134,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           `${syncUrl}?changesSince=${encodeURIComponent(new Date(params.lastSync).toISOString())}&limit=1000` : 
           baseUrl;
         
-        console.log(`[Observable] ${params?.lastSync ? 'Differential' : 'Full'} sync for ${entityName}:`, url);
+        log.info(`[Observable] ${params?.lastSync ? 'Differential' : 'Full'} sync for ${entityName}:`, url);
         
         const response = await fetch(url, {
           credentials: 'include',
@@ -142,15 +144,15 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         if (!response.ok) {
           // Handle common cases gracefully
           if (response.status === 404) {
-            console.info(`[Observable] Entity ${entityName} table not found (404) - returning empty data`)
+            log.info(`[Observable] Entity ${entityName} table not found (404) - returning empty data`)
             return []
           }
           if (response.status === 500) {
             // Likely table doesn't exist - don't spam console
-            console.info(`[Observable] Entity ${entityName} table not created yet (500) - returning empty data`)
+            log.info(`[Observable] Entity ${entityName} table not created yet (500) - returning empty data`)
             return []
           }
-          console.warn(`[Observable] Failed to load ${entityName}:`, response.status)
+          log.warn(`[Observable] Failed to load ${entityName}:`, response.status)
           return []
         }
         
@@ -159,14 +161,14 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         
         // Log sync results for debugging
         if (params?.lastSync) {
-          console.log(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${new Date(params.lastSync).toISOString()}`)
+          log.info(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${new Date(params.lastSync).toISOString()}`)
         } else {
-          console.log(`[Observable] Full sync ${entityName}: ${data.length} total records`)
+          log.info(`[Observable] Full sync ${entityName}: ${data.length} total records`)
         }
         
         return data
       } catch (error) {
-        console.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
+        log.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
         return []
       }
     },
@@ -179,7 +181,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           try {
             await validateItem(orgId, entityName, item, 'create')
           } catch (validationError) {
-            console.warn(`[Observable] Validation failed for ${entityName}:`, validationError.message)
+            log.warn(`[Observable] Validation failed for ${entityName}:`, validationError.message)
             throw validationError
           }
         }
@@ -219,11 +221,11 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         }
         
         const result = await response.json()
-        console.log(`[Observable] Successfully created ${entityName}:`, result.data?.id || 'unknown-id')
+        log.info(`[Observable] Successfully created ${entityName}:`, result.data?.id || 'unknown-id')
         return result.data || item
       } catch (error) {
         // Add context to help debugging
-        console.error(`[Observable] Create error for ${entityName}:`, {
+        log.error(`[Observable] Create error for ${entityName}:`, {
           error: error.message,
           item: item ? { id: item.id, ...Object.keys(item).slice(0, 3) } : 'null', // Avoid logging sensitive data
           orgId,
@@ -241,7 +243,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           try {
             await validateItem(orgId, entityName, item, 'update')
           } catch (validationError) {
-            console.warn(`[Observable] Validation failed for ${entityName} update:`, validationError.message)
+            log.warn(`[Observable] Validation failed for ${entityName} update:`, validationError.message)
             throw validationError
           }
         }
@@ -285,10 +287,10 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         }
         
         const result = await response.json()
-        console.log(`[Observable] Successfully updated ${entityName}:`, item.id)
+        log.info(`[Observable] Successfully updated ${entityName}:`, item.id)
         return result.data || item
       } catch (error) {
-        console.error(`[Observable] Update error for ${entityName}:`, {
+        log.error(`[Observable] Update error for ${entityName}:`, {
           error: error.message,
           itemId: item?.id || 'unknown',
           orgId,
@@ -319,7 +321,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
           
           if (response.status === 404) {
-            console.warn(`[Observable] ${entityName} already deleted:`, item.id)
+            log.warn(`[Observable] ${entityName} already deleted:`, item.id)
             return undefined // Treat as successful deletion
           }
           if (response.status === 403) {
@@ -332,10 +334,10 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           throw new Error(`Delete ${entityName} failed: ${errorMessage}`)
         }
         
-        console.log(`[Observable] Successfully deleted ${entityName}:`, item.id)
+        log.info(`[Observable] Successfully deleted ${entityName}:`, item.id)
         return undefined // Successful deletion
       } catch (error) {
-        console.error(`[Observable] Delete error for ${entityName}:`, {
+        log.error(`[Observable] Delete error for ${entityName}:`, {
           error: error.message,
           itemId: item?.id || 'unknown',
           orgId,
@@ -352,7 +354,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           return []
         }
 
-        console.log(`[Observable] Batch updating ${items.length} ${entityName} records`)
+        log.info(`[Observable] Batch updating ${items.length} ${entityName} records`)
 
         const response = await fetch(`${baseUrl}/batch`, {
           method: 'PUT',
@@ -387,10 +389,10 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         }
 
         const result = await response.json()
-        console.log(`[Observable] Successfully batch updated ${items.length} ${entityName} records`)
+        log.info(`[Observable] Successfully batch updated ${items.length} ${entityName} records`)
         return result.data || items
       } catch (error) {
-        console.error(`[Observable] Batch update error for ${entityName}:`, {
+        log.error(`[Observable] Batch update error for ${entityName}:`, {
           error: error.message,
           itemCount: items?.length || 0,
           orgId,
@@ -407,7 +409,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         
         // Only log notifications in development for debugging
         if (import.meta.env.DEV && notification.test) {
-          console.log(`[Observable] ${entityName} received test notification:`, notification)
+          log.info(`[Observable] ${entityName} received test notification:`, notification)
         }
         
         // Check if notification is for this entity
@@ -423,7 +425,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         
         if (isRelevantNotification) {
           if (import.meta.env.DEV) {
-            console.log(`[Observable] ${entityName} sync triggered by WebSocket`)
+            log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
           }
           refresh()
         }
@@ -432,11 +434,11 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       // Listen for table change notifications
       window.addEventListener('vibestack:table-change-notification', handler as any)
       
-      console.log(`[Observable] Subscribed to WebSocket notifications for ${entityName}`)
+      log.info(`[Observable] Subscribed to WebSocket notifications for ${entityName}`)
       
       // TEST: Dispatch a test event to verify the listener works
       setTimeout(() => {
-        console.log(`[Observable] Testing event listener for ${entityName}`)
+        log.info(`[Observable] Testing event listener for ${entityName}`)
         window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
           detail: { tables: ['tasks'], test: true }
         }))
@@ -446,7 +448,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       return () => {
         window.removeEventListener('vibestack:table-change-notification', handler as any)
         if (import.meta.env.DEV) {
-          console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+          log.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
         }
       }
     },
@@ -502,7 +504,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       
       // Only log notifications in development for debugging
       if (import.meta.env.DEV && notification.test) {
-        console.log(`[Observable] ${entityName} received test notification:`, notification)
+        log.info(`[Observable] ${entityName} received test notification:`, notification)
       }
       
       // Check if notification is for this entity
@@ -513,7 +515,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       
       if (isRelevantNotification) {
         if (import.meta.env.DEV) {
-          console.log(`[Observable] ${entityName} sync triggered by WebSocket`)
+          log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
         }
         refresh()
       }
@@ -528,7 +530,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     return () => {
       window.removeEventListener('vibestack:table-change-notification', handler as any)
       if (import.meta.env.DEV) {
-        console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+        log.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
       }
     }
   }
@@ -536,7 +538,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   const syncedCrudFn = syncedCrudWithPersistence || syncedCrud
   
   if (import.meta.env.DEV) {
-    console.log(`[Observable] Creating syncedCrud for ${entityName}`)
+    log.info(`[Observable] Creating syncedCrud for ${entityName}`)
   }
   
   // CRITICAL FIX: syncedCrud must be wrapped in observable() to create proper observable with .get()/.set() methods
@@ -552,11 +554,11 @@ export async function loadOrgContext(orgId: string, userId: string) {
   // Guard: Don't reload if already loaded with same org
   const currentContext = orgContext$.peek()
   if (currentContext.orgId === orgId && currentContext.userId === userId && currentContext.schema) {
-    console.log(`[Observable] Context already loaded for ${orgId}, skipping reload`)
+    log.info(`[Observable] Context already loaded for ${orgId}, skipping reload`)
     return
   }
   
-  console.log(`[Observable] Loading org context for ${orgId}`)
+  log.info(`[Observable] Loading org context for ${orgId}`)
   
   // Update loading state
   orgContext$.loading.set(true)
@@ -576,7 +578,7 @@ export async function loadOrgContext(orgId: string, userId: string) {
     // FIXED: Only recreate persistence if org or schema version changed
     // Issue was: IndexedDB persistence was causing continuous Document POST requests
     // Solution: Configure persistence more carefully to prevent auto-sync conflicts
-    console.log(`[Observable] PERSISTENCE ENABLED WITH SAFEGUARDS - Schema change detected`, {
+    log.info(`[Observable] PERSISTENCE ENABLED WITH SAFEGUARDS - Schema change detected`, {
       prevOrgId: currentOrgId,
       newOrgId: orgId,
       prevVersion: currentSchemaVersion,
@@ -587,7 +589,7 @@ export async function loadOrgContext(orgId: string, userId: string) {
       if (entityKeys.length > 0 && 
           (currentOrgId !== orgId || currentSchemaVersion !== schemaVersion)) {
       
-      console.log(`[Observable] Schema change detected - recreating persistence with safeguards`, {
+      log.info(`[Observable] Schema change detected - recreating persistence with safeguards`, {
         prevOrgId: currentOrgId,
         newOrgId: orgId,
         prevVersion: currentSchemaVersion,
@@ -613,14 +615,14 @@ export async function loadOrgContext(orgId: string, userId: string) {
         currentOrgId = orgId
         currentSchemaVersion = schemaVersion
         
-        console.log(`[Observable] IndexedDB persistence configured with safeguards for ${entityKeys.length} entities`)
+        log.info(`[Observable] IndexedDB persistence configured with safeguards for ${entityKeys.length} entities`)
       } else if (currentOrgId === orgId && currentSchemaVersion === schemaVersion) {
-        console.log(`[Observable] Schema unchanged - reusing existing persistence configuration`)
+        log.info(`[Observable] Schema unchanged - reusing existing persistence configuration`)
       }
     } catch (entitiesError) {
-      console.error('[Observable] Error processing entities for persistence:', entitiesError)
+      log.error('[Observable] Error processing entities for persistence:', entitiesError)
       // Continue without persistence if there's an error
-      console.log('[Observable] Continuing without IndexedDB persistence due to error')
+      log.info('[Observable] Continuing without IndexedDB persistence due to error')
     }
     
     // Update context
@@ -635,7 +637,7 @@ export async function loadOrgContext(orgId: string, userId: string) {
     // Pre-initialize commonly used entities to avoid race conditions with table components
     // This triggers the lazy getters in a controlled way after schema is loaded
     const entityCount = entities && typeof entities === 'object' ? Object.keys(entities).length : 0
-    console.log(`[Observable] Org context loaded with ${entityCount} entities`)
+    log.info(`[Observable] Org context loaded with ${entityCount} entities`)
     
     // Pre-initialize common entities by accessing them (triggers lazy creation)
     if (entities && typeof entities === 'object') {
@@ -646,17 +648,17 @@ export async function loadOrgContext(orgId: string, userId: string) {
             // Access the entity to trigger lazy getter initialization
             const entityObs = entities[entityName]
             if (entityObs) {
-              console.log(`[Observable] Pre-initialized ${entityName} entity observable`)
+              log.info(`[Observable] Pre-initialized ${entityName} entity observable`)
             }
           } catch (error) {
-            console.warn(`[Observable] Could not pre-initialize ${entityName}:`, error)
+            log.warn(`[Observable] Could not pre-initialize ${entityName}:`, error)
           }
         }
       })
     }
     
   } catch (error) {
-    console.error('[Observable] Failed to load org context:', error)
+    log.error('[Observable] Failed to load org context:', error)
     orgContext$.assign({
       loading: false,
       error: error instanceof Error ? error.message : 'Failed to load organization'
@@ -682,7 +684,7 @@ export const entities$ = observable(() => {
   
   // Return empty object while still loading or no context
   if (loading || !orgId || !schema?.entities) {
-    console.log(`[Observable] Entities not ready yet`, {
+    log.info(`[Observable] Entities not ready yet`, {
       loading,
       hasOrgId: !!orgId,
       hasSchema: !!schema,
@@ -694,7 +696,7 @@ export const entities$ = observable(() => {
   // Safely get entity keys
   const entityKeys = schema.entities && typeof schema.entities === 'object' ? Object.keys(schema.entities) : []
   
-  console.log(`[Observable] Creating entity observables reactively`, {
+  log.info(`[Observable] Creating entity observables reactively`, {
     orgId,
     schemaVersion: schema.version || 'unknown',
     entityCount: entityKeys.length
@@ -723,7 +725,7 @@ export const entities$ = observable(() => {
             globalEntityCache[cacheKey] = observable
             return observable
           } catch (entityError) {
-            console.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
+            log.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
             return null
           }
         },
@@ -732,10 +734,10 @@ export const entities$ = observable(() => {
       })
     })
     
-    console.log(`[Observable] Set up lazy entity observables for ${entityKeys.length} entities`)
+    log.info(`[Observable] Set up lazy entity observables for ${entityKeys.length} entities`)
     return entityObservables
   } catch (error) {
-    console.error('[Observable] Error setting up entity observables:', error)
+    log.error('[Observable] Error setting up entity observables:', error)
     // Return empty object on error to prevent crashes
     return {}
   }
@@ -753,7 +755,7 @@ export function getEntity$(entityName: string) {
     const currentSchema = orgContext$.schema.peek()
     
     if (!currentOrgId || !currentSchema?.entities?.[entityName]) {
-      console.warn(`[Observable] Entity ${entityName} not available - missing context or schema`)
+      log.warn(`[Observable] Entity ${entityName} not available - missing context or schema`)
       return null
     }
     
@@ -762,18 +764,18 @@ export function getEntity$(entityName: string) {
     
     // Check if we already have the observable cached
     if (globalEntityCache[cacheKey]) {
-      console.log(`[Observable] Retrieved cached ${entityName} observable`)
+      log.info(`[Observable] Retrieved cached ${entityName} observable`)
       return globalEntityCache[cacheKey]
     }
     
     // Create the observable directly if not cached
     try {
-      console.log(`[Observable] Creating new observable for ${entityName}`)
+      log.info(`[Observable] Creating new observable for ${entityName}`)
       const observable = createEntityObservable(currentOrgId, entityName, currentSchema.entities[entityName])
       globalEntityCache[cacheKey] = observable
       
       // DEBUG: Check what we created
-      console.log(`[Observable] Created ${entityName} observable`, {
+      log.info(`[Observable] Created ${entityName} observable`, {
         type: typeof observable,
         isFunction: typeof observable === 'function',
         hasGet: typeof observable?.get === 'function',
@@ -785,11 +787,11 @@ export function getEntity$(entityName: string) {
       
       return observable
     } catch (createError) {
-      console.error(`[Observable] Error creating observable for ${entityName}:`, createError)
+      log.error(`[Observable] Error creating observable for ${entityName}:`, createError)
       return null
     }
   } catch (error) {
-    console.error(`[Observable] Error getting entity observable for ${entityName}:`, error)
+    log.error(`[Observable] Error getting entity observable for ${entityName}:`, error)
     return null
   }
 }
@@ -798,7 +800,7 @@ export function getEntity$(entityName: string) {
  * Clear all observables (for logout or org switching)
  */
 export function clearContext() {
-  console.log('[Observable] Clearing all observables')
+  log.info('[Observable] Clearing all observables')
   
   // Clear persistence manager data if it exists
   if (persistenceManager) {
@@ -832,11 +834,11 @@ export function handleTableNotification(notification: any) {
   const orgId = orgContext$.orgId.get()
   if (!orgId) return
   
-  console.log(`[Observable] Table notification for ${notification.table}:`, notification.operation)
+  log.info(`[Observable] Table notification for ${notification.table}:`, notification.operation)
   
   // Handle schema changes from external sources (other clients)
   if (notification.table === 'entity_schemas') {
-    console.log(`[Observable] External entity schema change detected - reloading schema`)
+    log.info(`[Observable] External entity schema change detected - reloading schema`)
     // Only reload for external changes, not our own local changes
     reloadOrgSchema(orgId)
     return
@@ -854,16 +856,16 @@ export function handleTableNotification(notification: any) {
 export function removeEntityFromSchema(entityName: string) {
   const currentSchema = orgContext$.schema.peek()
   if (!currentSchema?.entities) {
-    console.warn(`[Observable] Cannot remove entity ${entityName} - no schema loaded`)
+    log.warn(`[Observable] Cannot remove entity ${entityName} - no schema loaded`)
     return
   }
   
   if (!currentSchema.entities[entityName]) {
-    console.warn(`[Observable] Entity ${entityName} not found in schema`)
+    log.warn(`[Observable] Entity ${entityName} not found in schema`)
     return
   }
   
-  console.log(`[Observable] Removing entity ${entityName} from local schema observable`)
+  log.info(`[Observable] Removing entity ${entityName} from local schema observable`)
   
   // Create new schema without the deleted entity - ensure deep clone
   const newEntities = { ...currentSchema.entities }
@@ -877,12 +879,12 @@ export function removeEntityFromSchema(entityName: string) {
     orgId: currentSchema.orgId
   }
   
-  console.log(`[Observable] New schema will have ${Object.keys(newEntities).length} entities (was ${Object.keys(currentSchema.entities).length})`)
+  log.info(`[Observable] New schema will have ${Object.keys(newEntities).length} entities (was ${Object.keys(currentSchema.entities).length})`)
   
   // Update the observable immediately - this will trigger all reactive components
   orgContext$.schema.set(newSchema)
   
-  console.log(`[Observable] Schema updated locally - UI should update immediately`)
+  log.info(`[Observable] Schema updated locally - UI should update immediately`)
 }
 
 /**
@@ -893,10 +895,10 @@ async function reloadOrgSchema(orgId: string) {
     const schemaResult = await orgSchemaClient.loadOrgSchema(orgId)
     if (schemaResult.success && schemaResult.schema) {
       orgContext$.schema.set(schemaResult.schema)
-      console.log(`[Observable] Schema reloaded from server`)
+      log.info(`[Observable] Schema reloaded from server`)
     }
   } catch (error) {
-    console.error('[Observable] Failed to reload schema:', error)
+    log.error('[Observable] Failed to reload schema:', error)
   }
 }
 
@@ -921,7 +923,7 @@ export const entityGroups$ = observable(() => {
       // Count will be loaded lazily when the entity page is actually accessed
     }))
   } catch (error) {
-    console.error('[Observable] Error creating entity groups:', error)
+    log.error('[Observable] Error creating entity groups:', error)
     return []
   }
 })
@@ -962,7 +964,7 @@ export const batchOperations = {
       .filter(({ result }) => result.status === 'rejected')
     
     if (failures.length > 0) {
-      console.warn(`[BatchOperations] ${failures.length}/${ids.length} deletions failed:`, failures)
+      log.warn(`[BatchOperations] ${failures.length}/${ids.length} deletions failed:`, failures)
     }
     
     return {
@@ -991,7 +993,7 @@ export const batchOperations = {
       .filter(({ result }) => result.status === 'rejected')
     
     if (failures.length > 0) {
-      console.warn(`[BatchOperations] ${failures.length}/${items.length} creations failed:`, failures)
+      log.warn(`[BatchOperations] ${failures.length}/${items.length} creations failed:`, failures)
     }
     
     return {
@@ -1058,7 +1060,7 @@ export const entityOperations = {
    */
   async updateEntity(entityName: string, id: string, data: any, options: { validate?: boolean } = {}) {
     try {
-      console.log(`[Observable] Direct observable update for ${entityName}:${id}`, data)
+      log.info(`[Observable] Direct observable update for ${entityName}:${id}`, data)
       
       // Get the entity observable (this is the syncedCrud observable)
       const entity$ = getEntity$(entityName)
@@ -1066,7 +1068,7 @@ export const entityOperations = {
         throw new Error(`Entity ${entityName} observable not found`)
       }
       
-      console.log(`[Observable] Found entity record ${entityName}:${id}, updating fields:`, Object.keys(data))
+      log.info(`[Observable] Found entity record ${entityName}:${id}, updating fields:`, Object.keys(data))
       
       // CORRECT PATTERN: For syncedCrud with list operations, access the record directly
       // entity$[id] gives us the observable for that specific record
@@ -1075,7 +1077,7 @@ export const entityOperations = {
       // FIXED: Use syncedCrud's update function directly
       // syncedCrud observables provide CRUD operations: list, create, update, delete
       // Don't access individual record observables, use the built-in update function
-      console.log(`[Observable] Using syncedCrud update for ${entityName}:${id}:`, data)
+      log.info(`[Observable] Using syncedCrud update for ${entityName}:${id}:`, data)
       
       // Get current data from the observable
       const allRecords = entity$.get()
@@ -1087,21 +1089,21 @@ export const entityOperations = {
       
       // Create updated record by merging current data with updates  
       const updatedRecord = { ...currentRecord, ...data, updated_at: new Date().toISOString() }
-      console.log(`[Observable] Merged record data:`, updatedRecord)
+      log.info(`[Observable] Merged record data:`, updatedRecord)
       
       // CORRECT syncedCrud pattern: update the record in the observable data
       // This will trigger the update function defined in the syncedCrud config and sync to server
       const newRecords = { ...allRecords, [id]: updatedRecord }
       entity$.set(newRecords)
       
-      console.log(`✅ [Observable] Observable update completed for ${entityName}:${id}`)
+      log.info(`✅ [Observable] Observable update completed for ${entityName}:${id}`)
       // syncedCrud will automatically handle the server sync in the background
       
       // Return the updated record that was already merged above
       return updatedRecord
       
     } catch (error) {
-      console.error(`❌ [Observable] Update failed for ${entityName}:${id}`, { error: error.message, data })
+      log.error(`❌ [Observable] Update failed for ${entityName}:${id}`, { error: error.message, data })
       throw error
     }
   },
@@ -1132,13 +1134,13 @@ export const entityOperations = {
         const syncConfig = (entity$ as any)[Symbol.for('LegendState_syncedCrud')]
         if (syncConfig && syncConfig.delete) {
           const deleteResult = await syncConfig.delete(recordToDelete, { id })
-          console.log(`[Observable] Direct delete result:`, deleteResult)
+          log.info(`[Observable] Direct delete result:`, deleteResult)
           return { success: true }
         } else {
           throw new Error('syncedCrud delete function not accessible')
         }
       } catch (directDeleteError) {
-        console.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
+        log.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
         
         // Fallback: trigger a manual server delete (bypass Legend State sync)
         const orgId = orgContext$.orgId.peek()
@@ -1161,7 +1163,7 @@ export const entityOperations = {
         }
         
         // Manually trigger a refresh to get updated data
-        console.log(`[Observable] Manual server delete successful, triggering refresh`)
+        log.info(`[Observable] Manual server delete successful, triggering refresh`)
         if (typeof (entity$ as any).refresh === 'function') {
           (entity$ as any).refresh()
         }

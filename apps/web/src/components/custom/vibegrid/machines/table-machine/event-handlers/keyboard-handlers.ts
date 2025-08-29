@@ -5,6 +5,8 @@
 import { sendTo, assign } from 'xstate';
 import { selectionActions } from '../slices/selection-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/keyboard-handlers.ts');
 
 // Helper function to parse external clipboard data
 function parseExternalClipboard(text: string, startRow: number, startCol: number) {
@@ -53,7 +55,7 @@ export const keyboardHandlers = {
       },
       
       ({ event }) => {
-        console.log('TableMachine: Arrow key navigation', {
+        log.info('TableMachine: Arrow key navigation', {
           direction: event.direction,
           extend: event.extend
         });
@@ -70,7 +72,7 @@ export const keyboardHandlers = {
       // Build rich clipboard data
       ({ context, self }) => {
         if (context.selectedCells.size === 0) {
-          console.log('TableMachine: No cells selected for copy');
+          log.info('TableMachine: No cells selected for copy');
           return;
         }
 
@@ -198,14 +200,14 @@ export const keyboardHandlers = {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(clipboardText)
             .then(() => {
-              console.log('TableMachine: Copied to clipboard', {
+              log.info('TableMachine: Copied to clipboard', {
                 cellCount: cells.length,
                 bounds: clipboardData.bounds,
                 text: clipboardText
               });
             })
             .catch(err => {
-              console.error('TableMachine: Failed to copy to clipboard', err);
+              log.error('TableMachine: Failed to copy to clipboard', err);
             });
         }
       }
@@ -225,7 +227,7 @@ export const keyboardHandlers = {
         
         // Check if we have selected cells to paste to
         if (context.selectedCells.size === 0) {
-          console.log('TableMachine: No target cells selected for paste');
+          log.info('TableMachine: No target cells selected for paste');
           return;
         }
 
@@ -238,7 +240,7 @@ export const keyboardHandlers = {
         const targetColData = context.coordinateMapping?.columns.find(c => c.columnId === targetColumnId);
         
         if (!targetRowData || !targetColData) {
-          console.error('TableMachine: Could not find target cell coordinates');
+          log.error('TableMachine: Could not find target cell coordinates');
           return;
         }
 
@@ -257,7 +259,7 @@ export const keyboardHandlers = {
             const targetType = targetColumn?.cellType || 'text';
             
             if (sourceType !== targetType) {
-              console.error('TableMachine: Cannot paste - column types do not match', {
+              log.error('TableMachine: Cannot paste - column types do not match', {
                 source: { id: firstCopiedColumnId, type: sourceType },
                 target: { id: targetColumnId, type: targetType }
               });
@@ -282,7 +284,7 @@ export const keyboardHandlers = {
           navigator.clipboard.readText()
             .then(clipboardText => {
               if (!clipboardText) {
-                console.log('TableMachine: No clipboard data available');
+                log.info('TableMachine: No clipboard data available');
                 return;
               }
               
@@ -300,7 +302,7 @@ export const keyboardHandlers = {
               });
             })
             .catch(err => {
-              console.error('TableMachine: Failed to read clipboard', err);
+              log.error('TableMachine: Failed to read clipboard', err);
             });
           
           // Exit early for external paste - will be handled by PASTE_EXTERNAL event
@@ -356,13 +358,13 @@ export const keyboardHandlers = {
 
         // Apply updates
         if (updates.length > 0) {
-          console.log('TableMachine: Applying internal paste updates', {
+          log.info('TableMachine: Applying internal paste updates', {
             updateCount: updates.length
           });
           
           // Apply updates using batch operation if available
           if (context.onBatchEntityUpdate && typeof context.onBatchEntityUpdate === 'function') {
-            console.log('TableMachine: Using batch update for paste operations');
+            log.info('TableMachine: Using batch update for paste operations');
             
             // Group updates by row for batch operation
             const updatesByRow = new Map<string, Record<string, any>>();
@@ -383,19 +385,19 @@ export const keyboardHandlers = {
               const result = context.onBatchEntityUpdate(batchUpdates);
               if (result instanceof Promise) {
                 result.catch((error: any) => {
-                  console.error('TableMachine: Batch paste update failed', { error });
+                  log.error('TableMachine: Batch paste update failed', { error });
                 });
               }
             } catch (error) {
-              console.error('TableMachine: Batch paste update threw error', { error });
+              log.error('TableMachine: Batch paste update threw error', { error });
             }
           } else if (context.onEntityUpdate) {
             // Fall back to individual updates
-            console.log('TableMachine: Using individual updates for paste operations');
+            log.info('TableMachine: Using individual updates for paste operations');
             
             for (const update of updates) {
               const updateData = { [update.field]: update.value };
-              console.log('TableMachine: Updating via onEntityUpdate', {
+              log.info('TableMachine: Updating via onEntityUpdate', {
                 rowId: update.rowId,
                 field: update.field,
                 value: update.value
@@ -405,15 +407,15 @@ export const keyboardHandlers = {
                 const result = context.onEntityUpdate(update.rowId, updateData);
                 if (result instanceof Promise) {
                   result.catch((error: any) => {
-                    console.error('TableMachine: onEntityUpdate failed', { rowId: update.rowId, error });
+                    log.error('TableMachine: onEntityUpdate failed', { rowId: update.rowId, error });
                   });
                 }
               } catch (error) {
-                console.error('TableMachine: onEntityUpdate threw error', { rowId: update.rowId, error });
+                log.error('TableMachine: onEntityUpdate threw error', { rowId: update.rowId, error });
               }
             }
           } else {
-            console.error('TableMachine: No update mechanism available (onEntityUpdate not provided)');
+            log.error('TableMachine: No update mechanism available (onEntityUpdate not provided)');
           }
           
           // Clear clipboard visual feedback after successful paste
@@ -424,7 +426,7 @@ export const keyboardHandlers = {
             // Already cleared above
           }
         } else {
-          console.log('TableMachine: No valid paste targets found');
+          log.info('TableMachine: No valid paste targets found');
         }
       }
     ]
@@ -441,7 +443,7 @@ export const keyboardHandlers = {
       // Need to implement cell deletion logic
       
       ({ context }) => {
-        console.log('TableMachine: Delete operation', {
+        log.info('TableMachine: Delete operation', {
           cellCount: context.selectedCells.size
         });
       }
@@ -516,12 +518,12 @@ export const keyboardHandlers = {
         if (context.editingCell) {
           // If editing, cancel the edit
           self.send({ type: 'edit.cancel' });
-          console.log('TableMachine: Escape - cancelled editing');
+          log.info('TableMachine: Escape - cancelled editing');
         } else {
           // If not editing, clear selection and clipboard
           self.send({ type: 'selection.clear' });
           self.send({ type: 'CLIPBOARD_CLEAR' });
-          console.log('TableMachine: Escape - cleared selection and clipboard');
+          log.info('TableMachine: Escape - cleared selection and clipboard');
         }
       }
     ]

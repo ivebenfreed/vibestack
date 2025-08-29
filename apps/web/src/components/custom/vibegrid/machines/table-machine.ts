@@ -13,6 +13,8 @@ export type { TableContext, TableEvents, TableConfig } from '../types';
 // ====================================
 
 import type { TableEvents } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine.ts');
 
 export const createTableEvent = <T extends TableEvents['type']>(
   type: T,
@@ -29,7 +31,7 @@ export const measurePerformance = <T>(operation: string, fn: () => T): T => {
   
   // Can be used to send PERFORMANCE_MARK events
   if (duration > 5) {
-    console.log(`${operation}: ${duration.toFixed(2)}ms`);
+    log.info(`${operation}: ${duration.toFixed(2)}ms`);
   }
   
   return result;

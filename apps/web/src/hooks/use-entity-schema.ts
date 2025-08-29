@@ -7,6 +7,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { 
+import { stateLog } from '@/logger';
+const log = stateLog('hooks/use-entity-schema.ts');
   orgSchemaClient, 
   type OrgEntitySchema, 
   type EntityDefinition, 
@@ -57,7 +59,7 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
         setError(null);
         
         // 🎯 OPTIMIZATION: Notify app init that schema is ready for fast dashboard loading
-        console.log('[Schema] ✅ Organization schema loaded - triggering app initialization');
+        log.info('[Schema] ✅ Organization schema loaded - triggering app initialization');
         const appInitActor = (window as any).appInitActor;
         if (appInitActor) {
           appInitActor.send({ type: 'SCHEMA_READY' });
@@ -72,7 +74,7 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
         setError(result.error || 'Failed to load schema');
         
         // Notify app init about schema loading failure
-        console.error('[Schema] ❌ Schema loading failed:', result.error);
+        log.error('[Schema] ❌ Schema loading failed:', result.error);
         const appInitActor = (window as any).appInitActor;
         if (appInitActor) {
           appInitActor.send({ type: 'SCHEMA_ERROR', error: result.error || 'Failed to load schema' });
@@ -96,7 +98,7 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
     const handleLocalSchemaReady = (event: CustomEvent) => {
       const { schema, source } = event.detail;
       if (schema && schema.orgId === orgId) {
-        console.log('[useOrgSchema] 🚀 Using local schema immediately from:', source);
+        log.info('[useOrgSchema] 🚀 Using local schema immediately from:', source);
         setSchema(schema);
         setCached(true);
         setError(null);
@@ -287,6 +289,6 @@ export function useSchemaUpdates(orgId: string | null, onSchemaUpdate?: (entityN
     //
     // return () => ws.close();
 
-    console.log(`[Schema Updates] WebSocket connection placeholder for org: ${orgId}`);
+    log.info(`[Schema Updates] WebSocket connection placeholder for org: ${orgId}`);
   }, [orgId, onSchemaUpdate]);
 }

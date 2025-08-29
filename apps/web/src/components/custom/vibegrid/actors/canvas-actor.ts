@@ -16,6 +16,8 @@ import { CanvasOverlayDOM } from '../overlays/CanvasOverlayDOM';
 import type { ViewportInfo, CellRef } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { OverlayConfig, VisualCellPosition } from '../overlays/OverlayTypes';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/actors/canvas-actor.ts');
 
 // ====================================
 // EVENT TYPES
@@ -71,19 +73,19 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
   let queuedCoordinateUpdate: any = null;
   let queuedViewportUpdate: ViewportInfo | null = null;
   
-  console.log('CanvasActor: Created for DOM overlay mode');
+  log.info('CanvasActor: Created for DOM overlay mode');
   
   receive((event) => {
     // Only log non-viewport events for debugging
     if (event.type !== 'UPDATE_VIEWPORT') {
-      console.log('CanvasActor: Received event:', event.type, event);
+      log.info('CanvasActor: Received event:', event.type, event);
     }
     
     try {
       switch (event.type) {
         case 'INITIALIZE':
           const initStartTime = performance.now();
-          console.log('CanvasActor: Deferring canvas initialization', {
+          log.info('CanvasActor: Deferring canvas initialization', {
             container: event.container,
             containerClass: event.container.className,
             config: event.config
@@ -101,12 +103,12 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           // since it runs in idle time and doesn't block the initial table render
           const initializeCanvas = async () => {
             try {
-              console.log('CanvasActor: Starting deferred DOM overlay initialization');
+              log.info('CanvasActor: Starting deferred DOM overlay initialization');
               const deferredStartTime = performance.now();
               
               // Create canvas with event callback to send events back to actor
               canvas = new CanvasOverlayDOM(storedConfig, (event) => {
-                console.log('CanvasActor: Received fill event from overlay', event);
+                log.info('CanvasActor: Received fill event from overlay', event);
                 sendBack(event);
               });
               canvas.init(storedContainer);
@@ -126,20 +128,20 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
               // await canvas.preInitializeAsync();
               
               const deferredInitTime = performance.now() - deferredStartTime;
-              console.log('🔥 CanvasActor: Deferred canvas initialization complete', {
+              log.info('🔥 CanvasActor: Deferred canvas initialization complete', {
                 initTime: `${deferredInitTime.toFixed(2)}ms`,
                 totalTimeFromInitialize: `${(performance.now() - initStartTime).toFixed(2)}ms`
               });
               
               // Process any queued events
               if (queuedCoordinateUpdate) {
-                console.log('CanvasActor: Processing queued coordinate update');
+                log.info('CanvasActor: Processing queued coordinate update');
                 canvas.updateCoordinateMapping(queuedCoordinateUpdate);
                 queuedCoordinateUpdate = null;
               }
               
               if (queuedViewportUpdate) {
-                console.log('CanvasActor: Processing queued viewport update');
+                log.info('CanvasActor: Processing queued viewport update');
                 canvas.updateViewport(queuedViewportUpdate);
                 queuedViewportUpdate = null;
                 sendBack({ type: 'VIEWPORT_UPDATED' });
@@ -148,10 +150,10 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
               sendBack({ type: 'CANVAS_DEFERRED_READY' });
               
               // Request initial viewport from table machine
-              console.log('CanvasActor: Requesting initial viewport update');
+              log.info('CanvasActor: Requesting initial viewport update');
               sendBack({ type: 'REQUEST_VIEWPORT_UPDATE' });
             } catch (error) {
-              console.error('CanvasActor: Failed to create canvas overlay:', error);
+              log.error('CanvasActor: Failed to create canvas overlay:', error);
               sendBack({ 
                 type: 'CANVAS_ERROR', 
                 error: `Failed to initialize canvas: ${error.message}` 
@@ -169,11 +171,11 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'UPDATE_SELECTION':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update selection - canvas not initialized');
+            log.warn('CanvasActor: Cannot update selection - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Updating selection:', {
+          log.info('CanvasActor: Updating selection:', {
             selectionSize: event.selection.size
           });
           
@@ -182,18 +184,18 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           break;
           
         case 'UPDATE_SELECTION_VISUAL':
-          console.log('CanvasActor: UPDATE_SELECTION_VISUAL debug', {
+          log.info('CanvasActor: UPDATE_SELECTION_VISUAL debug', {
             hasCanvas: !!canvas,
             canvasType: canvas?.constructor?.name,
             canvasInstance: canvas
           });
           
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update selection visual - canvas not initialized');
+            log.warn('CanvasActor: Cannot update selection visual - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Updating selection with visual positions:', {
+          log.info('CanvasActor: Updating selection with visual positions:', {
             cellCount: event.visualCells.length,
             positions: event.visualCells
           });
@@ -206,12 +208,12 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
         case 'UPDATE_COORDINATES':
           if (!canvas) {
             // Queue this event to be processed after initialization
-            console.log('CanvasActor: Queuing UPDATE_COORDINATES event until canvas is initialized');
+            log.info('CanvasActor: Queuing UPDATE_COORDINATES event until canvas is initialized');
             queuedCoordinateUpdate = event.mapping;
             return;
           }
           
-          console.log('CanvasActor: Updating coordinates:', {
+          log.info('CanvasActor: Updating coordinates:', {
             mappingVersion: event.mapping.version,
             rowCount: event.mapping.rows?.length || 0,
             columnCount: event.mapping.columns?.length || 0
@@ -224,67 +226,67 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
         case 'UPDATE_VIEWPORT':
           if (!canvas) {
             // Queue this event to be processed after initialization
-            console.log('CanvasActor: Queuing UPDATE_VIEWPORT event until canvas is initialized');
+            log.info('CanvasActor: Queuing UPDATE_VIEWPORT event until canvas is initialized');
             queuedViewportUpdate = event.viewport;
             return;
           }
           
-          console.log('CanvasActor: UPDATE_VIEWPORT received, updating canvas viewport:', event.viewport);
+          log.info('CanvasActor: UPDATE_VIEWPORT received, updating canvas viewport:', event.viewport);
           canvas.updateViewport(event.viewport);
-          console.log('CanvasActor: Viewport updated in canvas, sending VIEWPORT_UPDATED response');
+          log.info('CanvasActor: Viewport updated in canvas, sending VIEWPORT_UPDATED response');
           sendBack({ type: 'VIEWPORT_UPDATED' });
           break;
           
         case 'UPDATE_COLUMN_DRAG':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update column drag - canvas not initialized');
+            log.warn('CanvasActor: Cannot update column drag - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Updating column drag preview');
+          log.info('CanvasActor: Updating column drag preview');
           canvas.updateColumnDragPreview(event.dragState, event.mouseX, event.mouseY);
           break;
           
         case 'UPDATE_COLUMN_RESIZE':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update column resize - canvas not initialized');
+            log.warn('CanvasActor: Cannot update column resize - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Updating column resize preview');
+          log.info('CanvasActor: Updating column resize preview');
           canvas.updateColumnResizePreview(event.resizeState);
           break;
           
         case 'SHOW_COPY_INDICATOR':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot show copy indicator - canvas not initialized');
+            log.warn('CanvasActor: Cannot show copy indicator - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Showing copy indicator:', { isCut: event.isCut });
+          log.info('CanvasActor: Showing copy indicator:', { isCut: event.isCut });
           // TODO: Implement showCopyIndicator in DOM overlay
           // canvas.showCopyIndicator(event.isCut);
-          console.log('CanvasActor: Copy indicator not yet implemented in DOM overlay');
+          log.info('CanvasActor: Copy indicator not yet implemented in DOM overlay');
           break;
           
         case 'HIDE_COPY_INDICATOR':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot hide copy indicator - canvas not initialized');
+            log.warn('CanvasActor: Cannot hide copy indicator - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Hiding copy indicator');
+          log.info('CanvasActor: Hiding copy indicator');
           // TODO: Implement hideCopyIndicator in DOM overlay
           // canvas.hideCopyIndicator();
-          console.log('CanvasActor: Hide copy indicator not yet implemented in DOM overlay');
+          log.info('CanvasActor: Hide copy indicator not yet implemented in DOM overlay');
           break;
           
         case 'UPDATE_CLIPBOARD_VISUAL':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update clipboard visual - canvas not initialized');
+            log.warn('CanvasActor: Cannot update clipboard visual - canvas not initialized');
             return;
           }
-          console.log('CanvasActor: Updating clipboard visual', {
+          log.info('CanvasActor: Updating clipboard visual', {
             hasClipboard: !!event.clipboardState,
             cellCount: event.clipboardState?.copiedCells.size || 0,
             isCut: event.clipboardState?.isCut || false,
@@ -305,21 +307,21 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'CLIPBOARD_CLEAR':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot clear clipboard - canvas not initialized');
+            log.warn('CanvasActor: Cannot clear clipboard - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Clearing clipboard indicators');
+          log.info('CanvasActor: Clearing clipboard indicators');
           canvas.clearClipboardIndicators();
           break;
           
         case 'RENDER_FILL_HANDLE':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot render fill handle - canvas not initialized');
+            log.warn('CanvasActor: Cannot render fill handle - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Rendering fill handle with visual positions:', {
+          log.info('CanvasActor: Rendering fill handle with visual positions:', {
             cellCount: event.visualCells.length,
             selectedRowsCount: event.selectedRows?.size || 0,
             hasViewport: !!event.viewport
@@ -330,37 +332,37 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'RENDER_FILL_HANDLE_ROW_SELECTION':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot render row selection fill handle - canvas not initialized');
+            log.warn('CanvasActor: Cannot render row selection fill handle - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Rendering fill handle for row selection:', {
+          log.info('CanvasActor: Rendering fill handle for row selection:', {
             selectedRowsCount: event.selectedRows.size,
             visualCellsCount: event.visualCells.length
           });
           // TODO: Implement fill handle layer in DOM
           // const rowFillHandleLayer = (canvas as any).getFillHandleLayer();
           // rowFillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells, event.selectedRows);
-          console.log('CanvasActor: Row fill handle not yet implemented in DOM overlay');
+          log.info('CanvasActor: Row fill handle not yet implemented in DOM overlay');
           break;
           
         case 'RENDER_FILL_PREVIEW':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot render fill preview - canvas not initialized');
+            log.warn('CanvasActor: Cannot render fill preview - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Rendering fill preview (legacy)');
+          log.info('CanvasActor: Rendering fill preview (legacy)');
           canvas.renderFillPreview(event.previewCells);
           break;
           
         case 'RENDER_FILL_PREVIEW_VISUAL':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot render fill preview visual - canvas not initialized');
+            log.warn('CanvasActor: Cannot render fill preview visual - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Rendering fill preview with visual positions', {
+          log.info('CanvasActor: Rendering fill preview with visual positions', {
             cellCount: event.visualCells.length
           });
           canvas.renderFillPreviewWithVisualPositions(event.visualCells);
@@ -368,51 +370,51 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'CLEAR_FILL_PREVIEW':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot clear fill preview - canvas not initialized');
+            log.warn('CanvasActor: Cannot clear fill preview - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Clearing fill preview');
+          log.info('CanvasActor: Clearing fill preview');
           canvas.clearFillPreview();
           break;
           
         case 'HIDE_FILL_HANDLE':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot hide fill handle - canvas not initialized');
+            log.warn('CanvasActor: Cannot hide fill handle - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Hiding fill handle');
+          log.info('CanvasActor: Hiding fill handle');
           canvas.hideFillHandle();
           break;
           
         case 'SHOW_EDITING':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot show editing overlay - canvas not initialized');
+            log.warn('CanvasActor: Cannot show editing overlay - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Showing editing overlay', event.position);
+          log.info('CanvasActor: Showing editing overlay', event.position);
           canvas.showEditingOverlay(event.position);
           break;
           
         case 'HIDE_EDITING':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot hide editing overlay - canvas not initialized');
+            log.warn('CanvasActor: Cannot hide editing overlay - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Hiding editing overlay');
+          log.info('CanvasActor: Hiding editing overlay');
           canvas.hideEditingOverlay();
           break;
           
         case 'CALCULATE_FILL_PREVIEW':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot calculate fill preview - canvas not initialized');
+            log.warn('CanvasActor: Cannot calculate fill preview - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Calculating fill preview');
+          log.info('CanvasActor: Calculating fill preview');
           const fillHandleLayerPreview = (canvas as any).getFillHandleLayer();
           const previewCells = fillHandleLayerPreview.calculateFillPreviewCells(
             event.dragPos,
@@ -429,11 +431,11 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'CALCULATE_FILL_COMPLETE':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot calculate fill complete - canvas not initialized');
+            log.warn('CanvasActor: Cannot calculate fill complete - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Calculating fill complete');
+          log.info('CanvasActor: Calculating fill complete');
           const fillHandleLayerComplete = (canvas as any).getFillHandleLayer();
           const fillCells = fillHandleLayerComplete.calculateFillPreviewCells(
             event.dragPos,
@@ -450,11 +452,11 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'FILL_HANDLE_MOVE':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot handle fill move - canvas not initialized');
+            log.warn('CanvasActor: Cannot handle fill move - canvas not initialized');
             return;
           }
           
-          console.log('CanvasActor: Handling fill move via unified system');
+          log.info('CanvasActor: Handling fill move via unified system');
           const fillHandleLayer = (canvas as any).getFillHandleLayer();
           
           // Use the unified method that was added to FillHandleLayerDOM
@@ -462,7 +464,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           break;
           
         case 'DESTROY':
-          console.log('CanvasActor: Destroying canvas overlay');
+          log.info('CanvasActor: Destroying canvas overlay');
           
           if (canvas) {
             canvas.destroy();
@@ -471,10 +473,10 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           break;
           
         default:
-          console.warn('CanvasActor: Unknown event type:', event);
+          log.warn('CanvasActor: Unknown event type:', event);
       }
     } catch (error) {
-      console.error('CanvasActor: Error processing event:', error);
+      log.error('CanvasActor: Error processing event:', error);
       sendBack({ 
         type: 'CANVAS_ERROR', 
         error: `Error processing ${event.type}: ${error.message}` 
@@ -484,7 +486,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
   
   // Cleanup function - called when actor is stopped
   return () => {
-    console.log('CanvasActor: Cleanup - destroying canvas overlay');
+    log.info('CanvasActor: Cleanup - destroying canvas overlay');
     
     if (canvas) {
       canvas.destroy();

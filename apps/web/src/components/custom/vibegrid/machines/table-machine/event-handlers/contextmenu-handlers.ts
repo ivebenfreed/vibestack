@@ -5,6 +5,8 @@
 import { assign } from 'xstate';
 import type { TableContext, TableEvents } from '../../../types';
 import { ContextMenuManager, type ContextMenuProps } from '../../../components/ContextMenu';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/contextmenu-handlers.ts');
 
 // Global context menu manager instance - managed directly without actor wrapper
 let globalContextMenuManager: ContextMenuManager | null = null;
@@ -35,12 +37,12 @@ function ensureContextMenuManager(context: any): ContextMenuManager {
   if (needsRecreation) {
     // Clean up existing manager if any
     if (globalContextMenuManager) {
-      console.log('ContextMenuHandlers: Container changed, cleaning up old ContextMenuManager');
+      log.info('ContextMenuHandlers: Container changed, cleaning up old ContextMenuManager');
       globalContextMenuManager.destroy();
       globalContextMenuManager = null;
     }
     
-    console.log('ContextMenuHandlers: Creating new ContextMenuManager', {
+    log.info('ContextMenuHandlers: Creating new ContextMenuManager', {
       container,
       containerClass: container.className,
       containerInDOM: document.contains(container),
@@ -50,7 +52,7 @@ function ensureContextMenuManager(context: any): ContextMenuManager {
     
     globalContextMenuManager = new ContextMenuManager(container);
     
-    console.log('ContextMenuHandlers: Created new ContextMenuManager instance', {
+    log.info('ContextMenuHandlers: Created new ContextMenuManager instance', {
       manager: globalContextMenuManager,
       hasPortal: !!(globalContextMenuManager as any).portal,
       containerChildCount: container.childNodes.length
@@ -65,7 +67,7 @@ function cleanupContextMenuManager(): void {
   if (globalContextMenuManager) {
     globalContextMenuManager.destroy();
     globalContextMenuManager = null;
-    console.log('ContextMenuHandlers: Cleaned up ContextMenuManager instance');
+    log.info('ContextMenuHandlers: Cleaned up ContextMenuManager instance');
   }
 }
 
@@ -90,7 +92,7 @@ export const contextMenuHandlers = {
       }),
       // Log that context menu state was updated - the UI will reactively show the menu
       ({ context, event }) => {
-        console.log('🎯 ContextMenuHandlers: Context menu state updated', { 
+        log.info('🎯 ContextMenuHandlers: Context menu state updated', { 
           event, 
           contextMenu: {
             isVisible: true,
@@ -152,7 +154,7 @@ export const contextMenuHandlers = {
       }),
       // Log that context menu was hidden - the UI will reactively hide the menu
       () => {
-        console.log('🎯 ContextMenuHandlers: Context menu hidden');
+        log.info('🎯 ContextMenuHandlers: Context menu hidden');
       }
     ]
   },
@@ -222,7 +224,7 @@ export const contextMenuHandlers = {
       }),
       // TODO: Implement row insertion
       ({ context }: { context: TableContext }) => {
-        console.log('🎯 ContextMenu: Insert row requested', { context: context.contextMenu.context });
+        log.info('🎯 ContextMenu: Insert row requested', { context: context.contextMenu.context });
         // This would delegate to row insertion logic
       }
     ]
@@ -240,7 +242,7 @@ export const contextMenuHandlers = {
       }),
       // TODO: Implement row deletion
       ({ context }: { context: TableContext }) => {
-        console.log('🎯 ContextMenu: Delete row requested', { context: context.contextMenu.context });
+        log.info('🎯 ContextMenu: Delete row requested', { context: context.contextMenu.context });
         // This would delegate to row deletion logic
       }
     ]
@@ -258,7 +260,7 @@ export const contextMenuHandlers = {
       }),
       // TODO: Implement column insertion
       ({ context }: { context: TableContext }) => {
-        console.log('🎯 ContextMenu: Insert column requested', { context: context.contextMenu.context });
+        log.info('🎯 ContextMenu: Insert column requested', { context: context.contextMenu.context });
         // This would delegate to column insertion logic
       }
     ]
@@ -276,7 +278,7 @@ export const contextMenuHandlers = {
       }),
       // TODO: Implement column deletion
       ({ context }: { context: TableContext }) => {
-        console.log('🎯 ContextMenu: Delete column requested', { context: context.contextMenu.context });
+        log.info('🎯 ContextMenu: Delete column requested', { context: context.contextMenu.context });
         // This would delegate to column deletion logic
       }
     ]

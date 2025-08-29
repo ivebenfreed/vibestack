@@ -5,6 +5,8 @@
 import { emit } from 'xstate';
 import { overlayActions } from '../slices/overlay-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/fill-handlers.ts');
 
 // ====================================
 // FILL PATTERN DETECTION
@@ -35,7 +37,7 @@ function calculateFillPattern(originalCells: Set<string>, fillCells: Set<string>
       const field = column.field || columnId;
       const value = row.data[field];
       
-      console.log('TableMachine: Extracting value for fill pattern', {
+      log.info('TableMachine: Extracting value for fill pattern', {
         cellKey,
         rowId,
         columnId,
@@ -103,7 +105,7 @@ function calculateFillPattern(originalCells: Set<string>, fillCells: Set<string>
 
 function applyFillPattern(pattern: FillPattern, fillCells: Set<string>, context: any): void {
   if (!context.onEntityUpdate) {
-    console.error('TableMachine: Cannot apply fill - no update handler');
+    log.error('TableMachine: Cannot apply fill - no update handler');
     return;
   }
   
@@ -138,7 +140,7 @@ function applyFillPattern(pattern: FillPattern, fillCells: Set<string>, context:
   sortedFillCells.forEach(cellKey => {
     // Skip if this is an original cell
     if (originalCells.has(cellKey)) {
-      console.log('TableMachine: Skipping original cell', cellKey);
+      log.info('TableMachine: Skipping original cell', cellKey);
       return;
     }
     
@@ -162,7 +164,7 @@ function applyFillPattern(pattern: FillPattern, fillCells: Set<string>, context:
       fillValue = values[patternIndex % values.length];
     }
     
-    console.log('TableMachine: Fill cell', {
+    log.info('TableMachine: Fill cell', {
       cellKey,
       rowId,
       columnId,
@@ -189,7 +191,7 @@ function applyFillPattern(pattern: FillPattern, fillCells: Set<string>, context:
       updates
     }));
     
-    console.log('TableMachine: Applying batch fill updates', { 
+    log.info('TableMachine: Applying batch fill updates', { 
       updateCount: batchUpdates.length,
       updates: batchUpdates 
     });
@@ -201,26 +203,26 @@ function applyFillPattern(pattern: FillPattern, fillCells: Set<string>, context:
         const result = context.onBatchEntityUpdate(batchUpdates);
         if (result instanceof Promise) {
           result.catch((error: any) => {
-            console.error('TableMachine: Batch fill update failed', { error });
+            log.error('TableMachine: Batch fill update failed', { error });
           });
         }
       } catch (error) {
-        console.error('TableMachine: Batch fill update threw error', { error });
+        log.error('TableMachine: Batch fill update threw error', { error });
       }
     } else {
       // Fall back to individual updates
       updatesByRow.forEach((updates, rowId) => {
-        console.log('TableMachine: Applying individual fill update', { rowId, updates });
+        log.info('TableMachine: Applying individual fill update', { rowId, updates });
         
         try {
           const result = context.onEntityUpdate(rowId, updates);
           if (result instanceof Promise) {
             result.catch((error: any) => {
-              console.error('TableMachine: Fill update failed', { rowId, error });
+              log.error('TableMachine: Fill update failed', { rowId, error });
             });
           }
         } catch (error) {
-          console.error('TableMachine: Fill update threw error', { rowId, error });
+          log.error('TableMachine: Fill update threw error', { rowId, error });
         }
       });
     }
@@ -246,14 +248,14 @@ export const fillHandlers = {
       ({ context, event }: any) => {
         const fillCells = event.fillCells;
         if (!fillCells || fillCells.size === 0) {
-          console.log('TableMachine: No fill cells calculated');
+          log.info('TableMachine: No fill cells calculated');
           return;
         }
         
         const originalSelection = context.fillState?.originalSelection || context.selectedCells;
         
         if (originalSelection.size === 0) {
-          console.log('TableMachine: No original selection for fill');
+          log.info('TableMachine: No original selection for fill');
           return;
         }
         
@@ -261,11 +263,11 @@ export const fillHandlers = {
         const fillPattern = calculateFillPattern(originalSelection, fillCells, context);
         
         if (!fillPattern) {
-          console.log('TableMachine: Could not determine fill pattern');
+          log.info('TableMachine: Could not determine fill pattern');
           return;
         }
         
-        console.log('TableMachine: Fill operation completing with calculated cells', {
+        log.info('TableMachine: Fill operation completing with calculated cells', {
           originalCells: originalSelection.size,
           fillCells: fillCells.size,
           pattern: fillPattern,
@@ -286,7 +288,7 @@ export const fillHandlers = {
         const originalSelection = context.fillState?.originalSelection || context.selectedCells;
         const newSelection = new Set([...originalSelection, ...fillCells]);
         
-        console.log('TableMachine: Updating selection after fill completion', {
+        log.info('TableMachine: Updating selection after fill completion', {
           originalSize: originalSelection.size,
           fillCellsSize: fillCells.size, 
           newSelectionSize: newSelection.size
@@ -325,7 +327,7 @@ export const fillHandlers = {
       
       // Log fill start
       ({ event }: any) => {
-        console.log('TableMachine: Fill operation started', {
+        log.info('TableMachine: Fill operation started', {
           direction: event.direction
         });
       },
@@ -365,7 +367,7 @@ export const fillHandlers = {
       
       // Log preview update
       ({ event }: any) => {
-        console.log('TableMachine: Fill preview updated', {
+        log.info('TableMachine: Fill preview updated', {
           previewCellsCount: event.previewCells.size
         });
       },
@@ -381,7 +383,7 @@ export const fillHandlers = {
             context.rowHeight || context.settings?.rowHeight || 40
           );
           
-          console.log('TableMachine: Calculated fill preview visual positions', {
+          log.info('TableMachine: Calculated fill preview visual positions', {
             previewCellsCount: event.previewCells.size,
             visualPositionsCount: visualPositions.length
           });
@@ -427,7 +429,7 @@ export const fillHandlers = {
         const originalSelection = context.fillState?.originalSelection || new Set();
         
         if (fillCells.size === 0 || originalSelection.size === 0) {
-          console.log('TableMachine: Fill operation cancelled - no cells to fill', {
+          log.info('TableMachine: Fill operation cancelled - no cells to fill', {
             fillCellsSize: fillCells.size,
             originalSelectionSize: originalSelection.size,
             fillCells: Array.from(fillCells),
@@ -440,11 +442,11 @@ export const fillHandlers = {
         const fillPattern = calculateFillPattern(originalSelection, fillCells, context);
         
         if (!fillPattern) {
-          console.log('TableMachine: Could not determine fill pattern');
+          log.info('TableMachine: Could not determine fill pattern');
           return;
         }
         
-        console.log('TableMachine: Fill operation completed', {
+        log.info('TableMachine: Fill operation completed', {
           originalCells: originalSelection.size,
           fillCells: fillCells.size,
           pattern: fillPattern
@@ -476,7 +478,7 @@ export const fillHandlers = {
       },
       
       ({ context }: any) => {
-        console.log('TableMachine: Fill operation cancelled');
+        log.info('TableMachine: Fill operation cancelled');
       }
     ]
   }

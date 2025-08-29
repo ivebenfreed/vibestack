@@ -11,6 +11,9 @@
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from '../machines/table-machine';
 import type { ViewportInfo, CellRef } from '../types';
+import { uiLog } from '@/logger';
+
+const log = uiLog('components/custom/vibegrid/systems/EventDelegationManager.ts');
 
 // ====================================
 // EVENT DELEGATION CONFIGURATION
@@ -78,7 +81,7 @@ export class EventDelegationManager {
   constructor(config: EventDelegationConfig) {
     this.config = config;
     this.setupEventListeners();
-    console.log('🎯 EventDelegationManager: Initialized unified event system');
+    log.info('Initialized unified event system');
   }
   
   // ====================================
@@ -129,7 +132,7 @@ export class EventDelegationManager {
     // Scroll delegation - DISABLED: CleanTableRenderer handles scroll internally
     // this.setupScrollListener();
     
-    console.log('🎯 EventDelegationManager: Event listeners attached');
+    log.debug('Event listeners attached');
   }
 
   // ====================================
@@ -148,7 +151,7 @@ export class EventDelegationManager {
     
     // Log after critical path
     requestAnimationFrame(() => {
-      console.log('🎯 EventDelegationManager: MouseDown', {
+      log.debug('MouseDown', {
         ...logData,
         target: (event.target as Element)?.className // Access DOM property later
       });
@@ -166,7 +169,7 @@ export class EventDelegationManager {
       const classList = currentElement.classList;
       
       if (classList.contains('vibegridx-editing-portal')) {
-        console.log('🎯 EventDelegationManager: Event on editing overlay - skipping table actions');
+        log.debug('Event on editing overlay - skipping table actions');
         return;
       }
       
@@ -276,7 +279,7 @@ export class EventDelegationManager {
     // ALWAYS reset drag state on mouseup, regardless of whether we were actively dragging
     if (this.dragState.startPos) {
       if (this.dragState.isDragging) {
-        console.log('🎯 EventDelegationManager: Ending drag', { type: this.dragState.dragType });
+        log.debug('Ending drag', { type: this.dragState.dragType });
         
         switch (this.dragState.dragType) {
           case 'selection':
@@ -332,11 +335,11 @@ export class EventDelegationManager {
     
     // Skip events on editing overlay
     if (target.closest('.vibegridx-editing-portal')) {
-      console.log('🎯 EventDelegationManager: Ignoring click on editing overlay');
+      log.debug('Ignoring click on editing overlay');
       return;
     }
     
-    console.log('🎯 EventDelegationManager: Click event', {
+    log.debug('Click event', {
       target: target,
       targetClass: target.className,
       targetTagName: target.tagName,
@@ -348,7 +351,7 @@ export class EventDelegationManager {
     if (headerCell) {
       const columnId = headerCell.dataset.column; // Use data-column attribute, not data-column-id
       
-      console.log('🎯 EventDelegationManager: Header cell found', {
+      log.debug('Header cell found', {
         columnId,
         headerCell,
         dataset: headerCell.dataset
@@ -359,13 +362,13 @@ export class EventDelegationManager {
       
       if (columnId && sortIcon) {
         // Only trigger sort if we clicked on the sort icon
-        console.log('🎯 EventDelegationManager: Sort icon clicked, triggering sort');
+        log.debug('Sort icon clicked, triggering sort');
         this.send({
           type: 'view.column.click',
           field: columnId
         });
       } else if (columnId && !sortIcon) {
-        console.log('🎯 EventDelegationManager: Header clicked but not on sort icon, ignoring');
+        log.debug('Header clicked but not on sort icon, ignoring');
       }
       return;
     }
@@ -395,7 +398,7 @@ export class EventDelegationManager {
       
       if (rowId && columnId) {
         // Send selection event on click (for tests and simplified click handling)
-        console.log('🎯 EventDelegationManager: Cell clicked, sending selection event', { rowId, columnId });
+        log.debug('Cell clicked, sending selection event', { rowId, columnId });
         this.send({
           type: 'selection.cell.select',
           rowId,
@@ -438,11 +441,11 @@ export class EventDelegationManager {
     
     // Skip events on editing overlay
     if (target.closest('.vibegridx-editing-portal')) {
-      console.log('🎯 EventDelegationManager: Ignoring context menu on editing overlay');
+      log.debug('Ignoring context menu on editing overlay');
       return;
     }
     
-    console.log('🎯 EventDelegationManager: Context menu triggered', {
+    log.debug('Context menu triggered', {
       target: target,
       targetClass: target.className,
       x: event.clientX,
@@ -451,7 +454,7 @@ export class EventDelegationManager {
     
     // Check for cell right-click
     const cell = target.closest('.vibegridx-cell') as HTMLElement;
-    console.log('🎯 EventDelegationManager: Cell detection debug', {
+    log.debug('Cell detection debug', {
       target,
       targetClass: target.className,
       cell,
@@ -464,7 +467,7 @@ export class EventDelegationManager {
       const rowId = cell.dataset.rowId;
       const columnId = cell.dataset.columnId;
       
-      console.log('🎯 EventDelegationManager: Cell found, checking data attributes', {
+      log.debug('Cell found, checking data attributes', {
         rowId,
         columnId,
         hasRowId: !!rowId,
@@ -476,7 +479,7 @@ export class EventDelegationManager {
         // Convert to container coordinates for consistent positioning
         const containerCoords = this.convertToContainerCoordinates(event);
         
-        console.log('🎯 EventDelegationManager: About to send context menu event to XState', {
+        log.debug('About to send context menu event to XState', {
           eventType: 'contextmenu.show',
           rowId,
           columnId,
@@ -496,7 +499,7 @@ export class EventDelegationManager {
           clientY: event.clientY
         });
         
-        console.log('🎯 EventDelegationManager: Context menu event sent to XState');
+        log.debug('Context menu event sent to XState');
         return;
       }
     }
@@ -544,7 +547,7 @@ export class EventDelegationManager {
     // Skip selection column
     if (columnId === '__selection') return;
     
-    console.log('🎯 EventDelegationManager: Content click detected', {
+    log.debug('Content click detected', {
       rowId,
       columnId,
       target: event.target,
@@ -558,7 +561,7 @@ export class EventDelegationManager {
       const newCellId = `${rowId}:${columnId}`;
       
       if (currentEditingCell && currentEditingCell !== newCellId) {
-        console.log('🎯 EventDelegationManager: Content click on different cell while editing, ensuring edit ends first');
+        log.debug('Content click on different cell while editing, ensuring edit ends first');
         
         // Force any blur handlers to run immediately
         const activeInput = editingPortal.querySelector('input, select, textarea') as HTMLElement;
@@ -620,7 +623,7 @@ export class EventDelegationManager {
     const target = event.target as Element;
     const isEditableContent = target.closest('.vibegridx-cell-content-editable, .vibegridx-cell-text-editable, .vibegridx-cell-badge-editable, .vibegridx-cell-number-editable, .vibegridx-cell-boolean-editable, .vibegridx-cell-empty-editable');
     if (isEditableContent) {
-      console.log('🎯 EventDelegationManager: Clicked on editable content, skipping selection');
+      log.debug('Clicked on editable content, skipping selection');
       // Don't send selection event - let click handler deal with it
       return;
     }
@@ -628,7 +631,7 @@ export class EventDelegationManager {
     // Check if we're currently editing - if so, ensure edit mode ends first
     const editingPortal = document.querySelector('.vibegridx-editing-portal');
     if (editingPortal && editingPortal.style.display !== 'none') {
-      console.log('🎯 EventDelegationManager: Cell clicked while editing, ensuring edit ends first');
+      log.debug('Cell clicked while editing, ensuring edit ends first');
       
       // Force any blur handlers to run immediately
       const activeInput = editingPortal.querySelector('input, select, textarea') as HTMLElement;
@@ -739,7 +742,7 @@ export class EventDelegationManager {
     if (cell) {
       const rowId = cell.dataset.rowId;
       if (rowId) {
-        console.log('🎯 EventDelegationManager: Row checkbox clicked', { rowId });
+        log.debug('Row checkbox clicked', { rowId });
         // Send XState event for row selection toggle (correct event name)
         this.send({
           type: 'selection.checkbox.toggle',
@@ -754,7 +757,7 @@ export class EventDelegationManager {
     // Handle header checkbox (select all)
     const headerCheckbox = checkbox.closest('.vibegridx-selection-header');
     if (headerCheckbox) {
-      console.log('🎯 EventDelegationManager: Header checkbox clicked');
+      log.debug('Header checkbox clicked');
       
       // Check if the checkbox is currently checked to determine action
       const checkboxInput = headerCheckbox.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -780,7 +783,7 @@ export class EventDelegationManager {
       const computedWidth = headerCell.offsetWidth;
       if (computedWidth > 0) {
         currentWidth = computedWidth;
-        console.log('🎯 EventDelegationManager: Got column width from offsetWidth', {
+        log.debug('Got column width from offsetWidth', {
           columnId,
           width: currentWidth
         });
@@ -918,7 +921,7 @@ export class EventDelegationManager {
         const targetColumnId = targetHeaderCell.dataset.column;
         if (targetColumnId && targetColumnId !== this.lastDragOverColumn) {
           this.lastDragOverColumn = targetColumnId;
-          console.log('🎯 EventDelegationManager: Dragging over column', targetColumnId);
+          log.debug('Dragging over column', { targetColumnId });
         }
       }
       
@@ -936,7 +939,7 @@ export class EventDelegationManager {
 
   private handleResizeDrag(event: MouseEvent): void {
     if (!this.dragState.startColumnId || this.dragState.startWidth === undefined || this.dragState.startX === undefined) {
-      console.warn('EventDelegationManager: Missing resize state', this.dragState);
+      log.warn('Missing resize state', this.dragState);
       return;
     }
     
@@ -982,7 +985,7 @@ export class EventDelegationManager {
     // Send raw coordinates to XState - let the state machine handle all the logic
     const containerCoords = this.convertToContainerCoordinates(event);
     
-    console.log('🎯 EventDelegationManager: Column drag end - sending coordinates to XState', {
+    log.debug('Column drag end - sending coordinates to XState', {
       startColumn: this.dragState.startColumnId,
       mouseX: containerCoords.x,
       mouseY: containerCoords.y,
@@ -1010,7 +1013,7 @@ export class EventDelegationManager {
     // Skip keyboard handling when editing overlay is active
     const target = event.target as Element;
     if (target.closest('.vibegridx-editing-portal')) {
-      console.log('🎯 EventDelegationManager: Ignoring keyboard event on editing overlay');
+      log.debug('Ignoring keyboard event on editing overlay');
       return;
     }
     
@@ -1128,11 +1131,11 @@ export class EventDelegationManager {
 
   private handleFocusIn(event: FocusEvent): void {
     this.currentFocusElement = event.target as HTMLElement;
-    console.log('🎯 EventDelegationManager: Focus in', { target: this.currentFocusElement?.className });
+    log.debug('Focus in', { target: this.currentFocusElement?.className });
   }
 
   private handleFocusOut(event: FocusEvent): void {
-    console.log('🎯 EventDelegationManager: Focus out', { target: (event.target as HTMLElement)?.className });
+    log.debug('Focus out', { target: (event.target as HTMLElement)?.className });
     
     // Check if focus is leaving the editing area
     const relatedTarget = event.relatedTarget as HTMLElement;
@@ -1165,13 +1168,13 @@ export class EventDelegationManager {
            !currentActive.closest('.select-item')); // Custom select items
         
         if (stillLeavingEditingArea) {
-          console.log('🎯 EventDelegationManager: Focus left editing area, ensuring edit mode ends');
+          log.debug('Focus left editing area, ensuring edit mode ends');
           // Don't cancel - let the blur handlers commit first, then just ensure we exit edit mode
           this.send({
             type: 'edit.ensure.end'
           });
         } else {
-          console.log('🎯 EventDelegationManager: Focus returned to editing area, no action needed');
+          log.debug('Focus returned to editing area, no action needed');
         }
       }, 50);
     }
@@ -1182,7 +1185,7 @@ export class EventDelegationManager {
     
     // Prevent rapid focus calls that can trigger synthetic events
     if (now - this.lastFocusTime < 100) {
-      console.log('🎯 EventDelegationManager: Skipping focus (debounced)');
+      log.debug('Skipping focus (debounced)');
       return;
     }
     
@@ -1191,12 +1194,12 @@ export class EventDelegationManager {
     const isCurrentlyEditing = editingPortal && editingPortal.style.display !== 'none';
     
     if (isCurrentlyEditing) {
-      console.log('🎯 EventDelegationManager: Skipping focus - editing in progress');
+      log.debug('Skipping focus - editing in progress');
       return;
     }
     
     if (document.activeElement !== this.config.container) {
-      console.log('🎯 EventDelegationManager: Ensuring container focus');
+      log.debug('Ensuring container focus');
       this.lastFocusTime = now;
       this.config.container.focus({ preventScroll: true });
     }
@@ -1251,7 +1254,7 @@ export class EventDelegationManager {
     // Scroll handling disabled - CleanTableRenderer handles it internally
     
     this.isDestroyed = true;
-    console.log('🎯 EventDelegationManager: Destroyed');
+    log.info('Destroyed');
   }
 
   // ====================================

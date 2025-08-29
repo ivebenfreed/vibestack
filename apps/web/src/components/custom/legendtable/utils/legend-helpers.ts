@@ -1,4 +1,6 @@
 import type { TableRow, Column } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/utils/legend-helpers.ts');
 
 // Dummy data generation for testing
 export function generateDummyData(entityType: string, count: number): TableRow[] {
@@ -304,7 +306,7 @@ export function measurePerformance<T>(operation: string, fn: () => T): T {
   const duration = performance.now() - start;
   
   if (duration > 5) {
-    console.log(`[LegendTable] ${operation}: ${duration.toFixed(2)}ms`);
+    log.info(`[LegendTable] ${operation}: ${duration.toFixed(2)}ms`);
   }
   
   return result;

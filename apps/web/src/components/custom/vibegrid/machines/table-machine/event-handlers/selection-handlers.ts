@@ -5,6 +5,8 @@
 import { sendTo, assign, emit } from 'xstate';
 import { selectionActions } from '../slices/selection-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/selection-handlers.ts');
 
 export const selectionHandlers = {
   'selection.cell.select': {
@@ -17,11 +19,11 @@ export const selectionHandlers = {
       ({ context, self }) => {
         // Skip selection updates when editing
         if (context.editingCell) {
-          console.log('SelectionHandler: Skipping selection update - editing in progress');
+          log.info('SelectionHandler: Skipping selection update - editing in progress');
           return;
         }
         
-        console.log('SelectionHandler: Preparing canvas update', {
+        log.info('SelectionHandler: Preparing canvas update', {
           eventType: 'selection.cell.select',
           hasCoordinateMapping: !!context.coordinateMapping,
           hasCanvasActor: !!context.actors?.canvasActor,
@@ -30,13 +32,13 @@ export const selectionHandlers = {
         
         // Only proceed if we have valid context
         if (!context.coordinateMapping) {
-          console.warn('SelectionHandler: Missing coordinate mapping');
+          log.warn('SelectionHandler: Missing coordinate mapping');
           return;
         }
         
         // PERFORMANCE: Spawn canvas actor on first selection if needed
         if (!context.actors?.canvasActor) {
-          console.log('SelectionHandler: No canvas actor, sending spawn event');
+          log.info('SelectionHandler: No canvas actor, sending spawn event');
           self.send({ type: 'SPAWN_CANVAS_ACTOR_FOR_SELECTION' });
           return;
         }
@@ -48,13 +50,13 @@ export const selectionHandlers = {
           context.rowHeight || context.settings?.rowHeight || 40
         );
         
-        console.log('SelectionHandler: Calculated visual positions', {
+        log.info('SelectionHandler: Calculated visual positions', {
           count: visualPositions.length,
           positions: visualPositions
         });
         
         if (visualPositions.length > 0) {
-          console.log('SelectionHandler: Sending FORWARD_TO_CANVAS event');
+          log.info('SelectionHandler: Sending FORWARD_TO_CANVAS event');
           self.send({
             type: 'FORWARD_TO_CANVAS',
             event: {
@@ -105,7 +107,7 @@ export const selectionHandlers = {
       ({ context, self }) => {
         // Skip selection updates when editing
         if (context.editingCell) {
-          console.log('SelectionHandler: Skipping range selection update - editing in progress');
+          log.info('SelectionHandler: Skipping range selection update - editing in progress');
           return;
         }
         
@@ -177,7 +179,7 @@ export const selectionHandlers = {
       
       // Log the selection change
       ({ context, event }) => {
-        console.log('TableMachine: Checkbox selection toggled', {
+        log.info('TableMachine: Checkbox selection toggled', {
           rowId: event.rowId,
           isSelected: context.selectedRows.has(event.rowId),
           totalSelected: context.selectedRows.size
@@ -188,19 +190,19 @@ export const selectionHandlers = {
       ({ context, self }) => {
         // Skip selection updates when editing
         if (context.editingCell) {
-          console.log('SelectionHandler: Skipping row selection update - editing in progress');
+          log.info('SelectionHandler: Skipping row selection update - editing in progress');
           return;
         }
         
         // Only proceed if we have valid context
         if (!context.coordinateMapping) {
-          console.warn('SelectionHandler: Missing coordinate mapping');
+          log.warn('SelectionHandler: Missing coordinate mapping');
           return;
         }
         
         // PERFORMANCE: Spawn canvas actor on first selection if needed
         if (!context.actors?.canvasActor) {
-          console.log('SelectionHandler: No canvas actor, sending spawn event');
+          log.info('SelectionHandler: No canvas actor, sending spawn event');
           self.send({ type: 'SPAWN_CANVAS_ACTOR_FOR_SELECTION' });
           return;
         }
@@ -212,14 +214,14 @@ export const selectionHandlers = {
           context.rowHeight || context.settings?.rowHeight || 40
         );
         
-        console.log('SelectionHandler: Calculated visual positions for row selection', {
+        log.info('SelectionHandler: Calculated visual positions for row selection', {
           selectedCellsSize: context.selectedCells.size,
           selectedRowsSize: context.selectedRows.size,
           visualPositionsCount: visualPositions.length
         });
         
         if (visualPositions.length > 0) {
-          console.log('SelectionHandler: Sending row selection canvas events');
+          log.info('SelectionHandler: Sending row selection canvas events');
           self.send({
             type: 'FORWARD_TO_CANVAS',
             event: {
@@ -275,7 +277,7 @@ export const selectionHandlers = {
       selectionActions.selectAllRows,
       
       ({ context }) => {
-        console.log('TableMachine: All rows selected', {
+        log.info('TableMachine: All rows selected', {
           totalRows: context.allRowIds.length,
           selectedCount: context.selectedRows.size
         });
@@ -285,18 +287,18 @@ export const selectionHandlers = {
       ({ context, self }) => {
         // Skip selection updates when editing
         if (context.editingCell) {
-          console.log('SelectionHandler: Skipping select all update - editing in progress');
+          log.info('SelectionHandler: Skipping select all update - editing in progress');
           return;
         }
         
         // Only proceed if we have valid context
         if (!context.coordinateMapping) {
-          console.warn('SelectionHandler: Missing coordinate mapping');
+          log.warn('SelectionHandler: Missing coordinate mapping');
           return;
         }
         
         if (!context.actors?.canvasActor) {
-          console.log('SelectionHandler: No canvas actor, sending spawn event');
+          log.info('SelectionHandler: No canvas actor, sending spawn event');
           self.send({ type: 'SPAWN_CANVAS_ACTOR_FOR_SELECTION' });
           return;
         }
@@ -347,7 +349,7 @@ export const selectionHandlers = {
       selectionActions.clearRowSelection,
       
       () => {
-        console.log('TableMachine: All rows deselected');
+        log.info('TableMachine: All rows deselected');
       },
       
       // Clear selection visual and hide fill handle
@@ -390,7 +392,7 @@ export const selectionHandlers = {
       selectionActions.selectRowRange,
       
       ({ context, event }) => {
-        console.log('TableMachine: Range selection', {
+        log.info('TableMachine: Range selection', {
           startRowId: event.startRowId,
           endRowId: event.endRowId,
           selectedCount: context.selectedRows.size
@@ -408,7 +410,7 @@ export const selectionHandlers = {
       
       
       ({ event }) => {
-        console.log('TableMachine: Selection drag started', {
+        log.info('TableMachine: Selection drag started', {
           startCell: event.startCell
         });
       }
@@ -420,7 +422,7 @@ export const selectionHandlers = {
       // Update selection based on drag from anchor to current cell
       assign({
         selectedCells: ({ context, event }) => {
-          console.log('selection.drag.move: calculating range', {
+          log.info('selection.drag.move: calculating range', {
             anchor: context.anchor,
             currentCell: event.currentCell,
             hasCoordinateMapping: !!context.coordinateMapping
@@ -440,7 +442,7 @@ export const selectionHandlers = {
           const columns = context.coordinateMapping?.columns;
           
           if (!rows || !columns) {
-            console.warn('No coordinate mapping available');
+            log.warn('No coordinate mapping available');
             return context.selectedCells;
           }
           
@@ -451,7 +453,7 @@ export const selectionHandlers = {
           const endColData = columns.find((c: any) => c.columnId === endColId);
           
           if (!startRowData || !endRowData || !startColData || !endColData) {
-            console.warn('Could not find cells in coordinate mapping');
+            log.warn('Could not find cells in coordinate mapping');
             return context.selectedCells;
           }
           
@@ -477,7 +479,7 @@ export const selectionHandlers = {
             }
           }
           
-          console.log('Selected cells after range calculation:', selectedCells.size);
+          log.info('Selected cells after range calculation:', selectedCells.size);
           
           return selectedCells;
         }
@@ -487,7 +489,7 @@ export const selectionHandlers = {
       ({ context, self }) => {
         // Skip selection updates when editing
         if (context.editingCell) {
-          console.log('SelectionHandler: Skipping drag move update - editing in progress');
+          log.info('SelectionHandler: Skipping drag move update - editing in progress');
           return;
         }
         
@@ -544,7 +546,7 @@ export const selectionHandlers = {
       })),
       
       ({ context }) => {
-        console.log('TableMachine: Selection drag ended', {
+        log.info('TableMachine: Selection drag ended', {
           selectedCells: context.selectedCells.size
         });
       }

@@ -113,7 +113,21 @@ BETTER_AUTH_URL=http://localhost:${WEB_PORT}
 API_URL=http://localhost:${SERVER_PORT}
 
 # Issue tracking
-ISSUE_NUMBER=${issueNumber}`;
+ISSUE_NUMBER=${issueNumber}
+
+# Logging configuration (Contextual Logging System)
+# Uncomment and customize the following lines for focused development:
+# VITE_LOG_PATTERNS=components/custom/vibegrid/*,sync/*
+# VITE_LOG_CONTEXTS=ui,sync
+# VITE_LOG_LEVEL=info
+# VITE_LOG_FOCUS_MODE=all
+# VITE_LOG_DISABLED_PATTERNS=tests/*,archive/*
+# 
+# Example configurations:
+# For VibeGrid work: VITE_LOG_PATTERNS=components/custom/vibegrid/*
+# For sync debugging: VITE_LOG_PATTERNS=sync/*,state-machines/*
+# For UI components: VITE_LOG_CONTEXTS=ui
+# For quiet mode: VITE_LOG_FOCUS_MODE=none`;
   
   // Write the .env.local file
   fs.writeFileSync(envLocalPath, envLocalContent);

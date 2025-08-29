@@ -4,6 +4,8 @@
 
 import { overlayActions } from '../slices/overlay-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/machines/table-machine/event-handlers/clipboard-handlers.ts');
 
 export const clipboardHandlers = {
   'CLIPBOARD_SET': {
@@ -41,7 +43,7 @@ export const clipboardHandlers = {
       
       ({ event }: any) => {
         if (event.clipboardData) {
-          console.log('TableMachine: Clipboard data set', {
+          log.info('TableMachine: Clipboard data set', {
             cellCount: event.clipboardData.cells.length,
             bounds: event.clipboardData.bounds,
             columnIds: event.clipboardData.columnIds
@@ -73,7 +75,7 @@ export const clipboardHandlers = {
       },
       
       () => {
-        console.log('TableMachine: Clipboard cleared');
+        log.info('TableMachine: Clipboard cleared');
       }
     ]
   },
@@ -81,7 +83,7 @@ export const clipboardHandlers = {
   'PASTE_ERROR': {
     actions: [
       ({ context, event }: any) => {
-        console.error('TableMachine: Paste error', event.message);
+        log.error('TableMachine: Paste error', event.message);
         
         // Notification is already shown by the keyboard handler that sends this event
         // Don't show duplicate notification here
@@ -92,7 +94,7 @@ export const clipboardHandlers = {
   'PASTE_EXTERNAL': {
     actions: [
       ({ context, self, event }: any) => {
-        console.log('TableMachine: Processing external paste', {
+        log.info('TableMachine: Processing external paste', {
           clipboardText: event.clipboardText,
           targetRow: event.targetRowId,
           targetCol: event.targetColumnId
@@ -131,7 +133,7 @@ export const clipboardHandlers = {
         
         // Apply updates
         if (updates.length > 0) {
-          console.log('TableMachine: Applying external paste updates', {
+          log.info('TableMachine: Applying external paste updates', {
             updateCount: updates.length
           });
           
@@ -142,11 +144,11 @@ export const clipboardHandlers = {
                 const result = context.onEntityUpdate(update.rowId, updateData);
                 if (result instanceof Promise) {
                   result.catch((error: any) => {
-                    console.error('TableMachine: External paste onEntityUpdate failed', { rowId: update.rowId, error });
+                    log.error('TableMachine: External paste onEntityUpdate failed', { rowId: update.rowId, error });
                   });
                 }
               } catch (error) {
-                console.error('TableMachine: External paste onEntityUpdate threw error', { rowId: update.rowId, error });
+                log.error('TableMachine: External paste onEntityUpdate threw error', { rowId: update.rowId, error });
               }
             }
           }

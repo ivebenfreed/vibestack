@@ -1,6 +1,8 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/overlays/SelectionOverlayDOM.ts');
 
 // ====================================
 // DOM SELECTION OVERLAY
@@ -38,7 +40,7 @@ export class SelectionOverlayDOM {
       this.container.style.position = 'relative';
     }
     
-    console.log('SelectionOverlayDOM: Created', {
+    log.info('SelectionOverlayDOM: Created', {
       container: this.container,
       config: this.config
     });
@@ -48,7 +50,7 @@ export class SelectionOverlayDOM {
    * Update selection using coordinate mapping directly (pure XState approach)
    */
   updateSelectionWithMapping(selectedCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
-    console.log('SelectionOverlayDOM.updateSelectionWithMapping called', {
+    log.info('SelectionOverlayDOM.updateSelectionWithMapping called', {
       selectedCells: selectedCells.size,
       selectedCellKeys: Array.from(selectedCells),
       viewport: viewport,
@@ -64,7 +66,7 @@ export class SelectionOverlayDOM {
     }
 
     if (!viewport || !coordinateMapping) {
-      console.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for selection render', {
+      log.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for selection render', {
         hasViewport: !!viewport,
         hasCoordinateMapping: !!coordinateMapping
       });
@@ -102,7 +104,7 @@ export class SelectionOverlayDOM {
       }
     }
 
-    console.log('SelectionOverlayDOM: Visible cells calculated', {
+    log.info('SelectionOverlayDOM: Visible cells calculated', {
       totalSelected: selectedCells.size,
       visibleCount: visibleCells.size,
       viewport: {
@@ -133,7 +135,7 @@ export class SelectionOverlayDOM {
    * Update with visual cell positions directly
    */
   updateWithVisualPositions(visualCells: VisualCellPosition[]): void {
-    console.log('SelectionOverlayDOM.updateWithVisualPositions', {
+    log.info('SelectionOverlayDOM.updateWithVisualPositions', {
       cellCount: visualCells.length,
       containerExists: !!this.container,
       containerInDom: this.container ? document.body.contains(this.container) : false,
@@ -151,7 +153,7 @@ export class SelectionOverlayDOM {
     // Remove elements that are no longer selected (smooth fade out)
     for (const cellKey of currentCellKeys) {
       if (!newCellKeys.has(cellKey)) {
-        console.log(`SelectionOverlayDOM: Removing deselected cell ${cellKey}`);
+        log.info(`SelectionOverlayDOM: Removing deselected cell ${cellKey}`);
         this.removeSelectionElement(cellKey);
       }
     }
@@ -161,7 +163,7 @@ export class SelectionOverlayDOM {
       const cellKey = cell.cellKey;
       const isNewSelection = !currentCellKeys.has(cellKey);
       
-      console.log(`SelectionOverlayDOM: ${isNewSelection ? 'Adding new' : 'Updating existing'} element for ${cellKey}`, {
+      log.info(`SelectionOverlayDOM: ${isNewSelection ? 'Adding new' : 'Updating existing'} element for ${cellKey}`, {
         x: cell.x,
         y: cell.y,
         width: cell.width,
@@ -176,7 +178,7 @@ export class SelectionOverlayDOM {
       });
     }
     
-    console.log('SelectionOverlayDOM: After smooth update', {
+    log.info('SelectionOverlayDOM: After smooth update', {
       elementCount: this.selectionElements.size,
       elementKeys: Array.from(this.selectionElements.keys()),
       previousKeys: Array.from(currentCellKeys),
@@ -194,7 +196,7 @@ export class SelectionOverlayDOM {
     let element = this.selectionElements.get(cellKey);
     
     if (!element) {
-      console.log(`SelectionOverlayDOM: Creating new element for ${cellKey}`, {
+      log.info(`SelectionOverlayDOM: Creating new element for ${cellKey}`, {
         container: this.container.className,
         containerInDom: document.body.contains(this.container)
       });
@@ -220,7 +222,7 @@ export class SelectionOverlayDOM {
       this.container.appendChild(element);
       this.selectionElements.set(cellKey, element);
       
-      console.log(`SelectionOverlayDOM: Element created and appended for ${cellKey}`, {
+      log.info(`SelectionOverlayDOM: Element created and appended for ${cellKey}`, {
         elementInDom: document.body.contains(element),
         parentClass: element.parentElement?.className
       });
@@ -229,7 +231,7 @@ export class SelectionOverlayDOM {
       requestAnimationFrame(() => {
         element.style.opacity = '0.2';
         element.style.transform = 'scale(1)';
-        console.log(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
+        log.info(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
       });
     }
     
@@ -258,7 +260,7 @@ export class SelectionOverlayDOM {
       height: `${position.height}px`
     });
     
-    console.log(`SelectionOverlayDOM: Element positioned for ${cellKey}`, {
+    log.info(`SelectionOverlayDOM: Element positioned for ${cellKey}`, {
       left: position.x,
       top: position.y,
       width: position.width,
@@ -295,7 +297,7 @@ export class SelectionOverlayDOM {
    * Clear all selection elements
    */
   clearSelection(): void {
-    console.log('SelectionOverlayDOM: Clearing selection', {
+    log.info('SelectionOverlayDOM: Clearing selection', {
       elementCount: this.selectionElements.size
     });
     

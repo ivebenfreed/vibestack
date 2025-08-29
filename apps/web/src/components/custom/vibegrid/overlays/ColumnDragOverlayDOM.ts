@@ -1,5 +1,7 @@
 import type { ColumnDragState } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/overlays/ColumnDragOverlayDOM.ts');
 
 // ====================================
 // COLUMN DRAG OVERLAY - DOM Implementation
@@ -84,14 +86,14 @@ export class ColumnDragOverlayDOM {
     this.dragState = dragState;
     
     if (!this.coordinateMapping) {
-      console.warn('ColumnDragOverlayDOM: No coordinate mapping available');
+      log.warn('ColumnDragOverlayDOM: No coordinate mapping available');
       return;
     }
     
     // Get column info from coordinate mapping
     const column = this.coordinateMapping.columns.find(col => col.columnId === dragState.draggedColumnId);
     if (!column) {
-      console.warn('ColumnDragOverlayDOM: Column not found:', dragState.draggedColumnId);
+      log.warn('ColumnDragOverlayDOM: Column not found:', dragState.draggedColumnId);
       return;
     }
     

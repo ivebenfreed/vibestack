@@ -3,6 +3,8 @@ import { fromStore } from '@xstate/store';
 import { getEntity$, orgContext$, entities$ } from '@/legend-state/observables';
 import { when } from '@legendapp/state';
 import { 
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/vibegrid/stores/table-data-store-atomic.ts');
   discoverRelationships, 
   getUniqueRelationshipTables,
   getUniqueJunctionTables,
@@ -42,7 +44,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
     const incomingSystemFieldsAtEnd = incomingSystemFieldPositions.every(pos => pos === -1 || pos > columns.length / 2);
     const persistedSystemFieldsAtStart = persistedSystemFieldPositions.some(pos => pos >= 0 && pos < 3);
     
-    console.log('🔍 Column order detection:', {
+    log.info('🔍 Column order detection:', {
       incomingSystemFieldPositions,
       persistedSystemFieldPositions,
       incomingSystemFieldsAtEnd,
@@ -52,7 +54,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
     
     if (incomingSystemFieldsAtEnd && persistedSystemFieldsAtStart) {
       // Use the incoming order (new schema-driven order with system fields at end)
-      console.log('🔄 Using incoming column order (system fields moved to end)');
+      log.info('🔄 Using incoming column order (system fields moved to end)');
       initialColumns = columns;
     } else {
       // Reorder columns based on persisted order (original behavior)
@@ -101,7 +103,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       setInitialData: {
         entities: (context, event: { entities: Record<string, any>, relationships: Record<string, Record<string, any>> }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Setting entities', {
+            log.info('📊 TableStore: Setting entities', {
               entityCount: Object.keys(event.entities).length
             });
           }
@@ -151,7 +153,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
                   
                   // Debug logging for initial sort
                   if (process.env.NODE_ENV === 'development' && sort.field === 'title') {
-                    console.log('📊 TableStore: Initial sort application', {
+                    log.info('📊 TableStore: Initial sort application', {
                       field: sort.field,
                       direction: sort.direction,
                       aValue: String(aValue).substring(0, 20),
@@ -169,7 +171,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             });
             
             if (process.env.NODE_ENV === 'development' && context.sortBy[0]?.field === 'title') {
-              console.log('📊 TableStore: Initial data sorted with persisted state', {
+              log.info('📊 TableStore: Initial data sorted with persisted state', {
                 sortBy: context.sortBy,
                 firstThree: processedRows.slice(0, 3).map(row => ({
                   id: row.id,
@@ -182,7 +184,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           // Debug: Show sample resolved entity to verify relationship resolution
           if (process.env.NODE_ENV === 'development' && entityValues.length > 0) {
             const sampleEntity = entityValues[0];
-            console.log('📊 TableStore: Sample resolved entity:', {
+            log.info('📊 TableStore: Sample resolved entity:', {
               id: sampleEntity.id,
               title: sampleEntity.title,
               projectId: sampleEntity.projectId,
@@ -233,7 +235,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       updateEntity: {
         entities: (context, event: { entity: any }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Updating single entity atomically', {
+            log.info('📊 TableStore: Updating single entity atomically', {
               entityId: event.entity.id,
               entityType: context.entityType,
               hasTagsField: 'tags' in event.entity,
@@ -247,7 +249,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
           
           if (process.env.NODE_ENV === 'development' && event.entity.tags) {
-            console.log('📊 TableStore: Entity resolution result', {
+            log.info('📊 TableStore: Entity resolution result', {
               entityId: event.entity.id,
               originalTags: event.entity.tags,
               resolvedTags: resolvedEntity.__resolved_tags,
@@ -309,7 +311,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             
             if (needsResort) {
               if (process.env.NODE_ENV === 'development') {
-                console.log('📊 TableStore: Re-sorting after entity update', {
+                log.info('📊 TableStore: Re-sorting after entity update', {
                   entityId: event.entity.id,
                   sortBy: context.sortBy,
                   reason: context.sortBy.some(s => s.field === 'updatedAt') ? 'updatedAt field' : 'sorted field changed'
@@ -390,7 +392,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       updateRelationshipTable: {
         relationships: (context, event: { table: string, data: any[] }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Updating relationship table atomically', {
+            log.info('📊 TableStore: Updating relationship table atomically', {
               table: event.table,
               dataCount: event.data.length
             });
@@ -439,7 +441,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
               if (hasChanges) {
                 changedCount++;
                 if (process.env.NODE_ENV === 'development' && changedCount <= 3) {
-                  console.log('📊 TableStore: Entity resolution changed', {
+                  log.info('📊 TableStore: Entity resolution changed', {
                     entityId,
                     table: event.table,
                     affectedColumns: affectedConfigs.map(c => c.columnId),
@@ -453,7 +455,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             });
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('📊 TableStore: Re-resolved entities after relationship change', {
+              log.info('📊 TableStore: Re-resolved entities after relationship change', {
                 table: event.table,
                 totalEntities: Object.keys(updatedEntities).length,
                 changedEntities: changedCount
@@ -486,7 +488,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             };
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('📊 TableStore: Re-processing rows due to relationship change', {
+              log.info('📊 TableStore: Re-processing rows due to relationship change', {
                 table: event.table,
                 affectedColumns: affectedConfigs.map(c => c.columnId),
                 rowCount: context.processedRows.length,
@@ -515,7 +517,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       deleteEntity: {
         entities: (context, event: { entityId: string }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Deleting entity atomically', {
+            log.info('📊 TableStore: Deleting entity atomically', {
               entityId: event.entityId,
               entityType: context.entityType
             });
@@ -542,7 +544,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       setSortBy: {
         sortBy: (context, event: { sortBy: Array<{ field: string; direction: 'asc' | 'desc' }> }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Setting sort configuration', { 
+            log.info('📊 TableStore: Setting sort configuration', { 
               oldSortBy: context.sortBy,
               newSortBy: event.sortBy,
               isClearing: event.sortBy.length === 0,
@@ -555,7 +557,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           // If clearing sort, restore original order
           if (event.sortBy.length === 0) {
             if (process.env.NODE_ENV === 'development') {
-              console.log('📊 TableStore: Clearing sort, restoring original order', {
+              log.info('📊 TableStore: Clearing sort, restoring original order', {
                 originalRowCount: context.originalRows.length,
                 currentRowCount: context.processedRows.length
               });
@@ -639,7 +641,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
                   
                   // Debug logging for sort verification
                   if (process.env.NODE_ENV === 'development' && sort.field === 'title') {
-                    console.log('📊 TableStore: Sort comparison debug', {
+                    log.info('📊 TableStore: Sort comparison debug', {
                       field: sort.field,
                       direction: sort.direction,
                       aValue: String(aValue).substring(0, 20),
@@ -658,7 +660,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             
             // Debug logging for sort result
             if (process.env.NODE_ENV === 'development' && event.sortBy[0]?.field === 'title') {
-              console.log('📊 TableStore: Sort applied, first 3 results', {
+              log.info('📊 TableStore: Sort applied, first 3 results', {
                 sortBy: event.sortBy,
                 firstThree: sortedRows.slice(0, 3).map(row => ({
                   id: row.id,
@@ -677,7 +679,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       setFilters: {
         filters: (context, event: { filters: Array<{ field: string; operator: string; value: any }> }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Setting filters', { filters: event.filters });
+            log.info('📊 TableStore: Setting filters', { filters: event.filters });
           }
           return event.filters;
         },
@@ -757,7 +759,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       
       reorderColumns: {
         columns: (context, event: { fromIndex: number; toIndex: number }) => {
-          console.log('🔄 Store: reorderColumns called', {
+          log.info('🔄 Store: reorderColumns called', {
             fromIndex: event.fromIndex,
             toIndex: event.toIndex,
             currentColumns: context.columns.map(c => c.id),
@@ -769,14 +771,14 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             col.id !== '__selection' && context.columnVisibility[col.id] !== false
           );
           
-          console.log('🔄 Store: Visible columns before reorder', visibleColumns.map(c => c.id));
+          log.info('🔄 Store: Visible columns before reorder', visibleColumns.map(c => c.id));
           
           // Apply reorder to visible columns
           const newVisibleOrder = [...visibleColumns];
           const [removed] = newVisibleOrder.splice(event.fromIndex, 1);
           newVisibleOrder.splice(event.toIndex, 0, removed);
           
-          console.log('🔄 Store: Visible columns after reorder', {
+          log.info('🔄 Store: Visible columns after reorder', {
             moved: removed.id,
             from: event.fromIndex,
             to: event.toIndex,
@@ -820,7 +822,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             }
           });
           
-          console.log('🔄 Store: Final column order', {
+          log.info('🔄 Store: Final column order', {
             oldOrder: context.columns.map(c => c.id),
             newOrder: newColumns.map(c => c.id),
             changed: JSON.stringify(newColumns.map(c => c.id)) !== JSON.stringify(context.columns.map(c => c.id))
@@ -861,7 +863,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       setPagination: {
         pagination: (context, event: { pagination: typeof context.pagination }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Setting pagination', { pagination: event.pagination });
+            log.info('📊 TableStore: Setting pagination', { pagination: event.pagination });
           }
           return event.pagination;
         }
@@ -881,7 +883,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       atomicEntityUpdate: {
         entities: (context, event: { entityId: string, entity: any, silent?: boolean }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Processing atomic entity update', {
+            log.info('📊 TableStore: Processing atomic entity update', {
               entityId: event.entityId,
               entityType: context.entityType,
               entityName: event.entity?.name,
@@ -903,7 +905,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           // If silent update, skip processedRows update to prevent full re-render
           if (event.silent) {
             if (process.env.NODE_ENV === 'development') {
-              console.log('📊 TableStore: Skipping processedRows update for silent atomic update', {
+              log.info('📊 TableStore: Skipping processedRows update for silent atomic update', {
                 entityId: event.entityId,
                 reason: 'silent_mode_prevents_full_rerender'
               });
@@ -925,7 +927,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             };
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('📊 TableStore: Updated processed row via atomic update', {
+              log.info('📊 TableStore: Updated processed row via atomic update', {
                 entityId: event.entityId,
                 rowIndex,
                 newData: resolvedEntity
@@ -950,7 +952,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   const entityTableName = entityType; // Legend State uses singular names
   
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 TableStore: Loading initial data', {
+    log.info('📊 TableStore: Loading initial data', {
       entityType,
       entityTable: entityTableName,
       page: page || 'all'
@@ -961,7 +963,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   const entity$ = getEntity$(entityTableName);
   
   if (!entity$) {
-    console.warn('📊 TableStore: Entity observable not ready for', entityTableName, '- waiting...');
+    log.warn('📊 TableStore: Entity observable not ready for', entityTableName, '- waiting...');
     
     // Wait for entity observable to be ready instead of returning empty data
     return new Promise((resolve) => {
@@ -969,7 +971,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
         const entity$ = getEntity$(entityTableName);
         
         if (entity$) {
-          console.log('📊 TableStore: Entity observable is now ready for', entityTableName);
+          log.info('📊 TableStore: Entity observable is now ready for', entityTableName);
           // Recursively call loadInitialData now that entity is ready
           loadInitialData(entityType, columns, page).then(resolve);
         } else {
@@ -989,14 +991,14 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     
     // Check if data is actually loaded (not undefined or empty on first load)
     if (!entityData) {
-      console.log('📊 TableStore: Data not yet loaded for', entityTableName, '- waiting for sync...');
+      log.info('📊 TableStore: Data not yet loaded for', entityTableName, '- waiting for sync...');
       // Wait a bit for the initial sync to complete
       return new Promise((resolve) => {
         const checkDataReady = () => {
           try {
             const data = entity$.get();
             if (data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
-              console.log('📊 TableStore: Data is now ready for', entityTableName);
+              log.info('📊 TableStore: Data is now ready for', entityTableName);
               // Recursively call loadInitialData now that data is ready
               loadInitialData(entityType, columns, page).then(resolve);
             } else {
@@ -1015,7 +1017,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     
     entities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});
   } catch (error) {
-    console.warn('📊 TableStore: Could not access entity data, using empty array:', error.message);
+    log.warn('📊 TableStore: Could not access entity data, using empty array:', error.message);
     entities = [];
   }
   const totalCount = entities.length;
@@ -1049,7 +1051,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     };
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 TableStore: Pagination enabled', paginationInfo);
+      log.info('📊 TableStore: Pagination enabled', paginationInfo);
     }
   } else {
     // Load all data
@@ -1070,7 +1072,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
         const data = relationshipEntity$.peek?.() || relationshipEntity$;
         return Array.isArray(data) ? data : Object.values(data || {});
       } catch (error) {
-        console.warn(`📊 TableStore: Could not load relationship data for ${tableName}:`, error.message);
+        log.warn(`📊 TableStore: Could not load relationship data for ${tableName}:`, error.message);
         return [];
       }
     })),
@@ -1081,7 +1083,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
         const data = junctionEntity$.peek?.() || junctionEntity$;
         return Array.isArray(data) ? data : Object.values(data || {});
       } catch (error) {
-        console.warn(`📊 TableStore: Could not load junction data for ${tableName}:`, error.message);
+        log.warn(`📊 TableStore: Could not load junction data for ${tableName}:`, error.message);
         return [];
       }
     }))
@@ -1098,7 +1100,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     
     // Debug tag loading
     if (tableName === 'tags' && process.env.NODE_ENV === 'development') {
-      console.log('📊 TableStore: Loaded tags into relationships', {
+      log.info('📊 TableStore: Loaded tags into relationships', {
         tagCount: relationshipDataArrays[index].length,
         sampleTags: relationshipDataArrays[index].slice(0, 3).map((tag: any) => ({
           id: tag.id,
@@ -1116,7 +1118,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     const junctionData = junctionDataArrays[index];
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 TableStore: Processing junction table', {
+      log.info('📊 TableStore: Processing junction table', {
         tableName,
         junctionDataCount: junctionData.length,
         sampleJunction: junctionData[0]
@@ -1127,7 +1129,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     const config = relationshipConfigs.find(c => c.junctionTable === tableName);
     if (config) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('📊 TableStore: Found config for junction table', {
+        log.info('📊 TableStore: Found config for junction table', {
           tableName,
           fieldName: config.fieldName,
           sourceField: config.junctionSourceField,
@@ -1151,13 +1153,13 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
         }
       });
     } else {
-      console.warn('📊 TableStore: No config found for junction table', tableName);
+      log.warn('📊 TableStore: No config found for junction table', tableName);
     }
   });
   
   if (process.env.NODE_ENV === 'development') {
     const entitiesWithJunctions = Object.keys(junctionsByEntity).length;
-    console.log('📊 TableStore: Junction data processed', {
+    log.info('📊 TableStore: Junction data processed', {
       entitiesWithJunctionData: entitiesWithJunctions,
       sampleEntityId: Object.keys(junctionsByEntity)[0],
       sampleJunctionData: junctionsByEntity[Object.keys(junctionsByEntity)[0]]
@@ -1178,7 +1180,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   });
   
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 TableStore: Initial data loaded', {
+    log.info('📊 TableStore: Initial data loaded', {
       entityCount: entities.length,
       totalCount,
       relationshipTables: Object.keys(relationships),
@@ -1190,7 +1192,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     // Debug: Check if any entities have tags
     const entitiesWithTags = Object.values(resolvedEntities).filter((e: any) => e.tags && e.tags.length > 0);
     if (entitiesWithTags.length > 0) {
-      console.log('📊 TableStore: Found entities with tags', {
+      log.info('📊 TableStore: Found entities with tags', {
         count: entitiesWithTags.length,
         sample: entitiesWithTags[0],
         sampleTags: entitiesWithTags[0].tags,
@@ -1218,7 +1220,7 @@ export async function loadPage(
 ) {
   const entityTableName = entityType; // Legend State uses singular names
   
-  console.log('📊 TableStore: Loading page', {
+  log.info('📊 TableStore: Loading page', {
     entityType,
     page,
     pageSize
@@ -1236,7 +1238,7 @@ export async function loadPage(
     const entityData = entity$.peek?.() || entity$;
     allEntities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});
   } catch (error) {
-    console.warn('📊 TableStore: Could not access entity data for pagination:', error.message);
+    log.warn('📊 TableStore: Could not access entity data for pagination:', error.message);
     allEntities = [];
   }
   
@@ -1259,7 +1261,7 @@ export async function loadPage(
         const data = relationshipEntity$.peek?.() || relationshipEntity$;
         return Array.isArray(data) ? data : Object.values(data || {});
       } catch (error) {
-        console.warn(`📊 TableStore: Could not load relationship data for ${tableName}:`, error.message);
+        log.warn(`📊 TableStore: Could not load relationship data for ${tableName}:`, error.message);
         return [];
       }
     })),
@@ -1270,7 +1272,7 @@ export async function loadPage(
         const data = junctionEntity$.peek?.() || junctionEntity$;
         return Array.isArray(data) ? data : Object.values(data || {});
       } catch (error) {
-        console.warn(`📊 TableStore: Could not load junction data for ${tableName}:`, error.message);
+        log.warn(`📊 TableStore: Could not load junction data for ${tableName}:`, error.message);
         return [];
       }
     }))
@@ -1287,7 +1289,7 @@ export async function loadPage(
     
     // Debug tag loading
     if (tableName === 'tags' && process.env.NODE_ENV === 'development') {
-      console.log('📊 TableStore: Loaded tags into relationships', {
+      log.info('📊 TableStore: Loaded tags into relationships', {
         tagCount: relationshipDataArrays[index].length,
         sampleTags: relationshipDataArrays[index].slice(0, 3).map((tag: any) => ({
           id: tag.id,
@@ -1305,7 +1307,7 @@ export async function loadPage(
     const junctionData = junctionDataArrays[index];
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 TableStore: Processing junction table', {
+      log.info('📊 TableStore: Processing junction table', {
         tableName,
         junctionDataCount: junctionData.length,
         sampleJunction: junctionData[0]
@@ -1316,7 +1318,7 @@ export async function loadPage(
     const config = relationshipConfigs.find(c => c.junctionTable === tableName);
     if (config) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('📊 TableStore: Found config for junction table', {
+        log.info('📊 TableStore: Found config for junction table', {
           tableName,
           fieldName: config.fieldName,
           sourceField: config.junctionSourceField,
@@ -1340,13 +1342,13 @@ export async function loadPage(
         }
       });
     } else {
-      console.warn('📊 TableStore: No config found for junction table', tableName);
+      log.warn('📊 TableStore: No config found for junction table', tableName);
     }
   });
   
   if (process.env.NODE_ENV === 'development') {
     const entitiesWithJunctions = Object.keys(junctionsByEntity).length;
-    console.log('📊 TableStore: Junction data processed', {
+    log.info('📊 TableStore: Junction data processed', {
       entitiesWithJunctionData: entitiesWithJunctions,
       sampleEntityId: Object.keys(junctionsByEntity)[0],
       sampleJunctionData: junctionsByEntity[Object.keys(junctionsByEntity)[0]]
@@ -1381,14 +1383,14 @@ export function setupGranularSubscriptions(
   // DEPRECATED: Granular subscriptions pattern removed in favor of Legend State integration
   // Legend State handles all data synchronization automatically through XState
   
-  console.log('📊 TableStore: Granular subscriptions deprecated - using Legend State integration', {
+  log.info('📊 TableStore: Granular subscriptions deprecated - using Legend State integration', {
     entityType,
     columnCount: columns?.length || 0
   });
   
   // Return empty cleanup function since no subscriptions are created
   return () => {
-    console.log('📊 TableStore: No subscriptions to cleanup (Legend State handles sync)');
+    log.info('📊 TableStore: No subscriptions to cleanup (Legend State handles sync)');
   };
 }
 
@@ -1412,10 +1414,10 @@ export function saveDisplayState(entityType: string, state: any) {
     };
     localStorage.setItem(key, JSON.stringify(displayState));
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 TableStore: Saved display state', { entityType, displayState });
+      log.info('📊 TableStore: Saved display state', { entityType, displayState });
     }
   } catch (error) {
-    console.error('Failed to save display state:', error);
+    log.error('Failed to save display state:', error);
   }
 }
 
@@ -1426,12 +1428,12 @@ export function loadDisplayState(entityType: string): any | null {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (process.env.NODE_ENV === 'development') {
-        console.log('📊 TableStore: Loaded display state', { entityType, parsed });
+        log.info('📊 TableStore: Loaded display state', { entityType, parsed });
       }
       return parsed;
     }
   } catch (error) {
-    console.error('Failed to load display state:', error);
+    log.error('Failed to load display state:', error);
   }
   return null;
 }
@@ -1442,7 +1444,7 @@ export function loadDisplayState(entityType: string): any | null {
 
 export function createTableStoreActor(entityType: string, columns?: any[]) {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 TableStore: Creating atomic store logic for', entityType, {
+    log.info('📊 TableStore: Creating atomic store logic for', entityType, {
       columnCount: columns?.length || 0
     });
   }

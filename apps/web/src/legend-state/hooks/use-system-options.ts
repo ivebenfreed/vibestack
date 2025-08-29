@@ -9,6 +9,8 @@ import { observable } from '@legendapp/state';
 import { use$ } from '@legendapp/state/react';
 import { useEffect } from 'react';
 import { orgContext$ } from '../observables';
+import { stateLog } from '@/logger';
+const log = stateLog('legend-state/hooks/use-system-options.ts');
 
 // Types for option data
 export interface OptionValue {
@@ -50,7 +52,7 @@ const systemOptions$ = observable(() => {
   const orgId = orgContext$.orgId.get();
   if (!orgId) return {};
   
-  console.log(`[useSystemOptions] Org context loaded: ${orgId}`);
+  log.info(`[useSystemOptions] Org context loaded: ${orgId}`);
   return {};
 });
 
@@ -98,7 +100,7 @@ async function loadSystemOptions(optionType: string, archetype: string, optionSe
       metadata: {}
     })));
   } catch (error) {
-    console.error(`Failed to load system options for ${optionType}/${archetype}:`, error);
+    log.error(`Failed to load system options for ${optionType}/${archetype}:`, error);
     // Keep empty options array on error
   }
 }
@@ -233,7 +235,7 @@ export function useCustomOptions(orgId: string, optionSetName: string) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       customOptions$.errors[cacheKey].set(errorMessage);
-      console.error(`[useCustomOptions] Error loading custom options for ${optionSetName} in org ${orgId}:`, error);
+      log.error(`[useCustomOptions] Error loading custom options for ${optionSetName} in org ${orgId}:`, error);
     } finally {
       customOptions$.loading[cacheKey].set(false);
     }
@@ -384,7 +386,7 @@ export async function preloadCommonSystemOptions() {
         }
       }
     } catch (error) {
-      console.warn(`Failed to preload ${type} options for ${archetype}:`, error);
+      log.warn(`Failed to preload ${type} options for ${archetype}:`, error);
     }
   });
 

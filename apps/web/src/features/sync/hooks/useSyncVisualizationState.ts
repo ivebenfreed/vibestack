@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppInit, useSystem } from '@/state-machines';
 import { SyncManager, SyncState } from '@/sync/SyncManager';
+import { uiLog } from '@/logger';
+const log = uiLog('features/sync/hooks/useSyncVisualizationState.ts');
 
 export type FlowStatus = 'idle' | 'sending' | 'receiving' | 'acknowledged' | 'processed' | 'error' | 'timeout';
 
@@ -94,7 +96,7 @@ export function useSyncVisualizationState(): SyncVisualizationState {
       setIncomingStatus('error'); 
       resetStatus(setOutgoingStatus);
       resetStatus(setIncomingStatus);
-      console.error("Sync Error:", err);
+      log.error("Sync Error:", err);
     };
 
     const handleDisconnect = () => {
@@ -107,7 +109,7 @@ export function useSyncVisualizationState(): SyncVisualizationState {
       setErrorInfo(`Change Error: ${errorString}`);
       setOutgoingStatus('error');
       resetStatus(setOutgoingStatus);
-      console.error("Sync Change Error:", error);
+      log.error("Sync Change Error:", error);
     };
 
     const handleAck = () => {
@@ -139,7 +141,7 @@ export function useSyncVisualizationState(): SyncVisualizationState {
       } else {
           setErrorInfo(`Incoming processing failed: ${error?.message || error}`);
           setIncomingStatus('error');
-          console.error("Sync Incoming Processing Error:", error);
+          log.error("Sync Incoming Processing Error:", error);
       }
       resetStatus(setIncomingStatus);
     };
@@ -163,7 +165,7 @@ export function useSyncVisualizationState(): SyncVisualizationState {
         try {
             setCurrentLsn(manager.getLSN());
         } catch (e) {
-            console.error("Error getting initial LSN (manager already initialized):", e);
+            log.error("Error getting initial LSN (manager already initialized):", e);
         }
     }
 

@@ -1,5 +1,7 @@
 import type { ColumnResizeState } from '../types';
 import type { CoordinateMapping } from '../types';
+import { uiLog } from '@/logger';
+const log = uiLog('components/custom/legendtable/overlays/ColumnResizeOverlayDOM.ts');
 
 // ====================================
 // COLUMN RESIZE OVERLAY - DOM Implementation
@@ -71,14 +73,14 @@ export class ColumnResizeOverlayDOM {
     }
     
     if (!this.coordinateMapping) {
-      console.warn('ColumnResizeOverlayDOM: No coordinate mapping available');
+      log.warn('ColumnResizeOverlayDOM: No coordinate mapping available');
       return;
     }
     
     // Get column info from coordinate mapping
     const column = this.coordinateMapping.columns.find(col => col.columnId === resizeState.columnId);
     if (!column) {
-      console.warn('ColumnResizeOverlayDOM: Column not found:', resizeState.columnId);
+      log.warn('ColumnResizeOverlayDOM: Column not found:', resizeState.columnId);
       return;
     }
     
@@ -106,7 +108,7 @@ export class ColumnResizeOverlayDOM {
       transition: 'none'
     });
     
-    console.log('ColumnResizeOverlayDOM: Indicator updated', {
+    log.info('ColumnResizeOverlayDOM: Indicator updated', {
       columnId: resizeState.columnId,
       newWidth: resizeState.newWidth,
       indicatorX: newX

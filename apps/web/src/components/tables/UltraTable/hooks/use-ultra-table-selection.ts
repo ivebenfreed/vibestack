@@ -14,6 +14,8 @@ import { batch } from '@legendapp/state'
 import { selectionState$, type CellPosition } from '../state/selection-state'
 import { copyToClipboard, pasteFromClipboard } from '../utils/clipboard'
 import { setupUndoRedoShortcuts, trackCellEdit } from '../state/undo-redo'
+import { uiLog } from '@/logger';
+const log = uiLog('components/tables/UltraTable/hooks/use-ultra-table-selection.ts');
 
 export interface UseUltraTableSelectionOptions {
   tableData: any[]
@@ -53,7 +55,7 @@ export function useUltraTableSelection({
     // Capture cell position from the click event
     const cellRect = event?.target ? (event.target as HTMLElement).getBoundingClientRect() : null
     
-    console.log('[Selection] Cell click:', { 
+    log.info('[Selection] Cell click:', { 
       rowIndex, 
       columnIndex, 
       field, 
@@ -114,7 +116,7 @@ export function useUltraTableSelection({
     
     if (success) {
       // Could show toast notification here
-      console.log('[Selection] Data copied to clipboard')
+      log.info('[Selection] Data copied to clipboard')
     }
   }, [tableData, columns])
   
@@ -128,7 +130,7 @@ export function useUltraTableSelection({
     if (result.success && result.data) {
       const focusedCell = selectionState$.focusedCell.peek()
       if (!focusedCell) {
-        console.warn('[Selection] No focused cell for paste operation')
+        log.warn('[Selection] No focused cell for paste operation')
         return
       }
       
@@ -152,7 +154,7 @@ export function useUltraTableSelection({
         })
       })
       
-      console.log(`[Selection] Pasted ${result.data.length} rows`)
+      log.info(`[Selection] Pasted ${result.data.length} rows`)
     }
   }, [tableData, columns, onCellEdit])
   
@@ -162,7 +164,7 @@ export function useUltraTableSelection({
     
     const handleKeyDown = (e: KeyboardEvent) => {
       // Debug: Log all keyboard events to see if handler is running
-      console.log('[Selection] Keyboard event:', e.key, 'target:', e.target)
+      log.info('[Selection] Keyboard event:', e.key, 'target:', e.target)
       
       // Check if we have any selection or focus - if so, handle keyboard events globally
       const focused = selectionState$.focusedCell.peek()
@@ -179,11 +181,11 @@ export function useUltraTableSelection({
                           (e.target as Element)?.closest?.('table')
       
       if (!shouldHandle) {
-        console.log('[Selection] Keyboard event ignored - no focus/selection')
+        log.info('[Selection] Keyboard event ignored - no focus/selection')
         return
       }
       
-      console.log('[Selection] Processing keyboard event:', e.key, 'focused:', focused, 'hasSelection:', hasSelection)
+      log.info('[Selection] Processing keyboard event:', e.key, 'focused:', focused, 'hasSelection:', hasSelection)
       
       // Arrow key navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -202,7 +204,7 @@ export function useUltraTableSelection({
       // Copy (Ctrl+C)
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         e.preventDefault()
-        console.log('[Selection] Copy shortcut triggered')
+        log.info('[Selection] Copy shortcut triggered')
         handleCopy()
         return
       }
@@ -223,7 +225,7 @@ export function useUltraTableSelection({
       
       // Escape - Clear selection
       if (e.key === 'Escape') {
-        console.log('[Selection] Escape key - clearing selection')
+        log.info('[Selection] Escape key - clearing selection')
         selectionState$.actions.clearSelection()
         return
       }

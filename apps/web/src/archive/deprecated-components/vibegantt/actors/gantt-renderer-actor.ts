@@ -1,6 +1,8 @@
 import { fromCallback } from 'xstate';
 import type { CoordinateMapping } from '../stores/gantt-data-store';
 import { GanttRenderer } from '../renderers/core/GanttRenderer';
+import { debugLog } from '@/logger';
+const log = debugLog('archive/deprecated-components/vibegantt/actors/gantt-renderer-actor.ts');
 
 /**
  * Gantt Renderer Actor - Following VibeGridDex Pattern
@@ -59,22 +61,22 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
   let isInitialized = false;
   let isInitializing = false;
   
-  console.log('GanttRendererActor: Created callback actor with input:', input);
+  log.info('GanttRendererActor: Created callback actor with input:', input);
   
   // Initialize immediately if input is provided
   if (input && input.container) {
-    console.log('GanttRendererActor: Auto-initializing with input');
+    log.info('GanttRendererActor: Auto-initializing with input');
     
     isInitializing = true;
     
     try {
       const eventHandler = (event: any) => {
-        console.log('GanttRendererActor: Forwarding event from renderer:', event);
+        log.info('GanttRendererActor: Forwarding event from renderer:', event);
         sendBack(event);
       };
       
       const machineEventHandler = (event: any) => {
-        console.log('GanttRendererActor: Forwarding machine event directly:', event);
+        log.info('GanttRendererActor: Forwarding machine event directly:', event);
         sendBack(event);
       };
       
@@ -89,7 +91,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
       
       sendBack({ type: 'RENDERER_READY' });
     } catch (error) {
-      console.error('GanttRendererActor: Error during auto-initialization:', error);
+      log.error('GanttRendererActor: Error during auto-initialization:', error);
       sendBack({ 
         type: 'RENDERER_ERROR', 
         error: `Auto-initialization failed: ${error.message}` 
@@ -99,16 +101,16 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
   
   // Handle incoming events
   receive(async (event) => {
-    console.log('GanttRendererActor: Received event:', event.type);
+    log.info('GanttRendererActor: Received event:', event.type);
     
     try {
       switch (event.type) {
         case 'INITIALIZE':
-          console.log('GanttRendererActor: Initializing with options:', event.options);
+          log.info('GanttRendererActor: Initializing with options:', event.options);
           
           // Prevent multiple initializations
           if (isInitializing || isInitialized) {
-            console.warn('GanttRendererActor: Already initialized/initializing');
+            log.warn('GanttRendererActor: Already initialized/initializing');
             return;
           }
           
@@ -140,17 +142,17 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
             throw new Error('Container is required for initialization');
           }
           
-          console.log('GanttRendererActor: Creating renderer with merged options');
+          log.info('GanttRendererActor: Creating renderer with merged options');
           
           // Create renderer with event handler
           const eventHandler = (event: any) => {
-            console.log('GanttRendererActor: Forwarding event from renderer:', event);
+            log.info('GanttRendererActor: Forwarding event from renderer:', event);
             sendBack(event);
           };
           
           // Create machine event handler that forwards events to the parent machine directly
           const machineEventHandler = (event: any) => {
-            console.log('GanttRendererActor: Forwarding machine event directly:', event);
+            log.info('GanttRendererActor: Forwarding machine event directly:', event);
             sendBack(event);
           };
           
@@ -168,7 +170,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'RENDER_COORDINATES':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot render - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot render - renderer not initialized');
             sendBack({ 
               type: 'RENDERER_ERROR', 
               error: 'Renderer not initialized' 
@@ -176,7 +178,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
             return;
           }
           
-          console.log('GanttRendererActor: Rendering with coordinates:', {
+          log.info('GanttRendererActor: Rendering with coordinates:', {
             taskCount: event.mapping.tasks.length,
             segmentCount: event.mapping.timeline.segments.length,
             version: event.mapping.version
@@ -202,11 +204,11 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'UPDATE_VIEWPORT':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot update viewport - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot update viewport - renderer not initialized');
             return;
           }
           
-          console.log('GanttRendererActor: Updating viewport:', { 
+          log.info('GanttRendererActor: Updating viewport:', { 
             width: event.width, 
             height: event.height 
           });
@@ -217,11 +219,11 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'UPDATE_SELECTION':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot update selection - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot update selection - renderer not initialized');
             return;
           }
           
-          console.log('GanttRendererActor: Updating selection:', {
+          log.info('GanttRendererActor: Updating selection:', {
             selectedCount: event.selectedTaskIds.size
           });
           
@@ -230,11 +232,11 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'UPDATE_SCROLL':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot update scroll - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot update scroll - renderer not initialized');
             return;
           }
           
-          console.log('GanttRendererActor: Updating scroll position:', {
+          log.info('GanttRendererActor: Updating scroll position:', {
             scrollX: event.scrollX,
             scrollY: event.scrollY
           });
@@ -244,11 +246,11 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'UPDATE_TIMELINE_LAYOUT':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot update timeline layout - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot update timeline layout - renderer not initialized');
             return;
           }
           
-          console.log('GanttRendererActor: Updating timeline layout and scroll:', {
+          log.info('GanttRendererActor: Updating timeline layout and scroll:', {
             dayWidth: event.dayWidth,
             scrollX: event.scrollX,
             scrollY: event.scrollY
@@ -261,16 +263,16 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'UPDATE_DEPENDENCY_SELECTION':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot update dependency selection - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot update dependency selection - renderer not initialized');
             return;
           }
           
-          console.log('GanttRendererActor: Updating dependency selection:', event.dependencyId);
+          log.info('GanttRendererActor: Updating dependency selection:', event.dependencyId);
           renderer.updateDependencySelection(event.dependencyId);
           break;
           
         case 'APPLY_TIME_SCALE_ZOOM':
-          console.log('GanttRendererActor: APPLY_TIME_SCALE_ZOOM message received!', {
+          log.info('GanttRendererActor: APPLY_TIME_SCALE_ZOOM message received!', {
             dayWidth: event.dayWidth,
             anchorX: event.anchorX,
             anchorDate: event.anchorDate,
@@ -278,18 +280,18 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           });
           
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot apply time scale zoom - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot apply time scale zoom - renderer not initialized');
             return;
           }
           
-          console.log('GanttRendererActor: About to call applyTimeScaleZoom...');
+          log.info('GanttRendererActor: About to call applyTimeScaleZoom...');
           renderer.applyTimeScaleZoom(event.dayWidth, event.anchorX, event.anchorDate);
-          console.log('GanttRendererActor: applyTimeScaleZoom call completed');
+          log.info('GanttRendererActor: applyTimeScaleZoom call completed');
           break;
           
         case 'HANDLE_DRAG_MOVE':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot handle drag - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot handle drag - renderer not initialized');
             return;
           }
           
@@ -298,7 +300,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'HANDLE_RESIZE_MOVE':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot handle resize - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot handle resize - renderer not initialized');
             return;
           }
           
@@ -307,7 +309,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           
         case 'RESET_DRAG_STATE':
           if (!renderer) {
-            console.warn('GanttRendererActor: Cannot reset drag state - renderer not initialized');
+            log.warn('GanttRendererActor: Cannot reset drag state - renderer not initialized');
             return;
           }
           
@@ -315,7 +317,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           break;
           
         case 'DESTROY':
-          console.log('GanttRendererActor: Destroying renderer');
+          log.info('GanttRendererActor: Destroying renderer');
           
           if (renderer) {
             renderer.destroy();
@@ -326,10 +328,10 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           break;
           
         default:
-          console.warn('GanttRendererActor: Unknown event type:', event);
+          log.warn('GanttRendererActor: Unknown event type:', event);
       }
     } catch (error) {
-      console.error('GanttRendererActor: Error processing event:', error);
+      log.error('GanttRendererActor: Error processing event:', error);
       sendBack({ 
         type: 'RENDERER_ERROR', 
         error: `Error processing ${event.type}: ${error.message}` 
@@ -339,7 +341,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
   
   // Cleanup function - called when actor is stopped
   return () => {
-    console.log('GanttRendererActor: Cleanup - destroying renderer');
+    log.info('GanttRendererActor: Cleanup - destroying renderer');
     
     if (renderer) {
       renderer.destroy();

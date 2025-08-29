@@ -1,0 +1,20 @@
+#cloud-config
+users:
+  - name: developer
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: $6$rounds=4096$saltsalt$L9WtwuOr8CZI.xaD.d7s4g7L6aJ5b1.7iOaXY5x6L5c6Zj1c6Zj1c6
+
+ssh_pwauth: true
+disable_root: false
+
+runcmd:
+  - apt update
+  - apt install -y openssh-server
+  - systemctl enable ssh
+  - systemctl start ssh
+  - echo "developer:developer" | chpasswd
+
+final_message: "The system is ready for use!"

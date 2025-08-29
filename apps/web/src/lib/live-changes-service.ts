@@ -12,6 +12,8 @@ import type {
   LiveChangesError as LiveChangesErrorType
 } from '@/types/live-changes'
 import { LiveChangesError } from '@/types/live-changes'
+import { uiLog } from '@/logger';
+const log = uiLog('lib/live-changes-service.ts');
 
 export interface LiveChangesServiceCallbacks {
   onChangeReceived?: (entityType: string, changeType: 'INSERT' | 'UPDATE' | 'DELETE', data: any) => void;
@@ -30,7 +32,7 @@ export class LiveChangesService {
 
   constructor() {
     this.instanceId = `LCS_${Math.random().toString(36).substr(2, 9)}`
-    console.log(`[LiveChangesService] Created instance ${this.instanceId}`)
+    log.info(`[LiveChangesService] Created instance ${this.instanceId}`)
   }
 
   /**
@@ -42,10 +44,10 @@ export class LiveChangesService {
     callbacks: LiveChangesServiceCallbacks
   ): Promise<void> {
     try {
-      console.log(`[LiveChangesService:${this.instanceId}] Initializing with ${entityConfigs.length} entities...`)
+      log.info(`[LiveChangesService:${this.instanceId}] Initializing with ${entityConfigs.length} entities...`)
       
       if (this.status === 'active') {
-        console.log(`[LiveChangesService:${this.instanceId}] Already initialized, skipping`)
+        log.info(`[LiveChangesService:${this.instanceId}] Already initialized, skipping`)
         return
       }
 
@@ -57,7 +59,7 @@ export class LiveChangesService {
       // Set up all entity subscriptions
       const setupPromises = entityConfigs.map(config => 
         this.setupEntityLiveChanges(config).catch(error => {
-          console.error(`[LiveChangesService:${this.instanceId}] Failed to setup ${config.entity.name}:`, error)
+          log.error(`[LiveChangesService:${this.instanceId}] Failed to setup ${config.entity.name}:`, error)
           this.notifyError(error, `setup_${config.entity.name}`)
         })
       )
@@ -66,7 +68,7 @@ export class LiveChangesService {
 
       this.status = 'active'
       this.notifyStatusChange('active')
-      console.log(`[LiveChangesService:${this.instanceId}] ✅ All ${entityConfigs.length} entities initialized successfully`)
+      log.info(`[LiveChangesService:${this.instanceId}] ✅ All ${entityConfigs.length} entities initialized successfully`)
 
     } catch (error) {
       this.status = 'error'
@@ -86,12 +88,12 @@ export class LiveChangesService {
 
     // Check if already subscribed
     if (this.subscriptions.has(entityName)) {
-      console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: Already subscribed, skipping`)
+      log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: Already subscribed, skipping`)
       return
     }
 
     try {
-      console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: Setting up live changes for table "${tableName}"...`)
+      log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: Setting up live changes for table "${tableName}"...`)
 
       // Create a basic SELECT query for the entity
       const sql = `SELECT * FROM "${tableName}" ORDER BY "${primaryKey}" ASC`
@@ -114,18 +116,18 @@ export class LiveChangesService {
         (changes: ChangeEvent[]) => {
           // Skip changes if paused
           if (this.isPaused) {
-            console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: 🚫 Skipping ${changes.length} changes - service is paused`)
+            log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: 🚫 Skipping ${changes.length} changes - service is paused`)
             return
           }
           
-          console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: Received ${changes.length} changes`)
+          log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: Received ${changes.length} changes`)
           this.processChanges(config, changes, primaryKey)
         }
       )
 
       // Handle initial changes - skip them as route loaders handle bulk loading
       if (result.initialChanges && result.initialChanges.length > 0) {
-        console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: 🚫 Skipping ${result.initialChanges.length} initial changes - route loaders handle bulk loading`)
+        log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: 🚫 Skipping ${result.initialChanges.length} initial changes - route loaders handle bulk loading`)
       }
 
       // Store subscription for cleanup
@@ -136,10 +138,10 @@ export class LiveChangesService {
         config
       })
 
-      console.log(`[LiveChangesService:${this.instanceId}] ✅ ${entityName}: Live changes subscription active`)
+      log.info(`[LiveChangesService:${this.instanceId}] ✅ ${entityName}: Live changes subscription active`)
 
     } catch (error) {
-      console.error(`[LiveChangesService:${this.instanceId}] ❌ Failed to setup live changes for ${entityName}:`, error)
+      log.error(`[LiveChangesService:${this.instanceId}] ❌ Failed to setup live changes for ${entityName}:`, error)
       this.notifyError(error as Error, `setup_${entityName}`)
       throw error
     }
@@ -160,7 +162,7 @@ export class LiveChangesService {
       try {
         const itemId = change[primaryKey]
         if (!itemId) {
-          console.warn(`[LiveChangesService:${this.instanceId}] ${entityName}: Change missing primary key ${primaryKey}:`, change)
+          log.warn(`[LiveChangesService:${this.instanceId}] ${entityName}: Change missing primary key ${primaryKey}:`, change)
           continue
         }
 
@@ -171,14 +173,14 @@ export class LiveChangesService {
         
         // Skip if we processed this exact change within the last 100ms
         if (timeSinceLastChange < 100) {
-          console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: ⚠️ Skipping duplicate ${change.__op__} for ${itemId} (${timeSinceLastChange}ms ago)`)
+          log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: ⚠️ Skipping duplicate ${change.__op__} for ${itemId} (${timeSinceLastChange}ms ago)`)
           continue
         }
         
         // Track this change
         this.recentChanges.set(changeKey, now)
         
-        console.log(`[LiveChangesService:${this.instanceId}] ${entityName}: Processing ${change.__op__} for ${itemId}`)
+        log.info(`[LiveChangesService:${this.instanceId}] ${entityName}: Processing ${change.__op__} for ${itemId}`)
 
         // Notify via callback instead of handling directly
         this.notifyChangeReceived(entityName, change.__op__ as 'INSERT' | 'UPDATE' | 'DELETE', {
@@ -188,7 +190,7 @@ export class LiveChangesService {
         })
 
       } catch (error) {
-        console.error(`[LiveChangesService:${this.instanceId}] ${entityName}: Failed to process change:`, change, error)
+        log.error(`[LiveChangesService:${this.instanceId}] ${entityName}: Failed to process change:`, change, error)
         this.notifyError(error as Error, `process_change_${entityName}`)
       }
     }
@@ -210,7 +212,7 @@ export class LiveChangesService {
   pause(): void {
     this.isPaused = true
     this.notifyStatusChange('paused')
-    console.log(`[LiveChangesService:${this.instanceId}] ⏸️ Live changes processing paused`)
+    log.info(`[LiveChangesService:${this.instanceId}] ⏸️ Live changes processing paused`)
   }
 
   /**
@@ -219,18 +221,18 @@ export class LiveChangesService {
   resume(): void {
     this.isPaused = false
     this.notifyStatusChange('active')
-    console.log(`[LiveChangesService:${this.instanceId}] ▶️ Live changes processing resumed`)
+    log.info(`[LiveChangesService:${this.instanceId}] ▶️ Live changes processing resumed`)
   }
 
   /**
    * Stop all live changes subscriptions and clean up
    */
   async destroy(): Promise<void> {
-    console.log(`[LiveChangesService:${this.instanceId}] Stopping all subscriptions...`)
+    log.info(`[LiveChangesService:${this.instanceId}] Stopping all subscriptions...`)
     
     const stopPromises = Array.from(this.subscriptions.values()).map(subscription =>
       subscription.unsubscribe().catch((error: any) => 
-        console.error(`[LiveChangesService:${this.instanceId}] Failed to unsubscribe from ${subscription.entityName}:`, error)
+        log.error(`[LiveChangesService:${this.instanceId}] Failed to unsubscribe from ${subscription.entityName}:`, error)
       )
     )
     
@@ -240,7 +242,7 @@ export class LiveChangesService {
     this.status = 'stopped'
     this.notifyStatusChange('stopped')
     
-    console.log(`[LiveChangesService:${this.instanceId}] ✅ All subscriptions stopped and cleaned up`)
+    log.info(`[LiveChangesService:${this.instanceId}] ✅ All subscriptions stopped and cleaned up`)
   }
 
   /**
@@ -265,7 +267,7 @@ export class LiveChangesService {
       try {
         this.callbacks.onChangeReceived(entityType, changeType, data)
       } catch (error) {
-        console.error(`[LiveChangesService:${this.instanceId}] Error in onChangeReceived callback:`, error)
+        log.error(`[LiveChangesService:${this.instanceId}] Error in onChangeReceived callback:`, error)
       }
     }
   }
@@ -275,7 +277,7 @@ export class LiveChangesService {
       try {
         this.callbacks.onError(error, context)
       } catch (callbackError) {
-        console.error(`[LiveChangesService:${this.instanceId}] Error in onError callback:`, callbackError)
+        log.error(`[LiveChangesService:${this.instanceId}] Error in onError callback:`, callbackError)
       }
     }
   }
@@ -285,7 +287,7 @@ export class LiveChangesService {
       try {
         this.callbacks.onStatusChange(status)
       } catch (error) {
-        console.error(`[LiveChangesService:${this.instanceId}] Error in onStatusChange callback:`, error)
+        log.error(`[LiveChangesService:${this.instanceId}] Error in onStatusChange callback:`, error)
       }
     }
   }

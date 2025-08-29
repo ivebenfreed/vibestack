@@ -14,6 +14,8 @@
 
 import { createStore } from '@xstate/store'
 import { useSelector } from '@xstate/store/react'
+import { stateLog } from '@/logger';
+const log = stateLog('stores/layoutStoreV2.ts');
 
 // Section configuration - static data that doesn't change
 export const sectionConfig = {
@@ -80,7 +82,7 @@ function loadSidebarPreferences(): SidebarPreferences {
     }
   } catch (error) {
     if (import.meta.env.DEV) {
-      console.warn('[LayoutStoreV2] Failed to load sidebar preferences:', error)
+      log.warn('[LayoutStoreV2] Failed to load sidebar preferences:', error)
     }
   }
   
@@ -95,7 +97,7 @@ function saveSidebarPreferences(preferences: SidebarPreferences): void {
     localStorage.setItem(SIDEBAR_PREFERENCES_KEY, JSON.stringify(preferences))
   } catch (error) {
     if (import.meta.env.DEV) {
-      console.warn('[LayoutStoreV2] Failed to save sidebar preferences:', error)
+      log.warn('[LayoutStoreV2] Failed to save sidebar preferences:', error)
     }
   }
 }
@@ -129,7 +131,7 @@ export const layoutStoreV2 = createStore({
       const isBecomingVisible = !wasVisible && shouldShow
       
       if (import.meta.env.DEV) {
-        console.log('[LayoutStoreV2] Transitioning to section:', {
+        log.info('[LayoutStoreV2] Transitioning to section:', {
           section,
           shouldShow,
           userPreference,
@@ -158,13 +160,13 @@ export const layoutStoreV2 = createStore({
       
       if (!context.appSidebar.visible) {
         if (import.meta.env.DEV) {
-          console.warn('[LayoutStoreV2] Attempted to toggle sidebar when not visible')
+          log.warn('[LayoutStoreV2] Attempted to toggle sidebar when not visible')
         }
         return context
       }
       
       if (import.meta.env.DEV) {
-        console.log('[LayoutStoreV2] Setting sidebar expanded:', expanded)
+        log.info('[LayoutStoreV2] Setting sidebar expanded:', expanded)
       }
       
       // Update preferences and save to localStorage
@@ -188,7 +190,7 @@ export const layoutStoreV2 = createStore({
     // Clear transitioning flag after DOM updates
     clearTransitioning: (context) => {
       if (import.meta.env.DEV) {
-        console.log('[LayoutStoreV2] Clearing transitioning flag')
+        log.info('[LayoutStoreV2] Clearing transitioning flag')
       }
       
       return {
@@ -209,7 +211,7 @@ export const layoutStoreV2 = createStore({
       }
       
       if (import.meta.env.DEV) {
-        console.log('[LayoutStoreV2] Mobile state changed:', isMobile)
+        log.info('[LayoutStoreV2] Mobile state changed:', isMobile)
       }
       
       return {
@@ -242,7 +244,7 @@ export const layoutStoreV2 = createStore({
         const isBecomingVisible = !wasVisible && shouldShow
         
         if (import.meta.env.DEV) {
-          console.log('[LayoutStoreV2] Section change detected:', {
+          log.info('[LayoutStoreV2] Section change detected:', {
             pathname,
             from: context.activeSection,
             to: newSection,
@@ -254,7 +256,7 @@ export const layoutStoreV2 = createStore({
         
         // Log transition for debugging
         if (import.meta.env.DEV) {
-          console.log('[LayoutStoreV2] Route transition:', {
+          log.info('[LayoutStoreV2] Route transition:', {
             from: context.activeSection,
             to: newSection,
             wasVisible,
