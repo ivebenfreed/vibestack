@@ -510,6 +510,10 @@ apiApp.route('/auth', authRouter);
 import { adminRouter } from './routes/admin.js';
 apiApp.route('/admin', adminRouter);
 
+// Mount organization-scoped admin routes
+import { orgAdminRouter } from './routes/organization-admin.js';
+apiApp.route('/org-admin', orgAdminRouter);
+
 // Mount protected routes with mandatory context validation
 mountProtectedRoutes(apiApp);
 
