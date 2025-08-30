@@ -1,0 +1,73 @@
+# Complete Development Environment 1
+# Single container with Claude Code, tools, and services
+
+services:
+  # PostgreSQL database
+  postgres-devenv1:
+    image: postgres:17
+    container_name: vibestack-postgres-devenv1
+    volumes:
+      - postgres_data_devenv1:/var/lib/postgresql/data
+      - ../../data:/docker-entrypoint-initdb.d:ro
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=vibestack_dev
+    networks:
+      - devenv1
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Development environment with Claude Code
+  devenv1:
+    build:
+      context: ../../
+      dockerfile: Dockerfile.dev
+    container_name: vibestack-devenv1
+    volumes:
+      - ../../workspaces/dev-1:/workspace
+      - /workspace/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@postgres-devenv1:5432/vibestack_dev
+      - DIRECT_DATABASE_URL=postgres://postgres:postgres@postgres-devenv1:5432/vibestack_dev
+    ports:
+      - "5175:5173"  # Web app (host:container)  
+      - "8789:8787"  # API server (host:container)
+    depends_on:
+      postgres-devenv1:
+        condition: service_healthy
+    networks:
+      - devenv1
+    stdin_open: true
+    tty: true
+    # Run as non-root user to allow Claude Code to run
+    user: "1000:1000"
+    working_dir: /workspace
+
+  # Chrome for testing
+  chrome-devenv1:
+    image: browserless/chrome:latest
+    container_name: vibestack-chrome-devenv1
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - CONNECTION_TIMEOUT=60000
+      - PREBOOT_CHROME=true
+      - ENABLE_DEBUGGER=true
+    ports:
+      - "3000:3000"  # Browserless API
+      - "9222:9222"  # Chrome remote debugging
+    shm_size: 2gb
+    networks:
+      - devenv1
+
+networks:
+  devenv1:
+    driver: bridge
+
+volumes:
+  postgres_data_devenv1:
+    name: vibestack-postgres-devenv1-data
