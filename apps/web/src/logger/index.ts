@@ -1,5 +1,5 @@
 import { uiLog } from '@/logger';
-const log = uiLog('logger/index.ts);
+const log = uiLog('logger/index.ts');
 /**
  * Contextual Logging System with Focus Modes
  * 

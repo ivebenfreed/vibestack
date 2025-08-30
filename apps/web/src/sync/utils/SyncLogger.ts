@@ -1,5 +1,5 @@
 import { syncLog } from '@/logger';
-const log = syncLog('sync/utils/SyncLogger.ts);
+const log = syncLog('sync/utils/SyncLogger.ts');
 /**
  * SyncLogger - Centralized Logging for Sync System
  * 

@@ -1,5 +1,5 @@
 import { syncLog } from '@/logger';
-const log = syncLog('sync/config.ts);
+const log = syncLog('sync/config.ts');
 /**
  * Sync Configuration
  * 

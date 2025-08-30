@@ -1,5 +1,5 @@
 import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/systems/PerformanceSystem.ts);
+const log = uiLog('components/custom/legendtable/renderers/systems/PerformanceSystem.ts');
 // ====================================
 // PERFORMANCE MONITOR
 // ====================================

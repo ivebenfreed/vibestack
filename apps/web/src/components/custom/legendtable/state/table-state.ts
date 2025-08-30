@@ -1,7 +1,6 @@
 import { observable, batch, computed } from '@legendapp/state';
-import type { 
 import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/state/table-state.ts');
+import type { 
   TableRow, 
   Column, 
   CellRef, 
@@ -11,6 +10,8 @@ const log = uiLog('components/custom/legendtable/state/table-state.ts');
   TableConfig,
   CoordinateMapping 
 } from '../types';
+
+const log = uiLog('components/custom/legendtable/state/table-state.ts');
 
 // Utility functions for data processing
 function filterData(data: TableRow[], filters: Map<string, any>, searchTerm: string): TableRow[] {

@@ -1,5 +1,5 @@
 import { uiLog } from '@/logger';
-const log = uiLog('lib/schema-client.ts);
+const log = uiLog('lib/schema-client.ts');
 /**
  * Client-Side Schema Loading
  * 

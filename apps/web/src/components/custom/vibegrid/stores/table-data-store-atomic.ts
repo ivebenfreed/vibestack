@@ -2,15 +2,16 @@ import { fromStore } from '@xstate/store';
 // NOTE: @repo/dataforge/dexie-schema was deprecated - using Legend State
 import { getEntity$, orgContext$, entities$ } from '@/legend-state/observables';
 import { when } from '@legendapp/state';
-import { 
 import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/stores/table-data-store-atomic.ts');
+import { 
   discoverRelationships, 
   getUniqueRelationshipTables,
   getUniqueJunctionTables,
   resolveEntityRelationships,
   type RelationshipConfig
 } from '../utils/relationship-discovery';
+
+const log = uiLog('components/custom/vibegrid/stores/table-data-store-atomic.ts');
 
 // ====================================
 // MEMORY LIMITS FOR IN-MEMORY VS PAGINATION MODE
