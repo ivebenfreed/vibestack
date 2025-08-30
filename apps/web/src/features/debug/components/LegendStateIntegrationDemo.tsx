@@ -8,11 +8,15 @@ import { VibeGrid } from '@/components/custom/vibegrid'
 import { Badge } from '@/components/ui/badge'
 import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
 import { entityOperations } from '@/legend-state'
+import { debugLog } from '@/logger'
+
+// Create logger instance for this file
+const log = debugLog('features/debug/components/LegendStateIntegrationDemo.tsx');
 
 export function LegendStateIntegrationDemo() {
   const { columns, isLoading, error } = usePrecomputedEntityColumns('Client')
   
-  console.log('[LegendStateIntegrationDemo] Precomputed columns:', { 
+  log.info('Precomputed columns:', { 
     columns, 
     isLoading, 
     error, 

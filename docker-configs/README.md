@@ -41,11 +41,32 @@ The `.docker/` folder is gitignored, so these generated configs are never commit
   - Database: 5580 + (issue_number % 100)
   - Neon Proxy: Port follows similar offset pattern
 
+## Services Configuration
+
+### PostgreSQL Database
+- **Container**: `vibestack-postgres`
+- **Port**: 5432
+- **Data Source**: `../data/postgres-live/` (git-tracked database state)
+- **Credentials**: `postgres:postgres`
+- **Database**: `vibestack_dev`
+
+**CRITICAL**: The PostgreSQL container uses the git-tracked `data/postgres-live/` directory, which contains:
+- Complete database schema with all tables
+- Test user accounts (Wide Corp Solutions organization)
+- Sample data for development
+- Proper RLS (Row Level Security) configuration
+
+This ensures all developers have identical database state and eliminates "relation does not exist" errors.
+
 ## Usage
 
-### Main Branch
+### Main Branch Development
 ```bash
-docker compose -f docker-configs/docker-compose.yml up -d
+cd docker-configs
+docker compose up -d postgres
+
+# Verify database is ready
+docker exec vibestack-postgres pg_isready -U postgres
 ```
 
 ### Worktree (auto-generated)
@@ -54,3 +75,26 @@ docker compose -f docker-configs/docker-compose.yml up -d
 ./scripts/setup-pr-env.sh  # Generates .docker/docker-compose.pr-N.yml
 docker compose -f .docker/docker-compose.pr-N.yml up -d
 ```
+
+## Troubleshooting
+
+### Database Connection Issues
+If you see authentication errors (401) in the development server:
+
+1. **Verify PostgreSQL is using git-tracked data**:
+   ```bash
+   # Check docker-compose.yml volume mount:
+   # - ../data/postgres-live:/var/lib/postgresql/data
+   
+   # Verify data exists
+   ls -la ../data/postgres-live/
+   ```
+
+2. **Restart with correct configuration**:
+   ```bash
+   docker compose down postgres
+   docker compose up -d postgres
+   ```
+
+3. **Check server logs**:
+   Database queries should show successful user lookups, not "relation does not exist"

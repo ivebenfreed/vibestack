@@ -9,6 +9,10 @@ import { generateColumns } from './utils/legend-helpers';
 import { CanvasOverlayDOM } from './overlays/CanvasOverlayDOM';
 import { LegendTableEventSystem } from './events/LegendTableEventSystem';
 import '../vibegrid/vibegridx.css';
+import { uiLog } from '@/logger';
+
+// Create logger instance for this file
+const log = uiLog('components/custom/legendtable/LegendTable.tsx');
 
 // Helper function to create coordinate mapping for the renderer
 function createCoordinateMapping(columns: any[], rows: any[]) {
@@ -90,7 +94,7 @@ export function LegendTable(props: LegendTableProps) {
       return;
     }
     
-    console.log('[LegendTable] Initializing TableRenderer directly');
+    log.debug('[LegendTable] Initializing TableRenderer directly');
     
     let unsubscribeSelection: (() => void) | null = null;
     
@@ -106,7 +110,7 @@ export function LegendTable(props: LegendTableProps) {
         onStateChange: (event) => {
           if (event.type === 'canvas.container.ready' && event.container && !canvasOverlayRef.current) {
             // Initialize overlays when canvas container is ready
-            console.log('[LegendTable] Canvas container ready, initializing overlays');
+            log.debug('[LegendTable] Canvas container ready, initializing overlays');
             try {
               canvasOverlayRef.current = new CanvasOverlayDOM({
                 cellHeight: 40,
@@ -125,11 +129,11 @@ export function LegendTable(props: LegendTableProps) {
                 }
               }, (fillEvent) => {
                 // Handle fill operations
-                console.log('[LegendTable] Fill event received:', fillEvent);
+                log.debug('[LegendTable] Fill event received:', fillEvent);
                 
                 if (fillEvent.type === 'FILL_COMPLETE' && fillEvent.fillCells) {
                   const selectedCells = tableState$.selection.selectedCells.get();
-                  console.log('[LegendTable] Executing fill operation:', {
+                  log.debug('[LegendTable] Executing fill operation:', {
                     sourceCells: selectedCells.size,
                     fillCells: fillEvent.fillCells.size
                   });
@@ -182,10 +186,10 @@ export function LegendTable(props: LegendTableProps) {
               // Update event system with canvas overlay reference
               if (eventSystemRef.current) {
                 eventSystemRef.current.updateCanvasOverlay(canvasOverlayRef.current);
-                console.log('[LegendTable] Canvas overlay reference updated in event system');
+                log.debug('[LegendTable] Canvas overlay reference updated in event system');
               }
               
-              console.log('[LegendTable] Canvas overlay initialized successfully with coordinate mapping');
+              log.debug('[LegendTable] Canvas overlay initialized successfully with coordinate mapping');
             } catch (error) {
               console.error('[LegendTable] Failed to initialize canvas overlay:', error);
             }
@@ -245,7 +249,7 @@ export function LegendTable(props: LegendTableProps) {
         }
       }, 0);
       
-      console.log('[LegendTable] TableRenderer initialized successfully');
+      log.debug('[LegendTable] TableRenderer initialized successfully');
       
       // Set up overlay updates when selection changes
       unsubscribeSelection = observe(() => {
@@ -253,7 +257,7 @@ export function LegendTable(props: LegendTableProps) {
         const viewport = tableState$.viewport.get();
         const coordinateMapping = createCoordinateMapping(props.columns, data$.get());
         
-        console.log('[LegendTable] Observer triggered', {
+        log.debug('[LegendTable] Observer triggered', {
           selectedCellsSize: selectedCells.size,
           hasCanvasOverlay: !!canvasOverlayRef.current,
           hasRenderer: !!rendererRef.current,
@@ -262,7 +266,7 @@ export function LegendTable(props: LegendTableProps) {
         
         // Update overlay if it exists
         if (canvasOverlayRef.current && rendererRef.current) {
-          console.log('[LegendTable] Observer: updating overlay', {
+          log.debug('[LegendTable] Observer: updating overlay', {
             selectedCellsSize: selectedCells.size,
             hasViewport: !!viewport,
             hasCoordinateMapping: !!coordinateMapping,
@@ -291,7 +295,7 @@ export function LegendTable(props: LegendTableProps) {
             return null;
           }).filter(cell => cell !== null);
           
-          console.log('[LegendTable] Calling updateSelectionWithVisualPositions for fill handle', {
+          log.debug('[LegendTable] Calling updateSelectionWithVisualPositions for fill handle', {
             selectedCells: selectedCells.size,
             visualCells: visualCells.length,
             firstVisualCell: visualCells[0]
@@ -312,7 +316,7 @@ export function LegendTable(props: LegendTableProps) {
       
       // Cleanup renderer
       if (rendererRef.current) {
-        console.log('[LegendTable] Cleaning up TableRenderer');
+        log.debug('[LegendTable] Cleaning up TableRenderer');
         rendererRef.current.destroy();
         rendererRef.current = null;
         setIsRendererReady(false);
@@ -320,7 +324,7 @@ export function LegendTable(props: LegendTableProps) {
       
       // Cleanup canvas overlay
       if (canvasOverlayRef.current) {
-        console.log('[LegendTable] Cleaning up CanvasOverlayDOM');
+        log.debug('[LegendTable] Cleaning up CanvasOverlayDOM');
         canvasOverlayRef.current.destroy();
         canvasOverlayRef.current = null;
       }
@@ -332,13 +336,13 @@ export function LegendTable(props: LegendTableProps) {
     const container = containerRef.current;
     if (!container || !isRendererReady || !tableState$) return;
     
-    console.log('[LegendTable] Initializing centralized event system');
+    log.debug('[LegendTable] Initializing centralized event system');
     
     // Create the centralized event system (canvas overlay will be updated later when ready)
     eventSystemRef.current = new LegendTableEventSystem(container, tableState$, canvasOverlayRef.current);
     
     return () => {
-      console.log('[LegendTable] Cleaning up centralized event system');
+      log.debug('[LegendTable] Cleaning up centralized event system');
       if (eventSystemRef.current) {
         eventSystemRef.current.destroy();
         eventSystemRef.current = null;

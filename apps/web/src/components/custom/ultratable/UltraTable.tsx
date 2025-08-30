@@ -17,6 +17,10 @@ import { UltraTableRenderer } from './core/UltraTableRenderer';
 import { generateColumns } from './utils/column-generator';
 import type { UltraTableProps, UltraTableState } from './types';
 import './styles/ultra-table.css';
+import { uiLog } from '@/logger';
+
+// Create logger instance for this file
+const log = uiLog('components/custom/ultratable/UltraTable.tsx');
 
 export const UltraTable = observer((props: UltraTableProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -34,7 +38,7 @@ export const UltraTable = observer((props: UltraTableProps) => {
       return;
     }
     
-    console.log('[UltraTable] Waiting for precomputed columns for', props.entityType);
+    log.debug('[UltraTable] Waiting for precomputed columns for', props.entityType);
     
     let columnCheckInterval: NodeJS.Timeout;
     
@@ -42,21 +46,21 @@ export const UltraTable = observer((props: UltraTableProps) => {
       const precomputedColumns$ = getPrecomputedEntityColumns$(props.entityType);
       
       if (!precomputedColumns$) {
-        console.log('[UltraTable] Precomputed columns observable not ready yet...');
+        log.debug('[UltraTable] Precomputed columns observable not ready yet...');
         return false;
       }
       
       const vibeGridColumns = precomputedColumns$.peek();
       if (!vibeGridColumns || vibeGridColumns.length === 0) {
-        console.log('[UltraTable] Precomputed columns data not populated yet...');
+        log.debug('[UltraTable] Precomputed columns data not populated yet...');
         return false;
       }
       
-      console.log('[UltraTable] Precomputed columns ready:', vibeGridColumns.length, 'columns found');
+      log.debug('[UltraTable] Precomputed columns ready:', vibeGridColumns.length, 'columns found');
       
       // Generate UltraTable columns from precomputed columns
       const ultraColumns = generateColumns(props.entityType);
-      console.log('[UltraTable] Generated columns:', ultraColumns.length, 'columns');
+      log.debug('[UltraTable] Generated columns:', ultraColumns.length, 'columns');
       
       setColumns(ultraColumns);
       setColumnsReady(true);
@@ -85,7 +89,7 @@ export const UltraTable = observer((props: UltraTableProps) => {
   useEffect(() => {
     if (!containerRef.current || rendererRef.current || !columnsReady || columns.length === 0) return;
     
-    console.log('[UltraTable] Initializing renderer for', props.entityType);
+    log.debug('[UltraTable] Initializing renderer for', props.entityType);
     
     try {
       // Create high-performance renderer with Legend State integration
@@ -114,7 +118,7 @@ export const UltraTable = observer((props: UltraTableProps) => {
       });
       
       setIsReady(true);
-      console.log('[UltraTable] Renderer initialized successfully');
+      log.debug('[UltraTable] Renderer initialized successfully');
       
     } catch (error) {
       console.error('[UltraTable] Failed to initialize renderer:', error);
@@ -122,7 +126,7 @@ export const UltraTable = observer((props: UltraTableProps) => {
     
     return () => {
       if (rendererRef.current) {
-        console.log('[UltraTable] Cleaning up renderer');
+        log.debug('[UltraTable] Cleaning up renderer');
         rendererRef.current.destroy();
         rendererRef.current = null;
         setIsReady(false);
@@ -134,7 +138,7 @@ export const UltraTable = observer((props: UltraTableProps) => {
   useEffect(() => {
     if (!rendererRef.current || !isReady) return;
     
-    console.log('[UltraTable] Setting up Legend State subscription for', props.entityType);
+    log.debug('[UltraTable] Setting up Legend State subscription for', props.entityType);
     
     let entityCheckInterval: NodeJS.Timeout;
     let dataCleanup: (() => void) | null = null;
@@ -142,18 +146,18 @@ export const UltraTable = observer((props: UltraTableProps) => {
     const setupDataSubscription = () => {
       const entityObs$ = getEntity$(props.entityType);
       if (!entityObs$) {
-        console.log('[UltraTable] Entity observable not ready, waiting...', props.entityType);
+        log.debug('[UltraTable] Entity observable not ready, waiting...', props.entityType);
         return false;
       }
       
-      console.log('[UltraTable] Entity observable ready, setting up data subscription for', props.entityType);
+      log.debug('[UltraTable] Entity observable ready, setting up data subscription for', props.entityType);
       
       // Set up the data subscription
       dataCleanup = observe(() => {
         const entityData = entityObs$.get();
         const entities = Object.values(entityData || {});
         
-        console.log('[UltraTable] Legend State update:', {
+        log.debug('[UltraTable] Legend State update:', {
           entityType: props.entityType,
           entityCount: entities.length,
           timestamp: Date.now()

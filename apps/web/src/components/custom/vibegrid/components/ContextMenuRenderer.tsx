@@ -1,11 +1,15 @@
 import React from 'react';
 import { useSelector } from '@xstate/react';
 import { ContextMenuManager } from './ContextMenu';
+import { uiLog } from '@/logger';
 
 interface ContextMenuRendererProps {
   tableActor: any;
   containerRef: React.RefObject<HTMLDivElement>;
 }
+
+// Create logger instance for this file
+const log = uiLog('components/custom/vibegrid/components/ContextMenuRenderer.tsx');
 
 // Global context menu manager instance
 let globalContextMenuManager: ContextMenuManager | null = null;

@@ -28,6 +28,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 // import { QueryClient } from '@tanstack/react-query' // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
 import { FontProvider } from './context/font-context'
 import { ThemeProvider } from './context/theme-context'
+import { uiLog } from '@/logger'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
@@ -53,10 +54,13 @@ let router: ReturnType<typeof createRouter>;
 //   },
 // });
 
+// Create logger instance for this file
+const log = uiLog('main.tsx');
+
 // Initialize or reuse Router for HMR
 function getRouter() {
   if (!router) {
-    console.log("🚀 [ROUTER] Creating new router instance with performance tracking...")
+    log.info('🚀 Creating new router instance with performance tracking...')
     
     const startTime = performance.now()
     
@@ -81,7 +85,7 @@ function getRouter() {
     })
     
     const createTime = performance.now() - startTime
-    console.log("✅ [ROUTER] Router instance created", {
+    log.info('✅ Router instance created', {
       createTime: `${createTime.toFixed(2)}ms`,
       preloadEnabled: true,
       preloadDelay: 150,
@@ -93,13 +97,13 @@ function getRouter() {
     
     // ⚡ PERFORMANCE: Disable custom tracking during development to prevent HMR issues
     if (typeof window !== 'undefined' && !import.meta.env.DEV) {
-      console.log("🔍 [ROUTER] Setting up route change tracking for production...")
+      log.info('🔍 Setting up route change tracking for production...')
       
       // Only in production - avoid HMR conflicts in development
       const originalPushState = window.history.pushState
       window.history.pushState = function(state, title, url) {
         const navStart = performance.now()
-        console.log("📍 [ROUTER] Route change starting:", { 
+        log.info('📍 Route change starting:', { 
           url: url || 'unknown',
           timestamp: new Date().toISOString()
         })
@@ -108,7 +112,7 @@ function getRouter() {
         
         requestAnimationFrame(() => {
           const navTime = performance.now() - navStart
-          console.log("🎯 [ROUTER] Route change completed:", {
+          log.info('🎯 Route change completed:', {
             url: url || 'unknown',
             totalTime: `${navTime.toFixed(2)}ms`,
             currentPath: window.location.pathname
@@ -135,14 +139,14 @@ declare module '@tanstack/react-router' {
 // ⚡ PERFORMANCE: Simplified HMR - just preserve router instance
 if (import.meta.hot) {
   import.meta.hot.dispose((data) => {
-    console.log("🔥 [MAIN] HMR Dispose: Storing router instance");
+    log.info('🔥 HMR Dispose: Storing router instance');
     data.router = router;
     data.timestamp = Date.now();
   });
 
   // Restore instances on hot reload
   if (import.meta.hot.data.router) {
-    console.log("🔥 [MAIN] HMR Restore: Reusing existing router instance");
+    log.info('🔥 HMR Restore: Reusing existing router instance');
     router = import.meta.hot.data.router;
   }
 }
@@ -179,7 +183,7 @@ function AppWithRouterContext() {
 }
 
 function renderApp(rootElement: HTMLElement) {
-  console.log("🔍 [MAIN] Creating React root and rendering app");
+  log.info('🔍 Creating React root and rendering app');
   
   const root = ReactDOM.createRoot(rootElement)
   

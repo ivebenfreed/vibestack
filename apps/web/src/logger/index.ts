@@ -1,5 +1,4 @@
-import { uiLog } from '@/logger';
-const log = uiLog('logger/index.ts');
+// Logger implementation - cannot use self-import
 /**
  * Contextual Logging System with Focus Modes
  * 
@@ -110,22 +109,22 @@ class LoggingManager {
   // Runtime configuration methods
   setFocusMode(mode: LogContext | 'all' | 'none') {
     this.focusMode = mode;
-    log.info(`🎯 Log focus mode: ${mode}`);
+    console.info(`🎯 Log focus mode: ${mode}`);
   }
 
   addContextFilter(...contexts: LogContext[]) {
     contexts.forEach(ctx => this.contextFilters.add(ctx));
-    log.info(`🔍 Added context filters: ${contexts.join(', ')}`);
+    console.info(`🔍 Added context filters: ${contexts.join(', ')}`);
   }
 
   removeContextFilter(...contexts: LogContext[]) {
     contexts.forEach(ctx => this.contextFilters.delete(ctx));
-    log.info(`🚫 Removed context filters: ${contexts.join(', ')}`);
+    console.info(`🚫 Removed context filters: ${contexts.join(', ')}`);
   }
 
   clearContextFilters() {
     this.contextFilters.clear();
-    log.info('🗑️ Cleared all context filters');
+    console.info('🗑️ Cleared all context filters');
   }
 
   getFocusMode() {
@@ -211,13 +210,13 @@ export class Logger {
     switch (level) {
       case 'debug':
       case 'info':
-        log.info(formatted, data ?? '');
+        console.info(formatted, data ?? '');
         break;
       case 'warn':
-        log.warn(formatted, data ?? '');
+        console.warn(formatted, data ?? '');
         break;
       case 'error':
-        log.error(formatted, data ?? '');
+        console.error(formatted, data ?? '');
         break;
     }
   }
@@ -269,8 +268,8 @@ export const logControl = {
   remove: (...contexts: LogContext[]) => loggingManager.removeContextFilter(...contexts),
   clear: () => loggingManager.clearContextFilters(),
   status: () => {
-    log.info('🎯 Focus mode:', loggingManager.getFocusMode());
-    log.info('🔍 Context filters:', loggingManager.getContextFilters());
+    console.info('🎯 Focus mode:', loggingManager.getFocusMode());
+    console.info('🔍 Context filters:', loggingManager.getContextFilters());
   }
 };
 

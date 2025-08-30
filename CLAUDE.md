@@ -109,12 +109,20 @@ log.error('Validation failed', error); // Always logs
 
 **Docker Setup**:
 ```bash
-# Start local PostgreSQL database
+# Start local PostgreSQL database with git-tracked data
+cd docker-configs
 docker compose up -d postgres
 
 # Database will be available at:
 # postgres://postgres:postgres@localhost:5432/vibestack_dev
 ```
+
+**IMPORTANT**: The PostgreSQL container uses `data/postgres-live/` as its data directory, which contains git-tracked database state. This ensures consistent database schema and test data across all development environments.
+
+**Data Directory**: `/home/benfreed/dev/vibestack/data/postgres-live/`
+- Contains complete PostgreSQL data directory
+- Includes all tables, schemas, and test data
+- Automatically synced to git on commits via pre-commit hook
 
 ### Database Clients
 
@@ -136,28 +144,38 @@ The project uses two complementary database clients:
 
 If you see database connection errors:
 
-1. **Start Docker containers** (if not running):
+1. **Start PostgreSQL container** (if not running):
    ```bash
+   cd docker-configs
    docker compose up -d postgres
    ```
 
-2. **Check connection variables**:
+2. **Verify git-tracked data exists**:
    ```bash
-   # For local development, ensure either:
-   HYPERDRIVE_DB=available  # (automatically configured in wrangler dev)
-   # OR
-   DATABASE_URL=postgres://postgres:postgres@localhost:5432/vibestack_dev
+   ls -la data/postgres-live/
+   # Should contain PostgreSQL data files
    ```
 
-3. **Verify PostgreSQL is healthy**:
+3. **Check container status**:
+   ```bash
+   docker ps | grep postgres
+   # Should show vibestack-postgres running on port 5432
+   ```
+
+4. **Verify database connectivity**:
    ```bash
    docker exec vibestack-postgres pg_isready -U postgres
    ```
 
 **Error patterns to look for:**
-- `Error: Network connection lost` → Docker containers not running
-- `No database connection available` → Missing both HYPERDRIVE_DB and DATABASE_URL
+- `Error: proxy request failed, cannot connect to the specified address` → PostgreSQL container not running
+- `PostgresError: relation "user" does not exist` → Database using wrong data directory
 - `Connection timeout` → PostgreSQL container not started or unhealthy
+
+**If authentication still fails after database is running:**
+- Check that `docker-configs/docker-compose.yml` mounts `../data/postgres-live:/var/lib/postgresql/data`
+- Restart the development server: `pnpm dev` (with background: true)
+- The WebSocket sync connection should now work with 200 responses
 
 ## Database Synchronization
 

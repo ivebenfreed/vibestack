@@ -2,12 +2,16 @@ import React from 'react'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 import { useAuth } from '@/state-machines'
+import { authLog } from '@/logger'
+
+// Create logger instance for this file
+const log = authLog('components/providers/AuthAwareProviders.tsx');
 
 // Auth-aware wrapper component - LiveStore is initialized globally by app init machine
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isCheckingAuth, isSigningOut } = useAuth()
   
-  console.log('[AuthAwareProviders] Auth state:', { 
+  log.info('Auth state:', { 
     isAuthenticated, 
     isCheckingAuth,
     isSigningOut

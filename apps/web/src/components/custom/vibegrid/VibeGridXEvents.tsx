@@ -3,6 +3,10 @@ import type { CellRef, ViewportInfo, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
 import type { CanvasOverlay } from './overlays/CanvasOverlay';
+import { uiLog } from '@/logger';
+
+// Create logger instance for this file
+const log = uiLog('components/custom/vibegrid/VibeGridXEvents.tsx');
 
 // ====================================
 // EVENT HANDLER TYPES
@@ -103,18 +107,18 @@ export const createColumnClickHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((columnId: string, event: MouseEvent) => {
-    console.log('[VibeGridXEvents] Column click handler called:', columnId, event);
+    log.debug('[VibeGridXEvents] Column click handler called:', columnId, event);
     
     // Find the column definition
     const column = refs.columns.find(c => c.id === columnId);
-    console.log('[VibeGridXEvents] Found column:', column);
+    log.debug('[VibeGridXEvents] Found column:', column);
     
     if (!column || column.sortable === false) {
-      console.log('[VibeGridXEvents] Column not sortable, returning');
+      log.debug('[VibeGridXEvents] Column not sortable, returning');
       return; // Column not sortable
     }
     
-    console.log('[VibeGridXEvents] Sending view.column.click event to XState');
+    log.debug('[VibeGridXEvents] Sending view.column.click event to XState');
     
     // Just send the column click event to XState - let it handle the logic
     tableSend({
@@ -137,7 +141,7 @@ export const createKeyboardHandler = (
   return useCallback((event: React.KeyboardEvent | KeyboardEvent) => {
     // Only log special key combinations
     if ((event.ctrlKey || event.metaKey) && event.key !== 'Control' && event.key !== 'Meta' && event.key !== 'Alt') {
-      console.log('VibeGridX handleKeyDown:', {
+      log.debug('VibeGridX handleKeyDown:', {
         key: event.key,
         ctrlKey: event.ctrlKey,
         metaKey: event.metaKey
@@ -180,7 +184,7 @@ export const createKeyboardHandler = (
         
       case 'Tab':
         event.preventDefault();
-        console.log(`${event.shiftKey ? 'Shift+' : ''}Tab: Tab navigation`);
+        log.debug(`${event.shiftKey ? 'Shift+' : ''}Tab: Tab navigation`);
         
         // Send tab navigation to XState
         tableSend({
@@ -191,7 +195,7 @@ export const createKeyboardHandler = (
         
       case 'Escape':
         event.preventDefault();
-        console.log('Escape key pressed');
+        log.debug('Escape key pressed');
         
         // Send escape event to state machine - let it handle the priority logic
         tableSend({
@@ -210,7 +214,7 @@ export const createKeyboardHandler = (
       case 'a':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Ctrl+A: Select all');
+          log.debug('Ctrl+A: Select all');
           
           // Send to XState to select all
           tableSend({
@@ -222,7 +226,7 @@ export const createKeyboardHandler = (
       case 'c':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Ctrl+C: Copy');
+          log.debug('Ctrl+C: Copy');
           tableSend({
             type: 'keyboard.copy'
           });
@@ -232,7 +236,7 @@ export const createKeyboardHandler = (
       case 'x':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Ctrl+X: Cut');
+          log.debug('Ctrl+X: Cut');
           tableSend({
             type: 'keyboard.cut'
           });
@@ -242,7 +246,7 @@ export const createKeyboardHandler = (
       case 'v':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Ctrl+V: Paste');
+          log.debug('Ctrl+V: Paste');
           tableSend({
             type: 'keyboard.paste'
           });
@@ -279,7 +283,7 @@ export const createRendererStateChangeHandler = (
   tableSend?: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((event: any) => {
-    console.log('[VibeGridXEvents] Renderer state change event:', {
+    log.debug('[VibeGridXEvents] Renderer state change event:', {
       type: event.type,
       typeofType: typeof event.type,
       exactType: JSON.stringify(event.type),
@@ -299,7 +303,7 @@ export const createRendererStateChangeHandler = (
       // The selection will be automatically updated via the selection coordinator subscription.
     } else if (event.type === 'canvas.container.ready') {
       // Forward canvas container ready event to table machine
-      console.log('[VibeGridXEvents] Canvas container ready, forwarding to table machine');
+      log.debug('[VibeGridXEvents] Canvas container ready, forwarding to table machine');
       if (tableSend) {
         tableSend({
           type: 'CANVAS_CONTAINER_READY',
@@ -309,7 +313,7 @@ export const createRendererStateChangeHandler = (
     } else if (event.type === 'rows.sorted') {
       // Forward the sorted row IDs to the table machine
       // This event is no longer needed - sorting is handled by the table machine
-      console.log('Rows sorted event (deprecated):', event);
+      log.debug('Rows sorted event (deprecated):', event);
     }
   }, [refs, tableSend]);
 };
@@ -359,7 +363,7 @@ export const createColumnResizeStartHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((columnId: string, x: number, width: number) => {
-    console.log('[VibeGridXEvents] Column resize start', { columnId, x, width });
+    log.debug('[VibeGridXEvents] Column resize start', { columnId, x, width });
     tableSend({ type: 'view.columns.resize.start', columnId, x, width });
   }, [tableSend]);
 };
@@ -377,7 +381,7 @@ export const createColumnResizeMoveHandler = (
     }
     lastUpdateRef.current = now;
     
-    console.log('[VibeGridXEvents] Column resize move', { x });
+    log.debug('[VibeGridXEvents] Column resize move', { x });
     tableSend({ type: 'view.columns.resize.move', x });
   }, [tableSend]);
 };
@@ -386,7 +390,7 @@ export const createColumnResizeEndHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback(() => {
-    console.log('[VibeGridXEvents] Column resize end');
+    log.debug('[VibeGridXEvents] Column resize end');
     tableSend({ type: 'view.columns.resize.end' });
   }, [tableSend]);
 };
@@ -500,7 +504,7 @@ export const createMouseMoveHandler = (
           
           // Only send update if we've moved to a different cell
           if (currentCellKey !== lastCellKey) {
-            console.log('[VibeGridXEvents] Sending drag move event', { from: lastCellKey, to: currentCellKey });
+            log.debug('[VibeGridXEvents] Sending drag move event', { from: lastCellKey, to: currentCellKey });
             lastCellKey = currentCellKey;
             
             // Just send the current cell - let selection coordinator calculate the range

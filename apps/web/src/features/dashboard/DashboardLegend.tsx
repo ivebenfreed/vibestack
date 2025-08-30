@@ -17,6 +17,10 @@ import {
 } from '@/legend-state'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { use$ } from '@legendapp/state/react'
+import { uiLog } from '@/logger'
+
+// Create logger instance for this file
+const log = uiLog('features/dashboard/DashboardLegend.tsx');
 
 const topNav = [
   {
@@ -159,7 +163,7 @@ const DashboardContent = observer(function DashboardContent() {
   // Use the schema from the observable
   const schema = use$(orgContext$.schema)
 
-  console.log('[Dashboard] Using schema:', schema)
+  log.info('Using schema:', schema)
 
   if (!schema?.entities) {
     return (
@@ -170,7 +174,7 @@ const DashboardContent = observer(function DashboardContent() {
   }
 
   const entityList = Object.keys(schema.entities)
-  console.log('[Dashboard] Entity list from schema:', entityList)
+  log.info('Entity list from schema:', entityList)
 
   if (entityList.length === 0) {
     return (
@@ -225,7 +229,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
   
   // Handle entity deletion using new schema client API
   const handleDelete = async (entityName: string) => {
-    console.log(`[Dashboard] Deleting entity type: ${entityName}`)
+    log.info(`Deleting entity type: ${entityName}`)
     
     try {
       const orgId = currentOrganization?.id
@@ -245,7 +249,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
         throw new Error(result.error || 'Failed to delete entity schema')
       }
       
-      console.log(`[Dashboard] Successfully deleted entity type: ${entityName}`)
+      log.info(`Successfully deleted entity type: ${entityName}`)
       
     } catch (error) {
       console.error(`[Dashboard] Failed to delete entity ${entityName}:`, error)
