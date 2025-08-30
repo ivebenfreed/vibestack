@@ -1,4 +1,3 @@
-import type { QueryResultRow } from '@neondatabase/serverless';
 
 export interface WALData {
   lsn: string;

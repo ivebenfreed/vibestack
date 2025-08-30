@@ -2,9 +2,6 @@ import type { DurableObjectState } from '../types/cloudflare';
 import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
 import type { TableChange } from '@repo/sync-types';
-// Import domain tables from the typeorm package
-// import { SERVER_DOMAIN_TABLES } from '@repo/dataforge/server-entities';
-const SERVER_DOMAIN_TABLES = ['projects', 'tasks', 'users', 'comments']; // Stub
 
 /**
  * Configuration for the replication system
@@ -159,15 +156,6 @@ export interface SlotStatus {
   lsn?: string;
 }
 
-// For type safety when dealing with domain tables
-export type DomainTable = typeof SERVER_DOMAIN_TABLES[number];
-
-/**
- * Get the list of domain tables to track for replication
- */
-export function getDomainTables(): string[] {
-  return SERVER_DOMAIN_TABLES as unknown as string[];
-}
 
 /**
  * Verification metrics interface

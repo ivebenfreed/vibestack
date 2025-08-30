@@ -1,4 +1,3 @@
-import type { Client } from '@neondatabase/serverless';
 import type { Env } from '../types/env';
 import type { ReplicationConfig } from './types';
 import { replicationLogger } from '../middleware/logger';

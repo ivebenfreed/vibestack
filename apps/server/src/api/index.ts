@@ -4,7 +4,6 @@ import type { ApiEnv } from '../types/api'
 import { enforceTrialLimits } from '../middleware/trial-limits'
 import syncV2Router from './sync-v2'
 import replication from './replication'
-import { migrations } from './migrations'
 import authRouter from './auth'
 import organizationsRouter from './organizations'
 import { phase1TestRouter } from './phase1-tests.js'
@@ -26,7 +25,7 @@ api.use('*', enforceTrialLimits)
 // Mount routes with proper prefixes
 api.route('/sync', syncV2Router)
 api.route('/replication', replication)
-api.route('/migrations', migrations)
+// Legacy migrations route removed - DataForge handles schema operations
 // api.route('/db', db) // TypeORM-based
 api.route('/auth', authRouter)
 api.route('/organizations', organizationsRouter)

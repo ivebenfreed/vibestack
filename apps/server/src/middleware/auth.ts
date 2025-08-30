@@ -45,7 +45,6 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
           '/api/db/health',
           '/api/db/kysely-test',
           '/api/db/query',
-          '/api/bootstrap/',
           '/api/archetype/health',
           '/api/sync/connect/',  // WebSocket connections have custom auth logic in index.ts
           '/api/dataforge/'  // Temporarily public - should work with session auth

@@ -3,7 +3,6 @@ import type { MinimalContext } from '../types/hono';
 import { replicationLogger } from '../middleware/logger';
 import { getDBClient } from '../lib/db';
 import type { ReplicationConfig } from './types';
-import { getDomainTables } from './types';
 import { compareLSN } from '../lib/sync-common';
 
 const MODULE_NAME = 'state-manager';
@@ -99,16 +98,16 @@ export class StateManager {
           `, [this.config.publication]);
 
           if (pubResult.rows.length === 0) {
-            const domainTables = getDomainTables().join(', ');
+            // Create publication for all tables (dynamic discovery)
             await client.query(`
-              CREATE PUBLICATION $1 FOR TABLE ${domainTables};
-            `, [this.config.publication]);
+              CREATE PUBLICATION ${this.config.publication} FOR ALL TABLES;
+            `);
           }
 
           replicationLogger.info('Created replication resources', {
             slot: this.config.slot,
             publication: this.config.publication,
-            tableCount: getDomainTables().length
+            tableCount: 'all-tables'
           }, MODULE_NAME);
 
           // Get the new slot status after creation

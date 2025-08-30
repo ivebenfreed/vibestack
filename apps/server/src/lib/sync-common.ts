@@ -1,6 +1,4 @@
 import type { TableChange } from '@repo/sync-types';
-// import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
-const SERVER_DOMAIN_TABLE_HIERARCHY = {}; // Stub for now
 import { getDBClient, sql } from './db'; // Import necessary DB helpers
 import type { MinimalContext } from '../types/hono'; // Import context type
 import { syncLogger } from '../middleware/logger'; // Import logger
@@ -251,55 +249,20 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
   };
 }
 
-type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 /**
- * Order changes based on table hierarchy and operation type
- * - Creates/Updates: Process parents before children
- * - Deletes: Process children before parents
+ * Order changes by operation type only (no domain hierarchy)
+ * - Deletes first, then inserts, then updates
  */
 export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
-  // Log tables before sorting
-  const beforeTablesCount = changes.reduce((acc, change) => {
-    if (change.table) acc.push(change.table);
-    return acc;
-  }, [] as string[]).length;
-  
-  // Create a new copy to sort to avoid modifying the original array
+  // Simple operation-based ordering without domain hierarchy
   const ordered = [...changes].sort((a, b) => {
-    // Add quotes to match SERVER_TABLE_HIERARCHY keys
-    const aLevel = SERVER_DOMAIN_TABLE_HIERARCHY[`"${a.table}"` as TableName] ?? 0;
-    const bLevel = SERVER_DOMAIN_TABLE_HIERARCHY[`"${b.table}"` as TableName] ?? 0;
-
-    // For deletes, reverse the hierarchy
-    if (a.operation === 'delete' && b.operation === 'delete') {
-      return bLevel - aLevel;
-    }
-
-    // For mixed operations, deletes come last
-    if (a.operation === 'delete') return 1;
-    if (b.operation === 'delete') return -1;
-
-    // For creates/updates, follow hierarchy
-    return aLevel - bLevel;
-  });
-
-  // Log tables after sorting
-  const afterTablesCount = ordered.reduce((acc, change) => {
-    if (change.table) acc.push(change.table);
-    return acc;
-  }, [] as string[]).length;
-  
-  // Log if there's a difference
-  if (beforeTablesCount !== afterTablesCount) {
-    console.error(`TABLE PROPERTY LOST during sort: before=${beforeTablesCount}, after=${afterTablesCount}`);
+    const operationOrder = { delete: 0, insert: 1, update: 2 };
+    const aOrder = operationOrder[a.operation] ?? 3;
+    const bOrder = operationOrder[b.operation] ?? 3;
     
-    // Examine properties
-    if (changes.length > 0 && ordered.length > 0) {
-      console.log('First change before:', Object.keys(changes[0]!));
-      console.log('First change after:', Object.keys(ordered[0]!));
-    }
-  }
+    return aOrder - bOrder;
+  });
 
   return ordered;
 }

@@ -2,7 +2,7 @@
  * Dynamic Table Discovery for Multi-Organization Replication
  * 
  * Replaces build-time constants with runtime discovery of trackable tables.
- * Supports organization-specific tables created dynamically through OrgOpsDO.
+ * Supports organization-specific tables created dynamically through OrganizationActor.
  */
 
 import { replicationLogger } from '../middleware/logger';
@@ -308,7 +308,7 @@ export class DynamicTableDiscovery {
   }
 
   /**
-   * Register a new organization table in KV (called when OrgOpsDO creates new entities)
+   * Register a new organization table in KV (called when OrganizationActor creates new entities)
    */
   async registerOrgTable(tableName: string, organizationId: string, entityName: string): Promise<void> {
     try {

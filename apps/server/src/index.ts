@@ -22,7 +22,6 @@ import { getAuth, AuthType, initializeAuth } from './lib/auth';
 import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
 import authRouter from './api/auth';
-import bootstrapRouter from './api/bootstrap'; // Adjust path if necessary
 import polarWebhooksRouter from './api/polar-webhooks';
 import debugBillingRouter from './api/debug-billing';
 import { mountProtectedRoutes } from './routes/protected-routes';
@@ -85,9 +84,6 @@ cloudflareSecurityStack.forEach(middleware => {
   apiApp.use('*', middleware);
 });
 
-// Mount the bootstrap router BEFORE authMiddleware
-// This ensures it's not protected by standard authentication
-apiApp.route('/bootstrap', bootstrapRouter);
 
 // Add public health endpoints BEFORE authMiddleware
 apiApp.get('/health', (c) => c.text('Server OK'));

@@ -528,16 +528,16 @@ export class DataForgeEntityManager {
     errors?: string[];
   }> {
     try {
-      // Use OrgSchemaDO to list archetype entities
-      if (!this.config.env?.ORG_SCHEMA) {
+      // Use OrganizationActor to list archetype entities
+      if (!this.config.env?.ORGANIZATION_ACTOR) {
         return {
           success: false,
-          errors: ['OrgSchemaDO not available in environment']
+          errors: ['OrganizationActor not available in environment']
         };
       }
 
-      const doId = this.config.env.ORG_SCHEMA.idFromName(orgId);
-      const doStub = this.config.env.ORG_SCHEMA.get(doId);
+      const doId = this.config.env.ORGANIZATION_ACTOR.idFromName(orgId);
+      const doStub = this.config.env.ORGANIZATION_ACTOR.get(doId);
 
       const response = await doStub.fetch(new Request('http://localhost/archetype-entities'));
       const result = await response.json();
@@ -579,10 +579,10 @@ export class DataForgeEntityManager {
     options: { dropTable?: boolean } = {}
   ): Promise<{ success: boolean; errors?: string[] }> {
     try {
-      // 1. Remove from OrgSchemaDO
-      if (this.config.env?.ORG_SCHEMA) {
-        const doId = this.config.env.ORG_SCHEMA.idFromName(orgId);
-        const doStub = this.config.env.ORG_SCHEMA.get(doId);
+      // 1. Remove from OrganizationActor
+      if (this.config.env?.ORGANIZATION_ACTOR) {
+        const doId = this.config.env.ORGANIZATION_ACTOR.idFromName(orgId);
+        const doStub = this.config.env.ORGANIZATION_ACTOR.get(doId);
 
         const response = await doStub.fetch(new Request(`http://localhost/archetype-entity/${tableName}`, {
           method: 'DELETE'
@@ -647,7 +647,7 @@ export class DataForgeEntityManager {
   }
 
   /**
-   * Create archetype schema using OrgSchemaDO
+   * Create archetype schema using OrganizationActor
    */
   private async createArchetypeSchema(
     orgId: string,
@@ -656,15 +656,15 @@ export class DataForgeEntityManager {
     customFields: Record<string, FieldDefinition>
   ): Promise<{ success: boolean; ddl?: string; errors?: string[] }> {
     try {
-      if (!this.config.env?.ORG_SCHEMA) {
+      if (!this.config.env?.ORGANIZATION_ACTOR) {
         return {
           success: false,
-          errors: ['OrgSchemaDO not available in environment']
+          errors: ['OrganizationActor not available in environment']
         };
       }
 
-      const doId = this.config.env.ORG_SCHEMA.idFromName(orgId);
-      const doStub = this.config.env.ORG_SCHEMA.get(doId);
+      const doId = this.config.env.ORGANIZATION_ACTOR.idFromName(orgId);
+      const doStub = this.config.env.ORGANIZATION_ACTOR.get(doId);
 
       const response = await doStub.fetch(new Request('http://localhost/create-archetype', {
         method: 'POST',
@@ -695,12 +695,12 @@ export class DataForgeEntityManager {
     tableName: string
   ): Promise<{ archetype: string; tableName: string; fieldDefinitions: Record<string, FieldDefinition> } | null> {
     try {
-      if (!this.config.env?.ORG_SCHEMA) {
+      if (!this.config.env?.ORGANIZATION_ACTOR) {
         return null;
       }
 
-      const doId = this.config.env.ORG_SCHEMA.idFromName(orgId);
-      const doStub = this.config.env.ORG_SCHEMA.get(doId);
+      const doId = this.config.env.ORGANIZATION_ACTOR.idFromName(orgId);
+      const doStub = this.config.env.ORGANIZATION_ACTOR.get(doId);
 
       const response = await doStub.fetch(new Request(`http://localhost/archetype-entity/${tableName}`));
       if (!response.ok) {

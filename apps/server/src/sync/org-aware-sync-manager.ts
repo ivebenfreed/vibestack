@@ -285,8 +285,8 @@ export class OrgAwareSyncManager {
     organizationId: string
   ): Promise<string[]> {
     try {
-      if (!this.env.ORG_OPS) {
-        syncLogger.warn('ORG_OPS binding not available for broadcast filtering', {
+      if (!this.env.ORGANIZATION_ACTOR) {
+        syncLogger.warn('ORGANIZATION_ACTOR binding not available for broadcast filtering', {
           tableName,
           organizationId
         }, MODULE_NAME);
@@ -298,9 +298,9 @@ export class OrgAwareSyncManager {
         ? tableName.substring(organizationId.length + 1)
         : tableName;
 
-      // Use OrgOpsDO to get authorized users
-      const doId = this.env.ORG_OPS.idFromName(organizationId);
-      const doStub = this.env.ORG_OPS.get(doId);
+      // Use OrganizationActor to get authorized users
+      const doId = this.env.ORGANIZATION_ACTOR.idFromName(organizationId);
+      const doStub = this.env.ORGANIZATION_ACTOR.get(doId);
 
       const response = await doStub.fetch(new Request(`http://localhost/authorized-users`, {
         method: 'POST',

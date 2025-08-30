@@ -13,11 +13,6 @@ import { DEFAULT_REPLICATION_CONFIG } from './types';
 import { replicationLogger } from '../middleware/logger';
 import { PollingManager } from './polling';
 import { getDBClient } from '../lib/db';
-import { 
-  SERVER_DOMAIN_TABLES,
-  SERVER_TRACKED_TABLES,
-  SERVER_JUNCTION_TABLE_MAPPING
-} from '@repo/dataforge/server-entities';
 import { AppBindings, createMinimalContext, MinimalContext } from '../types/hono';
 import { StateManager } from './state-manager';
 import { getAllClientIds } from './process-changes';

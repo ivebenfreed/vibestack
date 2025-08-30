@@ -10,30 +10,15 @@ import { transformWALChangesWithOrg } from './org-aware-process-changes';
 type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
 import { sql, getDBClient } from '../lib/db';
 import { StateManager } from './state-manager';
-// import { 
-//   SERVER_DOMAIN_TABLES, 
-//   SERVER_DOMAIN_TABLE_HIERARCHY,
-//   SERVER_TRACKED_TABLES,
-//   SERVER_JUNCTION_TABLE_MAPPING
-// } from '@repo/dataforge/server-entities';
-
-// DEPRECATED: Hardcoded stubs replaced by dynamic discovery
-// const SERVER_DOMAIN_TABLES = ['projects', 'tasks', 'users', 'comments'];
-// const SERVER_DOMAIN_TABLE_HIERARCHY = {};
-// const SERVER_TRACKED_TABLES = ['projects', 'tasks', 'users', 'comments'];
-// const SERVER_JUNCTION_TABLE_MAPPING = {};
 
 import { DynamicTableDiscovery } from './dynamic-table-discovery';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
-import { NeonHTTPDialect } from 'kysely-neon-http';
-import { neonConfig } from '@neondatabase/serverless';
 import type { Database } from '@repo/dataforge/kysely-types';
 
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'process-changes';
 
-type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 // ====== Constants ======
 const DEFAULT_STORE_BATCH_SIZE = 500;
@@ -83,125 +68,14 @@ async function getCurrentRelationshipIds(
   sourceId: string, 
   relationName: string
 ): Promise<string[]> {
-  try {
-    // Import the relationship configuration helpers
-    const { getJunctionRelationships } = await import('@repo/dataforge/server-entities');
-    
-    // Convert quoted table name to entity name (remove quotes, capitalize first letter)
-    const entityName = sourceTable.replace(/"/g, '').toLowerCase();
-    
-    replicationLogger.info('getCurrentRelationshipIds using repository methods', {
-      sourceTable,
-      entityName,
-      sourceId,
-      relationName
-    }, MODULE_NAME);
-    
-    // Get junction relationships for this entity
-    const junctionRelationships = getJunctionRelationships(entityName);
-    
-    // Find the specific relationship we're looking for
-    const relationshipConfig = junctionRelationships.find(rel => rel.relationName === relationName);
-    
-    if (!relationshipConfig) {
-      replicationLogger.warn('No junction relationship config found', {
-        entityName,
-        relationName,
-        availableRelationships: junctionRelationships.map(r => r.relationName)
-      }, MODULE_NAME);
-      return [];
-    }
-    
-    replicationLogger.info('Found junction relationship config', {
-      junctionTable: relationshipConfig.junctionTable,
-      sourceColumn: relationshipConfig.sourceColumn,
-      targetColumn: relationshipConfig.targetColumn,
-      targetEntity: relationshipConfig.targetEntity
-    }, MODULE_NAME);
-    
-    // Use repository methods instead of raw SQL
-    const repositoryContainer = createRepositoryContainer(context);
-    let targetIds: string[] = [];
-    
-    // Handle different entity types with their specific repository methods
-    switch (entityName) {
-      case 'projects':
-        if (relationName === 'members') {
-          const members = await repositoryContainer.projects.getMembers(sourceId);
-          targetIds = members.map(member => member.id);
-          replicationLogger.debug('Got project members via repository', {
-            projectId: sourceId,
-            memberCount: members.length,
-            memberIds: targetIds
-          }, MODULE_NAME);
-        }
-        break;
-        
-      case 'tasks':
-        if (relationName === 'dependencies') {
-          // For task dependencies, we need to implement a getDependencies method
-          // For now, fall back to the raw SQL as a temporary measure
-          replicationLogger.debug('Task dependencies not yet implemented via repository, using fallback', {
-            taskId: sourceId,
-            relationName
-          }, MODULE_NAME);
-          
-          const neonService = (repositoryContainer as any).neonService;
-          const query = `
-            SELECT ${relationshipConfig.targetColumn} 
-            FROM "${relationshipConfig.junctionTable}" 
-            WHERE ${relationshipConfig.sourceColumn} = $1
-          `;
-          
-          const result = await neonService.query(query, [sourceId]);
-          
-          // Handle different result formats from NeonService
-          let rows;
-          if (Array.isArray(result)) {
-            rows = result;
-          } else if (result && result.rows && Array.isArray(result.rows)) {
-            rows = result.rows;
-          } else if (result && Array.isArray(result.result)) {
-            rows = result.result;
-          } else {
-            replicationLogger.warn('Unexpected query result format for task dependencies', {
-              resultType: typeof result,
-              result: result
-            }, MODULE_NAME);
-            return [];
-          }
-          
-          targetIds = rows.map((row: any) => row[relationshipConfig.targetColumn]);
-        }
-        break;
-        
-      default:
-        replicationLogger.warn('Unsupported entity type for relationship query', {
-          entityName,
-          relationName,
-          supportedEntities: ['projects', 'tasks']
-        }, MODULE_NAME);
-        return [];
-    }
-    
-    replicationLogger.debug('Repository relationship query result', {
-      entityName,
-      sourceId,
-      relationName,
-      targetCount: targetIds.length,
-      targetIds: targetIds
-    }, MODULE_NAME);
-    
-    return targetIds;
-  } catch (error) {
-    replicationLogger.error('Failed to get current relationship IDs via repository', {
-      error: error instanceof Error ? error.message : String(error),
-      sourceTable,
-      sourceId,
-      relationName
-    }, MODULE_NAME);
-    return [];
-  }
+  // Junction table processing is deprecated - return empty array
+  replicationLogger.debug('Junction table processing disabled (deprecated)', {
+    sourceTable,
+    sourceId,
+    relationName
+  }, MODULE_NAME);
+  
+  return [];
 }
 
 async function transformJunctionTableChange(
