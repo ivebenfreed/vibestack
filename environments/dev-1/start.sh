@@ -1,39 +1,67 @@
 #!/bin/bash
-# Development Environment 1 (Containerized) Startup Script
+
+# Start VibeStack Dev-1 Environment
+# Creates isolated environment by cloning git repo inside container
 
 set -e
 
-echo "🐳 Starting Development Environment 1 (Containerized)"
-echo "====================================================="
+echo "🚀 VibeStack Dev-1 Environment"
+echo "=============================="
+echo ""
 
-# Check if container is already running
-if docker ps | grep -q vibestack-devenv1; then
-    echo "✅ Container is already running"
-else
-    echo "📦 Starting container..."
-    docker compose -f docker-compose.devenv-1.yml up -d
-    echo "⏳ Waiting for container to be ready..."
+# Change to script directory
+cd "$(dirname "$0")"
+
+echo "🐳 Starting containers..."
+docker compose up -d --build
+
+echo "⏳ Waiting for environment setup..."
+echo "   (This includes git clone, dependency install, database setup)"
+echo ""
+
+# Wait and show progress
+for i in {1..30}; do
+    if docker exec vibestack-dev1 test -f /workspace/.git/config 2>/dev/null; then
+        echo "✅ Git repository cloned"
+        break
+    fi
+    echo "   Cloning repository... ($i/30)"
+    sleep 2
+done
+
+# Wait for dependencies
+for i in {1..20}; do
+    if docker exec vibestack-dev1 test -d /workspace/node_modules 2>/dev/null; then
+        echo "✅ Dependencies installed"
+        break
+    fi
+    echo "   Installing dependencies... ($i/20)"
     sleep 3
-fi
-
-# Check if development servers are running
-if docker exec vibestack-devenv1 bash -c "pgrep -f 'pnpm dev' > /dev/null 2>&1"; then
-    echo "⚠️  Development servers are already running in container"
-else
-    echo "🚀 Starting development servers in container..."
-    docker exec -d vibestack-devenv1 bash -c "export PATH=\"~/.local/bin:\$PATH\" && cd /workspace && WEB_PORT=5173 pnpm dev:web"
-fi
+done
 
 echo ""
-echo "✅ Environment 1 is ready!"
-echo "   Web: http://localhost:5175 (maps to container's 5173)"
-echo "   API: http://localhost:8789 (maps to container's 8787)"
+echo "🧪 Checking services..."
+
+# Check containers
+if ! docker ps | grep -q "vibestack-dev1"; then
+    echo "❌ Main container failed to start"
+    docker compose logs dev
+    exit 1
+fi
+
+echo "✅ Dev-1 environment running"
 echo ""
-echo "To enter the container with Claude Code:"
-echo "   docker exec -it vibestack-devenv1 bash"
-echo "   export PATH=\"~/.local/bin:\$PATH\""
-echo "   cd /workspace"
-echo "   claude"
+echo "🎉 DEV-1 ENVIRONMENT READY!"
+echo "==========================="
 echo ""
-echo "To stop this environment:"
-echo "   ./stop.sh"
+echo "🌐 Access URLs:"
+echo "   • Web App: http://localhost:5175"
+echo "   • API Server: http://localhost:8789"
+echo "   • PostgreSQL: localhost:5433"
+echo "   • Chrome Debug: http://localhost:3001"
+echo ""
+echo "🎯 Next Steps:"
+echo "   ./dev.sh    - Enter development environment"
+echo "   ./test.sh   - Test development servers"  
+echo "   ./stop.sh   - Stop all services"
+echo ""

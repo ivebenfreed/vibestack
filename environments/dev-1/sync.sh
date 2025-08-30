@@ -1,87 +1,77 @@
 #!/bin/bash
-# Development Environment 1 Sync Script
+
+# Host script to sync current staging branch into dev-1 container
 
 set -e
 
-echo "🔄 Syncing Development Environment 1 (Containerized)"
-echo "=================================================="
+echo "🔄 Syncing Staging Branch to Dev-1"
+echo "=================================="
+echo ""
 
-# Navigate to project root
-cd "$(dirname "$0")/../.."
+# Check if container is running
+if ! docker ps | grep -q "vibestack-dev1"; then
+    echo "❌ Dev-1 container not running"
+    echo "Run: ./start.sh first"
+    exit 1
+fi
 
-echo "📥 Pulling latest changes from git..."
-git fetch origin
-git pull origin staging
+echo "📂 Syncing current staging branch content..."
 
-echo "📦 Installing/updating dependencies on host..."
-pnpm install
+HOST_PROJECT_ROOT="/home/benfreed/dev/vibestack"
+CONTAINER_NAME="vibestack-dev1"
 
-# Check if container exists
-if ! docker ps -a | grep -q vibestack-devenv1; then
-    echo "🐳 Container doesn't exist - will be created on first start"
-else
-    # Stop container if running
-    if docker ps | grep -q vibestack-devenv1; then
-        echo "🛑 Stopping container for sync..."
-        docker compose -f docker/environments/docker-compose.devenv-1.yml down
+# Copy essential files and directories
+echo "   Copying apps, packages, scripts..."
+docker cp "$HOST_PROJECT_ROOT/apps" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   apps/ not found, skipping"
+docker cp "$HOST_PROJECT_ROOT/packages" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   packages/ not found, skipping" 
+docker cp "$HOST_PROJECT_ROOT/scripts" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   scripts/ not found, skipping"
+
+# Copy config files
+echo "   Copying config files..."
+docker cp "$HOST_PROJECT_ROOT/package.json" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   package.json not found"
+docker cp "$HOST_PROJECT_ROOT/pnpm-lock.yaml" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   pnpm-lock.yaml not found"
+docker cp "$HOST_PROJECT_ROOT/pnpm-workspace.yaml" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   pnpm-workspace.yaml not found"
+docker cp "$HOST_PROJECT_ROOT/tsconfig.json" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+docker cp "$HOST_PROJECT_ROOT/tsconfig.base.json" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+docker cp "$HOST_PROJECT_ROOT/turbo.json" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+docker cp "$HOST_PROJECT_ROOT/eslint.config.mjs" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+
+# Copy environment and config files
+echo "   Copying environment files..."
+docker cp "$HOST_PROJECT_ROOT/.env.local" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   .env.local not found"
+docker cp "$HOST_PROJECT_ROOT/.env.example" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+docker cp "$HOST_PROJECT_ROOT/patches" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   patches/ not found, skipping"
+docker cp "$HOST_PROJECT_ROOT/data" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   data/ not found, skipping"
+docker cp "$HOST_PROJECT_ROOT/.git" "$CONTAINER_NAME:/workspace/" 2>/dev/null || echo "   .git/ not found, skipping"
+docker cp "$HOST_PROJECT_ROOT/.mcp.json" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+docker cp "$HOST_PROJECT_ROOT/README.md" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+docker cp "$HOST_PROJECT_ROOT/CLAUDE.md" "$CONTAINER_NAME:/workspace/" 2>/dev/null || true
+
+# Fix ownership and trigger dependency install
+echo "   Fixing permissions and installing dependencies..."
+docker exec "$CONTAINER_NAME" bash -c "
+    cd /workspace
+    sudo chown -R developer:developer . 2>/dev/null || true
+    
+    # Install dependencies if we have package.json
+    if [ -f package.json ]; then
+        echo 'Installing dependencies...'
+        pnpm install --prefer-frozen-lockfile || pnpm install
     fi
     
-    echo "🗑️  Removing old container for clean sync..."
-    docker rm vibestack-devenv1 2>/dev/null || true
-fi
+    # Setup MCP if not done
+    if [ ! -f .mcp.json ] || ! grep -q 'playwright' .mcp.json; then
+        echo 'Setting up MCP Playwright...'
+        export PATH=\"/home/developer/.local/bin:\$PATH\"
+        claude mcp add --scope project playwright npx @playwright/mcp@latest 2>/dev/null || echo 'MCP setup completed'
+    fi
+"
 
-echo "🐳 Starting fresh container..."
-docker compose -f docker/environments/docker-compose.devenv-1.yml up -d
-
-echo "⏳ Waiting for container to be ready..."
-sleep 5
-
-echo "📂 Syncing source code to container..."
-# Copy essential files to container
-docker cp package.json vibestack-devenv1:/workspace/
-docker cp pnpm-workspace.yaml vibestack-devenv1:/workspace/
-docker cp turbo.json vibestack-devenv1:/workspace/
-docker cp pnpm-lock.yaml vibestack-devenv1:/workspace/
-docker cp scripts vibestack-devenv1:/workspace/
-docker cp apps/web/package.json vibestack-devenv1:/workspace/apps/web/
-docker cp apps/server/package.json vibestack-devenv1:/workspace/apps/server/
-docker cp apps/server/wrangler.toml vibestack-devenv1:/workspace/apps/server/
-docker cp apps/web/src vibestack-devenv1:/workspace/apps/web/
-docker cp apps/server/src vibestack-devenv1:/workspace/apps/server/
-
-echo "📦 Installing dependencies in container..."
-docker exec vibestack-devenv1 bash -c "cd /workspace && pnpm install"
-
-echo "🗄️  Loading fresh database data..."
-# Check if we have a database dump
-if [ -f "data/vibestack_dev_dump.sql" ]; then
-    echo "📋 Loading database dump into container..."
-    docker exec vibestack-postgres-devenv1 bash -c "psql -U postgres -d vibestack_dev -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'"
-    docker exec -i vibestack-postgres-devenv1 psql -U postgres -d vibestack_dev < data/vibestack_dev_dump.sql
-elif command -v ./scripts/sync-remote-to-local.sh >/dev/null 2>&1; then
-    echo "📊 Syncing database from remote..."
-    # First sync to local, then copy to container
-    ./scripts/sync-remote-to-local.sh
-    
-    # Export local data and import to container
-    echo "📤 Exporting local database..."
-    pg_dump postgres://postgres:postgres@localhost:5432/vibestack_dev > /tmp/local_dump.sql
-    
-    echo "📥 Importing to container database..."
-    docker exec vibestack-postgres-devenv1 bash -c "psql -U postgres -d vibestack_dev -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'"
-    docker exec -i vibestack-postgres-devenv1 psql -U postgres -d vibestack_dev < /tmp/local_dump.sql
-    rm /tmp/local_dump.sql
-else
-    echo "⚠️  No database sync available - container will use default setup"
-fi
-
-echo "✅ Development Environment 1 sync complete!"
-echo "   Container: vibestack-devenv1"
-echo "   Web: http://localhost:5175"
-echo "   API: http://localhost:8789"
 echo ""
-echo "To start development servers:"
-echo "   ./start.sh"
+echo "✅ Dev-1 Sync Complete!"
+echo "======================"
 echo ""
-echo "To enter with Claude Code:"
-echo "   ./enter.sh"
+echo "🎯 Ready Commands:"
+echo "   ./dev.sh    - Enter development environment"
+echo "   ./test.sh   - Test development servers"
+echo ""
