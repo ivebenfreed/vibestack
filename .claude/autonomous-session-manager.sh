@@ -64,38 +64,52 @@ if [ "$WORK_COUNT" -eq 0 ] && [ -d "$LATEST_SESSION" ] && git rev-parse --git-di
     fi
 fi
 
-# Skip autonomous processing for sessions with minimal activity
-if [ "$WORK_COUNT" -lt 5 ]; then
+# Skip autonomous processing for sessions with minimal activity  
+if [ "$WORK_COUNT" -lt 1 ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] AUTONOMOUS: Skipping short session ($WORK_COUNT actions)" >> "$CLAUDE_PROJECT_DIR/.claude/autonomous.log"
     echo '{"shouldBlock": false}'
     exit 0
 fi
 
-# Gather rich git context for analysis
-GIT_CONTEXT=""
+# Analyze current work state and gaps
+CURRENT_WORK_ANALYSIS=""
 if git rev-parse --git-dir > /dev/null 2>&1; then
-    # Get recent commits since session start
+    # Get uncommitted changes (what's actually being worked on)
+    UNCOMMITTED_STATUS=$(git status --porcelain 2>/dev/null | head -20)
+    UNCOMMITTED_CHANGES=$(git diff --name-only 2>/dev/null | head -15)
+    STAGED_CHANGES=$(git diff --name-only --cached 2>/dev/null | head -15)
+    
+    # Get recent commits since session started for context
     SESSION_START=$(stat -c %Y "$LATEST_SESSION" 2>/dev/null || echo 0)
-    RECENT_COMMITS=""
+    SESSION_COMMITS=""
     if [ "$SESSION_START" -gt 0 ]; then
-        RECENT_COMMITS=$(git log --oneline --since="@$SESSION_START" 2>/dev/null | head -5)
+        SESSION_COMMITS=$(git log --oneline --since="@$SESSION_START" 2>/dev/null | head -3)
     fi
     
-    # Get condensed diff summary (file changes only, limit size)
-    DIFF_SUMMARY=$(git diff --stat HEAD~1 2>/dev/null | head -20 || echo "No recent changes")
+    # Count different types of changes
+    UNTRACKED_COUNT=$(echo "$UNCOMMITTED_STATUS" | grep -c "^??" 2>/dev/null || echo 0)
+    MODIFIED_COUNT=$(echo "$UNCOMMITTED_STATUS" | grep -c "^ M\|^M " 2>/dev/null || echo 0)
+    ADDED_COUNT=$(echo "$UNCOMMITTED_STATUS" | grep -c "^A " 2>/dev/null || echo 0)
+    DELETED_COUNT=$(echo "$UNCOMMITTED_STATUS" | grep -c "^ D\|^D " 2>/dev/null || echo 0)
     
-    # Get modified file list with change types
-    MODIFIED_FILES=$(git diff --name-status HEAD~1 2>/dev/null | head -15 || echo "No changes")
-    
-    GIT_CONTEXT="
-RECENT COMMITS:
-$RECENT_COMMITS
+    CURRENT_WORK_ANALYSIS="
+CURRENT SESSION COMMITS:
+$SESSION_COMMITS
 
-DIFF SUMMARY:
-$DIFF_SUMMARY
+UNCOMMITTED WORK (what's being worked on right now):
+$UNCOMMITTED_STATUS
 
-MODIFIED FILES:
-$MODIFIED_FILES"
+WORK BREAKDOWN:
+- $UNTRACKED_COUNT new files created
+- $MODIFIED_COUNT files modified  
+- $ADDED_COUNT files staged for commit
+- $DELETED_COUNT files deleted
+
+MODIFIED FILES NEEDING COMMIT:
+$UNCOMMITTED_CHANGES
+
+STAGED FILES READY TO COMMIT:
+$STAGED_CHANGES"
 fi
 
 # Read current files for context
@@ -108,8 +122,8 @@ if [ -f "$WORK_LOG" ]; then
     WORK_LOG_CONTENT=$(cat "$WORK_LOG" 2>/dev/null || echo "No work log found")
 fi
 
-# Create actionable prompt with file contents and git context
-AUTONOMOUS_PROMPT="You are analyzing a Claude Code session with $WORK_COUNT git activities. 
+# Create actionable prompt focusing on current work and planning gaps
+AUTONOMOUS_PROMPT="You are analyzing a Claude Code session to identify planning gaps and current work status.
 
 CURRENT PLAN FILE ($PLAN_FILE):
 $PLAN_CONTENT
@@ -117,22 +131,27 @@ $PLAN_CONTENT
 CURRENT WORK LOG ($WORK_LOG):
 $WORK_LOG_CONTENT
 
-GIT ANALYSIS CONTEXT:$GIT_CONTEXT
+CURRENT WORK STATE ANALYSIS:$CURRENT_WORK_ANALYSIS
 
-TASK: Analyze the actual code changes and git activity to provide updates in this EXACT format:
+TASK: Analyze the uncommitted changes, work-in-progress, and planning gaps. Focus on:
+1. What work is currently in progress but not committed?
+2. Are there gaps between the plan and actual work being done? 
+3. What files/changes suggest work that isn't reflected in the plan?
+4. What should be committed or cleaned up?
+
+Provide updates in this EXACT format:
 
 ## PLAN UPDATES
 # Session 2 Plan: Complete Frontend Logging Migration
 [... rest of updated plan content with ✅ marks for completed items based on git activity ...]
 
 ## SESSION SUMMARY
-**Session Objectives:** [Brief description based on plan]
-**Key Accomplishments:** [Analyze git diff and commits to identify specific completions]  
-**Code Changes:** [Specific insights from diff summary - what types of changes were made]
-**Files Modified:** [List key files from git status with change significance]
-**Technical Progress:** [Analyze commit messages and diffs for technical insights]
-**Next Steps:** [Smart recommendations based on actual progress]
-**Activity Summary:** $WORK_COUNT git changes analyzed from actual diffs and commits
+**Work in Progress:** [What uncommitted changes show is being worked on]
+**Planning Gaps:** [Work being done that's not reflected in the plan]
+**Uncommitted Changes:** [Files that need to be committed or cleaned up]
+**Plan vs Reality:** [How actual work differs from the planned approach]
+**Immediate Actions:** [What should be committed, staged, or planned next]
+**Session Progress:** [Real assessment of what was accomplished vs planned]
 
 Focus on actionable updates based on the git activity detected."
 

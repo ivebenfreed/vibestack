@@ -21,11 +21,28 @@ if [ -n "$LAST_SESSION" ]; then
         TIME_DIFF=$((CURRENT_TIME - SESSION_TIME))
         
         if [ $TIME_DIFF -lt $REUSE_WINDOW ]; then
-            # Reuse existing session
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION REUSE - Directory: $LAST_SESSION" >> "$CLAUDE_PROJECT_DIR/sessions/session.log"
-            echo "$LAST_SESSION" > "$CLAUDE_PROJECT_DIR/sessions/current-session"
-            echo "Reusing existing session: $LAST_SESSION"
-            exit 0
+            # Check if there's been significant activity that warrants a new session
+            ACTIVITY_COUNT=0
+            if git rev-parse --git-dir > /dev/null 2>&1; then
+                # Count commits since last session
+                COMMIT_COUNT=$(git rev-list --count --since="@$SESSION_TIME" HEAD 2>/dev/null || echo 0)
+                # Count current modifications/staged files
+                MODIFIED_COUNT=$(git diff --name-only HEAD 2>/dev/null | wc -l || echo 0)
+                STAGED_COUNT=$(git diff --name-only --cached 2>/dev/null | wc -l || echo 0)
+                ACTIVITY_COUNT=$((COMMIT_COUNT + MODIFIED_COUNT + STAGED_COUNT))
+            fi
+            
+            # Create new session if significant activity (10+ changes) even within time window
+            if [ $ACTIVITY_COUNT -ge 10 ]; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION NEW - High activity ($ACTIVITY_COUNT changes) triggering new session" >> "$CLAUDE_PROJECT_DIR/sessions/session.log"
+                # Continue to create new session below
+            else
+                # Reuse existing session
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION REUSE - Directory: $LAST_SESSION" >> "$CLAUDE_PROJECT_DIR/sessions/session.log"
+                echo "$LAST_SESSION" > "$CLAUDE_PROJECT_DIR/sessions/current-session"
+                echo "Reusing existing session: $LAST_SESSION"
+                exit 0
+            fi
         fi
     fi
 fi
