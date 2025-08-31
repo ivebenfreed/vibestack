@@ -11,7 +11,7 @@ import {
   requireAdmin,
   requireOwner
 } from '../middleware/hybrid-rls-org-actor';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import type { 
   CreateOrganizationInput, 
   UpdateOrganizationInput,
@@ -40,7 +40,8 @@ organizationsRouter.post('/switch', async (c) => {
     }
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
 
     // Verify user is a member of the organization
     const membership = await db
@@ -108,7 +109,8 @@ organizationsRouter.post('/set-default', async (c) => {
     }
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
 
     // Verify user is a member of the organization
     const membership = await db
@@ -250,7 +252,8 @@ organizationsRouter.get('/', async (c) => {
     }
 
     // Get Kysely instance to fetch user's default organization info
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const userInfo = await db
       .selectFrom('user')
@@ -437,7 +440,8 @@ organizationsRouter.get('/:orgId/members',
     const search = c.req.query('search');
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const memberService = new OrganizationMemberService(db);
     const result = await memberService.listMembers({
@@ -480,7 +484,8 @@ organizationsRouter.post('/:orgId/members',
     }
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const memberService = new OrganizationMemberService(db);
     const result = await memberService.addMember(orgId, body.user_id, body.role, user.id);
@@ -521,7 +526,8 @@ organizationsRouter.put('/:orgId/members/:userId',
     };
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const memberService = new OrganizationMemberService(db);
     const result = await memberService.updateMember(orgId, userId, updates, user.id);
@@ -553,7 +559,8 @@ organizationsRouter.delete('/:orgId/members/:userId',
     const userId = c.req.param('userId');
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const memberService = new OrganizationMemberService(db);
     const result = await memberService.removeMember(orgId, userId, user.id);
@@ -597,7 +604,8 @@ organizationsRouter.post('/:orgId/invitations',
     };
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const invitationService = new OrganizationInvitationService(db, c.env);
     const result = await invitationService.createInvitation(data, user.id);
@@ -636,7 +644,8 @@ organizationsRouter.get('/:orgId/invitations',
     const role = c.req.query('role') as OrganizationRole;
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const invitationService = new OrganizationInvitationService(db, c.env);
     const result = await invitationService.listInvitations({
@@ -678,7 +687,8 @@ organizationsRouter.delete('/:orgId/invitations/:invitationId',
     const invitationId = c.req.param('invitationId');
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const invitationService = new OrganizationInvitationService(db, c.env);
     const result = await invitationService.cancelInvitation(invitationId, user.id);
@@ -708,7 +718,8 @@ organizationsRouter.post('/:orgId/invitations/:invitationId/resend',
     const invitationId = c.req.param('invitationId');
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const invitationService = new OrganizationInvitationService(db, c.env);
     const result = await invitationService.resendInvitation(invitationId, user.id);
@@ -747,7 +758,8 @@ organizationsRouter.post('/invitations/accept', async (c) => {
     }
 
     // Get Kysely instance
-        const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
     
     const invitationService = new OrganizationInvitationService(db, c.env);
     const result = await invitationService.acceptInvitation(body.token, user.id);

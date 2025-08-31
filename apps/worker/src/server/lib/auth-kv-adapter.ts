@@ -1,7 +1,7 @@
 import { SessionKVService, type SessionData } from '../services/session/SessionKVService';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
-import { getKysely } from './kysely';
+import { createDatabaseConnection, getKysely } from './database-manager';
 import { uuidv7 } from 'uuidv7';
 import type { Adapter } from 'better-auth';
 
@@ -42,7 +42,8 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely(this.env);
+    createDatabaseConnection(this.env);
+    const db = getKysely();
     
     switch (model) {
       case 'user':
@@ -96,7 +97,8 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely(this.env);
+    createDatabaseConnection(this.env);
+    const db = getKysely();
     
     switch (model) {
       case 'user':
@@ -167,7 +169,8 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely(this.env);
+    createDatabaseConnection(this.env);
+    const db = getKysely();
     
     let query: any;
     
@@ -212,7 +215,8 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely(this.env);
+    createDatabaseConnection(this.env);
+    const db = getKysely();
     
     switch (model) {
       case 'user':
@@ -269,7 +273,8 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely(this.env);
+    createDatabaseConnection(this.env);
+    const db = getKysely();
     
     switch (model) {
       case 'user':
@@ -330,7 +335,8 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // Get user from PostgreSQL
-    const db = getKysely(this.env);
+    createDatabaseConnection(this.env);
+    const db = getKysely();
     const user = await db
       .selectFrom('user')
       .selectAll()

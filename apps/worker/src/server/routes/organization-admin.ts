@@ -14,7 +14,7 @@ import {
   requireAdmin,
   requireOwner
 } from '../middleware/hybrid-rls-org-actor';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 const orgAdminRouter = new Hono<AppContext>();
 
@@ -35,7 +35,8 @@ orgAdminRouter.get('/:orgId/users',
     try {
       const security = c.get('security');
       const orgId = security.organizationId;
-      const db = getKysely(c.env);
+      createDatabaseConnection(c.env);
+      const db = getKysely();
 
       // Get organization members with user details
       const members = await db
@@ -98,7 +99,8 @@ orgAdminRouter.put('/:orgId/users/:userId/role',
         }, 400);
       }
 
-      const db = getKysely(c.env);
+      createDatabaseConnection(c.env);
+      const db = getKysely();
 
       // Additional security: Only owners can promote to admin/owner
       if (['admin', 'owner'].includes(role) && !security.isOwner()) {
@@ -195,7 +197,8 @@ orgAdminRouter.delete('/:orgId/users/:userId',
         }, 403);
       }
 
-      const db = getKysely(c.env);
+      createDatabaseConnection(c.env);
+      const db = getKysely();
 
       // Verify target user is a member of this organization
       const existingMember = await db
@@ -270,7 +273,8 @@ orgAdminRouter.get('/:orgId/activity',
       const limit = parseInt(c.req.query('limit') || '50');
       const offset = parseInt(c.req.query('offset') || '0');
 
-      const db = getKysely(c.env);
+      createDatabaseConnection(c.env);
+      const db = getKysely();
 
       // Get recent organization member changes
       // Note: This would require an audit log table in a real implementation

@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { dbLogger } from './logger';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 /**
  * Middleware to enforce trial expiration and subscription access
@@ -125,7 +125,8 @@ async function checkTrialStatus(c: Context, organizationId: string): Promise<{
   daysExpired?: number;
   daysRemaining?: number;
 }> {
-  const db = getKysely(c.env);
+  createDatabaseConnection(c.env);
+  const db = getKysely();
 
   // Get organization's trial status
   const organization = await db

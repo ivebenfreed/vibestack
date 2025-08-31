@@ -1116,8 +1116,9 @@ export class OrganizationActor implements DurableObject {
       }
 
       // Use kysely to fetch fresh role data
-      const { getKysely } = await import('../lib/kysely');
-      const kysely = getKysely(this.env);
+      const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+      createDatabaseConnection(this.env);
+      const kysely = getKysely();
       
       const members = await kysely
         .selectFrom('organization_members as m')

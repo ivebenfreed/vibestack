@@ -1,60 +1,82 @@
+/**
+ * @deprecated Use centralized database-manager instead
+ * 
+ * This file is deprecated. Use the new centralized database manager:
+ * import { createDatabaseConnection, pgClient, sql } from './database-manager';
+ * 
+ * The new pattern prevents connection leaks and provides unified access.
+ */
+
 import postgres from 'postgres';
 import type { Env } from '../types/env';
 import type { AppContext, MinimalContext } from '../types/hono';
+import { createDatabaseConnection, getPostgresClient, executeSQL } from './database-manager';
 
 export interface QueryResultRow {
   [column: string]: any;
 }
 
-// Initialize database client using postgres.js (consistent with Kysely setup)
+/**
+ * @deprecated Use getPostgresClient() from database-manager instead
+ * 
+ * Legacy function - creates new connections which can leak.
+ * New pattern: 
+ * import { createDatabaseConnection, pgClient } from './database-manager';
+ * createDatabaseConnection(env); // Once per Worker
+ * const client = pgClient(); // Reuse connection
+ */
 export const getDBClient = (c: AppContext | MinimalContext | { env: Env }) => {
+  console.warn('⚠️ getDBClient() is deprecated. Use createDatabaseConnection() and pgClient() from database-manager');
+  
+  const env = 'env' in c && typeof c.env === 'object' && c.env !== null 
+    ? c.env as Env
+    : undefined;
+    
+  if (!env) {
+    throw new Error('Environment variables not available');
+  }
+  
+  // For backward compatibility, create connection if not exists and return client
   try {
-    const env = 'env' in c && typeof c.env === 'object' && c.env !== null 
-      ? c.env as Env
-      : undefined;
-      
-    if (!env) {
-      throw new Error('Environment variables not available');
-    }
-    
-    // Get connection string - prioritize Hyperdrive, fallback to DATABASE_URL  
-    const connectionString = env.HYPERDRIVE_DB?.connectionString || env.DATABASE_URL;
-    
-    if (!connectionString) {
-      throw new Error('No database connection available. Please provide either HYPERDRIVE_DB or DATABASE_URL');
-    }
-    
-    const source = env.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct';
-    console.log(`🚀 Creating postgres.js client (${source})...`);
-    
-    // Create postgres.js client with Workers-optimized settings
-    const sql = postgres(connectionString, {
-      fetch_types: false,    // Reduce latency
-      prepare: false,        // Let Hyperdrive handle optimization
-      connect_timeout: 10,   // Connection timeout
-    });
-    
-    return sql;
+    return getPostgresClient();
   } catch (error) {
-    console.error('Error creating database client:', error);
-    throw error;
+    // Connection not initialized, initialize it
+    createDatabaseConnection(env);
+    return getPostgresClient();
   }
 };
 
-// Direct query execution using postgres.js
+/**
+ * @deprecated Use executeSQL() from database-manager instead
+ * 
+ * Legacy function - creates new connections which can leak.
+ * New pattern: 
+ * import { createDatabaseConnection, sql } from './database-manager';
+ * createDatabaseConnection(env); // Once per Worker
+ * const result = await sql(query, params); // Reuse connection
+ */
 export async function sql<T extends QueryResultRow = QueryResultRow>(
   c: AppContext | MinimalContext,
   query: string,
   params: any[] = []
 ): Promise<T[]> {
-  const client = getDBClient(c);
+  console.warn('⚠️ sql(c, query, params) is deprecated. Use createDatabaseConnection() and sql(query, params) from database-manager');
+  
+  const env = 'env' in c && typeof c.env === 'object' && c.env !== null 
+    ? c.env as Env
+    : undefined;
+    
+  if (!env) {
+    throw new Error('Environment variables not available');
+  }
+  
+  // For backward compatibility, try to use centralized connection
   try {
-    // postgres.js automatically handles connection management
-    const result = await client.unsafe(query, params);
-    return result as T[];
+    return await executeSQL<T>(query, params);
   } catch (error) {
-    console.error('SQL query error:', error);
-    throw error;
+    // Connection not initialized, initialize it
+    createDatabaseConnection(env);
+    return await executeSQL<T>(query, params);
   }
 }
 

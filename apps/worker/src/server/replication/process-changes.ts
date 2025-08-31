@@ -15,7 +15,7 @@ import { DynamicTableDiscovery } from './dynamic-table-discovery';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
 import type { Database } from '@repo/dataforge/kysely-types';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'process-changes';
@@ -513,7 +513,8 @@ function convertSnakeToCamelCase(obj: Record<string, unknown>): Record<string, u
 function createKyselyDb(context: MinimalContext): Kysely<Database> {
   // Use our centralized Kysely configuration which handles
   // postgres.js for local dev and Hyperdrive for production
-    return getKysely(context.env);
+    createDatabaseConnection(context.env);
+    return getKysely();
 }
 
 export async function storeChangesInHistory(

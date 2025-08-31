@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import crypto from 'crypto';
 import { uuidv7 } from 'uuidv7';
 
@@ -96,7 +96,8 @@ app.post('/polar/webhooks', async (c) => {
     }, 'polar-webhooks');
 
     // Get database connection
-    const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
 
     // Find organization by Polar customer ID
     let organization;

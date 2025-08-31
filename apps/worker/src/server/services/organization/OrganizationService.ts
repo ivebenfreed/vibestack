@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import type { Kysely } from 'kysely';
 import { dbLogger } from '../../middleware/logger';
-import { getKysely } from '../../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../../lib/database-manager';
 import type { 
   Organization, 
   CreateOrganizationInput, 
@@ -19,8 +19,9 @@ export class OrganizationService {
   private db: Kysely<any>;
 
   constructor(context: Context) {
-    // Get Kysely instance from the auth configuration
-        this.db = getKysely(context.env);
+    // Initialize centralized database connection
+    createDatabaseConnection(context.env);
+    this.db = getKysely();
   }
 
   /**

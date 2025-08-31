@@ -1,7 +1,7 @@
 import { SessionKVService, type SessionData } from '../services/session/SessionKVService';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
-import { getKysely } from './kysely';
+import { createDatabaseConnection, getKysely } from './database-manager';
 import { uuidv7 } from 'uuidv7';
 
 /**

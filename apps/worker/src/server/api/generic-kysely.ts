@@ -9,7 +9,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ApiEnv } from '../types/api';
 import { createErrorResponse, ServiceErrorType } from '../types/api';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import { KyselyGenericApiAdapter } from './generic/KyselyGenericApiAdapter';
 import { kyselyEntityConfigs, isValidEntity } from './generic/kysely-entity-config';
 
@@ -43,7 +43,8 @@ genericKysely.all('/:entity/*', async (c) => {
   }
   
   // Create query service and adapter for this request
-  const kyselyService = getKysely(c.env);
+  createDatabaseConnection(c.env);
+  const kyselyService = getKysely();
   const adapter = new KyselyGenericApiAdapter(
     config.tableName,
     kyselyService,

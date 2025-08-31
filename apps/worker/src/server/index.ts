@@ -124,8 +124,9 @@ apiApp.get('/db/postgres-test', async (c) => {
 // Test INSERT/UPDATE/DELETE with affected rows
 apiApp.post('/db/test-mutations', async (c) => {
   try {
-    const { getKysely } = await import('./lib/kysely');
-    const kysely = getKysely(c.env);
+    const { createDatabaseConnection, getKysely } = await import('./lib/database-manager');
+    createDatabaseConnection(c.env);
+    const kysely = getKysely();
     
     // Test INSERT - create a test entry
     console.log('Testing INSERT with affected rows...');
@@ -201,8 +202,9 @@ apiApp.post('/db/test-mutations', async (c) => {
 // Test transactions with isolation levels
 apiApp.post('/db/test-transactions', async (c) => {
   try {
-    const { getKysely } = await import('./lib/kysely');
-    const kysely = getKysely(c.env);
+    const { createDatabaseConnection, getKysely } = await import('./lib/database-manager');
+    createDatabaseConnection(c.env);
+    const kysely = getKysely();
     
     const isolationLevel = c.req.query('isolation') || 'READ COMMITTED';
     console.log(`Testing transaction with isolation level: ${isolationLevel}...`);
@@ -257,8 +259,9 @@ apiApp.post('/db/test-transactions', async (c) => {
 // Test streaming queries
 apiApp.get('/db/test-streaming', async (c) => {
   try {
-    const { getKysely } = await import('./lib/kysely');
-    const kysely = getKysely(c.env);
+    const { createDatabaseConnection, getKysely } = await import('./lib/database-manager');
+    createDatabaseConnection(c.env);
+    const kysely = getKysely();
     
     const chunkSize = parseInt(c.req.query('chunkSize') || '2');
     console.log(`Testing streaming query with chunk size: ${chunkSize}...`);
@@ -333,8 +336,9 @@ apiApp.get('/db/test-streaming', async (c) => {
 // Test connection handling and performance
 apiApp.get('/db/test-connections', async (c) => {
   try {
-    const { getKysely } = await import('./lib/kysely');
-    const kysely = getKysely(c.env);
+    const { createDatabaseConnection, getKysely } = await import('./lib/database-manager');
+    createDatabaseConnection(c.env);
+    const kysely = getKysely();
     
     const concurrent = parseInt(c.req.query('concurrent') || '3');
     console.log(`Testing ${concurrent} concurrent connections...`);
@@ -445,7 +449,7 @@ apiApp.get('/db/health', async (c) => {
 apiApp.get('/db/kysely-test', async (c) => {
   try {
     console.log('Starting Kysely test...');
-    const { getKysely } = await import('./lib/kysely');
+    const { createDatabaseConnection, getKysely } = await import('./lib/database-manager');
     
     const url = c.env.DATABASE_URL;
     if (!url) {
@@ -456,7 +460,8 @@ apiApp.get('/db/kysely-test', async (c) => {
     }
     
     console.log('Getting Kysely instance...');
-    const kysely = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const kysely = getKysely();
     console.log('Kysely instance created, running simple query...');
     
     // Test with simplest possible query

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import { dbLogger } from '../middleware/logger';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -14,7 +14,8 @@ app.post('/debug/check-billing-state', async (c) => {
       return c.json({ error: 'customerEmail or customerId required' }, 400);
     }
 
-    const db = getKysely(c.env);
+    createDatabaseConnection(c.env);
+    const db = getKysely();
 
     // Check for organization with this billing info
     let orgQuery = db.selectFrom('organizations').selectAll();

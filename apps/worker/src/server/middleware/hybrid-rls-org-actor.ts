@@ -16,7 +16,7 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
 import { syncLogger } from './logger';
 import { createOrgActorCache, type OrganizationActorCacheService, type RoleInfo } from '../lib/organization-actor-cache';
-import { db } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import { sql } from 'kysely';
 
 const MODULE_NAME = 'HybridRLSOrgActor';
@@ -71,7 +71,8 @@ async function setPostgreSQLContext(
   env: any
 ): Promise<void> {
   try {
-    const database = db(env);
+    createDatabaseConnection(env);
+    const database = getKysely();
     
     // Set simplified RLS context (no role needed)
     // Use sql template with proper parameterized query
@@ -108,7 +109,8 @@ async function getUserRole(
     async () => {
       // Fallback: Fetch role from PostgreSQL
       try {
-        const database = db(env);
+        createDatabaseConnection(env);
+    const database = getKysely();
         
         const member = await database
           .selectFrom('organization_members')

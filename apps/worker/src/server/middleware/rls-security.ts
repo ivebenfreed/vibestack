@@ -4,7 +4,7 @@
  */
 
 import { Context, Next } from 'hono';
-import { getKysely } from '../lib/kysely';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import { dbLogger } from './logger';
 import { sql } from 'kysely';
 
@@ -82,7 +82,8 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
   }
 
   // Check user's membership in this organization
-  const db = getKysely(c.env);
+  createDatabaseConnection(c.env);
+  const db = getKysely();
   const membership = await db
     .selectFrom('organization_members')
     .select(['role'])
@@ -112,7 +113,8 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
  * Set RLS context in database session
  */
 async function setRLSContext(c: Context, context: RLSContext): Promise<void> {
-  const db = getKysely(c.env);
+  createDatabaseConnection(c.env);
+  const db = getKysely();
   
   try {
     // Set RLS context variables
@@ -147,7 +149,8 @@ async function setRLSContext(c: Context, context: RLSContext): Promise<void> {
  * Clear RLS context after request
  */
 async function clearRLSContext(c: Context): Promise<void> {
-  const db = getKysely(c.env);
+  createDatabaseConnection(c.env);
+  const db = getKysely();
   
   try {
     await db.executeQuery(
@@ -355,7 +358,8 @@ export async function setManualRLSContext(
  * Validate RLS is working correctly
  */
 export async function validateRLSSecurity(c: Context): Promise<boolean> {
-  const db = getKysely(c.env);
+  createDatabaseConnection(c.env);
+  const db = getKysely();
   
   try {
     // Test that RLS is enforcing isolation

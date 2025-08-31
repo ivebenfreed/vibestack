@@ -152,8 +152,9 @@ export class DataForgeService {
    */
   async initialize(env: any): Promise<void> {
     // Initialize entity manager
-    const { getKysely } = await import('../lib/kysely');
-    const kysely = getKysely(env);
+    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    createDatabaseConnection(env);
+    const kysely = getKysely();
     
     this.entityManager = new ArchetypeEntityManager({
       kysely,

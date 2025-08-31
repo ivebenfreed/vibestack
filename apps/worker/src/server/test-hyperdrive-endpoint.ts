@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from './types/hono';
-import { db } from './lib/kysely';
+import { createDatabaseConnection, getKysely } from './lib/database-manager';
 
 const app = new Hono<AppContext>();
 
@@ -19,7 +19,8 @@ app.get('/test-hyperdrive', async (c) => {
     } : 'undefined');
     console.log('🔍 DATABASE_URL:', c.env.DATABASE_URL ? 'defined' : 'undefined');
     
-    const database = db(c.env);
+    createDatabaseConnection(c.env);
+    const database = getKysely();
     
     // Test basic query
     const userCount = await database

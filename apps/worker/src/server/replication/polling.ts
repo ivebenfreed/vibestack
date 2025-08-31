@@ -1,7 +1,7 @@
 import type { Env } from '../types/env';
 import type { ReplicationConfig } from './types';
 import { replicationLogger } from '../middleware/logger';
-import { getDBClient, sql } from '../lib/db';
+import { createDatabaseConnection, getPostgresClient, cleanupDatabaseConnection } from '../lib/database-manager';
 import type { MinimalContext } from '../types/hono';
 import type { TableChange } from '@repo/sync-types';
 import { StateManager } from './state-manager';
@@ -47,8 +47,11 @@ export class PollingManager {
         this.pollingInterval = null;
       }
       
+      // Initialize centralized database connection for this Worker
+      createDatabaseConnection(this.env);
+      
       this.pollCounter = 0;
-      replicationLogger.debug('Starting polling process', {}, MODULE_NAME);
+      replicationLogger.debug('Starting polling process with centralized DB connection', {}, MODULE_NAME);
       
       this.startContinuousPolling();
       this.hasCompletedFirstPoll = true; // Set flag after polling actually starts
@@ -79,8 +82,11 @@ export class PollingManager {
         this.pollingInterval = null;
       }
       
+      // Initialize centralized database connection for this Worker
+      createDatabaseConnection(this.env);
+      
       this.pollCounter = 0;
-      replicationLogger.debug('Starting polling process with first poll results', {}, MODULE_NAME);
+      replicationLogger.debug('Starting polling process with first poll results and centralized DB connection', {}, MODULE_NAME);
       
       // Perform the first poll immediately and capture results
       const firstPollResults = await this.performFirstPollAndGetResults();
@@ -179,7 +185,11 @@ export class PollingManager {
       this.pollingInterval = null;
       this.pollCounter = 0;
       this.hasCompletedFirstPoll = false;
-      replicationLogger.debug('Polling stopped', {}, MODULE_NAME);
+      
+      // Cleanup centralized database connection
+      cleanupDatabaseConnection();
+      
+      replicationLogger.debug('Polling stopped and database connection cleaned up', {}, MODULE_NAME);
     }
   }
 
@@ -530,15 +540,14 @@ export class PollingManager {
   }
 
   private async pollForChanges(): Promise<WALData[] | null> {
-    let client;
-    
     try {      
-      replicationLogger.debug('Polling for changes', {
+      replicationLogger.debug('Polling for changes using centralized DB connection', {
         slot: this.config.slot,
         batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
       }, MODULE_NAME);
       
-      client = getDBClient(this.c);
+      // Use centralized postgres.js client - no new connection creation
+      const client = getPostgresClient();
       
       const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
       
@@ -554,6 +563,9 @@ export class PollingManager {
         )
         LIMIT ${batchSize}
       `;
+      
+      // Using centralized connection - no manual cleanup needed
+      // Connection is shared across all database operations in this Worker
       
       const newChanges = result.map(row => ({
         data: row.data as string,
@@ -592,11 +604,11 @@ export class PollingManager {
           ...errorDetails,
           possibleCauses: [
             'DATABASE_URL misconfigured',
-            'Neon HTTP proxy not responding',
             'PostgreSQL database not running',
-            'Network connectivity issues'
+            'Network connectivity issues',
+            'Hyperdrive connection failure'
           ],
-          databaseUrl: 'env' in this.c && this.c.env ? (this.c.env as any).DATABASE_URL || 'undefined' : 'context missing env'
+          connectionType: 'Centralized database manager'
         }, MODULE_NAME);
         throw err;
       } else if (errorMsg.includes('does not exist')) {
@@ -606,20 +618,10 @@ export class PollingManager {
         }, MODULE_NAME);
         throw err;
       } else {
-        replicationLogger.error('Polling error', errorDetails, MODULE_NAME);
+        replicationLogger.error('Polling error with centralized connection', errorDetails, MODULE_NAME);
         throw err;
       }
-    } finally {
-      if (client) {
-        try {
-          await client.end();
-        } catch (closeError) {
-          replicationLogger.error('Error closing database connection after polling', {
-            error: closeError instanceof Error ? closeError.message : String(closeError),
-            slot: this.config.slot
-          }, MODULE_NAME);
-        }
-      }
     }
+    // No finally block needed - centralized connection management handles cleanup
   }
 } 

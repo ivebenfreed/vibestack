@@ -512,8 +512,9 @@ organizationActorRouter.post('/:orgId/refresh-cache', async (c) => {
   
   try {
     // Get fresh data from PostgreSQL
-    const { getKysely } = await import('../lib/kysely');
-    const kysely = getKysely(c.env);
+    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    createDatabaseConnection(c.env);
+    const kysely = getKysely();
     
     const organization = await kysely
       .selectFrom('organizations')
