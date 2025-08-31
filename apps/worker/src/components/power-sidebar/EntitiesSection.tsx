@@ -49,63 +49,44 @@ export const EntitiesSection = observer(function EntitiesSection({
     return icons[archetype] || Circle
   }
   
-  // Get all entities not already shown in worlds
-  const orphanEntities = () => {
+  // Get all entity types (not individual records)
+  const getEntityTypes = () => {
     if (!schema?.entities) return []
     
-    const entityGroups: Array<{
+    const entityTypes: Array<{
       name: string
       archetype: string
-      count: number
       icon: any
     }> = []
     
+    // Show all entity types from the schema
     Object.entries(schema.entities).forEach(([entityName, def]: [string, any]) => {
-      const entityObs = getEntity$(entityName)
-      if (!entityObs) return
-      
-      const allRecords = Object.values(entityObs.get())
-      
-      // Filter based on mode
-      const filteredRecords = allRecords.filter((record: any) => {
-        if (mode === 'personal') {
-          return record.universe_id || record.is_personal
-        } else if (mode === 'work') {
-          return !record.universe_id && !record.is_personal
-        }
-        return true // 'all' mode
+      entityTypes.push({
+        name: entityName,
+        archetype: def.archetype || 'record',
+        icon: getEntityIcon(def.archetype || 'record')
       })
-      
-      // Only show entities without world associations
-      const orphans = filteredRecords.filter((record: any) => 
-        !record.world_id && !record.parent_world_id
-      )
-      
-      if (orphans.length > 0) {
-        entityGroups.push({
-          name: entityName,
-          archetype: def.archetype,
-          count: orphans.length,
-          icon: getEntityIcon(def.archetype)
-        })
-      }
     })
     
-    return entityGroups.sort((a, b) => {
+    // Sort by archetype priority
+    return entityTypes.sort((a, b) => {
       const priority: Record<string, number> = {
         'project': 1,
         'task': 2,
         'document': 3,
         'record': 4,
-        'file': 5
+        'file': 5,
+        'discussion': 6,
+        'activity': 7,
+        'collection': 8
       }
       return (priority[a.archetype] || 99) - (priority[b.archetype] || 99)
     })
   }
   
-  const entities = orphanEntities()
+  const entityTypes = getEntityTypes()
   
-  if (entities.length === 0) return null
+  if (entityTypes.length === 0) return null
   
   if (isCollapsed) {
     return (
@@ -138,12 +119,12 @@ export const EntitiesSection = observer(function EntitiesSection({
           <Database className="h-4 w-4 mr-2" />
           <span className="flex-1 text-left font-medium">All Entities</span>
           <Badge variant="secondary" className="ml-auto">
-            {entities.reduce((sum, e) => sum + e.count, 0)}
+            {entityTypes.length}
           </Badge>
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="ml-2">
-        {entities.map(entity => {
+        {entityTypes.map(entity => {
           const Icon = entity.icon
           return (
             <Button
@@ -154,9 +135,6 @@ export const EntitiesSection = observer(function EntitiesSection({
             >
               <Icon className="h-3 w-3 mr-2" />
               <span className="flex-1 text-left text-sm">{entity.name}</span>
-              <Badge variant="outline" className="ml-1 px-1 py-0 text-xs">
-                {entity.count}
-              </Badge>
             </Button>
           )
         })}

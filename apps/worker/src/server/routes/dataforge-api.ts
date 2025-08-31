@@ -1051,7 +1051,7 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
     console.log(`[DataForge] User ${user?.email || 'unknown'} deleting entity ${entityName} in org ${security.organizationId} - access controlled by RLS`);
 
     // Use ArchetypeEntityManager for proper deletion
-    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -1348,7 +1348,7 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     console.log(`[Schema Cache] ❌ CACHE MISS - fetching from PostgreSQL`);
     
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -1366,7 +1366,7 @@ dataforgeRouter.get('/orgs/:orgId/schema',
       env: c.env
     });
 
-    const schema = await entityManager.getOrgSyncSchema(security.organizationId);
+    const schema = await entityManager.getSchema(security.organizationId);
     
     if (!schema) {
       return c.json({ error: `No schema found for org ${security.organizationId}` }, 404);
@@ -1430,7 +1430,7 @@ dataforgeRouter.post('/orgs/:orgId/validate/:entityName',
     const data = await c.req.json();
 
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -1543,7 +1543,7 @@ dataforgeRouter.get('/orgs/:orgId/schema-direct',
     console.log(`[Schema Direct] 🧪 TESTING - bypassing cache completely`);
     
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -1561,7 +1561,7 @@ dataforgeRouter.get('/orgs/:orgId/schema-direct',
       env: c.env
     });
 
-    const schema = await entityManager.getOrgSyncSchema(security.organizationId);
+    const schema = await entityManager.getSchema(security.organizationId);
     
     if (!schema) {
       return c.json({ error: `No schema found for org ${security.organizationId}` }, 404);
@@ -1766,7 +1766,7 @@ dataforgeRouter.post('/orgs/:orgId/data/:entityName/bulk',
 
     // Use ArchetypeEntityManager following the established pattern
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -1821,7 +1821,7 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/bulk',
 
     // Use ArchetypeEntityManager following the established pattern
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');

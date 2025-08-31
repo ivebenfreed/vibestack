@@ -402,57 +402,6 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       }
     },
 
-    // Real-time sync via WebSocket notifications
-    subscribe: ({ refresh }) => {
-      const handler = (e: CustomEvent) => {
-        const notification = e.detail
-        
-        // Only log notifications in development for debugging
-        if (import.meta.env.DEV && notification.test) {
-          log.info(`[Observable] ${entityName} received test notification:`, notification)
-        }
-        
-        // Check if notification is for this entity
-        // Handle both singular and plural table names (e.g., "task" vs "tasks")
-        // Also handle full org-prefixed table names from WAL notifications
-        const entityLower = entityName.toLowerCase()
-        const entityPlural = entityLower + 's'
-        
-        const isRelevantNotification = notification?.tables?.some((tableName: string) => {
-          const expectedTableName = entityName.toLowerCase() + 's'
-          return tableName === expectedTableName
-        })
-        
-        if (isRelevantNotification) {
-          if (import.meta.env.DEV) {
-            log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
-          }
-          refresh()
-        }
-      }
-      
-      // Listen for table change notifications
-      window.addEventListener('vibestack:table-change-notification', handler as any)
-      
-      log.info(`[Observable] Subscribed to WebSocket notifications for ${entityName}`)
-      
-      // TEST: Dispatch a test event to verify the listener works
-      setTimeout(() => {
-        log.info(`[Observable] Testing event listener for ${entityName}`)
-        window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
-          detail: { tables: ['tasks'], test: true }
-        }))
-      }, 1000)
-      
-      // Return cleanup function
-      return () => {
-        window.removeEventListener('vibestack:table-change-notification', handler as any)
-        if (import.meta.env.DEV) {
-          log.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
-        }
-      }
-    },
-
     // Retry configuration for network failures
     retry: {
       times: 3,
@@ -464,8 +413,9 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // Generate temporary IDs for optimistic updates
     generateId: () => `temp-${crypto.randomUUID()}`,
     
-    // Remove initial: [] to allow persistence to load first
-    // Legend State will load from IndexedDB, then sync changes
+    // Set initial to empty object to trigger the initial fetch
+    // syncedCrud needs this to know it should start loading data
+    initial: {},
     
     // Add waitFor to delay sync until persistence is ready
     ...(syncedCrudWithPersistence && persistenceManager ? {

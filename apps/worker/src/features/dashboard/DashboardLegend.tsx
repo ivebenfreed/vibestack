@@ -210,11 +210,33 @@ const EntityCardWithData = observer(function EntityCardWithData({
   // Access the entity store which triggers loading
   const entityStore = getEntity$(entityName)
   
-  // Get the data - this triggers the syncedCrud fetch
-  const data = use$(entityStore)
-  // Note: Loading state is handled internally by syncedCrud
-  const isLoading = false // Simplified for now
-  const hasLoaded = true // Simplified for now
+  // Debug logging
+  log.info(`EntityCardWithData for ${entityName}:`, {
+    entityStoreExists: !!entityStore,
+    entityStoreType: typeof entityStore,
+    hasGet: typeof entityStore?.get === 'function',
+    hasPeek: typeof entityStore?.peek === 'function'
+  })
+  
+  // Get the data - entityStore is already an observable wrapped by syncedCrud
+  // The issue is that syncedCrud might not trigger the initial fetch automatically
+  // We need to access it in a way that triggers the fetch
+  let data = null
+  let isLoading = true
+  let hasLoaded = false
+  
+  if (entityStore) {
+    // Use use$ to make the component reactive to the observable
+    // This should trigger the syncedCrud fetch
+    data = use$(entityStore)
+    
+    // Check loading state based on whether data exists
+    isLoading = data === undefined
+    hasLoaded = data !== undefined
+  } else {
+    isLoading = false
+    hasLoaded = false
+  }
   
   // syncedCrud returns an object with IDs as keys, not an array
   let count = 0
@@ -224,8 +246,9 @@ const EntityCardWithData = observer(function EntityCardWithData({
   }
   
   // Show loading state only if we haven't loaded data yet
-  // This prevents the "0 records" flash on reload
-  const displayCount = !hasLoaded && isLoading ? '...' : count.toString()
+  // If data is undefined (still loading), show ...
+  // If data is null (no entity store) or empty object, show 0
+  const displayCount = isLoading ? '...' : count.toString()
   
   // Handle entity deletion using new schema client API
   const handleDelete = async (entityName: string) => {

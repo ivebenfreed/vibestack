@@ -73,11 +73,8 @@ interface NavSection {
   items: NavItem[]
 }
 
-const staticNavigation: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
-  { id: 'apps', label: 'Apps', icon: Package, href: '/apps' },
-  { id: 'chats', label: 'Chats', icon: MessageSquare, href: '/chats', badge: '3' },
-]
+// Remove static navigation - PowerSidebar handles this now
+const staticNavigation: NavItem[] = []
 
 const businessNavigation: NavItem[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/projects' },
@@ -163,17 +160,19 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
             </div>
           )}
           
-          {/* Main Navigation */}
-          <div className="space-y-1 mb-6">
-            {mainNavigation.map((item) => (
-              <NavItem
-                key={item.id}
-                item={item}
-                isActive={isActive(item.href)}
-                isCollapsed={isCollapsed}
-              />
-            ))}
-          </div>
+          {/* Main Navigation - Only show if there are items */}
+          {mainNavigation.length > 0 && (
+            <div className="space-y-1 mb-6">
+              {mainNavigation.map((item) => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  isActive={isActive(item.href)}
+                  isCollapsed={isCollapsed}
+                />
+              ))}
+            </div>
+          )}
           
           {/* PowerSidebar - Dynamic Entity Navigation with Universe/Worlds */}
           <PowerSidebar isCollapsed={isCollapsed} />

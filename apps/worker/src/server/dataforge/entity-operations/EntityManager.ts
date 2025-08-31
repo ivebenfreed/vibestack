@@ -1346,6 +1346,9 @@ export class DataForgeEntityManager {
         .where('deleted', '!=', true)
         .execute();
 
+      console.log(`[DataForgeEntityManager] Found ${entities.length} entities from database`);
+      console.log(`[DataForgeEntityManager] Entity names:`, entities.map((e: any) => e.entity_name).sort());
+
       const schema = entities.map((entity: any) => ({
         entityName: entity.entity_name,
         archetype: entity.archetype,

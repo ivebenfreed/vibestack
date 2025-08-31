@@ -188,8 +188,15 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     const startTime = Date.now();
     const security = c.get('security');
     
-    // 1. First try OrganizationActor cache
-    if (c.env.ORGANIZATION_ACTOR) {
+    // Check if cache busting is requested
+    const bustCache = c.req.query('bustCache') === 'true';
+    console.log(`[Schema Cache] 🔍 bustCache parameter:`, bustCache);
+    if (bustCache) {
+      console.log(`[Schema Cache] 🚫 Cache busting requested - skipping cache lookup`);
+    }
+    
+    // 1. First try OrganizationActor cache (unless cache busting)
+    if (c.env.ORGANIZATION_ACTOR && !bustCache) {
       try {
         console.log(`[Schema Cache] 📡 Trying OrganizationActor cache first`);
         const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
