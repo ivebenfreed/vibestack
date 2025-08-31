@@ -105,3 +105,5 @@ worktrees/vibestack-env-*.tar.gz
 sessions/
 .claude/autonomous.log
 .claude/autonomous-output.log
+# PNPM store - never track package cache
+.pnpm-store/
