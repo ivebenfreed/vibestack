@@ -1,0 +1,100 @@
+name = "vibestack-worker"
+main = "worker.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+account_id = "c5f1240efb99747bc33b0fa1f70dcfb3"
+
+# Enable observability logging for all environments
+[observability.logs]
+enabled = true
+
+# Assets binding for serving the Vite-built SPA
+[assets]
+binding = "ASSETS"
+directory = "./dist/client"
+not_found_handling = "single-page-application"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
+BETTER_AUTH_URL = "http://localhost:5173"
+RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
+USE_KV_SESSIONS = true
+
+# Durable Objects configuration
+[[durable_objects.bindings]]
+name = "SYNC"
+class_name = "SyncDO"
+
+[[durable_objects.bindings]]
+name = "REPLICATION"
+class_name = "ReplicationDO"
+
+[[durable_objects.bindings]]
+name = "ORGANIZATION_ACTOR"
+class_name = "OrganizationActor"
+
+# Durable Objects migrations
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncDO", "ReplicationDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["OrganizationActor"]
+
+# Cron triggers
+[triggers]
+crons = ["0 0 * * *"]  # Run once daily at midnight UTC
+
+# Rate limiting configuration
+[[ratelimits]]
+name = "auth_rate_limit"
+simple = { limit = 5, period = 900 }
+
+[[ratelimits]]
+name = "api_rate_limit"
+simple = { limit = 100, period = 60 }
+
+[[ratelimits]]
+name = "signup_rate_limit"
+simple = { limit = 3, period = 3600 }
+
+# Hyperdrive configuration for PostgreSQL connection pooling
+[[hyperdrive]]
+binding = "HYPERDRIVE_DB"
+id = "placeholder-hyperdrive-id"
+localConnectionString = "postgresql://postgres:postgres@localhost:5432/vibestack_dev"
+
+# KV namespace configuration
+[[kv_namespaces]]
+binding = "CLIENT_REGISTRY"
+id = "a794cee3a313416993643848fc738281"
+preview_id = "a794cee3a313416993643848fc738281"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "b35f1142406543d79f9445f1af5c6abc"
+preview_id = "b35f1142406543d79f9445f1af5c6abc"
+
+# Staging environment
+[env.staging]
+name = "vibestack-worker-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+NODE_ENV = "staging"
+TYPEORM_LOGGING = true
+BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
+BETTER_AUTH_URL = "https://vibestack-staging.pages.dev"
+RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
+
+# Production environment
+[env.production]
+name = "vibestack-worker-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+NODE_ENV = "production"
+TYPEORM_LOGGING = false

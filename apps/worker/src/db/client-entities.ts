@@ -1,0 +1,370 @@
+/**
+ * Client Entities - Replacement for @repo/dataforge/client-entities
+ * 
+ * Basic entity definitions for client-side use
+ */
+
+// Entity type definitions (moved from dexie-schema for LiveStore compatibility)
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  project_id?: string;
+  assigned_to?: string;
+  due_date?: string;
+  priority?: 'low' | 'medium' | 'high';
+  status?: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  owner_id?: string;
+  start_date?: string;
+  end_date?: string;
+  budget?: number;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string;
+  role?: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  entity_type: string;
+  entity_id: string;
+  author_id: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntityDependency {
+  id: string;
+  dependent_entity_type: string;
+  dependent_entity_id: string;
+  dependency_entity_type: string;
+  dependency_entity_id: string;
+  organization_id: string;
+  created_at: string;
+}
+
+export interface LocalChanges {
+  id: string;
+  table_name: string;
+  entity_id: string;
+  operation: 'insert' | 'update' | 'delete';
+  changes: any;
+  organization_id: string;
+  created_at: string;
+  synced: boolean;
+  client_id: string;
+  user_id: string;
+}
+
+export interface StatusDefinition {
+  id: string;
+  name: string;
+  color: string;
+  entity_type: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TagSet {
+  id: string;
+  name: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StatusSet {
+  id: string;
+  name: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Entity type constants
+export const ENTITY_TYPES = {
+  TASK: 'task',
+  PROJECT: 'project',
+  USER: 'user',
+  COMMENT: 'comment',
+  ENTITY_DEPENDENCY: 'entity_dependency',
+  STATUS_DEFINITION: 'status_definition',
+  TAG: 'tag',
+  TAG_SET: 'tag_set',
+  STATUS_SET: 'status_set',
+} as const;
+
+// Entity table names
+export const TABLE_NAMES = {
+  TASKS: 'tasks',
+  PROJECTS: 'projects',
+  USERS: 'users',
+  COMMENTS: 'comments',
+  ENTITY_DEPENDENCIES: 'entity_dependencies',
+  LOCAL_CHANGES: 'local_changes',
+  STATUS_DEFINITIONS: 'status_definitions',
+  TAGS: 'tags',
+  TAG_SETS: 'tag_sets',
+  STATUS_SETS: 'status_sets',
+} as const;
+
+// Operation types for sync
+export const OPERATION_TYPES = {
+  INSERT: 'insert',
+  UPDATE: 'update', 
+  DELETE: 'delete',
+} as const;
+
+// Status types
+export const STATUS_TYPES = {
+  TODO: 'todo',
+  IN_PROGRESS: 'in_progress',
+  DONE: 'done',
+  BLOCKED: 'blocked',
+} as const;
+
+// Priority types
+export const PRIORITY_TYPES = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  URGENT: 'urgent',
+} as const;
+
+// Domain table lists for sync and storage operations
+export const CLIENT_DOMAIN_TABLES = [
+  'tasks',
+  'projects', 
+  'users',
+  'comments',
+  'entity_dependencies',
+  'status_definitions',
+  'tags',
+  'tag_sets',
+  'status_sets'
+] as const;
+
+// Organization-specific table patterns
+// e.g., org_01920000_1000_7000_8000_000000000001_client -> client
+const ORG_TABLE_PATTERNS = {
+  client: 'users',      // org_*_client maps to users
+  project: 'projects',  // org_*_project maps to projects
+  skill: 'tags',        // org_*_skill maps to tags
+  timesheet: 'tasks',   // org_*_timesheet maps to tasks
+  activity: 'tasks',    // org_*_activity maps to tasks
+  deal: 'projects',     // org_*_deal maps to projects
+  ticket: 'tasks'       // org_*_ticket maps to tasks
+} as const;
+
+/**
+ * Check if a table name is a CLIENT_DOMAIN_TABLE or organization-specific table
+ */
+export function isClientDomainTable(tableName: string): boolean {
+  // Check direct match first
+  if (CLIENT_DOMAIN_TABLES.includes(tableName as any)) {
+    return true;
+  }
+  
+  // Check organization table pattern: org_<orgId>_<entityType>
+  const orgTableMatch = tableName.match(/^org_[0-9a-f_]+_([a-z_]+)$/i);
+  if (orgTableMatch) {
+    const entityType = orgTableMatch[1];
+    return entityType in ORG_TABLE_PATTERNS;
+  }
+  
+  return false;
+}
+
+/**
+ * Get the base entity type for an organization table
+ * e.g., org_01920000_1000_7000_8000_000000000001_client -> users
+ */
+export function getBaseEntityType(tableName: string): string | null {
+  // Direct match
+  if (CLIENT_DOMAIN_TABLES.includes(tableName as any)) {
+    return tableName;
+  }
+  
+  // Organization table pattern
+  const orgTableMatch = tableName.match(/^org_[0-9a-f_]+_([a-z_]+)$/i);
+  if (orgTableMatch) {
+    const entityType = orgTableMatch[1];
+    return ORG_TABLE_PATTERNS[entityType as keyof typeof ORG_TABLE_PATTERNS] || null;
+  }
+  
+  return null;
+}
+
+export const ENTITY_TABLES = CLIENT_DOMAIN_TABLES;
+export const JUNCTION_TABLES: string[] = [];
+export const SYSTEM_TABLES = ['local_changes'] as const;
+
+// Table hierarchy for dependency resolution
+export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
+  users: 0,
+  status_definitions: 1,
+  tags: 1,
+  tag_sets: 1,
+  status_sets: 1,
+  projects: 2,
+  tasks: 3,
+  comments: 4,
+  entity_dependencies: 4
+} as const;
+
+// Junction table mapping (empty for now)
+export const CLIENT_JUNCTION_TABLE_MAPPING = {} as const;
+
+// Junction tables list (empty for now)
+export const CLIENT_JUNCTION_TABLES: string[] = [];
+
+// Additional type definitions for domain services
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+// Input types for domain operations
+export interface CreateTaskInput {
+  title: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assignee_id?: string;
+  project_id?: string;
+  due_date?: string;
+  organization_id?: string;
+}
+
+export interface UpdateTaskInput extends Partial<CreateTaskInput> {
+  id: string;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  description?: string;
+  status?: string;
+  owner_id?: string;
+  organization_id?: string;
+}
+
+export interface UpdateProjectInput extends Partial<CreateProjectInput> {
+  id: string;
+}
+
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  role?: string;
+  organization_id?: string;
+}
+
+export interface UpdateUserInput extends Partial<CreateUserInput> {
+  id: string;
+}
+
+// Additional type definitions for all domain services
+export enum ProjectStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive', 
+  COMPLETED = 'completed',
+  ARCHIVED = 'archived'
+}
+
+export interface CreateCommentInput {
+  content: string;
+  author_id: string;
+  entity_type: string;
+  entity_id: string;
+  organization_id?: string;
+}
+
+export interface UpdateCommentInput extends Partial<CreateCommentInput> {
+  id: string;
+}
+
+export interface CreateStatusDefinitionInput {
+  name: string;
+  color?: string;
+  entity_type: string;
+  sort_order?: number;
+  organization_id?: string;
+}
+
+export interface UpdateStatusDefinitionInput extends Partial<CreateStatusDefinitionInput> {
+  id: string;
+}
+
+export interface CreateTagInput {
+  name: string;
+  color?: string;
+  organization_id?: string;
+}
+
+export interface UpdateTagInput extends Partial<CreateTagInput> {
+  id: string;
+}
+
+export interface CreateTagSetInput {
+  name: string;
+  description?: string;
+  organization_id?: string;
+}
+
+export interface UpdateTagSetInput extends Partial<CreateTagSetInput> {
+  id: string;
+}
+
+export interface CreateStatusSetInput {
+  name: string;
+  description?: string;
+  organization_id?: string;
+}
+
+export interface UpdateStatusSetInput extends Partial<CreateStatusSetInput> {
+  id: string;
+}
+
+// Relationship context types for domain services
+export interface StatusDefinitionRelationshipContext {
+  entityType?: string;
+}
+
+export interface TagRelationshipContext {
+  tagSetId?: string;
+}

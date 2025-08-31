@@ -1,0 +1,55 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.env
+.dev.vars
+
+# Cloudflare/Wrangler
+.wrangler/
+wrangler.toml.bak
+
+# Playwright
+.playwright-mcp/
+test-results/
+playwright-report/
+
+# Test files and artifacts
+cookies.txt
+*.wav
+*.opus
+test-*.js
+testing.*
+
+# Development artifacts
+fix-require-calls.cjs
+public/audio-processor.js
+public/pwa-*.png
+
+# Documentation (project-specific)
+AI_CHAT_COMPARISON.md
+ARTIFACT_PERSISTENCE.md
+ARTIFACT_TESTING_SUMMARY.md
+CLOUDFLARE_VOICE_AI_TECHNICAL_REFERENCE.md
+artifact-test-examples.md
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,867 @@
+/**
+ * DexieIntegrityValidator - Dexie-based validation logic
+ * 
+ * Replaces the PGLite-based IntegrityValidator with Dexie implementation.
+ * This class handles:
+ * - Baseline validation with timestamp thresholds
+ * - Full validation workflows
+ * - Server-based validation requests
+ * - Local validation fallbacks
+ * - Empty database detection
+ * - Dexie-based fingerprint generation
+ */
+
+import { db, CLIENT_DOMAIN_TABLES, DEXIE_TO_DB_TABLE_MAP } from '../../db/dexie-schema';
+import type { IMessageSender } from '../interfaces';
+import type { Table } from 'dexie';
+import { 
+  IntegrityDecisionEngine, 
+  integrityDecisionEngine 
+} from './IntegrityDecisionEngine';
+import { syncLogger } from '../utils/SyncLogger';
+import { isDatabaseEmpty, getDatabaseStats } from '../../db/dexie-storage';
+import { syncLog } from '@/logger';
+const log = syncLog('sync/integrity/DexieIntegrityValidator.ts');
+
+// Re-export types that validator needs
+export interface TableFingerprint {
+  recordCount: number;
+  lastUpdated: number;
+  recordIdHash: string;
+  recentDataHash: string;
+}
+
+export interface IntegrityValidationRequest {
+  clientId: string;
+  fingerprints: Record<string, TableFingerprint>;
+  baselineTimestamp?: number;
+  sinceTimestamp?: number;
+  recordCount?: {
+    totalChanges: number;
+    tableBreakdown: Record<string, number>;
+  };
+}
+
+export interface IntegrityValidationResult {
+  isValid: boolean;
+  issues: any[];
+  recommendedAction: 'none' | 'retry' | 'reset' | 'catchup';
+  validationType?: string;
+  resetReason?: string;
+  serverResponse?: any;
+  rollbackToLSN?: string;
+  rollbackReason?: string;
+}
+
+export interface IntegrityValidationConfig {
+  clientId: string;
+  enableServerValidation: boolean;
+  validationTimeoutMs: number;
+  autoResetOnFailure: boolean;
+}
+
+export interface IntegrityValidationCallbacks {
+  onValidationStarted?: (reason: string) => void;
+  onValidationCompleted?: (result: IntegrityValidationResult) => void;
+  onValidationError?: (error: Error, reason?: string) => void;
+}
+
+export class DexieIntegrityValidator {
+  private config: IntegrityValidationConfig;
+  private callbacks: IntegrityValidationCallbacks = {};
+  private messageSender: IMessageSender | null = null;
+  
+  // Machine reference for event-driven communication
+  private machineRef: any = null;
+  
+  // Validation state
+  private pendingValidations = new Map<string, {
+    resolve: (result: IntegrityValidationResult) => void;
+    reject: (error: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+
+  constructor(config: IntegrityValidationConfig) {
+    this.config = config;
+    
+    log.info('[DexieIntegrityValidator] Initialized with config:', config);
+    
+    // Load persisted baseline
+    const baseline = this.loadBaseline();
+    log.info('[DexieIntegrityValidator] Loaded baseline:', baseline);
+  }
+
+  /**
+   * Load integrity baseline from localStorage
+   */
+  private loadBaseline(): any {
+    try {
+      const stored = localStorage.getItem('integrity-baseline');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      log.warn('[DexieIntegrityValidator] Failed to load baseline:', error);
+      localStorage.removeItem('integrity-baseline');
+    }
+    return null;
+  }
+
+  /**
+   * Save integrity baseline to localStorage
+   */
+  private saveBaseline(baseline: any): void {
+    try {
+      localStorage.setItem('integrity-baseline', JSON.stringify(baseline));
+      log.info('[DexieIntegrityValidator] 💾 Baseline saved:', baseline);
+    } catch (error) {
+      log.warn('[DexieIntegrityValidator] Failed to save baseline:', error);
+    }
+  }
+
+  /**
+   * Establish baseline without validation (used after initial sync)
+   */
+  async establishBaseline(reason: string): Promise<void> {
+    try {
+      log.info(`[DexieIntegrityValidator] Establishing baseline: ${reason}`);
+      
+      // Create baseline with current timestamp
+      const newBaseline = {
+        lastInitialSyncCompletedAt: new Date().toISOString(),
+        lastValidationTime: Date.now(),
+        isEstablished: true,
+        maxRecordsBeforeReset: 100000, // Default threshold
+        reason: reason
+      };
+      
+      this.saveBaseline(newBaseline);
+      log.info('[DexieIntegrityValidator] ✅ Baseline established without validation');
+      
+    } catch (error) {
+      log.error('[DexieIntegrityValidator] Failed to establish baseline:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set callbacks for validation events
+   */
+  setCallbacks(callbacks: IntegrityValidationCallbacks): void {
+    this.callbacks = callbacks;
+  }
+
+  /**
+   * Set message sender for server communication
+   */
+  setMessageSender(sender: IMessageSender): void {
+    this.messageSender = sender;
+    log.info('[DexieIntegrityValidator] Message sender configured');
+  }
+
+  /**
+   * Set machine reference for event-driven communication
+   */
+  setMachineRef(machineRef: any): void {
+    this.machineRef = machineRef;
+    log.info('[DexieIntegrityValidator] Machine reference set for event-driven communication');
+  }
+
+  /**
+   * Main validation method - uses structured decision matrix approach
+   */
+  async validateIntegrity(reason: string = 'routine check'): Promise<IntegrityValidationResult> {
+    try {
+      syncLogger.info('validation', `Starting Dexie integrity validation with decision engine: ${reason}`);
+      
+      this.callbacks.onValidationStarted?.(reason);
+
+      // Build validation context from current state
+      const context = await this.buildValidationContext(reason);
+      
+      // Process decision pipeline
+      const decision = await integrityDecisionEngine.processValidationDecision(context);
+      
+      // Log decision result
+      syncLogger.info('validation', 'Decision pipeline completed', {
+        finalAction: decision.finalAction,
+        strategy: decision.strategy,
+        reason: decision.reason,
+        pipelineSteps: decision.pipeline.length
+      });
+
+      // Execute the decided action
+      const result = await this.executeDecision(decision);
+      
+      // Update callback with result
+      this.callbacks.onValidationCompleted?.(result);
+      
+      return result;
+
+    } catch (error) {
+      syncLogger.error('validation', 'Validation error in decision-driven flow', error);
+      this.callbacks.onValidationError?.(error as Error, reason);
+      throw error;
+    }
+  }
+
+  /**
+   * Build validation context from current state
+   */
+  private async buildValidationContext(reason: string) {
+    // Gather current state information
+    const emptyDatabaseCheck = await this.checkForEmptyDatabase();
+    const baseline = this.loadBaseline();
+    const hasValidBaseline = baseline?.lastInitialSyncCompletedAt !== null && baseline?.lastInitialSyncCompletedAt !== undefined;
+    
+    // Count changes since baseline if we have one
+    let changesSinceBaseline = 0;
+    let changeBreakdown: Record<string, number> = {};
+    
+    if (hasValidBaseline && baseline?.lastInitialSyncCompletedAt) {
+      const recordCount = await this.countRecordsSinceBaseline(baseline.lastInitialSyncCompletedAt);
+      changesSinceBaseline = recordCount.totalChanges;
+      changeBreakdown = recordCount.tableBreakdown;
+    }
+
+    // Build context using decision engine utility
+    return await IntegrityDecisionEngine.buildValidationContext({
+      reason,
+      clientId: this.config.clientId,
+      totalRecords: emptyDatabaseCheck.totalRecords,
+      isEmpty: emptyDatabaseCheck.isEmpty,
+      hasBaseline: hasValidBaseline,
+      baselineTimestamp: baseline?.lastInitialSyncCompletedAt || null,
+      changesSinceBaseline,
+      changeBreakdown,
+      hasIntegrityService: true,
+      hasServerValidation: this.config.enableServerValidation && !!this.messageSender,
+      hasMessageSender: !!this.messageSender,
+      config: {
+        enableServerValidation: this.config.enableServerValidation,
+        autoResetOnFailure: this.config.autoResetOnFailure,
+        validationTimeoutMs: this.config.validationTimeoutMs
+      },
+      thresholds: {
+        maxRecordsBeforeReset: baseline?.maxRecordsBeforeReset || 10000,
+        quickValidationLimit: 100,
+        baselineValidationLimit: 1000,
+        maxDaysWithoutBaseline: 7,
+        staleBaselineWarningDays: 30,
+        maxValidationTimeMs: this.config.validationTimeoutMs,
+        maxFingerprintSizeMB: 10
+      }
+    });
+  }
+
+  /**
+   * Execute the action determined by the decision pipeline
+   */
+  private async executeDecision(decision: any): Promise<IntegrityValidationResult> {
+    switch (decision.finalAction) {
+      case 'SKIP':
+        return this.createSkipResult(decision);
+        
+      case 'VALIDATION':
+        return await this.executeValidationStrategy(decision);
+        
+      case 'RESET':
+        return this.createResetResult(decision);
+        
+      case 'ERROR':
+        return this.createErrorResult(decision);
+        
+      case 'RETRY':
+        // For now, treat retry as a local validation
+        return await this.performLocalValidation();
+        
+      default:
+        syncLogger.warn('validation', `Unknown decision action: ${decision.finalAction}`);
+        return await this.performLocalValidation();
+    }
+  }
+
+  /**
+   * Execute validation based on strategy
+   */
+  private async executeValidationStrategy(decision: any): Promise<IntegrityValidationResult> {
+    const strategy = decision.strategy;
+    const context = decision.context;
+    
+    switch (strategy) {
+      case 'full_validation':
+        syncLogger.info('validation', 'Executing full validation strategy');
+        return await this.performFullValidation(decision.reason);
+        
+      case 'baseline_validation':
+        syncLogger.info('validation', 'Executing baseline validation strategy');
+        if (context.hasServerValidation && context.baselineTimestamp) {
+          const recordCount = { 
+            totalChanges: context.changesSinceBaseline, 
+            tableBreakdown: context.changeBreakdown 
+          };
+          return await this.requestBaselineServerValidation(context.baselineTimestamp, recordCount);
+        } else {
+          return await this.performLocalValidation();
+        }
+        
+      case 'quick_validation':
+        syncLogger.info('validation', 'Executing quick validation strategy');
+        return await this.performLocalValidation();
+        
+      case 'server_validation':
+        syncLogger.info('validation', 'Executing server validation strategy');
+        if (context.baselineTimestamp) {
+          const recordCount = { 
+            totalChanges: context.changesSinceBaseline, 
+            tableBreakdown: context.changeBreakdown 
+          };
+          return await this.requestBaselineServerValidation(context.baselineTimestamp, recordCount);
+        } else {
+          return await this.performFullValidation(decision.reason);
+        }
+        
+      case 'local_validation':
+        syncLogger.info('validation', 'Executing local validation strategy');
+        return await this.performLocalValidation();
+        
+      default:
+        syncLogger.warn('validation', `Unknown validation strategy: ${strategy}, falling back to local validation`);
+        return await this.performLocalValidation();
+    }
+  }
+
+  /**
+   * Create result for skip action
+   */
+  private createSkipResult(decision: any): IntegrityValidationResult {
+    return {
+      isValid: true,
+      issues: [],
+      recommendedAction: 'none',
+      validationType: 'skipped_by_decision_matrix',
+      resetReason: decision.reason
+    };
+  }
+
+  /**
+   * Create result for reset action
+   */
+  private createResetResult(decision: any): IntegrityValidationResult {
+    return {
+      isValid: false,
+      issues: [{ type: 'reset_required', reason: decision.reason }],
+      recommendedAction: 'reset',
+      validationType: 'decision_matrix_reset',
+      resetReason: decision.reason
+    };
+  }
+
+  /**
+   * Create result for error action
+   */
+  private createErrorResult(decision: any): IntegrityValidationResult {
+    return {
+      isValid: false,
+      issues: [{ type: 'validation_error', reason: decision.reason }],
+      recommendedAction: 'retry',
+      validationType: 'decision_matrix_error',
+      resetReason: `Validation error: ${decision.reason}`
+    };
+  }
+
+  /**
+   * Check for empty database conditions using Dexie
+   */
+  private async checkForEmptyDatabase(): Promise<{ isEmpty: boolean; reason: string; totalRecords: number }> {
+    try {
+      const isEmpty = await isDatabaseEmpty();
+      const stats = await getDatabaseStats();
+      const totalRecords = stats.total || 0;
+
+      log.info(`[DexieIntegrityValidator] Empty database check:`, {
+        isEmpty,
+        totalRecords,
+        stats
+      });
+
+      if (isEmpty) {
+        return {
+          isEmpty: true,
+          reason: 'No records in any domain tables',
+          totalRecords: 0
+        };
+      }
+
+      return {
+        isEmpty: false,
+        reason: 'Database has records',
+        totalRecords
+      };
+
+    } catch (error) {
+      log.error('[DexieIntegrityValidator] Error checking for empty database:', error);
+      // If we can't check, assume not empty to be safe
+      return {
+        isEmpty: false,
+        reason: 'Error checking database state',
+        totalRecords: -1
+      };
+    }
+  }
+
+  /**
+   * Count records changed since baseline timestamp using Dexie
+   */
+  private async countRecordsSinceBaseline(baselineTimestamp: string): Promise<{
+    totalChanges: number;
+    tableBreakdown: Record<string, number>;
+  }> {
+    try {
+      const sinceDate = new Date(baselineTimestamp);
+      let totalChanges = 0;
+      const tableBreakdown: Record<string, number> = {};
+
+      log.info(`[DexieIntegrityValidator] Counting records changed since: ${sinceDate.toISOString()}`);
+
+      for (const dexieTableName of CLIENT_DOMAIN_TABLES) {
+        const table = db[dexieTableName] as Table;
+        if (!table) continue;
+
+        // Count records updated after the baseline timestamp
+        const count = await table
+          .where('updatedAt')
+          .above(sinceDate)
+          .count();
+
+        const dbTableName = DEXIE_TO_DB_TABLE_MAP[dexieTableName] || dexieTableName;
+        tableBreakdown[dbTableName] = count;
+        totalChanges += count;
+      }
+
+      log.info(`[DexieIntegrityValidator] Record count since baseline:`, {
+        baselineDate: sinceDate.toISOString(),
+        totalChanges,
+        tableBreakdown
+      });
+
+      return { totalChanges, tableBreakdown };
+
+    } catch (error) {
+      log.error('[DexieIntegrityValidator] Error counting records since baseline:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Request baseline server validation
+   */
+  private async requestBaselineServerValidation(
+    baselineTimestamp: string,
+    recordCount: { totalChanges: number; tableBreakdown: Record<string, number> }
+  ): Promise<IntegrityValidationResult> {
+    
+    return new Promise(async (resolve, reject) => {
+      try {
+        log.info('[DexieIntegrityValidator] Requesting baseline server validation...');
+        
+        // Generate fingerprints for modified data since baseline
+        const fingerprints = await this.generateFingerprintsSinceTimestamp(baselineTimestamp);
+        
+        const validationId = crypto.randomUUID();
+        const timeout = setTimeout(() => {
+          this.pendingValidations.delete(validationId);
+          log.warn('[DexieIntegrityValidator] Baseline validation timeout');
+          reject(new Error('Baseline validation timeout'));
+        }, this.config.validationTimeoutMs);
+
+        // Store pending validation
+        this.pendingValidations.set(validationId, { resolve, reject, timeout });
+
+        const validationRequest: IntegrityValidationRequest = {
+          clientId: this.config.clientId,
+          fingerprints,
+          baselineTimestamp: new Date(baselineTimestamp).getTime(),
+          sinceTimestamp: new Date(baselineTimestamp).getTime(),
+          recordCount
+        };
+
+        // Send baseline validation request
+        log.info('[DexieIntegrityValidator] 🔍 DEBUG: About to send validation request', {
+          hasMessageSender: !!this.messageSender,
+          messageSenderType: this.messageSender?.constructor?.name,
+          validationId,
+          requestSize: JSON.stringify(validationRequest).length
+        });
+
+        this.messageSender!.send({
+          type: 'clt_integrity_baseline_validation',
+          validationId,
+          ...validationRequest
+        });
+
+        log.info('[DexieIntegrityValidator] ✅ Baseline validation request sent successfully');
+
+      } catch (error) {
+        log.error('[DexieIntegrityValidator] Error requesting baseline server validation:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Generate fingerprints for data since a timestamp using Dexie
+   */
+  private async generateFingerprintsSinceTimestamp(sinceTimestamp: string): Promise<Record<string, TableFingerprint>> {
+    const fingerprints: Record<string, TableFingerprint> = {};
+    const sinceDate = new Date(sinceTimestamp);
+    
+    log.info(`[DexieIntegrityValidator] Generating fingerprints for data since: ${sinceDate.toISOString()}`);
+
+    for (const dexieTableName of CLIENT_DOMAIN_TABLES) {
+      try {
+        const dbTableName = DEXIE_TO_DB_TABLE_MAP[dexieTableName] || dexieTableName;
+        fingerprints[dbTableName] = await this.generateModifiedTableFingerprint(
+          dexieTableName, 
+          sinceDate
+        );
+      } catch (error) {
+        log.error(`[DexieIntegrityValidator] Error generating fingerprint for ${dexieTableName}:`, error);
+        // Continue with other tables
+      }
+    }
+
+    log.info(`[DexieIntegrityValidator] Generated ${Object.keys(fingerprints).length} fingerprints since baseline`);
+    return fingerprints;
+  }
+
+  /**
+   * Generate fingerprint for modified records in a table since a date using Dexie
+   */
+  private async generateModifiedTableFingerprint(
+    dexieTableName: string, 
+    sinceDate: Date
+  ): Promise<TableFingerprint> {
+    const table = db[dexieTableName] as Table;
+    if (!table) {
+      throw new Error(`No table found: ${dexieTableName}`);
+    }
+    
+    // Get modified records since the date
+    const modifiedRecords = await table
+      .where('updatedAt')
+      .above(sinceDate)
+      .toArray();
+
+    const recordCount = modifiedRecords.length;
+    
+    if (recordCount === 0) {
+      return {
+        recordCount: 0,
+        lastUpdated: Date.now(),
+        recordIdHash: '',
+        recentDataHash: ''
+      };
+    }
+
+    // Sort records by updatedAt for consistent ordering
+    modifiedRecords.sort((a, b) => {
+      const aTime = a.updatedAt?.getTime() || 0;
+      const bTime = b.updatedAt?.getTime() || 0;
+      return aTime - bTime;
+    });
+
+    // Generate hashes
+    const recordIds = modifiedRecords.map(record => record.id).sort();
+    const recordIdHash = await this.generateHash(recordIds.join(','));
+    
+    // Hash of most recent 10 records
+    const recentRecords = modifiedRecords.slice(-10);
+    const recentDataStr = recentRecords.map(record => 
+      JSON.stringify(record, Object.keys(record).sort())
+    ).join('|');
+    const recentDataHash = await this.generateHash(recentDataStr);
+    
+    const lastUpdated = modifiedRecords[modifiedRecords.length - 1]?.updatedAt?.getTime() || Date.now();
+
+    return {
+      recordCount,
+      lastUpdated,
+      recordIdHash,
+      recentDataHash
+    };
+  }
+
+  /**
+   * Perform full validation (when no baseline available)
+   */
+  private async performFullValidation(reason: string): Promise<IntegrityValidationResult> {
+    log.info(`[DexieIntegrityValidator] Performing full validation: ${reason}`);
+
+    if (this.config.enableServerValidation && this.messageSender) {
+      return await this.requestServerValidation();
+    } else {
+      log.info('[DexieIntegrityValidator] Server validation disabled, performing local validation');
+      return await this.performLocalValidation();
+    }
+  }
+
+  /**
+   * Request full server validation
+   */
+  private async requestServerValidation(): Promise<IntegrityValidationResult> {
+    
+    return new Promise(async (resolve, reject) => {
+      try {
+        log.info('[DexieIntegrityValidator] Requesting full server validation...');
+        
+        const fingerprints = await this.generateLocalFingerprints();
+        
+        const validationId = crypto.randomUUID();
+        const timeout = setTimeout(() => {
+          this.pendingValidations.delete(validationId);
+          log.warn('[DexieIntegrityValidator] Full validation timeout');
+          reject(new Error('Full validation timeout'));
+        }, this.config.validationTimeoutMs);
+
+        this.pendingValidations.set(validationId, { resolve, reject, timeout });
+
+        const validationRequest: IntegrityValidationRequest = {
+          clientId: this.config.clientId,
+          fingerprints
+        };
+
+        this.messageSender!.send({
+          type: 'clt_integrity_validation',
+          validationId,
+          ...validationRequest
+        });
+
+        log.info('[DexieIntegrityValidator] Full validation request sent');
+
+      } catch (error) {
+        log.error('[DexieIntegrityValidator] Error requesting server validation:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Perform local validation as fallback
+   */
+  private async performLocalValidation(): Promise<IntegrityValidationResult> {
+    try {
+      log.info('[DexieIntegrityValidator] Performing local integrity validation...');
+
+      // Basic local validation - check for obvious inconsistencies
+      const fingerprints = await this.generateLocalFingerprints();
+      const issues: any[] = [];
+
+      // Check if any tables are completely empty (might indicate issues)
+      for (const [tableName, fingerprint] of Object.entries(fingerprints)) {
+        if (fingerprint.recordCount === 0) {
+          log.warn(`[DexieIntegrityValidator] Warning: Table ${tableName} is empty`);
+          // This might be valid, so don't treat as error
+        }
+      }
+
+      log.info('[DexieIntegrityValidator] Local validation completed:', {
+        tablesChecked: Object.keys(fingerprints).length,
+        issuesFound: issues.length
+      });
+
+      // If validation successful, establish baseline
+      if (issues.length === 0) {
+        const newBaseline = {
+          lastInitialSyncCompletedAt: new Date().toISOString(),
+          lastValidationTime: Date.now(),
+          isEstablished: true,
+          maxRecordsBeforeReset: 100000, // Default threshold
+          reason: 'successful_local_validation'
+        };
+        
+        this.saveBaseline(newBaseline);
+        log.info('[DexieIntegrityValidator] ✅ Baseline established after successful validation');
+      }
+
+      return {
+        isValid: issues.length === 0,
+        issues,
+        recommendedAction: issues.length === 0 ? 'none' : 'retry',
+        validationType: 'local_validation'
+      };
+
+    } catch (error) {
+      log.error('[DexieIntegrityValidator] Local validation error:', error);
+      return {
+        isValid: false,
+        issues: [{ type: 'local_validation_error', message: error instanceof Error ? error.message : 'Unknown error' }],
+        recommendedAction: 'retry',
+        validationType: 'local_validation_error'
+      };
+    }
+  }
+
+  /**
+   * Generate local fingerprints for all tables using Dexie
+   */
+  async generateLocalFingerprints(): Promise<Record<string, TableFingerprint>> {
+    const fingerprints: Record<string, TableFingerprint> = {};
+
+    log.info('[DexieIntegrityValidator] Generating local fingerprints for all tables...');
+
+    for (const dexieTableName of CLIENT_DOMAIN_TABLES) {
+      try {
+        const dbTableName = DEXIE_TO_DB_TABLE_MAP[dexieTableName] || dexieTableName;
+        fingerprints[dbTableName] = await this.generateTableFingerprint(dexieTableName);
+      } catch (error) {
+        log.error(`[DexieIntegrityValidator] Error generating fingerprint for ${dexieTableName}:`, error);
+        // Continue with other tables
+      }
+    }
+
+    log.info(`[DexieIntegrityValidator] Generated ${Object.keys(fingerprints).length} local fingerprints`);
+    return fingerprints;
+  }
+
+  /**
+   * Generate fingerprint for a complete table using Dexie
+   */
+  private async generateTableFingerprint(dexieTableName: string): Promise<TableFingerprint> {
+    const table = db[dexieTableName] as Table;
+    if (!table) {
+      throw new Error(`No table found: ${dexieTableName}`);
+    }
+    
+    // Get all records
+    const allRecords = await table.toArray();
+
+    const recordCount = allRecords.length;
+    
+    if (recordCount === 0) {
+      return {
+        recordCount: 0,
+        lastUpdated: Date.now(),
+        recordIdHash: '',
+        recentDataHash: ''
+      };
+    }
+
+    // Sort records by updatedAt for consistent ordering
+    allRecords.sort((a, b) => {
+      const aTime = a.updatedAt?.getTime() || 0;
+      const bTime = b.updatedAt?.getTime() || 0;
+      return aTime - bTime;
+    });
+
+    // Generate hashes
+    const recordIds = allRecords.map(record => record.id).sort();
+    const recordIdHash = await this.generateHash(recordIds.join(','));
+    
+    // Hash of most recent 10 records
+    const recentRecords = allRecords.slice(-10);
+    const recentDataStr = recentRecords.map(record => 
+      JSON.stringify(record, Object.keys(record).sort())
+    ).join('|');
+    const recentDataHash = await this.generateHash(recentDataStr);
+    
+    const lastUpdated = allRecords[allRecords.length - 1]?.updatedAt?.getTime() || Date.now();
+
+    return {
+      recordCount,
+      lastUpdated,
+      recordIdHash,
+      recentDataHash
+    };
+  }
+
+  /**
+   * Handle validation response from server
+   */
+  async handleValidationResponse(message: any): Promise<IntegrityValidationResult> {
+    log.info('[DexieIntegrityValidator] Received validation response from server:', message);
+    
+    const result: IntegrityValidationResult = {
+      isValid: message.isValid,
+      issues: message.issues || [],
+      recommendedAction: this.mapRecommendedAction(message.recommendedAction),
+      serverResponse: message,
+      rollbackToLSN: message.rollbackToLSN,
+      rollbackReason: message.rollbackReason
+    };
+    
+    // Log validation result analysis including rollback info
+    log.info('[DexieIntegrityValidator] 🔍 Validation result analysis:', {
+      isValid: result.isValid,
+      issueCount: result.issues.length,
+      recommendedAction: result.recommendedAction,
+      rollbackToLSN: result.rollbackToLSN,
+      rollbackReason: result.rollbackReason
+    });
+
+    // If catchup is recommended with rollback LSN, notify about the rollback strategy
+    if (result.recommendedAction === 'catchup' && result.rollbackToLSN) {
+      log.info(`[DexieIntegrityValidator] 🔄 Server recommends catchup with rollback to LSN ${result.rollbackToLSN}: ${result.rollbackReason}`);
+    }
+    
+    // Resolve any pending validation promises
+    for (const [key, pending] of this.pendingValidations) {
+      log.info(`[DexieIntegrityValidator] Resolving pending validation: ${key}`);
+      clearTimeout(pending.timeout);
+      this.pendingValidations.delete(key);
+      pending.resolve(result);
+    }
+    
+    // Trigger callback
+    this.callbacks.onValidationCompleted?.(result);
+    
+    // Send event to machine if available with rollback info
+    this.sendEventToMachine({ 
+      type: 'INTEGRITY_VALIDATION_COMPLETED', 
+      result,
+      rollbackToLSN: result.rollbackToLSN,
+      rollbackReason: result.rollbackReason
+    });
+    
+    log.info('[DexieIntegrityValidator] Validation response processed');
+    return result;
+  }
+
+  /**
+   * Generate hash for data
+   */
+  private async generateHash(data: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(data);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * Map server recommended action to our action type
+   */
+  private mapRecommendedAction(serverAction: any): 'none' | 'retry' | 'reset' | 'catchup' {
+    if (!serverAction) return 'none';
+    
+    const action = String(serverAction).toLowerCase();
+    if (action.includes('reset')) return 'reset';
+    if (action.includes('retry')) return 'retry';
+    if (action.includes('catchup')) return 'catchup';
+    return 'none';
+  }
+
+  /**
+   * Send event to state machine
+   */
+  private sendEventToMachine(event: any): void {
+    if (this.machineRef) {
+      try {
+        this.machineRef.send(event);
+        log.info('[DexieIntegrityValidator] Event sent to machine:', event.type);
+      } catch (error) {
+        log.warn('[DexieIntegrityValidator] Failed to send event to machine:', error);
+      }
+    }
+  }
+}
