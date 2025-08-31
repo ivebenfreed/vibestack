@@ -7,7 +7,22 @@
 set -e
 
 FOCUS_TYPE=${1:-"help"}
-ENV_LOCAL="apps/web/.env.local"
+
+# Auto-detect which app to use based on current directory
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
+if [[ $PWD == *"/apps/worker"* ]] || [[ $PWD == */apps/worker ]]; then
+    ENV_LOCAL="$REPO_ROOT/apps/worker/.env.local"
+    APP_NAME="unified worker"
+elif [[ $PWD == *"/apps/web"* ]] || [[ $PWD == */apps/web ]]; then
+    ENV_LOCAL="$REPO_ROOT/apps/web/.env.local"
+    APP_NAME="web app"
+else
+    # Default to web for backwards compatibility when run from root
+    ENV_LOCAL="$REPO_ROOT/apps/web/.env.local"
+    APP_NAME="web app (default)"
+fi
 
 show_help() {
     echo "🎯 Set logging focus for development"
@@ -168,6 +183,6 @@ EOF
         ;;
 esac
 
-echo "✅ Logging focus updated in $ENV_LOCAL"
+echo "✅ Logging focus updated in $ENV_LOCAL ($APP_NAME)"
 echo "💡 Restart your dev server to apply changes"
 echo "🌐 Or use browser console: logControl.focus('$FOCUS_TYPE')"

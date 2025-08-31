@@ -21,46 +21,31 @@ async function checkDockerRunning() {
 
 async function checkServicesRunning() {
   try {
-    const result = execSync('docker compose ps --format json', { 
-      cwd: path.join(__dirname, '..'),
+    // Check if main postgres container is running
+    const result = execSync('docker ps --filter "name=vibestack-main-postgres" --format "{{.Status}}"', { 
       encoding: 'utf8',
       stdio: 'pipe'
     });
     
-    if (!result.trim()) {
-      return false;
-    }
-    
-    const services = result.trim().split('\n').map(line => JSON.parse(line));
-    const requiredServices = ['vibestack-postgres', 'vibestack-neon-proxy'];
-    
-    const runningServices = services.filter(service => 
-      service.State === 'running' && requiredServices.includes(service.Name)
-    );
-    
-    return runningServices.length === requiredServices.length;
+    return result.trim().startsWith('Up');
   } catch (error) {
     return false;
   }
 }
 
 async function startServices() {
-  console.log('🐳 Starting Docker services (PostgreSQL + Neon proxy)...');
+  console.log('🐳 Starting PostgreSQL using main-postgres setup...');
   
   try {
-    execSync('docker compose up -d', {
+    execSync('./main-postgres/start.sh', {
       cwd: path.join(__dirname, '..'),
       stdio: 'inherit'
     });
     
-    console.log('✅ Docker services started successfully');
-    
-    // Wait a moment for services to be fully ready
-    console.log('⏳ Waiting for services to be ready...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log('✅ PostgreSQL started successfully');
     
   } catch (error) {
-    console.error('❌ Failed to start Docker services:', error.message);
+    console.error('❌ Failed to start PostgreSQL:', error.message);
     process.exit(1);
   }
 }
