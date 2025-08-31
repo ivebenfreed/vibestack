@@ -7,7 +7,6 @@ import SyncStatusIcon from '../../features/sync/components/SyncStatusIcon'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { useLocation } from '@tanstack/react-router'
-import { GLOBAL_SIDEBAR_WIDTH } from './global-sidebar'
 import { Button } from '@/components/ui/button'
 import { RotateCcw } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -130,7 +129,7 @@ export const Header = ({
       className={cn(
         'bg-background flex items-center gap-3 p-4 sm:gap-4',
         fixed && 'header-fixed peer/header fixed top-0 right-0 z-50',
-        fixed && 'left-0 md:left-[var(--global-sidebar-width)]',
+        fixed && 'left-0',
         offset > 10 && fixed ? 'shadow-sm' : 'shadow-none',
         className
       )}
