@@ -1,10 +1,149 @@
 --
--- PostgreSQL database dump
--- Test modification for pre-commit hook testing
+-- PostgreSQL database cluster dump
 --
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
--- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg120+1)
+\restrict 6efyrsxJGe8zshsJ8qH8h0yMDuaEcuQKq6phSiFU9Dse7u27seU14l1E2UwQirV
+
+SET default_transaction_read_only = off;
+
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+
+--
+-- Roles
+--
+
+CREATE ROLE postgres;
+ALTER ROLE postgres WITH SUPERUSER INHERIT CREATEROLE CREATEDB LOGIN REPLICATION BYPASSRLS PASSWORD 'SCRAM-SHA-256$4096:hDJFpxU+RwYeYVYdZseesA==$pugO/TbJ1u+m9gJWaccalM32BSJ2RSoALu5P6vi920o=:PdSRguQY2lfdmUNggJtDgR4KOPABNU5qwjmOjQwoKmQ=';
+CREATE ROLE rls_test_user;
+ALTER ROLE rls_test_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION NOBYPASSRLS PASSWORD 'SCRAM-SHA-256$4096:tueG4GI1G0SneGrZC4hpJA==$Q5sMDwyrEwxKwhKBioFYfR8Y9aqXed49wTwZ1iYZHdc=:JWT2AWNewOtZVyPLtptGJI8xqIUGfnieMm1tub8AQs0=';
+CREATE ROLE test_user;
+ALTER ROLE test_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION NOBYPASSRLS PASSWORD 'SCRAM-SHA-256$4096:ZV+dENjmNVuPaWWqsFtxVQ==$S0COFRLdQlbsZVT+iCSv66dvrFxjMPgwIINNLIxaBXI=:GBBBjLxQZQePFTikOuN4qmz09lhxI0AzLV4k1Kr2yR0=';
+CREATE ROLE vibestack_app;
+ALTER ROLE vibestack_app WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION NOBYPASSRLS;
+CREATE ROLE vibestack_app_user;
+ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION NOBYPASSRLS PASSWORD 'SCRAM-SHA-256$4096:QPkei0PoACmdjke8oax4LQ==$xfrXIQNKVrupVwF6ulXFDq8ogWu21unMZFigalQRFJk=:3wwg/gGgWZqZlhjxTp+C72rQgXlVZqOH3qPzvRsmxs4=';
+
+--
+-- User Configurations
+--
+
+
+
+
+
+
+
+
+\unrestrict 6efyrsxJGe8zshsJ8qH8h0yMDuaEcuQKq6phSiFU9Dse7u27seU14l1E2UwQirV
+
+--
+-- Databases
+--
+
+--
+-- Database "template1" dump
+--
+
+\connect template1
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict pBqzLquwZrooEjP8e6f6k1lT4bNdhf0Sc7FLhupOrbouIQVtuPm17lklMZLVEe5
+
+-- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict pBqzLquwZrooEjP8e6f6k1lT4bNdhf0Sc7FLhupOrbouIQVtuPm17lklMZLVEe5
+
+--
+-- Database "postgres" dump
+--
+
+\connect postgres
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict a6SDSg2Q2cXER5RiFK7BjB6Mu1UgouvgbeEm9aumDoffeGNBvMNiIIeUDyHxrLp
+
+-- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict a6SDSg2Q2cXER5RiFK7BjB6Mu1UgouvgbeEm9aumDoffeGNBvMNiIIeUDyHxrLp
+
+--
+-- Database "vibestack_dev" dump
+--
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict gj5TkfK5hupm2Tg5xZ4DUrQRkaYbZC29yqOhfnWX3gFi5Tb8hzCDbMxmNufAIAk
+
+-- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: vibestack_dev; Type: DATABASE; Schema: -; Owner: postgres
+--
+
+CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'en_US.utf8';
+
+
+ALTER DATABASE vibestack_dev OWNER TO postgres;
+
+\unrestrict gj5TkfK5hupm2Tg5xZ4DUrQRkaYbZC29yqOhfnWX3gFi5Tb8hzCDbMxmNufAIAk
+\connect vibestack_dev
+\restrict gj5TkfK5hupm2Tg5xZ4DUrQRkaYbZC29yqOhfnWX3gFi5Tb8hzCDbMxmNufAIAk
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -40,6 +179,202 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
+
+--
+-- Name: add_soft_delete_fields(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.add_soft_delete_fields(table_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Add deleted boolean field (default false)
+    BEGIN
+        EXECUTE format('ALTER TABLE %I ADD COLUMN deleted BOOLEAN DEFAULT FALSE', table_name);
+        RAISE NOTICE 'Added deleted field to table: %', table_name;
+    EXCEPTION WHEN duplicate_column THEN
+        RAISE NOTICE 'Deleted field already exists in table: %', table_name;
+    END;
+    
+    -- Add deleted_at timestamp field (nullable)
+    BEGIN
+        EXECUTE format('ALTER TABLE %I ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE', table_name);
+        RAISE NOTICE 'Added deleted_at field to table: %', table_name;
+    EXCEPTION WHEN duplicate_column THEN
+        RAISE NOTICE 'Deleted_at field already exists in table: %', table_name;
+    END;
+    
+    -- Add index on deleted field for efficient queries
+    BEGIN
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (deleted)', 
+                      table_name || '_deleted_idx', 
+                      table_name);
+        RAISE NOTICE 'Added deleted index to table: %', table_name;
+    EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Could not create deleted index for table: % (may already exist)', table_name;
+    END;
+    
+    -- Add index on deleted_at field for efficient queries
+    BEGIN
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (deleted_at)', 
+                      table_name || '_deleted_at_idx', 
+                      table_name);
+        RAISE NOTICE 'Added deleted_at index to table: %', table_name;
+    EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Could not create deleted_at index for table: % (may already exist)', table_name;
+    END;
+END;
+$$;
+
+
+ALTER FUNCTION public.add_soft_delete_fields(table_name text) OWNER TO postgres;
+
+--
+-- Name: add_updated_at_trigger(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.add_updated_at_trigger(table_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    trigger_name TEXT;
+BEGIN
+    trigger_name := table_name || '_update_updated_at';
+    
+    -- Drop trigger if it exists
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', trigger_name, table_name);
+    
+    -- Create the trigger
+    EXECUTE format('
+        CREATE TRIGGER %I
+        BEFORE UPDATE ON %I
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column()',
+        trigger_name,
+        table_name
+    );
+    
+    RAISE NOTICE 'Added updated_at trigger to table: %', table_name;
+END;
+$$;
+
+
+ALTER FUNCTION public.add_updated_at_trigger(table_name text) OWNER TO postgres;
+
+--
+-- Name: apply_entity_table_rls(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.apply_entity_table_rls(table_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Enable RLS on the table
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', table_name);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', table_name);
+    
+    -- Read policy - users can read data in their org if they have read permissions
+    EXECUTE format('
+        CREATE POLICY %I_read_policy ON %I
+        FOR SELECT
+        USING (
+            user_can_read() AND 
+            organization_id = get_current_organization_id()
+        )',
+        table_name || '_read', table_name
+    );
+    
+    -- Write policy - users can insert data if they have write permissions
+    EXECUTE format('
+        CREATE POLICY %I_insert_policy ON %I  
+        FOR INSERT
+        WITH CHECK (
+            user_can_write() AND
+            organization_id = get_current_organization_id()
+        )',
+        table_name || '_insert', table_name
+    );
+    
+    -- Update policy - users can update data if they have write permissions
+    EXECUTE format('
+        CREATE POLICY %I_update_policy ON %I
+        FOR UPDATE
+        USING (
+            user_can_write() AND
+            organization_id = get_current_organization_id()
+        )
+        WITH CHECK (
+            user_can_write() AND
+            organization_id = get_current_organization_id()
+        )',
+        table_name || '_update', table_name
+    );
+    
+    -- Delete policy - only managers can delete data
+    EXECUTE format('
+        CREATE POLICY %I_delete_policy ON %I
+        FOR DELETE
+        USING (
+            user_can_manage() AND
+            organization_id = get_current_organization_id()
+        )',
+        table_name || '_delete', table_name
+    );
+    
+END;
+$$;
+
+
+ALTER FUNCTION public.apply_entity_table_rls(table_name text) OWNER TO postgres;
+
+--
+-- Name: FUNCTION apply_entity_table_rls(table_name text); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.apply_entity_table_rls(table_name text) IS 'Applies standard RLS policies to dynamically created entity tables';
+
+
+--
+-- Name: apply_simplified_business_table_rls(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.apply_simplified_business_table_rls() RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    table_record RECORD;
+    policy_count INTEGER := 0;
+BEGIN
+    -- Find all business tables (org_*_* pattern)
+    FOR table_record IN
+        SELECT schemaname, tablename 
+        FROM pg_tables 
+        WHERE tablename LIKE 'org_%_%'
+        AND schemaname = 'public'
+    LOOP
+        -- Drop existing complex policies
+        EXECUTE format('DROP POLICY IF EXISTS %I_admin_policy ON %I.%I', 
+            table_record.tablename, table_record.schemaname, table_record.tablename);
+        EXECUTE format('DROP POLICY IF EXISTS %I_user_policy ON %I.%I', 
+            table_record.tablename, table_record.schemaname, table_record.tablename);
+        EXECUTE format('DROP POLICY IF EXISTS %I_role_policy ON %I.%I', 
+            table_record.tablename, table_record.schemaname, table_record.tablename);
+        
+        -- Create simple organization-only policy
+        EXECUTE format('CREATE POLICY %I_org_policy ON %I.%I FOR ALL USING (organization_id = get_current_organization_id())', 
+            table_record.tablename, table_record.schemaname, table_record.tablename);
+        
+        policy_count := policy_count + 1;
+        
+        RAISE NOTICE 'Applied simplified RLS to table: %', table_record.tablename;
+    END LOOP;
+    
+    RETURN format('Applied simplified RLS policies to %s business tables', policy_count);
+END;
+$$;
+
+
+ALTER FUNCTION public.apply_simplified_business_table_rls() OWNER TO postgres;
 
 --
 -- Name: check_organization_limits(uuid, character varying); Type: FUNCTION; Schema: public; Owner: postgres
@@ -154,6 +489,39 @@ $$;
 
 
 ALTER FUNCTION public.check_organization_trial_status(org_id uuid) OWNER TO postgres;
+
+--
+-- Name: check_user_permission(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.check_user_permission(operation text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    CASE operation
+        WHEN 'read' THEN
+            RETURN user_can_read();
+        WHEN 'write', 'create', 'update' THEN  
+            RETURN user_can_write();
+        WHEN 'delete', 'manage' THEN
+            RETURN user_can_manage();
+        WHEN 'administer', 'admin' THEN
+            RETURN user_can_administer();
+        ELSE
+            RETURN FALSE;
+    END CASE;
+END;
+$$;
+
+
+ALTER FUNCTION public.check_user_permission(operation text) OWNER TO postgres;
+
+--
+-- Name: FUNCTION check_user_permission(operation text); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.check_user_permission(operation text) IS 'Checks if user has permission for specific operation';
+
 
 --
 -- Name: cleanup_old_change_history(integer); Type: FUNCTION; Schema: public; Owner: postgres
@@ -287,6 +655,37 @@ $$;
 ALTER FUNCTION public.enable_system_mode() OWNER TO postgres;
 
 --
+-- Name: ensure_org_id_indexes(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_org_id_indexes() RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    table_record RECORD;
+    index_count INTEGER := 0;
+BEGIN
+    FOR table_record IN
+        SELECT schemaname, tablename 
+        FROM pg_tables 
+        WHERE tablename LIKE 'org_%_%'
+        AND schemaname = 'public'
+    LOOP
+        -- Create organization_id index if it doesn't exist
+        EXECUTE format('CREATE INDEX IF NOT EXISTS idx_%I_organization_id ON %I.%I(organization_id)', 
+            table_record.tablename, table_record.schemaname, table_record.tablename);
+        
+        index_count := index_count + 1;
+    END LOOP;
+    
+    RETURN format('Ensured organization_id indexes on %s business tables', index_count);
+END;
+$$;
+
+
+ALTER FUNCTION public.ensure_org_id_indexes() OWNER TO postgres;
+
+--
 -- Name: generate_uuidv7(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -347,15 +746,20 @@ CREATE FUNCTION public.get_current_user_role() RETURNS text
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
-    RETURN current_setting('app.current_user_role', true);
-EXCEPTION 
-    WHEN OTHERS THEN
-        RETURN NULL;
+    -- Return NULL - roles now handled by Organization Actor
+    RETURN NULL;
 END;
 $$;
 
 
 ALTER FUNCTION public.get_current_user_role() OWNER TO postgres;
+
+--
+-- Name: FUNCTION get_current_user_role(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.get_current_user_role() IS 'DEPRECATED: Role checks moved to Organization Actor SQLite cache';
+
 
 --
 -- Name: get_organization_change_stats(uuid, integer); Type: FUNCTION; Schema: public; Owner: postgres
@@ -379,6 +783,35 @@ $$;
 
 
 ALTER FUNCTION public.get_organization_change_stats(org_id uuid, hours_back integer) OWNER TO postgres;
+
+--
+-- Name: get_organization_roles_for_cache(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_organization_roles_for_cache(p_organization_id uuid) RETURNS TABLE(user_id text, organization_id uuid, role text, permissions text[])
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        om.user_id,
+        om.organization_id,
+        om.role,
+        CASE om.role
+            WHEN 'owner' THEN ARRAY['admin', 'write', 'read', 'invite', 'manage_billing']
+            WHEN 'admin' THEN ARRAY['admin', 'write', 'read', 'invite']  
+            WHEN 'manager' THEN ARRAY['write', 'read', 'invite']
+            WHEN 'member' THEN ARRAY['read', 'write']
+            ELSE ARRAY['read']
+        END as permissions
+    FROM organization_members om
+    WHERE om.organization_id = p_organization_id
+    AND om.status = 'active';
+END;
+$$;
+
+
+ALTER FUNCTION public.get_organization_roles_for_cache(p_organization_id uuid) OWNER TO postgres;
 
 --
 -- Name: get_organization_usage(uuid, character varying, timestamp without time zone, timestamp without time zone); Type: FUNCTION; Schema: public; Owner: postgres
@@ -445,6 +878,194 @@ COMMENT ON FUNCTION public.get_secure_config(config_key character varying, maste
 
 
 --
+-- Name: get_user_effective_role(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_user_effective_role() RETURNS text
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    user_id TEXT;
+    org_id TEXT;
+    highest_role TEXT := 'none';
+    role_levels INTEGER := 0;
+BEGIN
+    -- Get current context
+    user_id := current_setting('app.current_user_id', true);
+    org_id := current_setting('app.current_organization_id', true);
+    
+    IF user_id IS NULL OR org_id IS NULL THEN
+        RETURN 'none';
+    END IF;
+    
+    -- Define role hierarchy levels (higher number = more permissions)
+    -- none: 0, viewer: 1, member: 2, contributor: 2, manager: 3, admin: 4, owner: 5
+    
+    -- Check system-level permissions first (highest priority)
+    SELECT 
+        CASE role
+            WHEN 'owner' THEN 5
+            WHEN 'admin' THEN 4  
+            WHEN 'manager' THEN 3
+            WHEN 'member' THEN 2
+            WHEN 'contributor' THEN 2
+            WHEN 'viewer' THEN 1
+            ELSE 0
+        END
+    INTO role_levels
+    FROM container_permission 
+    WHERE user_id = get_user_effective_role.user_id
+      AND permission_container_type = 'system'
+      AND permission_container_id = 'global'
+      AND status = 'active'
+      AND (expires_at IS NULL OR expires_at > NOW())
+    ORDER BY 
+        CASE role
+            WHEN 'owner' THEN 5
+            WHEN 'admin' THEN 4
+            WHEN 'manager' THEN 3  
+            WHEN 'member' THEN 2
+            WHEN 'contributor' THEN 2
+            WHEN 'viewer' THEN 1
+            ELSE 0
+        END DESC
+    LIMIT 1;
+    
+    -- If system role found, return it
+    IF role_levels > 0 THEN
+        SELECT role INTO highest_role
+        FROM container_permission 
+        WHERE user_id = get_user_effective_role.user_id
+          AND permission_container_type = 'system'
+          AND permission_container_id = 'global'
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY 
+            CASE role
+                WHEN 'owner' THEN 5
+                WHEN 'admin' THEN 4
+                WHEN 'manager' THEN 3
+                WHEN 'member' THEN 2
+                WHEN 'contributor' THEN 2
+                WHEN 'viewer' THEN 1
+                ELSE 0
+            END DESC
+        LIMIT 1;
+        
+        RETURN highest_role;
+    END IF;
+    
+    -- Check organization-level permissions
+    SELECT 
+        CASE role
+            WHEN 'owner' THEN 5
+            WHEN 'admin' THEN 4
+            WHEN 'manager' THEN 3
+            WHEN 'member' THEN 2
+            WHEN 'contributor' THEN 2
+            WHEN 'viewer' THEN 1
+            ELSE 0
+        END
+    INTO role_levels
+    FROM container_permission 
+    WHERE user_id = get_user_effective_role.user_id
+      AND permission_container_type = 'organization'
+      AND permission_container_id = org_id
+      AND status = 'active'
+      AND (expires_at IS NULL OR expires_at > NOW())
+    ORDER BY 
+        CASE role
+            WHEN 'owner' THEN 5
+            WHEN 'admin' THEN 4
+            WHEN 'manager' THEN 3
+            WHEN 'member' THEN 2
+            WHEN 'contributor' THEN 2
+            WHEN 'viewer' THEN 1
+            ELSE 0
+        END DESC
+    LIMIT 1;
+    
+    -- If org role found, return it
+    IF role_levels > 0 THEN
+        SELECT role INTO highest_role
+        FROM container_permission 
+        WHERE user_id = get_user_effective_role.user_id
+          AND permission_container_type = 'organization'
+          AND permission_container_id = org_id
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY 
+            CASE role
+                WHEN 'owner' THEN 5
+                WHEN 'admin' THEN 4
+                WHEN 'manager' THEN 3
+                WHEN 'member' THEN 2
+                WHEN 'contributor' THEN 2
+                WHEN 'viewer' THEN 1
+                ELSE 0
+            END DESC
+        LIMIT 1;
+        
+        RETURN highest_role;
+    END IF;
+    
+    -- Fall back to organization membership role
+    SELECT role INTO highest_role
+    FROM organization_members 
+    WHERE user_id = get_user_effective_role.user_id
+      AND organization_id = org_id;
+    
+    RETURN COALESCE(highest_role, 'none');
+END;
+$$;
+
+
+ALTER FUNCTION public.get_user_effective_role() OWNER TO postgres;
+
+--
+-- Name: FUNCTION get_user_effective_role(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.get_user_effective_role() IS 'Gets the highest role for the current user in the current organization context';
+
+
+--
+-- Name: get_user_permissions(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_user_permissions() RETURNS json
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    result JSON;
+BEGIN
+    SELECT json_build_object(
+        'user_id', get_current_user_id(),
+        'organization_id', get_current_organization_id(),
+        'effective_role', get_user_effective_role(),
+        'permissions', json_build_object(
+            'can_read', user_can_read(),
+            'can_write', user_can_write(), 
+            'can_manage', user_can_manage(),
+            'can_administer', user_can_administer()
+        )
+    ) INTO result;
+    
+    RETURN result;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_user_permissions() OWNER TO postgres;
+
+--
+-- Name: FUNCTION get_user_permissions(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.get_user_permissions() IS 'Returns JSON summary of user permissions in current context';
+
+
+--
 -- Name: is_organization_admin(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -452,12 +1073,20 @@ CREATE FUNCTION public.is_organization_admin() RETURNS boolean
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
-    RETURN get_current_user_role() IN ('owner', 'admin');
+    -- Return FALSE - admin checks now handled by Organization Actor
+    RETURN FALSE;
 END;
 $$;
 
 
 ALTER FUNCTION public.is_organization_admin() OWNER TO postgres;
+
+--
+-- Name: FUNCTION is_organization_admin(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.is_organization_admin() IS 'DEPRECATED: Admin checks moved to Organization Actor SQLite cache';
+
 
 --
 -- Name: list_secure_config_keys(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -544,6 +1173,29 @@ $$;
 ALTER FUNCTION public.set_current_organization_id(org_id uuid) OWNER TO postgres;
 
 --
+-- Name: set_default_organization_for_new_member(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_default_organization_for_new_member() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- When a user joins their first organization, set it as default
+    UPDATE "user" 
+    SET 
+        default_organization_id = COALESCE(default_organization_id, NEW.organization_id),
+        last_used_organization_id = NEW.organization_id,
+        last_org_access_at = NOW()
+    WHERE id = NEW.user_id;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.set_default_organization_for_new_member() OWNER TO postgres;
+
+--
 -- Name: set_rls_context(uuid, text, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -603,6 +1255,87 @@ COMMENT ON FUNCTION public.set_secure_config(config_key character varying, confi
 
 
 --
+-- Name: set_simplified_rls_context(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_simplified_rls_context(p_organization_id uuid, p_user_id text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    -- Set only the organization context (for PostgreSQL RLS)
+    PERFORM set_config('app.current_organization_id', p_organization_id::text, true);
+    PERFORM set_config('app.current_user_id', p_user_id, true);
+    
+    -- Clear role from PostgreSQL context (handled by Organization Actor)
+    PERFORM set_config('app.current_user_role', NULL, true);
+    
+    RETURN TRUE;
+END;
+$$;
+
+
+ALTER FUNCTION public.set_simplified_rls_context(p_organization_id uuid, p_user_id text) OWNER TO postgres;
+
+--
+-- Name: set_user_default_organization(text, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_user_default_organization(p_user_id text, p_organization_id text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Verify user is a member of the organization
+    IF NOT EXISTS (
+        SELECT 1 FROM organization_members 
+        WHERE user_id = p_user_id 
+        AND organization_id = p_organization_id
+    ) THEN
+        RAISE EXCEPTION 'User is not an active member of organization';
+    END IF;
+    
+    UPDATE "user" 
+    SET 
+        default_organization_id = p_organization_id,
+        last_used_organization_id = p_organization_id,
+        last_org_access_at = NOW()
+    WHERE id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION public.set_user_default_organization(p_user_id text, p_organization_id text) OWNER TO postgres;
+
+--
+-- Name: set_user_default_organization(text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_user_default_organization(p_user_id text, p_organization_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Verify user is a member of the organization
+    IF NOT EXISTS (
+        SELECT 1 FROM organization_members 
+        WHERE user_id = p_user_id 
+        AND organization_id = p_organization_id 
+        AND status = 'active'
+    ) THEN
+        RAISE EXCEPTION 'User is not an active member of organization';
+    END IF;
+    
+    UPDATE "user" 
+    SET 
+        default_organization_id = p_organization_id,
+        last_used_organization_id = p_organization_id,
+        last_org_access_at = NOW()
+    WHERE id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION public.set_user_default_organization(p_user_id text, p_organization_id uuid) OWNER TO postgres;
+
+--
 -- Name: test_rls_isolation(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -639,6 +1372,41 @@ $$;
 ALTER FUNCTION public.test_rls_isolation() OWNER TO postgres;
 
 --
+-- Name: test_simplified_rls(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.test_simplified_rls() RETURNS TABLE(test_name text, passed boolean, details text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Test 1: No context = no access
+    PERFORM clear_rls_context();
+    
+    RETURN QUERY SELECT 
+        'Simplified RLS - No context test'::TEXT,
+        (SELECT COUNT(*) FROM organizations) = 0,
+        'Should have no access without organization context'::TEXT;
+    
+    -- Test 2: With org context = access to org data only
+    PERFORM set_simplified_rls_context(
+        '01920000-1000-7000-8000-000000000001'::uuid,
+        'test-user-id'
+    );
+    
+    RETURN QUERY SELECT 
+        'Simplified RLS - Org context test'::TEXT,
+        (SELECT COUNT(*) FROM organizations WHERE id = '01920000-1000-7000-8000-000000000001'::uuid) > 0,
+        'Should have access to specified organization only'::TEXT;
+        
+    -- Clean up
+    PERFORM clear_rls_context();
+END;
+$$;
+
+
+ALTER FUNCTION public.test_simplified_rls() OWNER TO postgres;
+
+--
 -- Name: update_organization_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -653,6 +1421,148 @@ $$;
 
 
 ALTER FUNCTION public.update_organization_updated_at() OWNER TO postgres;
+
+--
+-- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.update_updated_at_column() OWNER TO postgres;
+
+--
+-- Name: update_user_org_access(text, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.update_user_org_access(p_user_id text, p_organization_id text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE "user" 
+    SET 
+        last_used_organization_id = p_organization_id,
+        last_org_access_at = NOW()
+    WHERE id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION public.update_user_org_access(p_user_id text, p_organization_id text) OWNER TO postgres;
+
+--
+-- Name: update_user_org_access(text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.update_user_org_access(p_user_id text, p_organization_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE "user" 
+    SET 
+        last_used_organization_id = p_organization_id,
+        last_org_access_at = NOW()
+    WHERE id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION public.update_user_org_access(p_user_id text, p_organization_id uuid) OWNER TO postgres;
+
+--
+-- Name: user_can_administer(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.user_can_administer() RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN get_user_effective_role() IN ('admin', 'owner');
+END;
+$$;
+
+
+ALTER FUNCTION public.user_can_administer() OWNER TO postgres;
+
+--
+-- Name: FUNCTION user_can_administer(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.user_can_administer() IS 'RLS helper - checks if user has admin permissions';
+
+
+--
+-- Name: user_can_manage(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.user_can_manage() RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN get_user_effective_role() IN ('manager', 'admin', 'owner');
+END;
+$$;
+
+
+ALTER FUNCTION public.user_can_manage() OWNER TO postgres;
+
+--
+-- Name: FUNCTION user_can_manage(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.user_can_manage() IS 'RLS helper - checks if user has manage permissions';
+
+
+--
+-- Name: user_can_read(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.user_can_read() RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN get_user_effective_role() IN ('viewer', 'member', 'contributor', 'manager', 'admin', 'owner');
+END;
+$$;
+
+
+ALTER FUNCTION public.user_can_read() OWNER TO postgres;
+
+--
+-- Name: FUNCTION user_can_read(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.user_can_read() IS 'RLS helper - checks if user has read permissions';
+
+
+--
+-- Name: user_can_write(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.user_can_write() RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN get_user_effective_role() IN ('member', 'contributor', 'manager', 'admin', 'owner');
+END;
+$$;
+
+
+ALTER FUNCTION public.user_can_write() OWNER TO postgres;
+
+--
+-- Name: FUNCTION user_can_write(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.user_can_write() IS 'RLS helper - checks if user has write permissions';
+
 
 --
 -- Name: validate_billing_schema(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -790,6 +1700,30 @@ $$;
 ALTER FUNCTION public.validate_rls_test_data() OWNER TO postgres;
 
 --
+-- Name: validate_simplified_rls_context(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validate_simplified_rls_context() RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+BEGIN
+    -- Only check org and user context (role handled by Organization Actor)
+    IF get_current_organization_id() IS NULL THEN
+        RAISE EXCEPTION 'Organization context not set - RLS security violation';
+    END IF;
+    
+    IF get_current_user_id() IS NULL THEN
+        RAISE EXCEPTION 'User context not set - RLS security violation';
+    END IF;
+    
+    RETURN TRUE;
+END;
+$$;
+
+
+ALTER FUNCTION public.validate_simplified_rls_context() OWNER TO postgres;
+
+--
 -- Name: validate_wal_rls_schema(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -872,6 +1806,28 @@ CREATE TABLE neon_control_plane.endpoints (
 ALTER TABLE neon_control_plane.endpoints OWNER TO postgres;
 
 --
+-- Name: 01920000_1000_7000_8000_000000000001_worlds; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."01920000_1000_7000_8000_000000000001_worlds" (
+    id text NOT NULL,
+    name text NOT NULL,
+    description text,
+    universe_id text,
+    state text DEFAULT 'exploring'::text,
+    world_type text DEFAULT 'personal'::text,
+    priority text DEFAULT 'medium'::text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    deleted boolean DEFAULT false,
+    deleted_at timestamp without time zone,
+    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text
+);
+
+
+ALTER TABLE public."01920000_1000_7000_8000_000000000001_worlds" OWNER TO postgres;
+
+--
 -- Name: account; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -895,103 +1851,65 @@ CREATE TABLE public.account (
 ALTER TABLE public.account OWNER TO postgres;
 
 --
--- Name: anon_test_org_1755171376923_anonymous_tests; Type: TABLE; Schema: public; Owner: postgres
+-- Name: entity_schemas; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.anon_test_org_1755171376923_anonymous_tests (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    anonymous_field character varying(255)
+CREATE TABLE public.entity_schemas (
+    org_id text NOT NULL,
+    entity_name text NOT NULL,
+    table_name text NOT NULL,
+    archetype text NOT NULL,
+    business_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp without time zone,
+    CONSTRAINT entity_schemas_archetype_check CHECK ((archetype = ANY (ARRAY['universe'::text, 'world'::text, 'project'::text, 'task'::text, 'record'::text, 'document'::text, 'file'::text, 'activity'::text, 'discussion'::text, 'collection'::text])))
 );
 
-
-ALTER TABLE public.anon_test_org_1755171376923_anonymous_tests OWNER TO postgres;
-
---
--- Name: audit_org_1755171369652_audit_test_taskss; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.audit_org_1755171369652_audit_test_taskss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    project_id uuid NOT NULL,
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    due_date date,
-    completed_date timestamp with time zone,
-    assignee_id uuid,
-    assignee character varying(255) NOT NULL
-);
+ALTER TABLE ONLY public.entity_schemas FORCE ROW LEVEL SECURITY;
 
 
-ALTER TABLE public.audit_org_1755171369652_audit_test_taskss OWNER TO postgres;
+ALTER TABLE public.entity_schemas OWNER TO postgres;
 
 --
--- Name: auth_test_org_1755171367708_auth_tracked_projectss; Type: TABLE; Schema: public; Owner: postgres
+-- Name: TABLE entity_schemas; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.auth_test_org_1755171367708_auth_tracked_projectss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    project_owner character varying(255) NOT NULL,
-    auth_test_field character varying(255)
-);
+COMMENT ON TABLE public.entity_schemas IS 'Central registry for all organization entity schemas, replacing Durable Object approach';
 
-
-ALTER TABLE public.auth_test_org_1755171367708_auth_tracked_projectss OWNER TO postgres;
 
 --
--- Name: auth_test_org_auth_test_projectss; Type: TABLE; Schema: public; Owner: postgres
+-- Name: COLUMN entity_schemas.archetype; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.auth_test_org_auth_test_projectss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    budget integer
-);
+COMMENT ON COLUMN public.entity_schemas.archetype IS 'Maps to Universal Archetype patterns: project, task, record, document, file, activity, discussion, collection';
 
 
-ALTER TABLE public.auth_test_org_auth_test_projectss OWNER TO postgres;
+--
+-- Name: COLUMN entity_schemas.business_metadata; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.entity_schemas.business_metadata IS 'JSONB field containing validation rules, field definitions, and business logic';
+
+
+--
+-- Name: archetype_usage_stats; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.archetype_usage_stats AS
+ SELECT org_id,
+    archetype,
+    count(*) AS entity_count,
+    count(DISTINCT entity_name) AS unique_entities,
+    max(created_at) AS last_created,
+    min(created_at) AS first_created
+   FROM public.entity_schemas
+  WHERE (archetype IS NOT NULL)
+  GROUP BY org_id, archetype;
+
+
+ALTER VIEW public.archetype_usage_stats OWNER TO postgres;
 
 --
 -- Name: change_history; Type: TABLE; Schema: public; Owner: postgres
@@ -1038,394 +1956,701 @@ CREATE TABLE public.container_permission (
 ALTER TABLE public.container_permission OWNER TO postgres;
 
 --
--- Name: entity_roles; Type: TABLE; Schema: public; Owner: postgres
+-- Name: custom_option_sets; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.entity_roles (
-    id uuid NOT NULL,
-    entity_type character varying(50) NOT NULL,
-    entity_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    role character varying(50) NOT NULL,
-    permissions jsonb DEFAULT '{}'::jsonb,
-    granted_by uuid,
-    granted_at timestamp with time zone DEFAULT now() NOT NULL,
-    expires_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.entity_roles OWNER TO postgres;
-
---
--- Name: error_test_org_1755170779580_test_tables; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.error_test_org_1755170779580_test_tables (
+CREATE TABLE public.custom_option_sets (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    org_id text NOT NULL,
+    option_set_type text NOT NULL,
+    name text NOT NULL,
+    description text,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE public.error_test_org_1755170779580_test_tables OWNER TO postgres;
+ALTER TABLE public.custom_option_sets OWNER TO postgres;
 
 --
--- Name: invitation; Type: TABLE; Schema: public; Owner: postgres
+-- Name: TABLE custom_option_sets; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.invitation (
+COMMENT ON TABLE public.custom_option_sets IS 'Organization-specific option sets that can extend or override system options';
+
+
+--
+-- Name: custom_options; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.custom_options (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    option_set_id uuid NOT NULL,
+    value text NOT NULL,
+    label text NOT NULL,
+    description text,
+    color text,
+    icon text,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.custom_options OWNER TO postgres;
+
+--
+-- Name: TABLE custom_options; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.custom_options IS 'Organization-specific option values with custom labels and styling';
+
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_archetypetests; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_archetypetests (
     id text NOT NULL,
-    "organizationId" text NOT NULL,
-    email text NOT NULL,
-    role text,
-    status text NOT NULL,
-    "expiresAt" timestamp without time zone NOT NULL,
-    "inviterId" text NOT NULL
+    organization_id text NOT NULL,
+    created_by text,
+    created_at text NOT NULL,
+    updated_at text NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    priority text
 );
 
 
-ALTER TABLE public.invitation OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_archetypetests OWNER TO postgres;
 
 --
--- Name: isolation_org_a_1755170777829_shared_table_names; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_cachetestentitys; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.isolation_org_a_1755170777829_shared_table_names (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cachetestentitys (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
+    project_id text,
+    sprint_id text,
+    story_points integer
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cachetestentitys OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_cleantests; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantests (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'planning'::text NOT NULL,
+    start_date date,
+    end_date date,
+    owner_id text,
+    budget numeric,
+    progress_percentage integer DEFAULT 0,
+    project_type text DEFAULT 'operational'::text,
+    client text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantests OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_clients; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_clients (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
+    organization_id text NOT NULL,
+    created_by uuid,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
+    name character varying(255) NOT NULL,
+    description character varying(255),
+    record_type character varying(255) NOT NULL,
+    status character varying(50) DEFAULT 'active'::character varying NOT NULL,
+    data jsonb,
+    parent_record_id uuid,
+    owner_id uuid,
+    email character varying(255),
+    phone character varying(255),
+    industry character varying(255),
+    company_name character varying(255),
+    contact_person character varying(255),
+    new_test_field text,
+    another_new_field numeric,
+    score numeric,
+    category text,
+    notes text,
+    test_field text,
+    test_field_2 text,
+    test_field_3 text,
+    final_test_field text,
+    test_cache_refresh text,
+    priority character varying(20) DEFAULT 'medium'::character varying
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_clients OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_contracts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contracts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    name character varying(255) NOT NULL,
     description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
+    priority character varying(50) DEFAULT 'medium'::character varying NOT NULL,
+    status character varying(50) DEFAULT 'planning'::character varying NOT NULL,
     start_date date,
     end_date date,
     owner_id uuid,
-    org_specific_field character varying(255) NOT NULL
-);
-
-
-ALTER TABLE public.isolation_org_a_1755170777829_shared_table_names OWNER TO postgres;
-
---
--- Name: isolation_org_b_1755170777829_shared_table_names; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.isolation_org_b_1755170777829_shared_table_names (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    org_specific_field character varying(255) NOT NULL
-);
-
-
-ALTER TABLE public.isolation_org_b_1755170777829_shared_table_names OWNER TO postgres;
-
---
--- Name: member; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.member (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "userId" text NOT NULL,
-    role text NOT NULL,
-    "createdAt" timestamp without time zone NOT NULL
-);
-
-
-ALTER TABLE public.member OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_certification; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_certification (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    user_id text,
-    name character varying(255) NOT NULL,
-    issuer character varying(255),
-    issue_date date,
-    expiry_date date,
-    credential_id character varying(255),
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_certification OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_client; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_client (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    name character varying(255) NOT NULL,
-    industry character varying(100),
-    contact_email character varying(255),
-    contract_value numeric(10,2),
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by text,
-    assigned_to text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_client OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_contract; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contract (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    client_id text,
-    project_id text,
-    contract_number character varying(100),
-    value numeric(10,2),
-    signed_date date,
-    start_date date,
-    end_date date,
-    status character varying(50) DEFAULT 'draft'::character varying,
-    created_by text,
-    assigned_to text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_contract OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_document; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_document (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    project_id text,
-    title character varying(255) NOT NULL,
-    description text,
-    file_url character varying(255),
-    file_size integer,
-    file_type character varying(100),
-    version character varying(50) DEFAULT '1.0'::character varying,
-    status character varying(50) DEFAULT 'draft'::character varying,
-    created_by text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_document OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_expense; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_expense (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    project_id text,
-    user_id text,
-    category character varying(100),
-    amount numeric(8,2),
-    description text,
-    receipt_url character varying(255),
-    date date,
-    status character varying(50) DEFAULT 'pending'::character varying,
-    created_by text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_expense OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoice (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    client_id text,
-    project_id text,
-    invoice_number character varying(100),
-    amount numeric(10,2),
-    due_date date,
-    status character varying(50) DEFAULT 'draft'::character varying,
-    created_by text,
-    assigned_to text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoice OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_meeting; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_meeting (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    project_id text,
-    title character varying(255) NOT NULL,
-    description text,
-    meeting_date timestamp with time zone,
-    duration integer,
-    location character varying(255),
-    meeting_type character varying(50),
-    status character varying(50) DEFAULT 'scheduled'::character varying,
-    created_by text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_meeting OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_project; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_project (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    client_id text,
-    name character varying(255) NOT NULL,
-    description text,
-    project_type character varying(100),
     budget numeric(10,2),
+    progress_percentage integer,
+    project_type character varying(100) DEFAULT 'operational'::character varying,
+    value numeric(10,2),
+    contract_type character varying(255)
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_contracts OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_discussions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_discussions (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text DEFAULT 'open'::text NOT NULL,
+    discussion_type text DEFAULT 'general'::text,
+    author_id text,
+    parent_discussion_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_discussions OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_expenses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_expenses (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    title character varying(255) NOT NULL,
+    content text,
+    status character varying(50) DEFAULT 'draft'::character varying NOT NULL,
+    category character varying(100),
+    author_id uuid,
+    parent_document_id uuid,
+    amount numeric(10,2) NOT NULL,
+    expense_type character varying(255),
+    receipt_url text,
+    reimbursable boolean
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_expenses OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_files; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_files (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    file_path text NOT NULL,
+    mime_type text NOT NULL,
+    size_bytes integer NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    uploaded_by text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_files OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_invoices; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoices (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    category text,
+    author_id text,
+    parent_document_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoices OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_meetings; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_meetings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    activity_type character varying(255) NOT NULL,
+    description character varying(255),
+    entity_type character varying(255),
+    entity_id character varying(255),
+    actor_id uuid,
+    metadata jsonb,
+    duration numeric(10,2),
+    location character varying(255),
+    attendees character varying(255),
+    meeting_type character varying(255)
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_meetings OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_morningworkouts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text,
+    description text,
+    world_id text,
+    priority text,
+    status text,
     start_date date,
     end_date date,
-    status character varying(50) DEFAULT 'planning'::character varying,
-    created_by text,
-    assigned_to text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    owner_id text,
+    budget text,
+    progress_percentage integer DEFAULT 0,
+    project_type text DEFAULT 'operational'::text
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_project OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_proposal; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_projects; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_proposal (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    client_id text,
-    title character varying(255) NOT NULL,
-    description text,
-    estimated_value numeric(10,2),
-    estimated_duration integer,
-    status character varying(50) DEFAULT 'draft'::character varying,
-    submitted_date date,
-    created_by text,
-    assigned_to text,
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projects (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    created_by uuid,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_proposal OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_resource; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_resource (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now(),
     name character varying(255) NOT NULL,
-    type character varying(100),
     description text,
-    availability_status character varying(50) DEFAULT 'available'::character varying,
-    hourly_rate numeric(6,2),
-    created_by text,
-    assigned_to text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    priority character varying(50) DEFAULT 'medium'::character varying NOT NULL,
+    status character varying(50) DEFAULT 'planning'::character varying NOT NULL,
+    start_date date,
+    end_date date,
+    owner_id uuid,
+    budget numeric(10,2),
+    progress_percentage integer,
+    project_type character varying(100) DEFAULT 'operational'::character varying
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_resource OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projects OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_skill; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_records; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_skill (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
-    name character varying(255) NOT NULL,
-    category character varying(100),
-    description text,
-    level character varying(50),
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_records (
+    id text NOT NULL,
+    organization_id text NOT NULL,
     created_by text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    title text
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_skill OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_records OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_timesheet; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_softdeletetests; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_timesheet (
-    id text DEFAULT public.generate_uuidv7() NOT NULL,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text NOT NULL,
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_softdeletetests (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
     project_id text,
-    user_id text,
-    date date,
-    hours numeric(4,2),
-    description text,
-    billable boolean DEFAULT true,
-    rate numeric(6,2),
-    status character varying(50) DEFAULT 'submitted'::character varying,
-    created_by text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    sprint_id text,
+    story_points integer
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_timesheet OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_softdeletetests OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_tasks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_tasks (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
+    project_id text,
+    sprint_id text,
+    story_points integer
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_tasks OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_temptests; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_temptests (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at text NOT NULL,
+    updated_at text NOT NULL,
+    name text,
+    description text,
+    record_type text,
+    status text,
+    data jsonb
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_temptests OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testcompany2s; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcompany2s (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    industry text,
+    revenue numeric
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcompany2s OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testcompanys; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcompanys (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at text NOT NULL,
+    updated_at text NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    industry text,
+    revenue numeric
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcompanys OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testdeletes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
+    project_id text,
+    sprint_id text,
+    story_points integer
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testentitys; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
+    project_id text,
+    sprint_id text,
+    story_points integer
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testproducts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testproducts (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at text NOT NULL,
+    updated_at text NOT NULL,
+    name text,
+    description text,
+    record_type text,
+    status text,
+    data jsonb,
+    sku text,
+    price numeric
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproducts OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testprojects; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at text NOT NULL,
+    updated_at text NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'planning'::text NOT NULL,
+    start_date timestamp without time zone,
+    end_date timestamp without time zone,
+    owner_id text,
+    budget numeric,
+    progress_percentage integer DEFAULT 0,
+    project_type text DEFAULT 'operational'::text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_timesheets; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_timesheets (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    activity_type text NOT NULL,
+    description text,
+    entity_type text,
+    entity_id text,
+    actor_id text,
+    metadata jsonb
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_timesheets OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_universes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_universes (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    owner_id text NOT NULL
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_universes OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_worlds; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_worlds (
+    id text,
+    organization_id text,
+    created_by text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    name text,
+    description text,
+    universe_id text,
+    state text,
+    world_type text,
+    priority text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_worlds OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_worldss; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_worldss (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    universe_id text,
+    state text DEFAULT 'exploring'::text NOT NULL,
+    world_type text DEFAULT 'personal'::text NOT NULL,
+    priority text DEFAULT 'medium'::text NOT NULL
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_worldss OWNER TO postgres;
 
 --
 -- Name: org_01920000_2000_7000_8000_000000000002_activity; Type: TABLE; Schema: public; Owner: postgres
@@ -1440,7 +2665,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_activity (
     description text,
     metadata jsonb,
     performed_by text,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1461,7 +2688,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_attachment (
     mime_type character varying(100),
     uploaded_by text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1481,7 +2710,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_comment (
     is_internal boolean DEFAULT false,
     created_by text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1503,7 +2734,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_contact (
     created_by text,
     assigned_to text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1524,7 +2757,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_custom_field_defini
     display_order integer DEFAULT 0,
     created_by text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1546,7 +2781,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_custom_field_value 
     value_boolean boolean,
     value_json jsonb,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1568,7 +2805,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_deal (
     created_by text,
     assigned_to text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1586,7 +2825,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_sync_configuration 
     is_enabled boolean DEFAULT true,
     created_by text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1603,7 +2844,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_tag (
     color character varying(7),
     created_by text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1620,7 +2863,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_tagging (
     taggable_type character varying(100) NOT NULL,
     taggable_id text NOT NULL,
     created_by text,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1641,7 +2886,9 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_ticket (
     assigned_to text,
     created_by text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deleted boolean DEFAULT false,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1678,6 +2925,19 @@ CREATE TABLE public.organizations (
 
 
 ALTER TABLE public.organizations OWNER TO postgres;
+
+--
+-- Name: schema_metadata; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.schema_metadata (
+    key character varying(255) NOT NULL,
+    value text,
+    updated_at timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.schema_metadata OWNER TO postgres;
 
 --
 -- Name: secure_config; Type: TABLE; Schema: public; Owner: postgres
@@ -1740,206 +3000,95 @@ CREATE TABLE public.subscription_limits (
 ALTER TABLE public.subscription_limits OWNER TO postgres;
 
 --
--- Name: task_org_api_1755170776840_development_tasks_apis; Type: TABLE; Schema: public; Owner: postgres
+-- Name: system_option_sets; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.task_org_api_1755170776840_development_tasks_apis (
+CREATE TABLE public.system_option_sets (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    project_id uuid NOT NULL,
+    option_set_type text NOT NULL,
+    archetype text NOT NULL,
+    name text NOT NULL,
     description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    due_date date,
-    completed_date timestamp with time zone,
-    assignee_id uuid,
-    github_issue character varying(255),
-    story_points integer,
-    sprint character varying(255)
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT system_option_sets_archetype_check CHECK ((archetype = ANY (ARRAY['universe'::text, 'world'::text, 'project'::text, 'task'::text, 'record'::text, 'document'::text, 'file'::text, 'activity'::text, 'discussion'::text, 'collection'::text])))
 );
 
 
-ALTER TABLE public.task_org_api_1755170776840_development_tasks_apis OWNER TO postgres;
+ALTER TABLE public.system_option_sets OWNER TO postgres;
 
 --
--- Name: test_crud_final_final_crud_tests; Type: TABLE; Schema: public; Owner: postgres
+-- Name: TABLE system_option_sets; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.test_crud_final_final_crud_tests (
+COMMENT ON TABLE public.system_option_sets IS 'System-wide option sets shared across all organizations for each archetype';
+
+
+--
+-- Name: COLUMN system_option_sets.option_set_type; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.system_option_sets.option_set_type IS 'Type of option set: priority, status, category, discussion_type, etc.';
+
+
+--
+-- Name: COLUMN system_option_sets.archetype; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.system_option_sets.archetype IS 'Which archetype this option set applies to';
+
+
+--
+-- Name: system_options; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.system_options (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
+    option_set_id uuid NOT NULL,
+    value text NOT NULL,
+    label text NOT NULL,
     description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    budget integer
+    color text,
+    icon text,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE public.test_crud_final_final_crud_tests OWNER TO postgres;
+ALTER TABLE public.system_options OWNER TO postgres;
 
 --
--- Name: test_crud_org_crud_test_projectss; Type: TABLE; Schema: public; Owner: postgres
+-- Name: TABLE system_options; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.test_crud_org_crud_test_projectss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    budget integer
-);
+COMMENT ON TABLE public.system_options IS 'System option values with labels, colors, and metadata';
 
-
-ALTER TABLE public.test_crud_org_crud_test_projectss OWNER TO postgres;
 
 --
--- Name: test_crud_org_v2_crud_test_v2s; Type: TABLE; Schema: public; Owner: postgres
+-- Name: COLUMN system_options.value; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.test_crud_org_v2_crud_test_v2s (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    budget integer
-);
+COMMENT ON COLUMN public.system_options.value IS 'The stored value in entity fields (e.g., "high", "active")';
 
-
-ALTER TABLE public.test_crud_org_v2_crud_test_v2s OWNER TO postgres;
 
 --
--- Name: test_manual_org_manual_test_projectss; Type: TABLE; Schema: public; Owner: postgres
+-- Name: COLUMN system_options.label; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.test_manual_org_manual_test_projectss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    budget integer
-);
+COMMENT ON COLUMN public.system_options.label IS 'The display label shown in UI (e.g., "High Priority", "Active")';
 
-
-ALTER TABLE public.test_manual_org_manual_test_projectss OWNER TO postgres;
 
 --
--- Name: test_org_api_1755170768084_client_projects_apis; Type: TABLE; Schema: public; Owner: postgres
+-- Name: COLUMN system_options.color; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.test_org_api_1755170768084_client_projects_apis (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    contract_value integer,
-    project_phase character varying(255)
-);
+COMMENT ON COLUMN public.system_options.color IS 'Hex color code for UI styling (e.g., "#ef4444" for red)';
 
-
-ALTER TABLE public.test_org_api_1755170768084_client_projects_apis OWNER TO postgres;
-
---
--- Name: test_org_api_1755170775829_client_projects_apis; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.test_org_api_1755170775829_client_projects_apis (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    client_name character varying(255) NOT NULL,
-    contract_value integer,
-    project_phase character varying(255)
-);
-
-
-ALTER TABLE public.test_org_api_1755170775829_client_projects_apis OWNER TO postgres;
-
---
--- Name: universal_entity_registry; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.universal_entity_registry (
-    org_id text NOT NULL,
-    entity_name text NOT NULL,
-    table_name text,
-    definition json,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-);
-
-
-ALTER TABLE public.universal_entity_registry OWNER TO postgres;
 
 --
 -- Name: user; Type: TABLE; Schema: public; Owner: postgres
@@ -1957,83 +3106,14 @@ CREATE TABLE public."user" (
     banned boolean,
     "banReason" text,
     "banExpires" timestamp with time zone,
-    password text
+    password text,
+    default_organization_id text,
+    last_used_organization_id text,
+    last_org_access_at timestamp with time zone
 );
 
 
 ALTER TABLE public."user" OWNER TO postgres;
-
---
--- Name: user_org_a_1755171371820_user_isolated_recordss; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.user_org_a_1755171371820_user_isolated_recordss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    user_data character varying(255) NOT NULL
-);
-
-
-ALTER TABLE public.user_org_a_1755171371820_user_isolated_recordss OWNER TO postgres;
-
---
--- Name: user_org_b_1755171371820_user_isolated_recordss; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.user_org_b_1755171371820_user_isolated_recordss (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    user_data character varying(255) NOT NULL
-);
-
-
-ALTER TABLE public.user_org_b_1755171371820_user_isolated_recordss OWNER TO postgres;
-
---
--- Name: validation_org_1755170780558_comprehensive_tests; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.validation_org_1755170780558_comprehensive_tests (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid,
-    name character varying(255) NOT NULL,
-    status character varying(50) DEFAULT 'active'::character varying,
-    created_by_id uuid,
-    client_id uuid,
-    custom_fields jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    description text,
-    priority character varying(50) DEFAULT 'medium'::character varying,
-    start_date date,
-    end_date date,
-    owner_id uuid,
-    text_field character varying(255),
-    longtext_field text,
-    number_field integer,
-    decimal_field integer,
-    boolean_field boolean,
-    date_field timestamp with time zone,
-    datetime_field timestamp with time zone,
-    json_field jsonb
-);
-
-
-ALTER TABLE public.validation_org_1755170780558_comprehensive_tests OWNER TO postgres;
 
 --
 -- Name: verification; Type: TABLE; Schema: public; Owner: postgres
@@ -2060,43 +3140,19 @@ ALTER TABLE ONLY neon_control_plane.endpoints
 
 
 --
+-- Name: 01920000_1000_7000_8000_000000000001_worlds 01920000_1000_7000_8000_000000000001_worlds_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."01920000_1000_7000_8000_000000000001_worlds"
+    ADD CONSTRAINT "01920000_1000_7000_8000_000000000001_worlds_pkey" PRIMARY KEY (id);
+
+
+--
 -- Name: account account_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT account_pkey PRIMARY KEY (id);
-
-
---
--- Name: anon_test_org_1755171376923_anonymous_tests anon_test_org_1755171376923_anonymous_tests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.anon_test_org_1755171376923_anonymous_tests
-    ADD CONSTRAINT anon_test_org_1755171376923_anonymous_tests_pkey PRIMARY KEY (id);
-
-
---
--- Name: audit_org_1755171369652_audit_test_taskss audit_org_1755171369652_audit_test_taskss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.audit_org_1755171369652_audit_test_taskss
-    ADD CONSTRAINT audit_org_1755171369652_audit_test_taskss_pkey PRIMARY KEY (id);
-
-
---
--- Name: auth_test_org_1755171367708_auth_tracked_projectss auth_test_org_1755171367708_auth_tracked_projectss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.auth_test_org_1755171367708_auth_tracked_projectss
-    ADD CONSTRAINT auth_test_org_1755171367708_auth_tracked_projectss_pkey PRIMARY KEY (id);
-
-
---
--- Name: auth_test_org_auth_test_projectss auth_test_org_auth_test_projectss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.auth_test_org_auth_test_projectss
-    ADD CONSTRAINT auth_test_org_auth_test_projectss_pkey PRIMARY KEY (id);
 
 
 --
@@ -2124,163 +3180,83 @@ ALTER TABLE ONLY public.container_permission
 
 
 --
--- Name: entity_roles entity_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: custom_option_sets custom_option_sets_org_id_option_set_type_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.entity_roles
-    ADD CONSTRAINT entity_roles_pkey PRIMARY KEY (id);
-
-
---
--- Name: error_test_org_1755170779580_test_tables error_test_org_1755170779580_test_tables_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.error_test_org_1755170779580_test_tables
-    ADD CONSTRAINT error_test_org_1755170779580_test_tables_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.custom_option_sets
+    ADD CONSTRAINT custom_option_sets_org_id_option_set_type_name_key UNIQUE (org_id, option_set_type, name);
 
 
 --
--- Name: invitation invitation_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: custom_option_sets custom_option_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.invitation
-    ADD CONSTRAINT invitation_pkey PRIMARY KEY (id);
-
-
---
--- Name: isolation_org_a_1755170777829_shared_table_names isolation_org_a_1755170777829_shared_table_names_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.isolation_org_a_1755170777829_shared_table_names
-    ADD CONSTRAINT isolation_org_a_1755170777829_shared_table_names_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.custom_option_sets
+    ADD CONSTRAINT custom_option_sets_pkey PRIMARY KEY (id);
 
 
 --
--- Name: isolation_org_b_1755170777829_shared_table_names isolation_org_b_1755170777829_shared_table_names_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: custom_options custom_options_option_set_id_value_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.isolation_org_b_1755170777829_shared_table_names
-    ADD CONSTRAINT isolation_org_b_1755170777829_shared_table_names_pkey PRIMARY KEY (id);
-
-
---
--- Name: member member_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.member
-    ADD CONSTRAINT member_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.custom_options
+    ADD CONSTRAINT custom_options_option_set_id_value_key UNIQUE (option_set_id, value);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_certification org_01920000_1000_7000_8000_000000000001_certification_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: custom_options custom_options_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_certification
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_certification_pkey PRIMARY KEY (id);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_client org_01920000_1000_7000_8000_000000000001_client_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_client
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_client_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.custom_options
+    ADD CONSTRAINT custom_options_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_contract org_01920000_1000_7000_8000_000000000001_co_contract_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: entity_schemas entity_schemas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_contract
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_co_contract_number_key UNIQUE (contract_number);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_contract org_01920000_1000_7000_8000_000000000001_contract_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_contract
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_contract_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.entity_schemas
+    ADD CONSTRAINT entity_schemas_pkey PRIMARY KEY (org_id, entity_name);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_document org_01920000_1000_7000_8000_000000000001_document_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_clients org_01920000_1000_7000_8000_000000000001_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_document
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_document_pkey PRIMARY KEY (id);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_expense org_01920000_1000_7000_8000_000000000001_expense_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_expense
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_expense_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_clients
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_clients_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_invoice org_01920000_1000_7000_8000_000000000001_inv_invoice_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_contracts org_01920000_1000_7000_8000_000000000001_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_inv_invoice_number_key UNIQUE (invoice_number);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_invoice org_01920000_1000_7000_8000_000000000001_invoice_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_invoice_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_contracts
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_contracts_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_meeting org_01920000_1000_7000_8000_000000000001_meeting_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_expenses org_01920000_1000_7000_8000_000000000001_expenses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meeting
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_meeting_pkey PRIMARY KEY (id);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_project org_01920000_1000_7000_8000_000000000001_project_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_project
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_project_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_expenses
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_expenses_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_proposal org_01920000_1000_7000_8000_000000000001_proposal_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_meetings org_01920000_1000_7000_8000_000000000001_meetings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_proposal
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_proposal_pkey PRIMARY KEY (id);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_resource org_01920000_1000_7000_8000_000000000001_resource_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_resource
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_resource_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meetings
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_meetings_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_skill org_01920000_1000_7000_8000_000000000001_skill_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_projects org_01920000_1000_7000_8000_000000000001_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_skill
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_skill_pkey PRIMARY KEY (id);
-
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_timesheet org_01920000_1000_7000_8000_000000000001_timesheet_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_timesheet
-    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_timesheet_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projects
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_projects_pkey PRIMARY KEY (id);
 
 
 --
@@ -2404,6 +3380,14 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: schema_metadata schema_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.schema_metadata
+    ADD CONSTRAINT schema_metadata_pkey PRIMARY KEY (key);
+
+
+--
 -- Name: secure_config secure_config_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2436,67 +3420,35 @@ ALTER TABLE ONLY public.subscription_limits
 
 
 --
--- Name: task_org_api_1755170776840_development_tasks_apis task_org_api_1755170776840_development_tasks_apis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: system_option_sets system_option_sets_option_set_type_archetype_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.task_org_api_1755170776840_development_tasks_apis
-    ADD CONSTRAINT task_org_api_1755170776840_development_tasks_apis_pkey PRIMARY KEY (id);
-
-
---
--- Name: test_crud_final_final_crud_tests test_crud_final_final_crud_tests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.test_crud_final_final_crud_tests
-    ADD CONSTRAINT test_crud_final_final_crud_tests_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.system_option_sets
+    ADD CONSTRAINT system_option_sets_option_set_type_archetype_name_key UNIQUE (option_set_type, archetype, name);
 
 
 --
--- Name: test_crud_org_crud_test_projectss test_crud_org_crud_test_projectss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: system_option_sets system_option_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.test_crud_org_crud_test_projectss
-    ADD CONSTRAINT test_crud_org_crud_test_projectss_pkey PRIMARY KEY (id);
-
-
---
--- Name: test_crud_org_v2_crud_test_v2s test_crud_org_v2_crud_test_v2s_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.test_crud_org_v2_crud_test_v2s
-    ADD CONSTRAINT test_crud_org_v2_crud_test_v2s_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.system_option_sets
+    ADD CONSTRAINT system_option_sets_pkey PRIMARY KEY (id);
 
 
 --
--- Name: test_manual_org_manual_test_projectss test_manual_org_manual_test_projectss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: system_options system_options_option_set_id_value_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.test_manual_org_manual_test_projectss
-    ADD CONSTRAINT test_manual_org_manual_test_projectss_pkey PRIMARY KEY (id);
-
-
---
--- Name: test_org_api_1755170768084_client_projects_apis test_org_api_1755170768084_client_projects_apis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.test_org_api_1755170768084_client_projects_apis
-    ADD CONSTRAINT test_org_api_1755170768084_client_projects_apis_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.system_options
+    ADD CONSTRAINT system_options_option_set_id_value_key UNIQUE (option_set_id, value);
 
 
 --
--- Name: test_org_api_1755170775829_client_projects_apis test_org_api_1755170775829_client_projects_apis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: system_options system_options_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.test_org_api_1755170775829_client_projects_apis
-    ADD CONSTRAINT test_org_api_1755170775829_client_projects_apis_pkey PRIMARY KEY (id);
-
-
---
--- Name: universal_entity_registry universal_entity_registry_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.universal_entity_registry
-    ADD CONSTRAINT universal_entity_registry_pkey PRIMARY KEY (org_id, entity_name);
+ALTER TABLE ONLY public.system_options
+    ADD CONSTRAINT system_options_pkey PRIMARY KEY (id);
 
 
 --
@@ -2508,22 +3460,6 @@ ALTER TABLE ONLY public."user"
 
 
 --
--- Name: user_org_a_1755171371820_user_isolated_recordss user_org_a_1755171371820_user_isolated_recordss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.user_org_a_1755171371820_user_isolated_recordss
-    ADD CONSTRAINT user_org_a_1755171371820_user_isolated_recordss_pkey PRIMARY KEY (id);
-
-
---
--- Name: user_org_b_1755171371820_user_isolated_recordss user_org_b_1755171371820_user_isolated_recordss_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.user_org_b_1755171371820_user_isolated_recordss
-    ADD CONSTRAINT user_org_b_1755171371820_user_isolated_recordss_pkey PRIMARY KEY (id);
-
-
---
 -- Name: user user_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2532,75 +3468,11 @@ ALTER TABLE ONLY public."user"
 
 
 --
--- Name: validation_org_1755170780558_comprehensive_tests validation_org_1755170780558_comprehensive_tests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.validation_org_1755170780558_comprehensive_tests
-    ADD CONSTRAINT validation_org_1755170780558_comprehensive_tests_pkey PRIMARY KEY (id);
-
-
---
 -- Name: verification verification_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
-
-
---
--- Name: entity_roles_entity_lookup; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX entity_roles_entity_lookup ON public.entity_roles USING btree (entity_type, entity_id);
-
-
---
--- Name: entity_roles_role_lookup; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX entity_roles_role_lookup ON public.entity_roles USING btree (entity_type, role);
-
-
---
--- Name: entity_roles_unique_entity_user; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX entity_roles_unique_entity_user ON public.entity_roles USING btree (entity_type, entity_id, user_id);
-
-
---
--- Name: entity_roles_user_lookup; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX entity_roles_user_lookup ON public.entity_roles USING btree (user_id);
-
-
---
--- Name: idx_anon_test_org_1755171376923_anonymous_tests_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_anon_test_org_1755171376923_anonymous_tests_created_at ON public.anon_test_org_1755171376923_anonymous_tests USING btree (created_at);
-
-
---
--- Name: idx_audit_org_1755171369652_audit_test_taskss_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_audit_org_1755171369652_audit_test_taskss_created_at ON public.audit_org_1755171369652_audit_test_taskss USING btree (created_at);
-
-
---
--- Name: idx_auth_test_org_1755171367708_auth_tracked_projectss_created_; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_auth_test_org_1755171367708_auth_tracked_projectss_created_ ON public.auth_test_org_1755171367708_auth_tracked_projectss USING btree (created_at);
-
-
---
--- Name: idx_auth_test_org_auth_test_projectss_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_auth_test_org_auth_test_projectss_created_at ON public.auth_test_org_auth_test_projectss USING btree (created_at);
 
 
 --
@@ -2646,6 +3518,20 @@ CREATE INDEX idx_change_history_table_org ON public.change_history USING btree (
 
 
 --
+-- Name: idx_client_priority; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_client_priority ON public.org_01920000_1000_7000_8000_000000000001_clients USING btree (priority);
+
+
+--
+-- Name: idx_client_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_client_status ON public.org_01920000_1000_7000_8000_000000000001_clients USING btree (status);
+
+
+--
 -- Name: idx_container_permission_container; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2660,24 +3546,87 @@ CREATE INDEX idx_container_permission_user ON public.container_permission USING 
 
 
 --
--- Name: idx_error_test_org_1755170779580_test_tables_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_custom_option_sets_org_type; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_error_test_org_1755170779580_test_tables_created_at ON public.error_test_org_1755170779580_test_tables USING btree (created_at);
-
-
---
--- Name: idx_isolation_org_a_1755170777829_shared_table_names_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_isolation_org_a_1755170777829_shared_table_names_created_at ON public.isolation_org_a_1755170777829_shared_table_names USING btree (created_at);
+CREATE INDEX idx_custom_option_sets_org_type ON public.custom_option_sets USING btree (org_id, option_set_type);
 
 
 --
--- Name: idx_isolation_org_b_1755170777829_shared_table_names_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_custom_options_set_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_isolation_org_b_1755170777829_shared_table_names_created_at ON public.isolation_org_b_1755170777829_shared_table_names USING btree (created_at);
+CREATE INDEX idx_custom_options_set_id ON public.custom_options USING btree (option_set_id);
+
+
+--
+-- Name: idx_custom_options_value; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_custom_options_value ON public.custom_options USING btree (value);
+
+
+--
+-- Name: idx_entity_schemas_archetype; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_entity_schemas_archetype ON public.entity_schemas USING btree (archetype);
+
+
+--
+-- Name: idx_entity_schemas_deleted; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_entity_schemas_deleted ON public.entity_schemas USING btree (org_id, deleted) WHERE (deleted = false);
+
+
+--
+-- Name: idx_entity_schemas_org_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_entity_schemas_org_id ON public.entity_schemas USING btree (org_id);
+
+
+--
+-- Name: idx_entity_schemas_table_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_entity_schemas_table_name ON public.entity_schemas USING btree (table_name);
+
+
+--
+-- Name: idx_org_01920000_1000_7000_8000_000000000001_clients_created_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_clients_created_at ON public.org_01920000_1000_7000_8000_000000000001_clients USING btree (created_at);
+
+
+--
+-- Name: idx_org_01920000_1000_7000_8000_000000000001_contracts_created_; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_contracts_created_ ON public.org_01920000_1000_7000_8000_000000000001_contracts USING btree (created_at);
+
+
+--
+-- Name: idx_org_01920000_1000_7000_8000_000000000001_expenses_created_a; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_expenses_created_a ON public.org_01920000_1000_7000_8000_000000000001_expenses USING btree (created_at);
+
+
+--
+-- Name: idx_org_01920000_1000_7000_8000_000000000001_meetings_created_a; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_meetings_created_a ON public.org_01920000_1000_7000_8000_000000000001_meetings USING btree (created_at);
+
+
+--
+-- Name: idx_org_01920000_1000_7000_8000_000000000001_projects_created_a; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_projects_created_a ON public.org_01920000_1000_7000_8000_000000000001_projects USING btree (created_at);
 
 
 --
@@ -2716,73 +3665,171 @@ CREATE UNIQUE INDEX idx_subscription_limits_unique ON public.subscription_limits
 
 
 --
--- Name: idx_task_org_api_1755170776840_development_tasks_apis_created_a; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_system_option_sets_type_archetype; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_task_org_api_1755170776840_development_tasks_apis_created_a ON public.task_org_api_1755170776840_development_tasks_apis USING btree (created_at);
-
-
---
--- Name: idx_test_crud_final_final_crud_tests_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_test_crud_final_final_crud_tests_created_at ON public.test_crud_final_final_crud_tests USING btree (created_at);
+CREATE INDEX idx_system_option_sets_type_archetype ON public.system_option_sets USING btree (option_set_type, archetype);
 
 
 --
--- Name: idx_test_crud_org_crud_test_projectss_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_system_options_set_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_test_crud_org_crud_test_projectss_created_at ON public.test_crud_org_crud_test_projectss USING btree (created_at);
-
-
---
--- Name: idx_test_crud_org_v2_crud_test_v2s_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_test_crud_org_v2_crud_test_v2s_created_at ON public.test_crud_org_v2_crud_test_v2s USING btree (created_at);
+CREATE INDEX idx_system_options_set_id ON public.system_options USING btree (option_set_id);
 
 
 --
--- Name: idx_test_manual_org_manual_test_projectss_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_system_options_value; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_test_manual_org_manual_test_projectss_created_at ON public.test_manual_org_manual_test_projectss USING btree (created_at);
-
-
---
--- Name: idx_test_org_api_1755170768084_client_projects_apis_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_test_org_api_1755170768084_client_projects_apis_created_at ON public.test_org_api_1755170768084_client_projects_apis USING btree (created_at);
+CREATE INDEX idx_system_options_value ON public.system_options USING btree (value);
 
 
 --
--- Name: idx_test_org_api_1755170775829_client_projects_apis_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_user_default_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_test_org_api_1755170775829_client_projects_apis_created_at ON public.test_org_api_1755170775829_client_projects_apis USING btree (created_at);
-
-
---
--- Name: idx_user_org_a_1755171371820_user_isolated_recordss_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_user_org_a_1755171371820_user_isolated_recordss_created_at ON public.user_org_a_1755171371820_user_isolated_recordss USING btree (created_at);
+CREATE INDEX idx_user_default_organization_id ON public."user" USING btree (default_organization_id);
 
 
 --
--- Name: idx_user_org_b_1755171371820_user_isolated_recordss_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_user_last_org_access_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_user_org_b_1755171371820_user_isolated_recordss_created_at ON public.user_org_b_1755171371820_user_isolated_recordss USING btree (created_at);
+CREATE INDEX idx_user_last_org_access_at ON public."user" USING btree (last_org_access_at);
 
 
 --
--- Name: idx_validation_org_1755170780558_comprehensive_tests_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_user_last_used_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_validation_org_1755170780558_comprehensive_tests_created_at ON public.validation_org_1755170780558_comprehensive_tests USING btree (created_at);
+CREATE INDEX idx_user_last_used_organization_id ON public."user" USING btree (last_used_organization_id);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_activity_deleted_at_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_activity_deleted_at_id ON public.org_01920000_2000_7000_8000_000000000002_activity USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_activity_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_activity_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_activity USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_attachment_deleted_at_; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_attachment_deleted_at_ ON public.org_01920000_2000_7000_8000_000000000002_attachment USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_attachment_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_attachment_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_attachment USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_comment_deleted_at_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_comment_deleted_at_idx ON public.org_01920000_2000_7000_8000_000000000002_comment USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_comment_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_comment_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_comment USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_contact_deleted_at_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_contact_deleted_at_idx ON public.org_01920000_2000_7000_8000_000000000002_contact USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_contact_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_contact_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_contact USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_custom_field_value_del; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_custom_field_value_del ON public.org_01920000_2000_7000_8000_000000000002_custom_field_value USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_deal_deleted_at_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_deal_deleted_at_idx ON public.org_01920000_2000_7000_8000_000000000002_deal USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_deal_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_deal_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_deal USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_sync_configuration_del; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_sync_configuration_del ON public.org_01920000_2000_7000_8000_000000000002_sync_configuration USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_tag_deleted_at_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_tag_deleted_at_idx ON public.org_01920000_2000_7000_8000_000000000002_tag USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_tag_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_tag_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_tag USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_tagging_deleted_at_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_tagging_deleted_at_idx ON public.org_01920000_2000_7000_8000_000000000002_tagging USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_tagging_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_tagging_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_tagging USING btree (deleted);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_ticket_deleted_at_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_ticket_deleted_at_idx ON public.org_01920000_2000_7000_8000_000000000002_ticket USING btree (deleted_at);
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_ticket_deleted_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_01920000_2000_7000_8000_000000000002_ticket_deleted_idx ON public.org_01920000_2000_7000_8000_000000000002_ticket USING btree (deleted);
 
 
 --
@@ -2790,6 +3837,106 @@ CREATE INDEX idx_validation_org_1755170780558_comprehensive_tests_created_at ON 
 --
 
 CREATE INDEX session_userid_idx ON public.session USING btree ("userId");
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_activity org_01920000_2000_7000_8000_000000000002_activity_update_update; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_activity_update_update BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_activity FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_attachment org_01920000_2000_7000_8000_000000000002_attachment_update_upda; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_attachment_update_upda BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_attachment FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_comment org_01920000_2000_7000_8000_000000000002_comment_update_updated; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_comment_update_updated BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_comment FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_contact org_01920000_2000_7000_8000_000000000002_contact_update_updated; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_contact_update_updated BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_contact FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_custom_field_definitio org_01920000_2000_7000_8000_000000000002_custom_field_definitio; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_custom_field_definitio BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_custom_field_definitio FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_custom_field_value org_01920000_2000_7000_8000_000000000002_custom_field_value_upd; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_custom_field_value_upd BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_custom_field_value FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_deal org_01920000_2000_7000_8000_000000000002_deal_update_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_deal_update_updated_at BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_deal FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_sync_configuration org_01920000_2000_7000_8000_000000000002_sync_configuration_upd; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_sync_configuration_upd BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_sync_configuration FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_tag org_01920000_2000_7000_8000_000000000002_tag_update_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_tag_update_updated_at BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_tag FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_tagging org_01920000_2000_7000_8000_000000000002_tagging_update_updated; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_tagging_update_updated BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_tagging FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: org_01920000_2000_7000_8000_000000000002_ticket org_01920000_2000_7000_8000_000000000002_ticket_update_updated_; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER org_01920000_2000_7000_8000_000000000002_ticket_update_updated_ BEFORE UPDATE ON public.org_01920000_2000_7000_8000_000000000002_ticket FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: organizations organizations_update_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER organizations_update_updated_at BEFORE UPDATE ON public.organizations FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: organization_members trigger_set_default_organization_for_new_member; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trigger_set_default_organization_for_new_member AFTER INSERT ON public.organization_members FOR EACH ROW EXECUTE FUNCTION public.set_default_organization_for_new_member();
+
+
+--
+-- Name: user user_update_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER user_update_updated_at BEFORE UPDATE ON public."user" FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+ALTER TABLE public."user" DISABLE TRIGGER user_update_updated_at;
 
 
 --
@@ -2817,19 +3964,11 @@ ALTER TABLE ONLY public.container_permission
 
 
 --
--- Name: invitation invitation_inviterId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: custom_options custom_options_option_set_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.invitation
-    ADD CONSTRAINT "invitation_inviterId_fkey" FOREIGN KEY ("inviterId") REFERENCES public."user"(id);
-
-
---
--- Name: member member_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.member
-    ADD CONSTRAINT "member_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id);
+ALTER TABLE ONLY public.custom_options
+    ADD CONSTRAINT custom_options_option_set_id_fkey FOREIGN KEY (option_set_id) REFERENCES public.custom_option_sets(id) ON DELETE CASCADE;
 
 
 --
@@ -2857,6 +3996,30 @@ ALTER TABLE ONLY public.session
 
 
 --
+-- Name: system_options system_options_option_set_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.system_options
+    ADD CONSTRAINT system_options_option_set_id_fkey FOREIGN KEY (option_set_id) REFERENCES public.system_option_sets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user user_default_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."user"
+    ADD CONSTRAINT user_default_organization_id_fkey FOREIGN KEY (default_organization_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+
+--
+-- Name: user user_last_used_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."user"
+    ADD CONSTRAINT user_last_used_organization_id_fkey FOREIGN KEY (last_used_organization_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+
+--
 -- Name: change_history; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -2867,6 +4030,72 @@ ALTER TABLE public.change_history ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY change_history_org_isolation ON public.change_history USING (((current_setting('app.system_mode'::text, true) = 'true'::text) OR (organization_id = (current_setting('app.current_organization_id'::text, true))::uuid)));
+
+
+--
+-- Name: container_permission container_permission_admin_policy; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY container_permission_admin_policy ON public.container_permission USING (public.user_can_administer()) WITH CHECK (public.user_can_administer());
+
+
+--
+-- Name: container_permission container_permission_read_policy; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY container_permission_read_policy ON public.container_permission FOR SELECT USING (((user_id = public.get_current_user_id()) OR public.user_can_administer()));
+
+
+--
+-- Name: entity_schemas; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.entity_schemas ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: entity_schemas entity_schemas_delete_policy; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY entity_schemas_delete_policy ON public.entity_schemas FOR DELETE USING ((public.user_can_administer() AND (org_id = (public.get_current_organization_id())::text)));
+
+
+--
+-- Name: entity_schemas entity_schemas_read_policy; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY entity_schemas_read_policy ON public.entity_schemas FOR SELECT USING ((public.user_can_read() AND (org_id = (public.get_current_organization_id())::text)));
+
+
+--
+-- Name: entity_schemas entity_schemas_update_policy; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY entity_schemas_update_policy ON public.entity_schemas FOR UPDATE USING ((public.user_can_administer() AND (org_id = (public.get_current_organization_id())::text)));
+
+
+--
+-- Name: entity_schemas entity_schemas_write_policy; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY entity_schemas_write_policy ON public.entity_schemas FOR INSERT WITH CHECK ((public.user_can_administer() AND (org_id = (public.get_current_organization_id())::text)));
+
+
+--
+-- Name: vibestack_pub; Type: PUBLICATION; Schema: -; Owner: postgres
+--
+
+CREATE PUBLICATION vibestack_pub FOR ALL TABLES WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION vibestack_pub OWNER TO postgres;
+
+--
+-- Name: DATABASE vibestack_dev; Type: ACL; Schema: -; Owner: postgres
+--
+
+GRANT CONNECT ON DATABASE vibestack_dev TO vibestack_app;
+GRANT CONNECT ON DATABASE vibestack_dev TO rls_test_user;
+GRANT CONNECT ON DATABASE vibestack_dev TO vibestack_app_user;
 
 
 --
@@ -2931,6 +4160,13 @@ GRANT ALL ON FUNCTION public.get_current_user_role() TO vibestack_app;
 
 
 --
+-- Name: FUNCTION get_organization_roles_for_cache(p_organization_id uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_organization_roles_for_cache(p_organization_id uuid) TO vibestack_app;
+
+
+--
 -- Name: FUNCTION is_organization_admin(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -2968,38 +4204,6 @@ GRANT SELECT ON TABLE public.account TO test_user;
 
 
 --
--- Name: TABLE anon_test_org_1755171376923_anonymous_tests; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.anon_test_org_1755171376923_anonymous_tests TO vibestack_app;
-GRANT SELECT ON TABLE public.anon_test_org_1755171376923_anonymous_tests TO test_user;
-
-
---
--- Name: TABLE audit_org_1755171369652_audit_test_taskss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.audit_org_1755171369652_audit_test_taskss TO vibestack_app;
-GRANT SELECT ON TABLE public.audit_org_1755171369652_audit_test_taskss TO test_user;
-
-
---
--- Name: TABLE auth_test_org_1755171367708_auth_tracked_projectss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.auth_test_org_1755171367708_auth_tracked_projectss TO vibestack_app;
-GRANT SELECT ON TABLE public.auth_test_org_1755171367708_auth_tracked_projectss TO test_user;
-
-
---
--- Name: TABLE auth_test_org_auth_test_projectss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.auth_test_org_auth_test_projectss TO vibestack_app;
-GRANT SELECT ON TABLE public.auth_test_org_auth_test_projectss TO test_user;
-
-
---
 -- Name: TABLE change_history; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3014,54 +4218,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.change_history TO vibestack_ap
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.container_permission TO vibestack_app;
 GRANT SELECT ON TABLE public.container_permission TO test_user;
-
-
---
--- Name: TABLE entity_roles; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.entity_roles TO vibestack_app;
-GRANT SELECT ON TABLE public.entity_roles TO test_user;
-
-
---
--- Name: TABLE error_test_org_1755170779580_test_tables; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.error_test_org_1755170779580_test_tables TO vibestack_app;
-GRANT SELECT ON TABLE public.error_test_org_1755170779580_test_tables TO test_user;
-
-
---
--- Name: TABLE invitation; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.invitation TO vibestack_app;
-GRANT SELECT ON TABLE public.invitation TO test_user;
-
-
---
--- Name: TABLE isolation_org_a_1755170777829_shared_table_names; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.isolation_org_a_1755170777829_shared_table_names TO vibestack_app;
-GRANT SELECT ON TABLE public.isolation_org_a_1755170777829_shared_table_names TO test_user;
-
-
---
--- Name: TABLE isolation_org_b_1755170777829_shared_table_names; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.isolation_org_b_1755170777829_shared_table_names TO vibestack_app;
-GRANT SELECT ON TABLE public.isolation_org_b_1755170777829_shared_table_names TO test_user;
-
-
---
--- Name: TABLE member; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.member TO vibestack_app;
-GRANT SELECT ON TABLE public.member TO test_user;
 
 
 --
@@ -3081,99 +4237,11 @@ GRANT SELECT ON TABLE public.subscription_limits TO test_user;
 
 
 --
--- Name: TABLE task_org_api_1755170776840_development_tasks_apis; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.task_org_api_1755170776840_development_tasks_apis TO vibestack_app;
-GRANT SELECT ON TABLE public.task_org_api_1755170776840_development_tasks_apis TO test_user;
-
-
---
--- Name: TABLE test_crud_final_final_crud_tests; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.test_crud_final_final_crud_tests TO vibestack_app;
-GRANT SELECT ON TABLE public.test_crud_final_final_crud_tests TO test_user;
-
-
---
--- Name: TABLE test_crud_org_crud_test_projectss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.test_crud_org_crud_test_projectss TO vibestack_app;
-GRANT SELECT ON TABLE public.test_crud_org_crud_test_projectss TO test_user;
-
-
---
--- Name: TABLE test_crud_org_v2_crud_test_v2s; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.test_crud_org_v2_crud_test_v2s TO vibestack_app;
-GRANT SELECT ON TABLE public.test_crud_org_v2_crud_test_v2s TO test_user;
-
-
---
--- Name: TABLE test_manual_org_manual_test_projectss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.test_manual_org_manual_test_projectss TO vibestack_app;
-GRANT SELECT ON TABLE public.test_manual_org_manual_test_projectss TO test_user;
-
-
---
--- Name: TABLE test_org_api_1755170768084_client_projects_apis; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.test_org_api_1755170768084_client_projects_apis TO vibestack_app;
-GRANT SELECT ON TABLE public.test_org_api_1755170768084_client_projects_apis TO test_user;
-
-
---
--- Name: TABLE test_org_api_1755170775829_client_projects_apis; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.test_org_api_1755170775829_client_projects_apis TO vibestack_app;
-GRANT SELECT ON TABLE public.test_org_api_1755170775829_client_projects_apis TO test_user;
-
-
---
--- Name: TABLE universal_entity_registry; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.universal_entity_registry TO vibestack_app;
-GRANT SELECT ON TABLE public.universal_entity_registry TO test_user;
-
-
---
 -- Name: TABLE "user"; Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public."user" TO vibestack_app;
 GRANT SELECT ON TABLE public."user" TO test_user;
-
-
---
--- Name: TABLE user_org_a_1755171371820_user_isolated_recordss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.user_org_a_1755171371820_user_isolated_recordss TO vibestack_app;
-GRANT SELECT ON TABLE public.user_org_a_1755171371820_user_isolated_recordss TO test_user;
-
-
---
--- Name: TABLE user_org_b_1755171371820_user_isolated_recordss; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.user_org_b_1755171371820_user_isolated_recordss TO vibestack_app;
-GRANT SELECT ON TABLE public.user_org_b_1755171371820_user_isolated_recordss TO test_user;
-
-
---
--- Name: TABLE validation_org_1755170780558_comprehensive_tests; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.validation_org_1755170780558_comprehensive_tests TO vibestack_app;
-GRANT SELECT ON TABLE public.validation_org_1755170780558_comprehensive_tests TO test_user;
 
 
 --
@@ -3186,5 +4254,11 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 
 --
 -- PostgreSQL database dump complete
+--
+
+\unrestrict gj5TkfK5hupm2Tg5xZ4DUrQRkaYbZC29yqOhfnWX3gFi5Tb8hzCDbMxmNufAIAk
+
+--
+-- PostgreSQL database cluster dump complete
 --
 

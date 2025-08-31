@@ -61,39 +61,14 @@ next-env.d.ts
 *.sqlite3
 *.db
 
-# PostgreSQL data - track live volume and container, ignore copies
+# PostgreSQL data - ignore all live data, track only schema/seed files
 data/*
-!data/postgres-live/
-!data/container-main.tar
 !data/database-schema.sql
 !data/database-seed.sql
 
-# PostgreSQL binary files - never track these
-**/pg_wal/
-**/pg_xlog/
-**/pg_log/
-**/pg_stat_tmp/
-**/pg_subtrans/
-**/pg_clog/
-**/pg_multixact/
-**/pg_notify/
-**/pg_serial/
-**/pg_snapshots/
-**/pg_tblspc/
-**/pg_twophase/
-**/pg_replslot/
-**/pg_commit_ts/
-**/pg_logical/
-**/base/
-**/global/
-**/*.pid
-**/*.lock
-**/postmaster.pid
-**/postgresql.auto.conf
-**/recovery.conf
-**/recovery.done
-**/backup_label*
-**/tablespace_map
+# Never track PostgreSQL live data or binary files
+data/postgres-live/
+data/postgres-*/
 
 # Logs
 logs
