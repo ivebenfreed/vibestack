@@ -1,8 +1,0 @@
-{
-  "timestamp": "2025-08-15T19:21:16.278Z",
-  "rls_fix_applied": true,
-  "non_superuser_testing": true,
-  "techflow_isolation_working": true,
-  "other_org_isolation_working": true,
-  "overall_isolation_working": true
-}

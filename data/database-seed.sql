@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AOJxkyeTbGWpe0HdS81KuRxjoMZiFS1VPdKFLnQLDf5CEB9qcdBllgLT8U3JN87
+\restrict zlUFTGIHMnO21K5yuuVsdDOUqDifJ7LQQx0qeecyOx6dOP7ri9D6f88JU0mamM7
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -12448,6 +12448,15 @@ COPY public.org_01920000_1000_7000_8000_000000000001_universes (id, organization
 
 COPY public.org_01920000_1000_7000_8000_000000000001_worlds (id, organization_id, created_by, created_at, updated_at, name, description, universe_id, state, world_type, priority) FROM stdin;
 c59b7733-c958-446a-9115-5b5d09bdec2e	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 18:57:55.902638	2025-08-31 18:57:55.902638	Alice Personal World	Personal productivity world	85d2018c-c97f-4b81-b8dc-aefef3d86e0c	active	personal	high
+world-strategic-planning	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:20.538994	2025-08-31 23:12:20.538994	Strategic Planning	Long-term strategic initiatives and company direction	\N	active	business	critical
+world-operations-mgmt	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:20.538994	2025-08-31 23:12:20.538994	Operations Management	Daily operations and process optimization	\N	active	business	high
+world-client-relations	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:20.538994	2025-08-31 23:12:20.538994	Client Relations	Client management and business development	\N	active	client	high
+world-product-dev	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:20.538994	2025-08-31 23:12:20.538994	Product Development	Innovation and product roadmap management	\N	developing	project_domain	high
+world-financial-mgmt	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:20.538994	2025-08-31 23:12:20.538994	Financial Management	Budget planning and financial oversight	\N	active	department	critical
+world-team-leadership	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:20.538994	2025-08-31 23:12:20.538994	Team Leadership	HR management and team development	\N	active	department	high
+world-personal-growth	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:30.742804	2025-08-31 23:12:30.742804	Personal Development	Learning, skills development, and personal goals	85d2018c-c97f-4b81-b8dc-aefef3d86e0c	active	personal	high
+world-health-fitness	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:30.742804	2025-08-31 23:12:30.742804	Health & Fitness	Physical health, fitness routines, and wellness	85d2018c-c97f-4b81-b8dc-aefef3d86e0c	active	personal	high
+world-family-life	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 23:12:30.742804	2025-08-31 23:12:30.742804	Family & Relationships	Family time, relationships, and personal commitments	85d2018c-c97f-4b81-b8dc-aefef3d86e0c	active	personal	medium
 \.
 
 
@@ -12775,5 +12784,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AOJxkyeTbGWpe0HdS81KuRxjoMZiFS1VPdKFLnQLDf5CEB9qcdBllgLT8U3JN87
+\unrestrict zlUFTGIHMnO21K5yuuVsdDOUqDifJ7LQQx0qeecyOx6dOP7ri9D6f88JU0mamM7
 

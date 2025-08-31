@@ -107,3 +107,5 @@ sessions/
 .claude/autonomous-output.log
 # PNPM store - never track package cache
 .pnpm-store/
+marketing/
+screenshots/
