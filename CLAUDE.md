@@ -4,25 +4,73 @@
 
 ## Current Configuration
 
-**Main staging branch with default ports:**
+**Single Worker App Architecture:**
 
-- Web application: `http://localhost:5173`
-- Server API: `http://localhost:8787`
-- Database: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
+- **Unified Application**: `http://localhost:5174` (or `http://localhost:5175` if 5174 is in use)
+- **Frontend & Backend**: Single Cloudflare Worker with integrated Vite dev server
+- **Database**: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
+- **Architecture**: Full-stack React app with Cloudflare Workers backend, unified in single app
+
+## Single Worker App Architecture
+
+**VibeStack has been unified into a single Cloudflare Worker application that combines both frontend and backend:**
+
+### Key Benefits
+- **Simplified Development**: Single `pnpm dev` command starts everything
+- **Unified Deployment**: Single Worker handles both React frontend and API backend
+- **No Port Conflicts**: One server serves both frontend and API routes
+- **Better Performance**: No need for separate frontend/backend communication
+- **Easier Debugging**: All logs in one place, unified error handling
+
+### Architecture Details
+- **Frontend**: React 19 with TanStack Router for file-based routing
+- **Backend**: Hono with OpenAPI integration for API routes
+- **Integration**: Cloudflare Vite plugin provides seamless HMR for both client and server code
+- **Database**: PostgreSQL with Kysely ORM, optimized for Cloudflare Workers
+- **Sync**: Real-time WebSocket sync via Durable Objects
+- **Auth**: Better Auth with multi-tenant organization support
+
+### Development Workflow
+1. **Start dev server**: `pnpm dev` 
+2. **Single URL**: `http://localhost:5174` (or 5175) serves both app and API
+3. **Hot reloading**: Works for both React components and Worker API code
+4. **API routes**: Available at same origin (e.g., `/api/auth/sign-in/email`)
+5. **No CORS issues**: Frontend and backend on same origin
+
+### File Structure
+```
+apps/worker/
+├── src/
+│   ├── components/          # React components
+│   ├── routes/             # TanStack Router routes  
+│   ├── server/             # Worker API code
+│   │   ├── api/           # API route handlers
+│   │   ├── lib/           # Database & utility code
+│   │   └── sync/          # Real-time sync system
+│   └── worker.ts          # Worker entry point
+├── vite.config.ts         # Vite + Cloudflare config
+└── wrangler.toml         # Cloudflare deployment config
+```
+
+### Common Troubleshooting
+- **Reload Loops**: Fixed by ignoring `.wrangler/**` in Vite watch config
+- **Port Conflicts**: Vite automatically finds next available port (5174→5175→etc.)
+- **Database Issues**: Ensure PostgreSQL container is running with git-tracked data
+- **Type Errors**: Use focused type check scripts for faster debugging
 
 ## ✅ API Authentication Testing
 
 **Working curl commands for backend API testing:**
 
 ```bash
-# Login with test user
-curl -X POST "http://localhost:8787/api/auth/sign-in/email" \
+# Login with test user (use current dev server port)
+curl -X POST "http://localhost:5175/api/auth/sign-in/email" \
   -H "Content-Type: application/json" \
   -d "{\"email\": \"ceo@widecorp.com\", \"password\": \"WideCorp2024!CEO\"}" \
   -c cookies.txt
 
 # Test protected API endpoints
-curl -X GET "http://localhost:8787/api/organizations" -b cookies.txt
+curl -X GET "http://localhost:5175/api/organizations" -b cookies.txt
 ```
 
 **Key points:**
@@ -34,14 +82,10 @@ curl -X GET "http://localhost:8787/api/organizations" -b cookies.txt
 
 **IMPORTANT**: Use Claude Code's native background support for all development servers.
 
-### Running Development Servers:
+### Running Development Server:
 ```bash
-# Start main development servers (web + API)
+# Start unified development server (web + API in single worker)
 Bash(command="pnpm dev", run_in_background=true)
-
-# Or start specific services
-Bash(command="pnpm dev:web", run_in_background=true)    # Web app only
-Bash(command="pnpm dev:server", run_in_background=true) # API server only
 
 # Build processes
 Bash(command="pnpm build --watch", run_in_background=true)
@@ -53,13 +97,13 @@ Bash(command="pnpm test --watch", run_in_background=true)
 - **Stop processes**: Use `KillBash(shell_id="...")` tool to stop servers
 - **Background processes persist** even if Claude disconnects
 
-### Server-Only Development:
+### Development Server Details:
 ```bash
-# API server only for backend development  
-Bash(command="pnpm dev:server", run_in_background=true)
+# Start unified Cloudflare Worker with Vite integration
+pnpm dev  # Typically runs on port 5174 or 5175
 
-# Test API directly
-curl -X GET http://localhost:8787/health
+# Test API directly (adjust port as needed)
+curl -X GET http://localhost:5175/health
 psql postgres://postgres:postgres@localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
 ```
 
@@ -93,7 +137,7 @@ log.debug('Component rendered', { props });
 log.error('Validation failed', error); // Always logs
 ```
 
-**📖 Complete documentation:** [`apps/web/src/logger/README.md`](apps/web/src/logger/README.md)
+**📖 Complete documentation:** [`apps/worker/src/logger/README.md`](apps/worker/src/logger/README.md)
 
 ## Database Configuration: Postgres + Hyperdrive
 
@@ -128,13 +172,13 @@ docker compose up -d postgres
 
 The project uses two complementary database clients:
 
-1. **Kysely** (Primary ORM): `apps/server/src/lib/kysely.ts`
+1. **Kysely** (Primary ORM): `apps/worker/src/server/lib/kysely.ts`
    - Type-safe query builder with postgres.js dialect
    - Optimized for Cloudflare Workers
    - Uses Hyperdrive when available, falls back to direct connection
    - Usage: `const users = await db(c.env).selectFrom('user').selectAll().execute()`
 
-2. **postgres.js** (Direct queries): `apps/server/src/lib/db.ts`
+2. **postgres.js** (Direct queries): `apps/worker/src/server/lib/db.ts`
    - For raw SQL operations and health checks
    - Lightweight serverless-optimized client
    - Consistent connection handling with Kysely
@@ -173,9 +217,10 @@ If you see database connection errors:
 - `Connection timeout` → PostgreSQL container not started or unhealthy
 
 **If authentication still fails after database is running:**
-- Check that `docker-configs/docker-compose.yml` mounts `../data/postgres-live:/var/lib/postgresql/data`
-- Restart the development server: `pnpm dev` (with background: true)
+- Check that PostgreSQL container is mounted correctly with git-tracked data
+- Restart the unified development server: `pnpm dev` (with background: true)
 - The WebSocket sync connection should now work with 200 responses
+- Check Vite config if experiencing reload loops (should ignore .wrangler directory)
 
 ## Database Synchronization
 
@@ -189,8 +234,8 @@ When starting fresh on the main/staging branch or setting up a new development e
 
 This will:
 - Reset your local database (prompts for confirmation)
-- Clone all data from the remote Neon database
-- Use the DATABASE_URL from `apps/server/.dev.vars`
+- Clone all data from the remote database
+- Use the DATABASE_URL from `apps/worker/.dev.vars`
 
 ### Sync Remote to Local
 
@@ -224,8 +269,7 @@ We use TypeScript with strict configuration for the entire monorepo:
 For debugging and fixing type errors systematically, use the focused type check scripts:
 
 - **`./scripts/type-check-focused/type-check-all.sh`** - Runs focused checks on all packages with summary
-- **`./scripts/type-check-focused/type-check-server.sh`** - Server-only type check (faster than full monorepo check)
-- **`./scripts/type-check-focused/type-check-web.sh`** - Web app type check
+- **`./scripts/type-check-focused/type-check-worker.sh`** - Worker app type check (full-stack unified app)
 
 These scripts are particularly useful when:
 - Full `pnpm type-check` hangs or is slow
@@ -238,8 +282,8 @@ These scripts are particularly useful when:
 # Check all packages with summary
 ./scripts/type-check-focused/type-check-all.sh
 
-# Focus on specific package with errors
-./scripts/type-check-focused/type-check-server.sh
+# Focus on the worker app with errors
+./scripts/type-check-focused/type-check-worker.sh
 
 # After fixes, verify with full check
 pnpm type-check
@@ -301,8 +345,8 @@ test('my test', async ({ page }) => {
 
 **DO use MCP tools directly:**
 ```bash
-# ✅ Use MCP tools in Claude Code:
-mcp__playwright__browser_navigate(url="http://localhost:5173")
+# ✅ Use MCP tools in Claude Code (adjust port as needed):
+mcp__playwright__browser_navigate(url="http://localhost:5175")
 mcp__playwright__browser_click(element="Sign In button", ref="e23")
 mcp__playwright__browser_type(element="Email input", ref="e45", text="ceo@widecorp.com")
 mcp__playwright__browser_snapshot()  # Get current page state
@@ -477,8 +521,9 @@ rm -rf .playwright/profiles/profile-main/
 - `planning/active/testing-infrastructure/` - Test system improvements
 
 **Component Organization:**
-- **UltraTable**: Restructured from flat files to organized subfolder at `apps/web/src/components/tables/UltraTable/`
+- **UltraTable**: Restructured from flat files to organized subfolder at `apps/worker/src/components/custom/ultratable/`
   - Main components: `UltraTable.tsx`, `UltraTableCell.tsx`, `UltraTableEditor.tsx`, `UltraTableSelection.tsx`
+  - Core engine: `core/UltraTableRenderer.ts`, `core/UltraTableDataManager.ts`
   - Utilities: `utils/clipboard.ts`, `state/selection-state.ts`, `hooks/use-ultra-table-selection.ts`
 
 ## Interaction Protocol Memorization
@@ -511,4 +556,4 @@ For testing WebSocket connection and sync functionality:
 - Use **Alice CEO** (Owner role) for comprehensive access
 - Organization ID: `01920000-1000-7000-8000-000000000001` 
 - 12 business entity tables available for sync testing
-- Login at: `http://localhost:5173/sign-in`
+- Login at: `http://localhost:5175/sign-in` (or check current dev server port)
