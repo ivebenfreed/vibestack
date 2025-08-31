@@ -9,8 +9,8 @@ set -euo pipefail
 echo "🔄 Syncing live PostgreSQL data to git-tracked location..."
 
 # Check if postgres container is running
-if ! docker ps | grep -q vibestack-postgres; then
-    echo "❌ PostgreSQL container (vibestack-postgres) is not running"
+if ! docker ps | grep -q vibestack-main-postgres; then
+    echo "❌ PostgreSQL container (vibestack-main-postgres) is not running"
     exit 1
 fi
 
@@ -18,7 +18,7 @@ echo "📋 Copying live database state..."
 
 # Copy current live data from container volume
 docker run --rm \
-  -v vibestack_postgres_data:/source:ro \
+  -v vibestack_main_postgres_data:/source:ro \
   -v "${PWD}/data/postgres-live:/target" \
   alpine:latest \
   sh -c "

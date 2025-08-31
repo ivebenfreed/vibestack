@@ -2,7 +2,7 @@ services:
   # PostgreSQL database
   postgres:
     image: postgres:17
-    container_name: vibestack-dev1-postgres
+    container_name: vibestack-postgres
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -11,9 +11,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/pgdata
     ports:
-      - "5433:5432"  # dev-1 uses 5433
+      - "5433:5432"  # Different port to avoid conflicts
     networks:
-      - dev1
+      - vibestack
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
@@ -28,47 +28,52 @@ services:
   # Chrome for testing
   chrome:
     image: browserless/chrome:latest
-    container_name: vibestack-dev1-chrome
+    container_name: vibestack-chrome
     environment:
       - MAX_CONCURRENT_SESSIONS=10
       - CONNECTION_TIMEOUT=60000
     ports:
-      - "3001:3000"  # dev-1 uses 3001
-      - "9223:9222"   
+      - "3001:3000"  # Different port to avoid conflicts
+      - "9223:9222"  # Different port for debugging
     shm_size: 1gb
     networks:
-      - dev1
+      - vibestack
 
-  # Development environment - NO MOUNTING, will clone git repo inside
+  # Development environment
   dev:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: vibestack-dev1
+    container_name: vibestack-dev
+    volumes:
+      - ..:/workspace:delegated  # Mount parent directory (vibestack root) as workspace
+      - node_modules_cache:/workspace/node_modules
+      - pnpm_cache:/home/developer/.local/share/pnpm
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/vibestack_dev
       - PNPM_HOME=/home/developer/.local/share/pnpm
       - PATH=/home/developer/.local/share/pnpm:/home/developer/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      # Git repo to clone
-      - GIT_REPO_URL=https://github.com/vibestack/vibestack.git
-      - GIT_BRANCH=staging
     ports:
-      - "5175:5173"  # dev-1 uses 5175 for web
-      - "8789:8787"  # dev-1 uses 8789 for api  
+      - "5175:5173"  # Web app
+      - "8789:8787"  # API server
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - dev1
+      - vibestack
     stdin_open: true
     tty: true
-    user: "1000:1000"
+    user: "1000:1000"  # Run as developer user
 
 networks:
-  dev1:
+  vibestack:
     driver: bridge
 
 volumes:
   postgres_data:
-    name: vibestack-dev1-postgres-data
+    name: vibestack-postgres-data
+  node_modules_cache:
+    name: vibestack-node-modules-cache
+  pnpm_cache:
+    name: vibestack-pnpm-cache

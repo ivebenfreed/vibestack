@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # Set non-interactive frontend for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies (no nodejs from apt - we'll install newer version)
 RUN apt-get update && apt-get install -y \
     curl wget git tmux nano htop \
     build-essential python3 python3-pip \
@@ -35,7 +35,7 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
     apt-get install -y google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# Install pnpm globally
+# Install pnpm globally (now with Node.js 20+)
 RUN npm install -g pnpm@9.15.1
 
 # Create developer user with same UID as host (1000)
@@ -59,10 +59,5 @@ RUN sudo mkdir -p /workspace && sudo chown -R developer:developer /workspace
 # Set final working directory
 WORKDIR /workspace
 
-# Copy startup and sync scripts
-COPY --chown=developer:developer startup.sh /workspace/startup.sh
-COPY --chown=developer:developer sync-from-host.sh /workspace/sync-from-host.sh
-RUN chmod +x /workspace/startup.sh /workspace/sync-from-host.sh
-
-# Run startup script on container start (sets up repo, dependencies, etc.)
-CMD ["/workspace/startup.sh"]
+# Keep container running
+CMD ["sleep", "infinity"]
