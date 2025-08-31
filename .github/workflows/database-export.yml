@@ -4,14 +4,14 @@ on:
   push:
     branches: [main, staging]
     paths:
-      - 'apps/server/src/migrations/**'
-      - 'packages/dataforge/src/entities/**'
+      - 'apps/worker/src/server/migrations/**'
+      - 'apps/worker/src/server/lib/**'
       - 'data/database-schema.sql'
   pull_request:
     branches: [main, staging]
     paths:
-      - 'apps/server/src/migrations/**'
-      - 'packages/dataforge/src/entities/**'
+      - 'apps/worker/src/server/migrations/**'
+      - 'apps/worker/src/server/lib/**'
       - 'data/database-schema.sql'
   workflow_dispatch:
 
@@ -76,8 +76,8 @@ jobs:
           fi
           
           # Run migrations if they exist
-          if [ -d "apps/server/src/migrations" ]; then
-            cd apps/server
+          if [ -d "apps/worker/src/server/migrations" ]; then
+            cd apps/worker
             pnpm run migrate || echo "No migrations to run or migrate command not available"
           fi
 
