@@ -343,6 +343,73 @@ export function initializeAuth(env: Env, request?: Request) {
           },
           after: async (user) => {
             console.log('[DB Hook] After creating user:', user);
+            
+            // Auto-create personal organization for new user
+            try {
+              const db = kyselyInstance;
+              const userName = user.name || user.email?.split('@')[0] || 'User';
+              
+              // Create personal organization
+              const personalOrgId = uuidv7();
+              const personalOrgSlug = `${userName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+              
+              await db
+                .insertInto('organizations')
+                .values({
+                  id: personalOrgId,
+                  name: `${userName}'s Personal Workspace`,
+                  slug: personalOrgSlug,
+                  type: 'personal',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .execute();
+              
+              // Add user as owner of personal organization
+              await db
+                .insertInto('organization_members')
+                .values({
+                  id: uuidv7(),
+                  organization_id: personalOrgId,
+                  user_id: user.id,
+                  role: 'owner',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .execute();
+              
+              // Set as default organization for the user
+              await db
+                .updateTable('user')
+                .set({
+                  default_organization_id: personalOrgId,
+                  last_used_organization_id: personalOrgId,
+                  last_org_access_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .where('id', '=', user.id)
+                .execute();
+              
+              dbLogger.info('Created personal organization for new user', {
+                userId: user.id,
+                userEmail: user.email,
+                orgId: personalOrgId,
+                orgName: `${userName}'s Personal Workspace`,
+                orgSlug: personalOrgSlug
+              }, 'auth');
+              
+            } catch (error) {
+              dbLogger.error('Failed to create personal organization for new user', {
+                userId: user.id,
+                userEmail: user.email,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined
+              }, 'auth');
+              
+              // Don't throw error here as it would prevent user creation
+              // The user can still use the system, just without a personal org initially
+            }
+            
             return user;
           }
         }

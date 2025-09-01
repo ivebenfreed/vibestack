@@ -907,14 +907,8 @@ export class DataForgeEntityManager {
     try {
       switch (archetype) {
         // REMOVED: universe and world are now core business logic, not DataForge archetypes
-        // case 'universe': {
-        //   const { UniverseArchetype } = await import('../archetypes/UniverseArchetype');
-        //   return { ...baseFields, ...UniverseArchetype.fields };
-        // }
-        // case 'world': {
-        //   const { WorldArchetype } = await import('../archetypes/WorldArchetype');
-        //   return { ...baseFields, ...WorldArchetype.fields };
-        // }
+        // NOTE: 'universe' and 'world' are now hardcoded system entities with dedicated APIs
+        // They are no longer user-configurable archetypes
         case 'record': {
           const { RecordArchetype } = await import('../archetypes/RecordArchetype');
           return { ...baseFields, ...RecordArchetype.fields };

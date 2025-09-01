@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict lCL8tOVdxFJnh5mG2etF5OlO7dDTfD2nAtoXYqadRHckPhLDvptcMsnVnYeKbsd
+\restrict au3LcdweUgfDhnRxipIf5yj3eg31EkpOYieXQScvHl5xsVv1ysDKdQTzoizYVUG
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict lCL8tOVdxFJnh5mG2etF5OlO7dDTfD2nAtoXYqadRHckPhLDvptcMsnVnYeKbsd
+\unrestrict au3LcdweUgfDhnRxipIf5yj3eg31EkpOYieXQScvHl5xsVv1ysDKdQTzoizYVUG
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict mwdb50vnLTyMmyRsoCgwdAbbHf6xCVX1TPtet7RURE9EaYXKVmDYMniZIG0WOA1
+\restrict oORJa5sQ5bGRLgTVx1yg5hdXhkEGtj7mV5uQAqFYGCsEXchERoxqDjlMn2etWvj
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mwdb50vnLTyMmyRsoCgwdAbbHf6xCVX1TPtet7RURE9EaYXKVmDYMniZIG0WOA1
+\unrestrict oORJa5sQ5bGRLgTVx1yg5hdXhkEGtj7mV5uQAqFYGCsEXchERoxqDjlMn2etWvj
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict YbR9z5MtVlm0LihlERrqOmj9exmoSSNICrBifH9jI1Afgdhc2AA9rOciTOyC0yi
+\restrict WDP0ygFjRVPjwkII8l99D9aEwX10e9ms8WEbwA0LTBVEFQQEYStUutjj5Szq6cD
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YbR9z5MtVlm0LihlERrqOmj9exmoSSNICrBifH9jI1Afgdhc2AA9rOciTOyC0yi
+\unrestrict WDP0ygFjRVPjwkII8l99D9aEwX10e9ms8WEbwA0LTBVEFQQEYStUutjj5Szq6cD
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
+\restrict d3cwmKkp4SIS1a7ablqWjxGPI4o7UicVNwx4IGR5uq2rqOK065x0QMVRXN6ymeN
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
+\unrestrict d3cwmKkp4SIS1a7ablqWjxGPI4o7UicVNwx4IGR5uq2rqOK065x0QMVRXN6ymeN
 \connect vibestack_dev
-\restrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
+\restrict d3cwmKkp4SIS1a7ablqWjxGPI4o7UicVNwx4IGR5uq2rqOK065x0QMVRXN6ymeN
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2920,7 +2920,10 @@ CREATE TABLE public.organizations (
     slug character varying(100) NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    settings jsonb DEFAULT '{}'::jsonb
+    settings jsonb DEFAULT '{}'::jsonb,
+    type text DEFAULT 'business'::text,
+    owner_user_id text,
+    auto_created boolean DEFAULT false
 );
 
 
@@ -3195,7 +3198,7 @@ ALTER TABLE public.verification OWNER TO postgres;
 
 CREATE TABLE public.worlds (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid NOT NULL,
+    organization_id text NOT NULL,
     team_id uuid,
     name text NOT NULL,
     description text,
@@ -3205,7 +3208,6 @@ CREATE TABLE public.worlds (
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now(),
     created_by uuid,
-    owner_user_id uuid,
     CONSTRAINT worlds_priority_check CHECK ((priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text]))),
     CONSTRAINT worlds_state_check CHECK ((state = ANY (ARRAY['exploring'::text, 'developing'::text, 'active'::text, 'paused'::text, 'archived'::text]))),
     CONSTRAINT worlds_world_type_check CHECK ((world_type = ANY (ARRAY['personal'::text, 'business'::text, 'client'::text, 'department'::text, 'project_domain'::text])))
@@ -3885,20 +3887,6 @@ CREATE INDEX idx_worlds_organization_id ON public.worlds USING btree (organizati
 
 
 --
--- Name: idx_worlds_owner_user_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_owner_user_id ON public.worlds USING btree (owner_user_id);
-
-
---
--- Name: idx_worlds_personal_active; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_personal_active ON public.worlds USING btree (owner_user_id, state) WHERE (owner_user_id IS NOT NULL);
-
-
---
 -- Name: idx_worlds_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -4201,6 +4189,14 @@ ALTER TABLE ONLY public.organization_members
 
 
 --
+-- Name: organizations organizations_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
+
+
+--
 -- Name: session session_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4334,13 +4330,6 @@ ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.worlds ENABLE ROW LEVEL SECURITY;
-
---
--- Name: worlds worlds_personal_isolation; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY worlds_personal_isolation ON public.worlds USING ((((owner_user_id IS NOT NULL) AND (owner_user_id = (current_setting('app.current_user_id'::text))::uuid)) OR (owner_user_id IS NULL)));
-
 
 --
 -- Name: vibestack_pub; Type: PUBLICATION; Schema: -; Owner: postgres
@@ -4518,7 +4507,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
+\unrestrict d3cwmKkp4SIS1a7ablqWjxGPI4o7UicVNwx4IGR5uq2rqOK065x0QMVRXN6ymeN
 
 --
 -- PostgreSQL database cluster dump complete

@@ -52,6 +52,7 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
         'o.id',
         'o.name',
         'o.slug',
+        'o.type',
         'om.role',
         'om.created_at as joined_at'
       ])
@@ -79,11 +80,12 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
 
     const orgIds = userOrganizations.map(org => org.id);
 
-    // Get personal worlds (owned by the user)
+    // Get personal worlds (from user's personal organization)
     let personalWorldsQuery = db(c.env)
       .selectFrom('worlds as w')
+      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
       .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.cast(eb.ref('w.organization_id'), 'text'))
+        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
           .on('om.user_id', '=', (eb) => eb.val(userId))
       )
       .select([
@@ -97,7 +99,7 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
         'w.created_at',
         'w.updated_at'
       ])
-      .where('w.owner_user_id', '=', userId);
+      .where('o.type', '=', 'personal')
 
     if (!includeInactive) {
       personalWorldsQuery = personalWorldsQuery.where('w.state', 'in', ['active', 'developing']);
@@ -108,16 +110,17 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
 
     const personalWorlds = await personalWorldsQuery.execute();
 
-    // Get business worlds (not owned by user, but accessible)  
+    // Get business worlds (from business organizations user belongs to)  
     let businessWorldsQuery = db(c.env)
       .selectFrom('worlds as w')
+      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
       .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
       .leftJoin('team_memberships as tm', (join) =>
         join.on('tm.team_id', '=', (eb) => eb.ref('w.team_id'))
           .on('tm.user_id', '=', (eb) => eb.val(userId))
       )
       .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.cast(eb.ref('w.organization_id'), 'text'))
+        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
           .on('om.user_id', '=', (eb) => eb.val(userId))
       )
       .select([
@@ -133,7 +136,7 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
         'w.updated_at',
         't.name as team_name'
       ])
-      .where('w.owner_user_id', 'is', null)
+      .where('o.type', '=', 'business')
       .where('w.organization_id', 'in', orgIds);
 
     if (!includeInactive) {
@@ -158,7 +161,7 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
         't.team_type'
       ])
       .where('tm.user_id', '=', userId)
-      .where((eb) => eb.cast(eb.ref('t.organization_id'), 'text'), 'in', orgIds)
+      .where('t.organization_id', 'in', orgIds)
       .execute();
 
     // Build the workspace data structure with actual data
@@ -198,11 +201,12 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
           id: org.id,
           name: org.name,
           slug: org.slug,
+          type: org.type,
           role: org.role,
           joinedAt: org.joined_at
         },
-        personal: { worlds: orgPersonalWorlds },
-        business: { worlds: orgBusinessWorlds },
+        personalWorlds: orgPersonalWorlds,
+        businessWorlds: orgBusinessWorlds,
         teams: orgTeams
       };
     });
@@ -232,11 +236,12 @@ workspaceApi.get('/personal', zValidator('query', WorkspaceQuerySchema), async (
   const userId = user.id;
 
   try {
-    // Get user's personal worlds across all organizations (simplified architecture)
+    // Get user's personal worlds from their personal organization
     let personalWorldsQuery = db(c.env)
       .selectFrom('worlds as w')
+      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
       .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.cast(eb.ref('w.organization_id'), 'text'))
+        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
           .on('om.user_id', '=', (eb) => eb.val(userId))
       )
       .select([
@@ -250,7 +255,7 @@ workspaceApi.get('/personal', zValidator('query', WorkspaceQuerySchema), async (
         'w.created_at',
         'w.updated_at'
       ])
-      .where('w.owner_user_id', '=', userId);
+      .where('o.type', '=', 'personal')
 
     if (!includeInactive) {
       personalWorldsQuery = personalWorldsQuery.where('w.state', 'in', ['active', 'developing']);
@@ -302,6 +307,7 @@ workspaceApi.get('/organizations', zValidator('query', WorkspaceQuerySchema), as
         'o.id',
         'o.name',
         'o.slug',
+        'o.type',
         'om.role',
         'om.created_at as joined_at'
       ])
@@ -322,16 +328,17 @@ workspaceApi.get('/organizations', zValidator('query', WorkspaceQuerySchema), as
 
     const orgIds = organizations.map(org => org.id);
 
-    // Get business worlds and teams for all organizations
+    // Get business worlds and teams for all business organizations
     let businessWorldsQuery = db(c.env)
       .selectFrom('worlds as w')
+      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
       .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
       .leftJoin('team_memberships as tm', (join) =>
         join.on('tm.team_id', '=', (eb) => eb.ref('w.team_id'))
           .on('tm.user_id', '=', (eb) => eb.val(userId))
       )
       .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.cast(eb.ref('w.organization_id'), 'text'))
+        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
           .on('om.user_id', '=', (eb) => eb.val(userId))
       )
       .select([
@@ -349,7 +356,7 @@ workspaceApi.get('/organizations', zValidator('query', WorkspaceQuerySchema), as
         'tm.role as team_role',
         'om.role as org_role'
       ])
-      .where('w.owner_user_id', 'is', null)
+      .where('o.type', '=', 'business')
       .where('w.organization_id', 'in', orgIds);
 
     if (!includeInactive) {
@@ -374,7 +381,7 @@ workspaceApi.get('/organizations', zValidator('query', WorkspaceQuerySchema), as
         't.team_type'
       ])
       .where('tm.user_id', '=', userId)
-      .where((eb) => eb.cast(eb.ref('t.organization_id'), 'text'), 'in', orgIds)
+      .where('t.organization_id', 'in', orgIds)
       .execute();
 
     // Organize by organization
@@ -423,8 +430,9 @@ workspaceApi.get('/activity', zValidator('query', ActivityQuerySchema), async (c
 
     const recentWorldUpdates = await db(c.env)
       .selectFrom('worlds as w')
+      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
       .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.cast(eb.ref('w.organization_id'), 'text'))
+        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
           .on('om.user_id', '=', (eb) => eb.val(userId))
       )
       .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
@@ -432,20 +440,20 @@ workspaceApi.get('/activity', zValidator('query', ActivityQuerySchema), async (c
         'w.id',
         'w.name',
         'w.organization_id',
-        'w.owner_user_id',
         'w.team_id',
         'w.updated_at',
         't.name as team_name',
+        'o.type as org_type',
         (eb) => eb.lit('world_updated').as('activity_type')
       ])
       .where('w.updated_at', '>=', cutoffDate)
-      // Apply the same access control as other world queries
+      // Apply org-scoped access control
       .where((eb) => eb.or([
-        // Personal worlds
-        eb('w.owner_user_id', '=', userId),
-        // Accessible business worlds
+        // Personal worlds: user's personal org (already filtered by organization membership)
+        eb('o.type', '=', 'personal'),
+        // Business worlds: accessible based on org membership and team access
         eb.and([
-          eb('w.owner_user_id', 'is', null),
+          eb('o.type', '=', 'business'),
           eb.or([
             eb.and([eb('w.team_id', 'is', null), eb('w.state', '=', 'active')]),
             eb('w.team_id', 'in', 

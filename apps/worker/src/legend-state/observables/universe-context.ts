@@ -61,6 +61,7 @@ export interface OrgInfo {
   id: string;
   name: string;
   slug: string;
+  type?: 'personal' | 'business';
   role: 'member' | 'manager' | 'admin' | 'owner';
   joinedAt: string;
 }
