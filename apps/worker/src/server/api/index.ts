@@ -10,6 +10,11 @@ import { phase1TestRouter } from './phase1-tests.js'
 import { dataforgeRouter } from '../routes/dataforge-api-refactored.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
+
+// Core business logic APIs (Worlds, Teams)
+import { teamsApi } from '../routes/teams-api.js'
+import { worldsApi } from '../routes/worlds-api.js'
+import { workspaceApi } from '../routes/user-workspace-api.js'
 // Custom organization routes removed - using Better Auth endpoints instead
 
 // Create API router
@@ -33,6 +38,11 @@ api.route('/test', phase1TestRouter)
 api.route('/dataforge', dataforgeRouter)
 api.route('/db', testDbRouter)
 api.route('/debug', debugTableDataRouter)
+
+// Core business logic API routes
+api.route('/teams', teamsApi)
+api.route('/worlds', worldsApi)
+api.route('/workspace', workspaceApi)
 
 // Import and mount Kysely-based generic API
 import { genericKysely } from './generic-kysely'

@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict 81FHpy67T3xgZC5JSlHqszhdWBIpVJScfn5dcOrZSgBnAWX8rU0HLajfTnpklsM
+\restrict lCL8tOVdxFJnh5mG2etF5OlO7dDTfD2nAtoXYqadRHckPhLDvptcMsnVnYeKbsd
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict 81FHpy67T3xgZC5JSlHqszhdWBIpVJScfn5dcOrZSgBnAWX8rU0HLajfTnpklsM
+\unrestrict lCL8tOVdxFJnh5mG2etF5OlO7dDTfD2nAtoXYqadRHckPhLDvptcMsnVnYeKbsd
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict beS1L8ii2WwuuUDP497heaFiZCkR8ORBrdBg2BywZKuBfxQ7Vh6nCS3pvyKmnCZ
+\restrict mwdb50vnLTyMmyRsoCgwdAbbHf6xCVX1TPtet7RURE9EaYXKVmDYMniZIG0WOA1
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict beS1L8ii2WwuuUDP497heaFiZCkR8ORBrdBg2BywZKuBfxQ7Vh6nCS3pvyKmnCZ
+\unrestrict mwdb50vnLTyMmyRsoCgwdAbbHf6xCVX1TPtet7RURE9EaYXKVmDYMniZIG0WOA1
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 0Z4jvVnHQbEfUVATOp2Rh43NHGFHPN2mJTReU5XBDGto9YpOq0fnE7ImUY2IoGE
+\restrict YbR9z5MtVlm0LihlERrqOmj9exmoSSNICrBifH9jI1Afgdhc2AA9rOciTOyC0yi
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0Z4jvVnHQbEfUVATOp2Rh43NHGFHPN2mJTReU5XBDGto9YpOq0fnE7ImUY2IoGE
+\unrestrict YbR9z5MtVlm0LihlERrqOmj9exmoSSNICrBifH9jI1Afgdhc2AA9rOciTOyC0yi
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict rpPfaYx82CFF47xFN4doiLAt4mio9sv3aVhn50cjGifhzfSUhRAbHWrZVpjG6D6
+\restrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict rpPfaYx82CFF47xFN4doiLAt4mio9sv3aVhn50cjGifhzfSUhRAbHWrZVpjG6D6
+\unrestrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
 \connect vibestack_dev
-\restrict rpPfaYx82CFF47xFN4doiLAt4mio9sv3aVhn50cjGifhzfSUhRAbHWrZVpjG6D6
+\restrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -3091,6 +3091,64 @@ COMMENT ON COLUMN public.system_options.color IS 'Hex color code for UI styling 
 
 
 --
+-- Name: team_memberships; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.team_memberships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    team_id uuid,
+    user_id uuid NOT NULL,
+    role text DEFAULT 'member'::text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    created_by uuid,
+    CONSTRAINT team_memberships_role_check CHECK ((role = ANY (ARRAY['member'::text, 'lead'::text, 'admin'::text])))
+);
+
+
+ALTER TABLE public.team_memberships OWNER TO postgres;
+
+--
+-- Name: TABLE team_memberships; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.team_memberships IS 'User roles and memberships within specific teams';
+
+
+--
+-- Name: teams; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.teams (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    description text,
+    parent_team_id uuid,
+    team_type text DEFAULT 'department'::text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    created_by uuid,
+    CONSTRAINT teams_team_type_check CHECK ((team_type = ANY (ARRAY['department'::text, 'project'::text, 'functional'::text, 'cross_functional'::text])))
+);
+
+
+ALTER TABLE public.teams OWNER TO postgres;
+
+--
+-- Name: TABLE teams; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.teams IS 'Organizational units within a single organization (departments, project teams, etc.)';
+
+
+--
+-- Name: COLUMN teams.parent_team_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.teams.parent_team_id IS 'NULL = top-level team, NOT NULL = sub-team';
+
+
+--
 -- Name: user; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3130,6 +3188,45 @@ CREATE TABLE public.verification (
 
 
 ALTER TABLE public.verification OWNER TO postgres;
+
+--
+-- Name: worlds; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.worlds (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    team_id uuid,
+    name text NOT NULL,
+    description text,
+    state text DEFAULT 'active'::text NOT NULL,
+    world_type text NOT NULL,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    created_by uuid,
+    owner_user_id uuid,
+    CONSTRAINT worlds_priority_check CHECK ((priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text]))),
+    CONSTRAINT worlds_state_check CHECK ((state = ANY (ARRAY['exploring'::text, 'developing'::text, 'active'::text, 'paused'::text, 'archived'::text]))),
+    CONSTRAINT worlds_world_type_check CHECK ((world_type = ANY (ARRAY['personal'::text, 'business'::text, 'client'::text, 'department'::text, 'project_domain'::text])))
+);
+
+
+ALTER TABLE public.worlds OWNER TO postgres;
+
+--
+-- Name: TABLE worlds; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.worlds IS 'Life areas (personal) or business domains (organizational), can be org-wide or team-specific';
+
+
+--
+-- Name: COLUMN worlds.team_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.worlds.team_id IS 'NULL = org-wide world, NOT NULL = team-specific world';
+
 
 --
 -- Name: endpoints endpoints_pkey; Type: CONSTRAINT; Schema: neon_control_plane; Owner: postgres
@@ -3452,6 +3549,30 @@ ALTER TABLE ONLY public.system_options
 
 
 --
+-- Name: team_memberships team_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.team_memberships
+    ADD CONSTRAINT team_memberships_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: team_memberships team_memberships_team_id_user_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.team_memberships
+    ADD CONSTRAINT team_memberships_team_id_user_id_key UNIQUE (team_id, user_id);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: user user_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3473,6 +3594,14 @@ ALTER TABLE ONLY public."user"
 
 ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: worlds worlds_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.worlds
+    ADD CONSTRAINT worlds_pkey PRIMARY KEY (id);
 
 
 --
@@ -3686,6 +3815,41 @@ CREATE INDEX idx_system_options_value ON public.system_options USING btree (valu
 
 
 --
+-- Name: idx_team_memberships_team_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_team_memberships_team_id ON public.team_memberships USING btree (team_id);
+
+
+--
+-- Name: idx_team_memberships_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_team_memberships_user_id ON public.team_memberships USING btree (user_id);
+
+
+--
+-- Name: idx_teams_organization_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_teams_organization_id ON public.teams USING btree (organization_id);
+
+
+--
+-- Name: idx_teams_parent_team_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_teams_parent_team_id ON public.teams USING btree (parent_team_id);
+
+
+--
+-- Name: idx_teams_updated_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_teams_updated_at ON public.teams USING btree (updated_at);
+
+
+--
 -- Name: idx_user_default_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -3704,6 +3868,55 @@ CREATE INDEX idx_user_last_org_access_at ON public."user" USING btree (last_org_
 --
 
 CREATE INDEX idx_user_last_used_organization_id ON public."user" USING btree (last_used_organization_id);
+
+
+--
+-- Name: idx_worlds_org_team; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_org_team ON public.worlds USING btree (organization_id, team_id);
+
+
+--
+-- Name: idx_worlds_organization_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_organization_id ON public.worlds USING btree (organization_id);
+
+
+--
+-- Name: idx_worlds_owner_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_owner_user_id ON public.worlds USING btree (owner_user_id);
+
+
+--
+-- Name: idx_worlds_personal_active; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_personal_active ON public.worlds USING btree (owner_user_id, state) WHERE (owner_user_id IS NOT NULL);
+
+
+--
+-- Name: idx_worlds_state; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_state ON public.worlds USING btree (state);
+
+
+--
+-- Name: idx_worlds_team_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_team_id ON public.worlds USING btree (team_id);
+
+
+--
+-- Name: idx_worlds_updated_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_worlds_updated_at ON public.worlds USING btree (updated_at);
 
 
 --
@@ -4004,6 +4217,22 @@ ALTER TABLE ONLY public.system_options
 
 
 --
+-- Name: team_memberships team_memberships_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.team_memberships
+    ADD CONSTRAINT team_memberships_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE CASCADE;
+
+
+--
+-- Name: teams teams_parent_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_parent_team_id_fkey FOREIGN KEY (parent_team_id) REFERENCES public.teams(id) ON DELETE CASCADE;
+
+
+--
 -- Name: user user_default_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4017,6 +4246,14 @@ ALTER TABLE ONLY public."user"
 
 ALTER TABLE ONLY public."user"
     ADD CONSTRAINT user_last_used_organization_id_fkey FOREIGN KEY (last_used_organization_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+
+--
+-- Name: worlds worlds_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.worlds
+    ADD CONSTRAINT worlds_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE SET NULL;
 
 
 --
@@ -4078,6 +4315,31 @@ CREATE POLICY entity_schemas_update_policy ON public.entity_schemas FOR UPDATE U
 --
 
 CREATE POLICY entity_schemas_write_policy ON public.entity_schemas FOR INSERT WITH CHECK ((public.user_can_administer() AND (org_id = (public.get_current_organization_id())::text)));
+
+
+--
+-- Name: team_memberships; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.team_memberships ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: teams; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: worlds; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.worlds ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: worlds worlds_personal_isolation; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY worlds_personal_isolation ON public.worlds USING ((((owner_user_id IS NOT NULL) AND (owner_user_id = (current_setting('app.current_user_id'::text))::uuid)) OR (owner_user_id IS NULL)));
 
 
 --
@@ -4256,7 +4518,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rpPfaYx82CFF47xFN4doiLAt4mio9sv3aVhn50cjGifhzfSUhRAbHWrZVpjG6D6
+\unrestrict wkhlagwe2dsjBC7tTZ3socIP7MdFLS9YhzjDVQ1eKfztNw3oFjwrTTYfjF3uq4k
 
 --
 -- PostgreSQL database cluster dump complete

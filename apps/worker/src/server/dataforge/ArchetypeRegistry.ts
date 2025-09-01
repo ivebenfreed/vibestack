@@ -15,12 +15,11 @@ import { FileArchetype } from './archetypes/FileArchetype';
 import { ActivityArchetype } from './archetypes/ActivityArchetype';
 import { DiscussionArchetype } from './archetypes/DiscussionArchetype';
 import { CollectionArchetype } from './archetypes/CollectionArchetype';
-import { UniverseArchetype } from './archetypes/UniverseArchetype';
-import { WorldArchetype } from './archetypes/WorldArchetype';
+// REMOVED: Universe and World archetypes moved to core business logic
+// import { UniverseArchetype } from './archetypes/UniverseArchetype';
+// import { WorldArchetype } from './archetypes/WorldArchetype';
 
 export type ArchetypeType = 
-  | 'universe'
-  | 'world'
   | 'project' 
   | 'task' 
   | 'record' 
@@ -29,6 +28,7 @@ export type ArchetypeType =
   | 'activity' 
   | 'discussion' 
   | 'collection';
+  // REMOVED: 'universe' and 'world' are now core business logic, not user-configurable archetypes
 
 export interface ArchetypeDefinition {
   name: ArchetypeType;
@@ -51,8 +51,6 @@ export interface ArchetypeDefinition {
 
 export class ArchetypeRegistry {
   private static readonly archetypeClasses = {
-    universe: UniverseArchetype,
-    world: WorldArchetype,
     project: ProjectArchetype,
     task: TaskArchetype,
     record: RecordArchetype,
@@ -61,6 +59,7 @@ export class ArchetypeRegistry {
     activity: ActivityArchetype,
     discussion: DiscussionArchetype,
     collection: CollectionArchetype
+    // REMOVED: universe and world archetypes - now core business logic
   };
 
   static getArchetypeClass(type: ArchetypeType) {

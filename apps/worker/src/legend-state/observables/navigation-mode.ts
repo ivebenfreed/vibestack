@@ -1,5 +1,11 @@
 import { observable, computed } from '@legendapp/state'
-import { orgContext$, getEntity$ } from '@/legend-state'
+import { 
+  universeContext$, 
+  allPersonalWorlds$, 
+  allBusinessWorlds$, 
+  allTeams$,
+  currentOrganizations$ 
+} from '@/legend-state'
 
 export type NavigationMode = 'all' | 'personal' | 'work'
 
@@ -7,49 +13,65 @@ export const navigationMode$ = observable<NavigationMode>('all')
 
 export const filteredContent$ = computed(() => {
   const mode = navigationMode$.get()
-  const schema = orgContext$.schema.get()
-  const userId = orgContext$.userId.get()
+  const universeData = universeContext$.get()
+  const personalWorlds = allPersonalWorlds$.get()
+  const businessWorlds = allBusinessWorlds$.get()
+  const teams = allTeams$.get()
+  const organizations = currentOrganizations$.get()
   
-  if (!schema) return null
-  
-  const worldsObs = getEntity$('worlds')
-  const allWorlds = worldsObs ? Object.values(worldsObs.get()) : []
-  
-  const universeObs = getEntity$('universe')
-  const userUniverse = universeObs ? 
-    Object.values(universeObs.get()).find(u => u.owner_id === userId) : 
-    null
-  
-  const personalWorlds = allWorlds.filter(w => w.universe_id === userUniverse?.id)
-  const businessWorlds = allWorlds.filter(w => !w.universe_id)
+  if (!universeData.isInitialized) return null
   
   switch (mode) {
     case 'personal':
       return {
-        universe: userUniverse,
         personalWorlds,
         businessWorlds: [],
-        showUniverse: true,
-        showBusinessWorlds: false
+        teams: [],
+        organizations: [],
+        showPersonal: true,
+        showBusinessWorlds: false,
+        showTeams: false,
+        summary: {
+          totalPersonalWorlds: personalWorlds.length,
+          totalBusinessWorlds: 0,
+          totalTeams: 0,
+          totalOrganizations: 0
+        }
       }
     
     case 'work':
       return {
-        universe: null,
         personalWorlds: [],
         businessWorlds,
-        showUniverse: false,
-        showBusinessWorlds: true
+        teams,
+        organizations,
+        showPersonal: false,
+        showBusinessWorlds: true,
+        showTeams: true,
+        summary: {
+          totalPersonalWorlds: 0,
+          totalBusinessWorlds: businessWorlds.length,
+          totalTeams: teams.length,
+          totalOrganizations: organizations.length
+        }
       }
     
     case 'all':
     default:
       return {
-        universe: userUniverse,
         personalWorlds,
         businessWorlds,
-        showUniverse: true,
-        showBusinessWorlds: true
+        teams,
+        organizations,
+        showPersonal: true,
+        showBusinessWorlds: true,
+        showTeams: true,
+        summary: {
+          totalPersonalWorlds: personalWorlds.length,
+          totalBusinessWorlds: businessWorlds.length,
+          totalTeams: teams.length,
+          totalOrganizations: organizations.length
+        }
       }
   }
 })

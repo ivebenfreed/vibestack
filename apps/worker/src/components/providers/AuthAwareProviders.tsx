@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 import { useAuth } from '@/state-machines'
 import { authLog } from '@/logger'
+import { universeHelpers } from '@/legend-state'
 
 // Create logger instance for this file
 const log = authLog('components/providers/AuthAwareProviders.tsx');
@@ -38,6 +39,23 @@ export function AuthAwareProviders({ children }: { children: React.ReactNode }) 
 
 // Authenticated app layout
 function AppLayout({ children }: { children: React.ReactNode }) {
+  // Initialize universe context when user is authenticated
+  useEffect(() => {
+    const initializeUniverse = () => {
+      try {
+        log.info('Setting authentication state for synced observables...');
+        // Set authentication state to trigger synced data loading
+        // This will automatically trigger the workspace API calls via syncedCrud
+        universeHelpers.setAuthenticated(true, 'current-user-id');
+        log.info('Authentication state set - synced observables will load data automatically');
+      } catch (error) {
+        log.error('Failed to set authentication state:', error);
+      }
+    };
+    
+    initializeUniverse();
+  }, []);
+  
   return (
     <div className="flex flex-col min-h-screen">
       <NavigationProgress />

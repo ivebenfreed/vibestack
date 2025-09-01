@@ -4,16 +4,15 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Globe, ChevronRight } from 'lucide-react'
+import { Users, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { WorldFolder } from './WorldFolder'
-import type { World } from '@/legend-state'
+import type { Team } from '@/legend-state'
 
-export const UniverseSection = observer(function UniverseSection({ 
-  personalWorlds,
+export const TeamsSection = observer(function TeamsSection({ 
+  teams,
   isCollapsed 
 }: {
-  personalWorlds: World[]
+  teams: Team[]
   isCollapsed?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -24,11 +23,11 @@ export const UniverseSection = observer(function UniverseSection({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="w-full justify-center">
-              <Globe className="h-4 w-4" />
+              <Users className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            My Universe ({personalWorlds.length} worlds)
+            Teams ({teams.length})
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -46,25 +45,34 @@ export const UniverseSection = observer(function UniverseSection({
             "h-3 w-3 mr-1 transition-transform",
             isOpen && "rotate-90"
           )} />
-          <Globe className="h-4 w-4 mr-2" />
-          <span className="flex-1 text-left font-medium">My Universe</span>
+          <Users className="h-4 w-4 mr-2" />
+          <span className="flex-1 text-left font-medium">Teams</span>
           <Badge variant="secondary" className="ml-auto">
-            {personalWorlds.length}
+            {teams.length}
           </Badge>
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="ml-2">
-        {personalWorlds.length > 0 ? (
-          personalWorlds.map(world => (
-            <WorldFolder 
-              key={world.id} 
-              world={world}
-              isPersonal={true}
-            />
+        {teams.length > 0 ? (
+          teams.map(team => (
+            <Button
+              key={team.id}
+              variant="ghost"
+              className="w-full justify-start px-6 py-1.5 h-auto font-normal text-xs"
+            >
+              <div className="flex items-center w-full">
+                <span className="flex-1 text-left">{team.name}</span>
+                {team.member_count && (
+                  <Badge variant="outline" className="ml-auto text-xs">
+                    {team.member_count}
+                  </Badge>
+                )}
+              </div>
+            </Button>
           ))
         ) : (
           <div className="text-xs text-muted-foreground px-6 py-2">
-            No personal worlds yet
+            No teams yet
           </div>
         )}
       </CollapsibleContent>

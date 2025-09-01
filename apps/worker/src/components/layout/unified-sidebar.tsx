@@ -6,7 +6,6 @@
 import * as React from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { useAuth } from '@/state-machines'
-import { OrganizationSwitcher } from './OrganizationSwitcher'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -153,12 +152,6 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <div className="px-3 py-4">
-          {/* Organization Switcher */}
-          {!isCollapsed && (
-            <div className="mb-6">
-              <OrganizationSwitcher />
-            </div>
-          )}
           
           {/* Main Navigation - Only show if there are items */}
           {mainNavigation.length > 0 && (

@@ -4,12 +4,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Globe, ChevronRight } from 'lucide-react'
+import { User, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { WorldFolder } from './WorldFolder'
 import type { World } from '@/legend-state'
 
-export const UniverseSection = observer(function UniverseSection({ 
+export const PersonalSection = observer(function PersonalSection({ 
   personalWorlds,
   isCollapsed 
 }: {
@@ -24,11 +24,11 @@ export const UniverseSection = observer(function UniverseSection({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="w-full justify-center">
-              <Globe className="h-4 w-4" />
+              <User className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            My Universe ({personalWorlds.length} worlds)
+            Personal ({personalWorlds.length} worlds)
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -46,8 +46,8 @@ export const UniverseSection = observer(function UniverseSection({
             "h-3 w-3 mr-1 transition-transform",
             isOpen && "rotate-90"
           )} />
-          <Globe className="h-4 w-4 mr-2" />
-          <span className="flex-1 text-left font-medium">My Universe</span>
+          <User className="h-4 w-4 mr-2" />
+          <span className="flex-1 text-left font-medium">Personal</span>
           <Badge variant="secondary" className="ml-auto">
             {personalWorlds.length}
           </Badge>
