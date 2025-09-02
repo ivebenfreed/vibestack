@@ -92,9 +92,12 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
     e.stopPropagation()
   }
   
+  // Get the clean display name for use in descriptions and icon detection
+  const displayName = entityDef?._originalName || entityName;
+
   // Override icon for specific entity names
   const getEntityIcon = () => {
-    const entityLower = entityName.toLowerCase()
+    const entityLower = displayName.toLowerCase()
     
     // Special cases based on entity name
     if (entityLower.includes('client') || entityLower.includes('customer')) {
@@ -116,7 +119,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
   }
 
   const getEntityDescription = () => {
-    const entityLower = entityName.toLowerCase()
+    const entityLower = displayName.toLowerCase()
     if (entityLower.includes('client') || entityLower.includes('customer')) return 'Business clients'
     if (entityLower.includes('project')) return 'Project records'
     if (entityLower.includes('task')) return 'Task records'
@@ -129,7 +132,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
     if (entityLower.includes('file')) return 'File records'
     if (entityLower.includes('discussion')) return 'Discussion records'
     if (entityLower.includes('setting')) return 'Configuration settings'
-    return `${entityName} records`
+    return `${displayName} records`
   }
 
   return (
@@ -139,7 +142,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
           <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
             <div className="flex items-center gap-2">
               <CardTitle className='text-sm font-medium'>
-                {entityName}
+                {displayName}
               </CardTitle>
               <Badge variant="secondary" className={archetypeConfig.color}>
                 {archetypeConfig.label}
@@ -194,7 +197,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Entity Type</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the "{entityName}" entity type? This action will:
+              Are you sure you want to delete the "{displayName}" entity type? This action will:
               <br />
               <br />
               • Remove the entity definition from your organization
