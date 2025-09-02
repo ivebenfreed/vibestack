@@ -109,15 +109,16 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     return fallbackKey || expectedEntityKey
   })()
   
-  const entityStore = schema ? getEntity$(actualEntityName) : null
+  // Always call getEntity$ to maintain consistent hook order
+  const entityStore = getEntity$(actualEntityName)
   
-  // Always call use$() hook, but pass null if entityStore doesn't exist
+  // Always call use$() hook to maintain consistent order
   const entityData = use$(entityStore)
   const isEntityLoading = false // Simplified for now
   const hasEntityLoaded = true // Simplified for now
   
-  // Convert object to array for display
-  const entityArray = entityData ? Object.values(entityData) : []
+  // Convert object to array for display - check if entityStore exists and has data
+  const entityArray = (entityStore && entityData) ? Object.values(entityData) : []
   
   // Get entity schema with UUID-prefixed lookup for universe context
   const entitySchema = (() => {
