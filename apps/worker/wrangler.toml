@@ -35,14 +35,12 @@ class_name = "ReplicationDO"
 name = "ORGANIZATION_ACTOR"
 class_name = "OrganizationActor"
 
+
 # Durable Objects migrations
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["SyncDO", "ReplicationDO"]
+new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrganizationActor"]
 
-[[migrations]]
-tag = "v2"
-new_sqlite_classes = ["OrganizationActor"]
 
 # Cron triggers
 [triggers]

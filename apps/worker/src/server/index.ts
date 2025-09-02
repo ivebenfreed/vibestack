@@ -14,8 +14,7 @@ import type { AppBindings } from './types/hono';
 import type { Env, ExecutionContext } from './types/env';
 import { SyncDO } from './sync/SyncDO';
 import { ReplicationDO } from './replication/ReplicationDO';
-import { OrganizationActor } from './actors/OrganizationActor';
-// OrgSchemaDO functionality replaced by OrganizationActor
+// OrgSchemaDO functionality removed - using direct PostgreSQL queries
 // SuperAdminDO removed - will handle super admin differently
 // OrgOpsDO archived - sync system is now pull-based
 import { getAuth, AuthType, initializeAuth } from './lib/auth';
@@ -522,7 +521,7 @@ apiApp.route('/org-admin', orgAdminRouter);
 // Mount protected routes with mandatory context validation
 mountProtectedRoutes(apiApp);
 
-// Mount Organization Actor routes (gradual migration alongside existing sync)
+// Mount Organization Actor routes (for permissions caching, not schema caching)
 apiApp.route('/org-actor', organizationActorRouter);
 
 // Mount OTHER public API routes (which will also be protected by authMiddleware)
@@ -843,5 +842,6 @@ const worker = {
   }
 };
 
-export { SyncDO, ReplicationDO, OrganizationActor };
+export { SyncDO, ReplicationDO };
+export { OrganizationActor } from './actors/OrganizationActor';
 export default worker; 

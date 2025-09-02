@@ -122,32 +122,8 @@ dataforgeRouter.post('/orgs/:orgId/entities',
       return c.json({ error: errorMessage, errors: result.errors }, 400);
     }
     
-    // 🔄 CACHE INVALIDATION: Clear OrganizationActor schema cache when new entity is created
-    if (c.env.ORGANIZATION_ACTOR) {
-      try {
-        console.log(`[EntityCreation] Invalidating OrganizationActor cache for new entity: ${entityName}`);
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        
-        const cacheInvalidationResponse = await orgActor.fetch(new Request('https://internal/clear-org-schema-cache', {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-org-id': security.organizationId
-          }
-        }));
-        
-        if (cacheInvalidationResponse.ok) {
-          const invalidationResult = await cacheInvalidationResponse.json();
-          console.log(`[EntityCreation] ✅ Cache invalidated successfully:`, invalidationResult);
-        } else {
-          const errorText = await cacheInvalidationResponse.text();
-          console.log(`[EntityCreation] ⚠️ Cache invalidation failed:`, cacheInvalidationResponse.status, errorText);
-        }
-      } catch (error) {
-        console.log(`[EntityCreation] ⚠️ Cache invalidation error:`, error instanceof Error ? error.message : String(error));
-      }
-    }
+    // Cache layer removed - using direct PostgreSQL queries with WAL real-time updates
+    console.log(`[EntityCreation] Created entity: ${entityName} (no cache invalidation needed)`);
     
     return c.json({ success: true, data: result.data });
   }
@@ -190,47 +166,9 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     
     // Check if cache busting is requested
     const bustCache = c.req.query('bustCache') === 'true';
-    console.log(`[Schema Cache] 🔍 bustCache parameter:`, bustCache);
-    if (bustCache) {
-      console.log(`[Schema Cache] 🚫 Cache busting requested - skipping cache lookup`);
-    }
+    // Direct PostgreSQL query (no caching complexity)
+    console.log(`[Schema Loading] 📡 Loading schema from PostgreSQL`);
     
-    // 1. First try OrganizationActor cache (unless cache busting)
-    if (c.env.ORGANIZATION_ACTOR && !bustCache) {
-      try {
-        console.log(`[Schema Cache] 📡 Trying OrganizationActor cache first`);
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema', {
-          headers: { 'x-org-id': security.organizationId }
-        }));
-        
-        if (cacheResponse.ok) {
-          const cacheResult = await cacheResponse.json();
-          console.log(`[Schema Cache] 🔍 Cache response:`, { 
-            cached: cacheResult.cached, 
-            schemaCount: cacheResult.schema?.length || 0 
-          });
-          
-          if (cacheResult.cached && cacheResult.schema && cacheResult.schema.length > 0) {
-            const responseTime = Date.now() - startTime;
-            console.log(`[Schema Cache] ✅ CACHE HIT - served from OrganizationActor SQLite cache (${responseTime}ms)`);
-            return c.json({
-              success: true,
-              schema: cacheResult.schema,
-              cached: true,
-              source: 'organization_actor_cache',
-              responseTime: responseTime
-            });
-          }
-        }
-      } catch (error) {
-        console.log(`[Schema Cache] ⚠️ Cache attempt failed:`, error instanceof Error ? error.message : String(error));
-      }
-    }
-    
-    // 2. Cache miss - fallback to PostgreSQL and populate cache
-    console.log(`[Schema Cache] 💾 CACHE MISS - falling back to PostgreSQL`);
     const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
@@ -245,41 +183,14 @@ dataforgeRouter.get('/orgs/:orgId/schema',
       return c.json({ error: result.error }, 500);
     }
     
-    // 3. Populate cache with fresh data
-    if (c.env.ORGANIZATION_ACTOR && result.data) {
-      try {
-        console.log(`[Schema Cache] 💾 Populating cache with fresh schema data (${result.data.length} entities)`);
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        const cacheWriteResponse = await orgActor.fetch(new Request('https://internal/cache-org-schema', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            organizationId: security.organizationId, 
-            schema: result.data 
-          })
-        }));
-        
-        if (cacheWriteResponse.ok) {
-          const cacheWriteResult = await cacheWriteResponse.json();
-          console.log(`[Schema Cache] ✅ Cache populated successfully:`, cacheWriteResult);
-        } else {
-          const errorText = await cacheWriteResponse.text();
-          console.log(`[Schema Cache] ❌ Cache population failed:`, cacheWriteResponse.status, errorText);
-        }
-      } catch (error) {
-        console.log(`[Schema Cache] ⚠️ Cache population failed:`, error instanceof Error ? error.message : String(error));
-      }
-    }
-    
     const responseTime = Date.now() - startTime;
-    console.log(`[Schema Cache] 📊 PostgreSQL response completed (${responseTime}ms) with ${result.data?.length || 0} entities`);
+    console.log(`[Schema Loading] ✅ PostgreSQL response completed (${responseTime}ms) with ${result.data?.length || 0} entities`);
     
     return c.json({
       success: true,
       schema: result.data,
       cached: false,
-      source: 'postgresql_fallback',
+      source: 'postgresql_direct',
       responseTime: responseTime
     });
   }
@@ -309,32 +220,8 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
       return c.json({ error: result.error }, result.error?.includes('not found') ? 404 : 500);
     }
     
-    // 🔄 CACHE INVALIDATION: Clear OrganizationActor schema cache when entity is deleted
-    if (c.env.ORGANIZATION_ACTOR) {
-      try {
-        console.log(`[EntityDeletion] Invalidating OrganizationActor cache for deleted entity: ${entityName}`);
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        
-        const cacheInvalidationResponse = await orgActor.fetch(new Request('https://internal/clear-org-schema-cache', {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-org-id': security.organizationId
-          }
-        }));
-        
-        if (cacheInvalidationResponse.ok) {
-          const invalidationResult = await cacheInvalidationResponse.json();
-          console.log(`[EntityDeletion] ✅ Cache invalidated successfully:`, invalidationResult);
-        } else {
-          const errorText = await cacheInvalidationResponse.text();
-          console.log(`[EntityDeletion] ⚠️ Cache invalidation failed:`, cacheInvalidationResponse.status, errorText);
-        }
-      } catch (error) {
-        console.log(`[EntityDeletion] ⚠️ Cache invalidation error:`, error instanceof Error ? error.message : String(error));
-      }
-    }
+    // Cache layer removed - using direct PostgreSQL queries with WAL real-time updates
+    console.log(`[EntityDeletion] Deleted entity: ${entityName} (no cache invalidation needed)`);
     
     return c.json({ success: true, message: result.message });
   }

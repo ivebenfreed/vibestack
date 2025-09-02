@@ -9,17 +9,17 @@ import { Hono } from 'hono';
 import type { AppContext } from '../types/hono';
 import { dbLogger } from '../middleware/logger';
 import { 
-  hybridRLSOrgActorMiddleware,
+  simpleRLSMiddleware,
   requireRole,
   requireAdmin,
   requireOwner
-} from '../middleware/hybrid-rls-org-actor';
+} from '../middleware/simple-rls';
 import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 const orgAdminRouter = new Hono<AppContext>();
 
 // Apply organization security middleware to all routes
-orgAdminRouter.use('/:orgId/*', hybridRLSOrgActorMiddleware);
+orgAdminRouter.use('/:orgId/*', simpleRLSMiddleware);
 
 // ==============================================
 // ORGANIZATION MEMBER ADMIN ACTIONS

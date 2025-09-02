@@ -12,8 +12,11 @@ services:
       -c max_logical_replication_workers=3
       -c log_statement=all
       -c log_replication_commands=on
-      -c logging_collector=on
+      -c logging_collector=off
       -c log_destination=stderr
+      -c log_min_messages=info
+      -c log_connections=on
+      -c log_disconnections=on
     volumes:
       - vibestack_main_postgres_data:/var/lib/postgresql/data
     ports:

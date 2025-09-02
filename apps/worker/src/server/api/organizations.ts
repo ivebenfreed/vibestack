@@ -5,12 +5,12 @@ import { OrganizationMemberService } from '../services/organization/Organization
 import { OrganizationInvitationService } from '../services/organization/OrganizationInvitationService';
 import type { AppContext } from '../types/hono';
 import { 
-  hybridRLSOrgActorMiddleware,
+  simpleRLSMiddleware,
   requirePermission,
   requireRole,
   requireAdmin,
   requireOwner
-} from '../middleware/hybrid-rls-org-actor';
+} from '../middleware/simple-rls';
 import { withKysely, createKyselyForPersistentUse } from '../lib/database-manager';
 import type { 
   CreateOrganizationInput, 
@@ -166,14 +166,14 @@ organizationsRouter.post('/set-default', async (c) => {
 
 // Apply hybrid security middleware to organization-scoped routes
 // This must come AFTER the switching endpoints to avoid conflicts
-organizationsRouter.use('/:orgId/*', hybridRLSOrgActorMiddleware);
+organizationsRouter.use('/:orgId/*', simpleRLSMiddleware);
 
-// MIGRATED TO HYBRID SECURITY: Legacy custom middleware removed
+// SIMPLIFIED SECURITY: Direct PostgreSQL queries with WAL real-time updates
 // Now using:
-// - hybridRLSOrgActorMiddleware for zero-latency permission checks
+// - simpleRLSMiddleware for direct database queries (no caching complexity)
 // - requireRole(), requireAdmin(), requireOwner() for declarative access control
 // - PostgreSQL RLS for organization-level data isolation
-// - Organization Actor SQLite cache for instant role validation
+// - WAL polling provides real-time updates without cache staleness
 
 // ==============================================
 // ORGANIZATION CRUD ENDPOINTS

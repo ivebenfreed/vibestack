@@ -112,14 +112,25 @@ export class ContextMenuManager {
   public destroy(): void {
     this.hide();
 
+    // Defer unmount to avoid React race condition during render
     if (this.root) {
-      this.root.unmount();
+      const rootToUnmount = this.root;
       this.root = null;
+      
+      setTimeout(() => {
+        rootToUnmount.unmount();
+      }, 0);
     }
 
     if (this.portal && this.portal.parentNode) {
-      this.portal.parentNode.removeChild(this.portal);
+      const portalToRemove = this.portal;
       this.portal = null;
+      
+      setTimeout(() => {
+        if (portalToRemove.parentNode) {
+          portalToRemove.parentNode.removeChild(portalToRemove);
+        }
+      }, 0);
     }
   }
 }

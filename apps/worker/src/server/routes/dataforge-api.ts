@@ -5,10 +5,10 @@
  * All entity operations must go through DataForge with archetype patterns.
  * 
  * SECURITY MODEL:
- * - Uses hybridRLSOrgActorMiddleware for zero-latency permission checks
+ * - Uses simpleRLSMiddleware for direct PostgreSQL queries (no caching complexity)
  * - PostgreSQL RLS handles organization-level data isolation
- * - Organization Actor SQLite cache provides instant role/permission validation
- * - 85-90% performance improvement over legacy RLS-only approach
+ * - WAL polling provides real-time updates without cache staleness
+ * - Simpler and more reliable than complex cache layers
  */
 
 import { Hono } from 'hono';
@@ -195,11 +195,11 @@ dataforgeRouter.post('/orgs/:orgId/entities',
   try {
     const body = await c.req.json();
     
-    // Get hybrid security context (zero-latency)
+    // Get security context from simple RLS middleware
     const security = c.get('security');
     const user = c.get('user');
     
-    // Zero-latency permission check already performed by requirePermission middleware
+    // Permission check already performed by requirePermission middleware
     console.log(`[DataForge] User ${user?.email || 'anonymous'} creating entity in org ${security.organizationId} with ${security.roleInfo?.role || 'unknown'} role`);
     
     const { entityName, archetype, customFields = [] } = body as {
@@ -244,12 +244,12 @@ dataforgeRouter.post('/orgs/:orgId/entities',
       }, 409); // 409 Conflict
     }
     
-    // Access control handled by hybrid security:
+    // Access control handled by simple RLS:
     // - PostgreSQL RLS provides organization-level data isolation
-    // - Organization Actor cache provided instant permission validation
+    // - Direct PostgreSQL queries for role validation
     const { withKysely } = await import('../lib/database-manager');
     
-    console.log(`[DataForge] User ${user?.email || 'unknown'} creating entity in org ${security.organizationId} - hybrid security active`);
+    console.log(`[DataForge] User ${user?.email || 'unknown'} creating entity in org ${security.organizationId} - simple RLS active`);
 
     // Lazy load additional components
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -1326,39 +1326,8 @@ dataforgeRouter.get('/orgs/:orgId/schema',
       console.log(`[Schema Cache] 🚫 Cache busting requested - skipping cache lookup`);
     }
     
-    // 1. First try OrganizationActor cache (unless cache busting)
-    try {
-      if (c.env.ORGANIZATION_ACTOR && !bustCache) {
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        
-        // Try to get schema from cache
-        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema', {
-          headers: { 'x-org-id': security.organizationId }
-        }));
-        
-        if (cacheResponse.ok) {
-          const cacheResult = await cacheResponse.json();
-          
-          if (cacheResult.cached && cacheResult.schema && cacheResult.schema.length > 0) {
-            console.log(`[Schema Cache] ✅ CACHE HIT - served from OrganizationActor SQLite cache (${Date.now() - startTime}ms)`);
-            
-            return c.json({
-              success: true,
-              schema: cacheResult.schema,
-              cached: true,
-              source: 'organization_actor_cache',
-              responseTime: Date.now() - startTime
-            });
-          }
-        }
-      }
-    } catch (cacheError) {
-      console.warn('[Schema Cache] Cache lookup failed, falling back to PostgreSQL:', cacheError);
-    }
-    
-    // 2. Cache miss - fallback to PostgreSQL and populate cache
-    console.log(`[Schema Cache] ❌ CACHE MISS - fetching from PostgreSQL`);
+    // Direct PostgreSQL query (no caching complexity)
+    console.log(`[Schema API] Fetching schema from PostgreSQL`);
     
     // Since ArchetypeEntityManager expects a kysely instance but we need to use safe patterns,
     // we'll need to use createKyselyForPersistentUse for this manager
@@ -1387,43 +1356,13 @@ dataforgeRouter.get('/orgs/:orgId/schema',
       return c.json({ error: `No schema found for org ${security.organizationId}` }, 404);
     }
     
-    // 3. Populate cache with fresh data
-    try {
-      if (c.env.ORGANIZATION_ACTOR) {
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        
-        const cacheRequest = new Request('https://internal/cache-org-schema', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            organizationId: security.organizationId,
-            schema: schema
-          })
-        });
-        
-        const cacheWriteResponse = await orgActor.fetch(cacheRequest);
-        
-        if (cacheWriteResponse.ok) {
-          const cacheWriteResult = await cacheWriteResponse.json();
-          console.log(`[Schema Cache] ✅ Cache populated successfully:`, cacheWriteResult);
-        } else {
-          const errorText = await cacheWriteResponse.text();
-          console.log(`[Schema Cache] ❌ Cache population failed:`, cacheWriteResponse.status, errorText);
-        }
-      }
-    } catch (populateError) {
-      console.warn('[Schema Cache] Failed to populate cache:', populateError);
-      // Don't fail the request if cache population fails
-    }
-
-    console.log(`[Schema Cache] ✅ PostgreSQL response served (${Date.now() - startTime}ms)`);
+    console.log(`[Schema API] ✅ PostgreSQL response served (${Date.now() - startTime}ms)`);
     
     return c.json({
       success: true,
       schema: schema,
       cached: false,
-      source: 'postgresql_with_cache_population',
+      source: 'postgresql_direct',
       responseTime: Date.now() - startTime
     });
   } catch (error) {
@@ -1499,42 +1438,11 @@ dataforgeRouter.delete('/orgs/:orgId/schema/cache',
     const security = c.get('security');
     const startTime = Date.now();
     
-    console.log(`[Schema Cache] 🗑️ CLEARING cache for org ${security.organizationId}`);
-    
-    try {
-      if (c.env.ORGANIZATION_ACTOR) {
-        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
-        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
-        
-        // Try to clear cache
-        const clearRequest = new Request('https://internal/clear-org-schema', {
-          method: 'DELETE',
-          headers: { 'x-org-id': security.organizationId }
-        });
-        
-        const clearResponse = await orgActor.fetch(clearRequest);
-        
-        if (clearResponse.ok) {
-          const result = await clearResponse.json();
-          console.log(`[Schema Cache] ✅ Cache cleared successfully (${Date.now() - startTime}ms)`);
-          
-          return c.json({
-            success: true,
-            message: 'Schema cache cleared successfully',
-            cleared: true,
-            responseTime: Date.now() - startTime
-          });
-        } else {
-          console.log(`[Schema Cache] ⚠️ Cache clear failed, but continuing (${Date.now() - startTime}ms)`);
-        }
-      }
-    } catch (cacheError) {
-      console.warn('[Schema Cache] Cache clear failed, but continuing:', cacheError);
-    }
+    console.log(`[Schema API] No cache to clear - using direct PostgreSQL`);
     
     return c.json({
       success: true,
-      message: 'Cache clear attempted',
+      message: 'No cache layer active - using direct PostgreSQL queries',
       cleared: false,
       responseTime: Date.now() - startTime
     });
