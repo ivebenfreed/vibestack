@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { simpleRLSMiddleware } from '../middleware/simple-rls';
+import { hybridRLSOrgActorMiddleware } from '../middleware/hybrid-rls-org-actor';
 import { db } from '../lib/kysely';
 
 const teamsApi = new Hono();
@@ -38,7 +38,7 @@ const UpdateMemberRoleSchema = z.object({
 });
 
 // Apply organization security middleware to all routes
-teamsApi.use('*', simpleRLSMiddleware);
+teamsApi.use('*', hybridRLSOrgActorMiddleware);
 
 /**
  * GET /api/teams/org/:orgId

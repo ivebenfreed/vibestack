@@ -8,12 +8,12 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../types/hono';
 import { 
-  simpleRLSMiddleware,
+  hybridRLSOrgActorMiddleware,
   requirePermission,
   requireRole,
   requireAdmin,
   requireOwner
-} from '../middleware/simple-rls';
+} from '../middleware/hybrid-rls-org-actor';
 import { apiLogger } from '../middleware/logger';
 
 // Legacy context validation imports kept for backward compatibility
@@ -32,8 +32,8 @@ export const adminRoutes = new Hono<AppContext>();
 
 // Apply hybrid security to organization-scoped routes
 // Routes will be mounted as /api/org/:orgId/* to enable automatic context extraction
-orgRoutes.use('/:orgId/*', simpleRLSMiddleware);
-adminRoutes.use('/:orgId/*', simpleRLSMiddleware);
+orgRoutes.use('/:orgId/*', hybridRLSOrgActorMiddleware);
+adminRoutes.use('/:orgId/*', hybridRLSOrgActorMiddleware);
 
 // =============================================================================
 // USER-ONLY ROUTES (require user context only)

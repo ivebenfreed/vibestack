@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
-import { simpleRLSMiddleware } from '../middleware/simple-rls';
+import { hybridRLSOrgActorMiddleware } from '../middleware/hybrid-rls-org-actor';
 import { withKysely } from '../lib/database-manager';
 
 const worldsApi = new Hono();
@@ -42,7 +42,7 @@ const WorldQuerySchema = z.object({
 });
 
 // Apply organization security middleware to all routes
-worldsApi.use('*', simpleRLSMiddleware);
+worldsApi.use('*', hybridRLSOrgActorMiddleware);
 
 /**
  * GET /api/worlds

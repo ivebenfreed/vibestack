@@ -5,10 +5,11 @@
  * All entity operations must go through DataForge with archetype patterns.
  * 
  * SECURITY MODEL:
- * - Uses simpleRLSMiddleware for direct PostgreSQL queries (no caching complexity)
+ * - Uses hybridRLSOrgActorMiddleware for zero-latency permission checks
  * - PostgreSQL RLS handles organization-level data isolation
- * - WAL polling provides real-time updates without cache staleness
- * - Simpler and more reliable than complex cache layers
+ * - Organization Actor SQLite cache provides instant role/permission validation
+ * - Direct PostgreSQL schema queries prevent cache staleness
+ * - WAL polling provides real-time updates for data changes
  */
 
 import { Hono } from 'hono';
@@ -195,7 +196,7 @@ dataforgeRouter.post('/orgs/:orgId/entities',
   try {
     const body = await c.req.json();
     
-    // Get security context from simple RLS middleware
+    // Get security context from hybrid RLS middleware
     const security = c.get('security');
     const user = c.get('user');
     
@@ -244,12 +245,12 @@ dataforgeRouter.post('/orgs/:orgId/entities',
       }, 409); // 409 Conflict
     }
     
-    // Access control handled by simple RLS:
+    // Access control handled by hybrid security:
     // - PostgreSQL RLS provides organization-level data isolation
-    // - Direct PostgreSQL queries for role validation
+    // - Organization Actor cache provided instant permission validation
     const { withKysely } = await import('../lib/database-manager');
     
-    console.log(`[DataForge] User ${user?.email || 'unknown'} creating entity in org ${security.organizationId} - simple RLS active`);
+    console.log(`[DataForge] User ${user?.email || 'unknown'} creating entity in org ${security.organizationId} - hybrid security active`);
 
     // Lazy load additional components
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
