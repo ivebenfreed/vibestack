@@ -10,136 +10,101 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 import { 
   Globe, 
   Building2, 
   User, 
   Users, 
-  Folder, 
   MoreHorizontal,
   Edit,
-  Trash2,
-  Eye,
-  Play,
-  Pause,
-  Archive,
-  Sparkles
+  ExternalLink,
+  Heart,
+  Target,
+  Activity,
+  Crown
 } from 'lucide-react';
 
-interface WorldData {
+interface World {
   id: string;
   name: string;
-  description?: string;
-  universe_id?: string; // If null, it's organizational
-  state: 'exploring' | 'developing' | 'active' | 'paused' | 'archived';
-  world_type: 'personal' | 'business' | 'client' | 'department' | 'project_domain';
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  slug: string;
+  type: 'personal' | 'business';
+  lore?: string; // Purpose, mission, story
+  canon?: string[]; // Rules, standards, boundaries
   created_at: string;
   updated_at: string;
-  created_by?: string;
-  // Additional computed properties
-  projectCount?: number;
-  isPersonal?: boolean;
+  role: 'member' | 'manager' | 'admin' | 'owner';
+  member_count?: number;
+  project_count?: number;
 }
 
 interface WorldCardProps {
-  world: WorldData;
-  onEdit?: (world: WorldData) => void;
-  onDelete?: (world: WorldData) => void;
-  onStateChange?: (world: WorldData, newState: WorldData['state']) => void;
+  world: World;
+  onEdit?: (world: World) => void;
+  onDelete?: (world: World) => void;
   className?: string;
 }
 
-// State configuration
-const STATE_CONFIG = {
-  exploring: { 
-    color: 'bg-blue-500/10 text-blue-600', 
-    icon: Eye, 
-    label: 'Exploring',
-    description: 'Initial discovery phase'
-  },
-  developing: { 
-    color: 'bg-yellow-500/10 text-yellow-600', 
-    icon: Edit, 
-    label: 'Developing',
-    description: 'Building and planning'
-  },
-  active: { 
-    color: 'bg-green-500/10 text-green-600', 
-    icon: Play, 
-    label: 'Active',
-    description: 'Actively working'
-  },
-  paused: { 
-    color: 'bg-orange-500/10 text-orange-600', 
-    icon: Pause, 
-    label: 'Paused',
-    description: 'Temporarily on hold'
-  },
-  archived: { 
-    color: 'bg-gray-500/10 text-gray-600', 
-    icon: Archive, 
-    label: 'Archived',
-    description: 'Completed or inactive'
-  },
-};
-
-// World type configuration
-const TYPE_CONFIG = {
-  personal: { color: 'bg-purple-500/10 text-purple-600', icon: User, label: 'Personal' },
-  business: { color: 'bg-blue-500/10 text-blue-600', icon: Building2, label: 'Business' },
-  client: { color: 'bg-green-500/10 text-green-600', icon: Users, label: 'Client' },
-  department: { color: 'bg-indigo-500/10 text-indigo-600', icon: Building2, label: 'Department' },
-  project_domain: { color: 'bg-pink-500/10 text-pink-600', icon: Folder, label: 'Project Domain' },
-};
-
-// Priority configuration
-const PRIORITY_CONFIG = {
-  low: { color: 'bg-gray-500/10 text-gray-600', label: 'Low' },
-  medium: { color: 'bg-blue-500/10 text-blue-600', label: 'Medium' },
-  high: { color: 'bg-orange-500/10 text-orange-600', label: 'High' },
-  critical: { color: 'bg-red-500/10 text-red-600', label: 'Critical' },
-};
-
-export const WorldCard: React.FC<WorldCardProps> = ({
-  world,
-  onEdit,
-  onDelete,
-  onStateChange,
-  className = ''
-}) => {
-  const stateConfig = STATE_CONFIG[world.state];
-  const typeConfig = TYPE_CONFIG[world.world_type];
-  const priorityConfig = PRIORITY_CONFIG[world.priority];
-  const StateIcon = stateConfig.icon;
-  const TypeIcon = typeConfig.icon;
+export function WorldCard({ world, onEdit, onDelete, className }: WorldCardProps) {
+  const isPersonal = world.type === 'personal';
   
-  const isPersonal = !!world.universe_id;
-
-  const handleStateChange = (newState: WorldData['state']) => {
-    if (onStateChange) {
-      onStateChange(world, newState);
+  // Determine role colors and icons
+  const getRoleInfo = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return { color: 'text-yellow-600', icon: Crown, label: 'Owner' };
+      case 'admin':
+        return { color: 'text-red-600', icon: Users, label: 'Admin' };
+      case 'manager':
+        return { color: 'text-blue-600', icon: Users, label: 'Manager' };
+      default:
+        return { color: 'text-gray-600', icon: User, label: 'Member' };
     }
   };
 
+  const roleInfo = getRoleInfo(world.role);
+  const RoleIcon = roleInfo.icon;
+
+  // Simulate world health (in real app, this would come from backend)
+  const worldHealth = {
+    momentum: 75,
+    satisfaction: 85,
+    alignment: 90
+  };
+
+  const overallHealth = Math.round((worldHealth.momentum + worldHealth.satisfaction + worldHealth.alignment) / 3);
+
   return (
-    <Card className={`hover:shadow-md transition-shadow ${className}`}>
+    <Card className={`group hover:shadow-md transition-shadow ${className}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3">
-            <div className={`p-2 rounded-lg ${typeConfig.color}`}>
-              <TypeIcon className="h-4 w-4" />
+          <div className="flex items-start gap-3 flex-1">
+            <div className={`p-2 rounded-lg ${isPersonal ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+              {isPersonal ? (
+                <Globe className="h-5 w-5" />
+              ) : (
+                <Building2 className="h-5 w-5" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-semibold truncate">
-                {world.name}
-                {isPersonal && (
-                  <Sparkles className="inline h-3 w-3 ml-1 text-purple-500" />
-                )}
-              </CardTitle>
-              <CardDescription className="text-sm text-muted-foreground">
-                {world.description || `${typeConfig.label} world`}
-              </CardDescription>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg leading-6 truncate">
+                  {world.name}
+                </CardTitle>
+                <Badge 
+                  variant="secondary" 
+                  className={`text-xs ${isPersonal ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}
+                >
+                  {isPersonal ? 'Personal' : 'Business'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1 mt-1">
+                <RoleIcon className={`h-3 w-3 ${roleInfo.color}`} />
+                <span className={`text-xs ${roleInfo.color}`}>
+                  {roleInfo.label}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -153,87 +118,111 @@ export const WorldCard: React.FC<WorldCardProps> = ({
               <DropdownMenuLabel>World Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onEdit?.(world)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
+                <Edit className="h-4 w-4 mr-2" />
+                Edit World
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open World
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>Change State</DropdownMenuLabel>
-              {Object.entries(STATE_CONFIG).map(([state, config]) => {
-                const Icon = config.icon;
-                return (
-                  <DropdownMenuItem
-                    key={state}
-                    onClick={() => handleStateChange(state as WorldData['state'])}
-                    disabled={world.state === state}
-                  >
-                    <Icon className="mr-2 h-4 w-4" />
-                    {config.label}
-                  </DropdownMenuItem>
-                );
-              })}
-              <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onClick={() => onDelete?.(world)}
-                className="text-destructive"
+                onClick={() => onDelete?.(world)} 
+                className="text-red-600"
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                <Users className="h-4 w-4 mr-2" />
+                Leave World
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </CardHeader>
-      
-      <CardContent className="pt-0 space-y-3">
-        {/* State and Priority Badges */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary" className={stateConfig.color}>
-            <StateIcon className="mr-1 h-3 w-3" />
-            {stateConfig.label}
-          </Badge>
-          
-          <Badge variant="outline" className={priorityConfig.color}>
-            {priorityConfig.label}
-          </Badge>
-          
-          {isPersonal ? (
-            <Badge variant="outline" className="bg-purple-500/10 text-purple-600">
-              <User className="mr-1 h-3 w-3" />
-              Personal
-            </Badge>
-          ) : (
-            <Badge variant="outline" className={typeConfig.color}>
-              <TypeIcon className="mr-1 h-3 w-3" />
-              {typeConfig.label}
-            </Badge>
-          )}
-        </div>
-        
-        {/* Project Count */}
-        {typeof world.projectCount === 'number' && (
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Folder className="h-3 w-3" />
-            <span>{world.projectCount} project{world.projectCount !== 1 ? 's' : ''}</span>
+
+      <CardContent className="space-y-4">
+        {/* World Lore */}
+        {world.lore && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Heart className="h-4 w-4 text-red-500" />
+              <span className="text-sm font-medium text-muted-foreground">Lore</span>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {world.lore.length > 120 ? `${world.lore.substring(0, 120)}...` : world.lore}
+            </p>
           </div>
         )}
-        
-        {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <span>Updated {new Date(world.updated_at).toLocaleDateString()}</span>
-          {world.state !== 'active' && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => handleStateChange('active')}
-              className="h-6 px-2 text-xs"
-            >
-              Activate
-            </Button>
-          )}
+
+        {/* World Canon */}
+        {world.canon && world.canon.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-muted-foreground">Canon</span>
+            </div>
+            <div className="space-y-1">
+              {world.canon.slice(0, 2).map((rule, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-600 mt-2 flex-shrink-0" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {rule.length > 60 ? `${rule.substring(0, 60)}...` : rule}
+                  </p>
+                </div>
+              ))}
+              {world.canon.length > 2 && (
+                <p className="text-xs text-muted-foreground italic">
+                  +{world.canon.length - 2} more rules...
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* World Health */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-orange-500" />
+            <span className="text-sm font-medium text-muted-foreground">World Health</span>
+            <Badge variant="outline" className="text-xs">
+              {overallHealth}%
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Momentum</span>
+              <span>{worldHealth.momentum}%</span>
+            </div>
+            <Progress value={worldHealth.momentum} className="h-1" />
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center justify-between pt-2 border-t">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span>{world.member_count || 0}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Building2 className="h-4 w-4" />
+              <span>{world.project_count || 0} projects</span>
+            </div>
+          </div>
+          
+          <Badge 
+            variant="outline" 
+            className={`${
+              overallHealth >= 80 ? 'border-green-200 text-green-700' :
+              overallHealth >= 60 ? 'border-yellow-200 text-yellow-700' :
+              'border-red-200 text-red-700'
+            }`}
+          >
+            {overallHealth >= 80 ? 'Thriving' :
+             overallHealth >= 60 ? 'Growing' : 'Needs Attention'}
+          </Badge>
         </div>
       </CardContent>
     </Card>
   );
-};
+}
 
 export default WorldCard;

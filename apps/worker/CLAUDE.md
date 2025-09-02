@@ -35,10 +35,10 @@ This is a full-stack React admin dashboard built for Cloudflare Workers with the
 ### Backend Stack
 - **Cloudflare Workers** for serverless compute
 - **Hono** with **OpenAPI** integration for the web framework
-- **D1** for the database (SQLite)
+- **PostgreSQL** for the database (with Hyperdrive optimization)
 - **KV** for key-value storage
 - **Better Auth** for authentication with OpenAPI documentation
-- **Drizzle ORM** for database operations
+- **Kysely** for type-safe database operations
 - **Cloudflare AI** for AI chat functionality
 
 ### Key Architecture Patterns
@@ -68,7 +68,40 @@ This is a full-stack React admin dashboard built for Cloudflare Workers with the
 6. **Cloudflare Integration**:
    - Worker entry point in `worker.ts` using Hono
    - API functions in `functions/api/` directory
-   - Environment bindings for D1, KV, AI, and auth secrets
+   - Environment bindings for PostgreSQL, KV, AI, and auth secrets
+
+## AI Universe Architecture
+
+VibeStack implements an **AI Universe** model for organizing life and work across major areas with lore and canon frameworks:
+
+### Universe Hierarchy
+```
+User's Universe → Worlds (Organizations) → Projects → Tasks
+```
+
+- **Universe**: The complete scope of a user's life and work
+- **Worlds**: Major life/business areas (5-6 max) - these ARE organizations
+- **Projects**: Specific work initiatives within worlds (formerly called "worlds" before architectural fix)
+- **Tasks**: Individual action items within projects
+
+### World Framework
+Each world (organization) has:
+- **Lore**: Purpose, mission, and story ("why this world exists")
+- **Canon**: Non-negotiable rules and standards that govern the world
+- **Health Metrics**: Momentum, satisfaction, and alignment tracking
+- **Role-based Access**: Owner, Admin, Manager, Member permissions
+
+### Key Features
+- **Multi-tenant**: Users belong to multiple organizations/worlds
+- **Universe Context**: Legend State manages cross-organization state
+- **World Types**: Personal worlds (life areas) vs Business worlds (companies)
+- **Real-time Sync**: WebSocket synchronization across worlds and devices
+
+### Implementation Notes
+- Organizations table contains `lore` (TEXT) and `canon` (JSONB) fields
+- Former "worlds" table was dropped - those micro-worlds became projects
+- Universe API (`/api/universe/complete`) returns organizations as worlds
+- Frontend components (`WorldManager`, `WorldCard`) display organization data as worlds
 
 ## Important Configuration
 
@@ -82,9 +115,10 @@ This is a full-stack React admin dashboard built for Cloudflare Workers with the
 - Strict unused variable checking with underscore prefix exception
 
 ### Database
-- Uses D1 (Cloudflare's SQLite) with Drizzle ORM
-- Schema and migrations in `database/` directory
-- Local development uses file-based SQLite
+- Uses PostgreSQL with Kysely ORM for type-safe queries
+- Cloudflare Hyperdrive for connection pooling and optimization in production
+- Schema and migrations in `apps/worker/src/server/migrations/` directory
+- Local development uses Docker PostgreSQL with git-tracked data
 
 ### Modified ShadcnUI Components
 The following components have been customized for RTL support and should not be updated via Shadcn CLI without reviewing changes:
@@ -118,11 +152,16 @@ New routes defined in `src/server/routes/` with Zod schemas automatically appear
 ## Authentication & Testing
 
 ### Test User Credentials
-For development and testing purposes:
-- **Email**: `demo@example.com`  
-- **Password**: `password123`
+**Wide Corp Solutions Test Users** (Organization ID: `01920000-1000-7000-8000-000000000001`):
+- **Owner**: `ceo@widecorp.com` / `WideCorp2024!CEO` (Alice CEO)
+- **Admin**: `cto@widecorp.com` / `WideCorp2024!CTO` (Bob CTO)  
+- **Manager**: `pm1@widecorp.com` / `WideCorp2024!PM1` (Carol PM)
+- **Member**: `dev1@widecorp.com` / `WideCorp2024!DEV1` (Eve Developer)
 
-**Note**: Users must be created via Better Auth API. Use this curl command to create new test users:
+**Legacy Demo User**:
+- **Email**: `demo@example.com` / **Password**: `password123`
+
+**Creating New Users**:
 ```bash
 curl -X POST http://localhost:5174/api/auth/sign-up/email \
   -H "Content-Type: application/json" \

@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict tkPlDEimKTUTh8IR0AdgF1DqXFxBCAKShNAeD3u6Y5wAc9iNIUUISI0PaelMVkk
+\restrict h6mRYcf04PyG0om2Pu4zjLSNqFVlmmlUpFFubHqUUM1Qs5n3BJUPozbXSHv4HgT
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict tkPlDEimKTUTh8IR0AdgF1DqXFxBCAKShNAeD3u6Y5wAc9iNIUUISI0PaelMVkk
+\unrestrict h6mRYcf04PyG0om2Pu4zjLSNqFVlmmlUpFFubHqUUM1Qs5n3BJUPozbXSHv4HgT
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict wpmLSwL5vRYqwrcf2Kh7U5pfHT3h4bVgxqqd4jLdZpdVKdRg4YaAs0aGo4LlhAc
+\restrict gjcOl5JGUFa8S6KrmTzBzRzNDR4bm7Um2cFq1zflZkyVr0QIDdYjpHEzAPFPb4C
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wpmLSwL5vRYqwrcf2Kh7U5pfHT3h4bVgxqqd4jLdZpdVKdRg4YaAs0aGo4LlhAc
+\unrestrict gjcOl5JGUFa8S6KrmTzBzRzNDR4bm7Um2cFq1zflZkyVr0QIDdYjpHEzAPFPb4C
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict a2NyMvkGiaDQbGc3Sn54Vh4aigALOsn4LEwpTtUZ0W7kVchlsX64k9oczpC0av5
+\restrict rwHdfgZFWnif9nBdf1jcK37h5WTK31hIxF2opzA5F5DkCSkBzzUrFw8Z5iHGNzb
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a2NyMvkGiaDQbGc3Sn54Vh4aigALOsn4LEwpTtUZ0W7kVchlsX64k9oczpC0av5
+\unrestrict rwHdfgZFWnif9nBdf1jcK37h5WTK31hIxF2opzA5F5DkCSkBzzUrFw8Z5iHGNzb
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict xnxvuGtrKoX92w3YsfKzU7bgpZWYaC5HkpKhWRzSis2M9T0WeB9ywvuuCJkwJQL
+\restrict PBIen1CRzAIR3o0V9c6X9FfV5GN3v9J3B6r2DFoTBHtxiGcWJFXJlJd8BP7N3Im
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict xnxvuGtrKoX92w3YsfKzU7bgpZWYaC5HkpKhWRzSis2M9T0WeB9ywvuuCJkwJQL
+\unrestrict PBIen1CRzAIR3o0V9c6X9FfV5GN3v9J3B6r2DFoTBHtxiGcWJFXJlJd8BP7N3Im
 \connect vibestack_dev
-\restrict xnxvuGtrKoX92w3YsfKzU7bgpZWYaC5HkpKhWRzSis2M9T0WeB9ywvuuCJkwJQL
+\restrict PBIen1CRzAIR3o0V9c6X9FfV5GN3v9J3B6r2DFoTBHtxiGcWJFXJlJd8BP7N3Im
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2901,11 +2901,68 @@ CREATE TABLE public.organizations (
     settings jsonb DEFAULT '{}'::jsonb,
     type text DEFAULT 'business'::text,
     owner_user_id text,
-    auto_created boolean DEFAULT false
+    auto_created boolean DEFAULT false,
+    lore text,
+    canon jsonb DEFAULT '[]'::jsonb
 );
 
 
 ALTER TABLE public.organizations OWNER TO postgres;
+
+--
+-- Name: TABLE organizations; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.organizations IS 'Organizations table - each organization represents a "world" in a user''s universe with its own lore (purpose) and canon (rules)';
+
+
+--
+-- Name: COLUMN organizations.lore; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.organizations.lore IS 'World lore: The purpose, mission, and story of this world (organization)';
+
+
+--
+-- Name: COLUMN organizations.canon; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.organizations.canon IS 'World canon: The rules, standards, and boundaries that govern this world';
+
+
+--
+-- Name: projects; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.projects (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    team_id uuid,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'active'::text,
+    priority text DEFAULT 'medium'::text,
+    project_type text,
+    start_date date,
+    target_completion_date date,
+    actual_completion_date date,
+    created_by uuid,
+    project_lead_id uuid,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT projects_priority_check CHECK ((priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text]))),
+    CONSTRAINT projects_status_check CHECK ((status = ANY (ARRAY['active'::text, 'completed'::text, 'paused'::text, 'cancelled'::text])))
+);
+
+
+ALTER TABLE public.projects OWNER TO postgres;
+
+--
+-- Name: TABLE projects; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.projects IS 'Projects table - contains actual work initiatives within organization worlds. Converted from the original worlds table to eliminate micro-worlds.';
+
 
 --
 -- Name: schema_metadata; Type: TABLE; Schema: public; Owner: postgres
@@ -3171,44 +3228,6 @@ CREATE TABLE public.verification (
 ALTER TABLE public.verification OWNER TO postgres;
 
 --
--- Name: worlds; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.worlds (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id text NOT NULL,
-    team_id uuid,
-    name text NOT NULL,
-    description text,
-    state text DEFAULT 'active'::text NOT NULL,
-    world_type text NOT NULL,
-    priority text DEFAULT 'medium'::text NOT NULL,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now(),
-    created_by uuid,
-    CONSTRAINT worlds_priority_check CHECK ((priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text]))),
-    CONSTRAINT worlds_state_check CHECK ((state = ANY (ARRAY['exploring'::text, 'developing'::text, 'active'::text, 'paused'::text, 'archived'::text]))),
-    CONSTRAINT worlds_world_type_check CHECK ((world_type = ANY (ARRAY['personal'::text, 'business'::text, 'client'::text, 'department'::text, 'project_domain'::text])))
-);
-
-
-ALTER TABLE public.worlds OWNER TO postgres;
-
---
--- Name: TABLE worlds; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON TABLE public.worlds IS 'Life areas (personal) or business domains (organizational), can be org-wide or team-specific';
-
-
---
--- Name: COLUMN worlds.team_id; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.worlds.team_id IS 'NULL = org-wide world, NOT NULL = team-specific world';
-
-
---
 -- Name: endpoints endpoints_pkey; Type: CONSTRAINT; Schema: neon_control_plane; Owner: postgres
 --
 
@@ -3449,6 +3468,22 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: projects projects_org_name_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.projects
+    ADD CONSTRAINT projects_org_name_unique UNIQUE (organization_id, name);
+
+
+--
+-- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.projects
+    ADD CONSTRAINT projects_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: schema_metadata schema_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3566,14 +3601,6 @@ ALTER TABLE ONLY public."user"
 
 ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
-
-
---
--- Name: worlds worlds_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.worlds
-    ADD CONSTRAINT worlds_pkey PRIMARY KEY (id);
 
 
 --
@@ -3731,6 +3758,48 @@ CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_projects_created_a ON 
 
 
 --
+-- Name: idx_organizations_canon_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_organizations_canon_gin ON public.organizations USING gin (canon);
+
+
+--
+-- Name: idx_organizations_lore_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_organizations_lore_gin ON public.organizations USING gin (to_tsvector('english'::regconfig, lore));
+
+
+--
+-- Name: idx_projects_created_by; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_projects_created_by ON public.projects USING btree (created_by);
+
+
+--
+-- Name: idx_projects_lead; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_projects_lead ON public.projects USING btree (project_lead_id);
+
+
+--
+-- Name: idx_projects_org_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_projects_org_status ON public.projects USING btree (organization_id, status);
+
+
+--
+-- Name: idx_projects_team; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_projects_team ON public.projects USING btree (team_id);
+
+
+--
 -- Name: idx_secure_config_key; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -3840,41 +3909,6 @@ CREATE INDEX idx_user_last_org_access_at ON public."user" USING btree (last_org_
 --
 
 CREATE INDEX idx_user_last_used_organization_id ON public."user" USING btree (last_used_organization_id);
-
-
---
--- Name: idx_worlds_org_team; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_org_team ON public.worlds USING btree (organization_id, team_id);
-
-
---
--- Name: idx_worlds_organization_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_organization_id ON public.worlds USING btree (organization_id);
-
-
---
--- Name: idx_worlds_state; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_state ON public.worlds USING btree (state);
-
-
---
--- Name: idx_worlds_team_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_team_id ON public.worlds USING btree (team_id);
-
-
---
--- Name: idx_worlds_updated_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_worlds_updated_at ON public.worlds USING btree (updated_at);
 
 
 --
@@ -4167,6 +4201,22 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: projects projects_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.projects
+    ADD CONSTRAINT projects_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: projects projects_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.projects
+    ADD CONSTRAINT projects_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE SET NULL;
+
+
+--
 -- Name: session session_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4212,14 +4262,6 @@ ALTER TABLE ONLY public."user"
 
 ALTER TABLE ONLY public."user"
     ADD CONSTRAINT user_last_used_organization_id_fkey FOREIGN KEY (last_used_organization_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
-
-
---
--- Name: worlds worlds_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.worlds
-    ADD CONSTRAINT worlds_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE SET NULL;
 
 
 --
@@ -4294,12 +4336,6 @@ ALTER TABLE public.team_memberships ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
-
---
--- Name: worlds; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.worlds ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: vibestack_pub; Type: PUBLICATION; Schema: -; Owner: postgres
@@ -4477,7 +4513,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xnxvuGtrKoX92w3YsfKzU7bgpZWYaC5HkpKhWRzSis2M9T0WeB9ywvuuCJkwJQL
+\unrestrict PBIen1CRzAIR3o0V9c6X9FfV5GN3v9J3B6r2DFoTBHtxiGcWJFXJlJd8BP7N3Im
 
 --
 -- PostgreSQL database cluster dump complete

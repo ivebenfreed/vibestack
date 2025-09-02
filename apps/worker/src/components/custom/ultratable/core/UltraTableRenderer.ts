@@ -58,7 +58,7 @@ export class UltraTableRenderer {
   private editingCell: { rowId: string; columnId: string } | null = null;
   
   // Virtual scrolling state
-  private viewport: ViewportInfo = {
+  private viewportInfo: ViewportInfo = {
     scrollTop: 0,
     scrollLeft: 0,
     containerWidth: 0,
@@ -181,7 +181,7 @@ export class UltraTableRenderer {
     const startTime = performance.now();
     
     this.entities = entities;
-    this.viewport.totalRows = entities.length;
+    this.viewportInfo.totalRows = entities.length;
     
     // Update body container height for virtual scrolling
     const totalHeight = entities.length * this.rowHeight;
@@ -198,7 +198,7 @@ export class UltraTableRenderer {
       log.info('[UltraTableRenderer] Data updated:', {
         entityCount: entities.length,
         renderTime: Math.round(this.renderMetrics.renderTime * 100) / 100,
-        visibleRange: `${this.viewport.visibleStart}-${this.viewport.visibleEnd}`
+        visibleRange: `${this.viewportInfo.visibleStart}-${this.viewportInfo.visibleEnd}`
       });
     }
   }
@@ -369,8 +369,8 @@ export class UltraTableRenderer {
       const startTime = performance.now();
       
       const visibleEntities = this.entities.slice(
-        this.viewport.visibleStart, 
-        this.viewport.visibleEnd
+        this.viewportInfo.visibleStart, 
+        this.viewportInfo.visibleEnd
       );
       
       // Track which rows are currently needed
@@ -381,7 +381,7 @@ export class UltraTableRenderer {
       
       // Render visible rows
       visibleEntities.forEach((entity, index) => {
-        const absoluteIndex = this.viewport.visibleStart + index;
+        const absoluteIndex = this.viewportInfo.visibleStart + index;
         this.renderRow(entity, absoluteIndex);
       });
       
@@ -535,26 +535,26 @@ export class UltraTableRenderer {
     if (!this.viewport || !this.entities.length) return;
     
     const containerRect = this.viewport.getBoundingClientRect();
-    this.viewport.containerWidth = containerRect.width;
-    this.viewport.containerHeight = containerRect.height;
-    this.viewport.scrollTop = this.viewport.scrollTop;
-    this.viewport.scrollLeft = this.viewport.scrollLeft;
+    this.viewportInfo.containerWidth = containerRect.width;
+    this.viewportInfo.containerHeight = containerRect.height;
+    this.viewportInfo.scrollTop = this.viewport.scrollTop;
+    this.viewportInfo.scrollLeft = this.viewport.scrollLeft;
     
     // Calculate visible row range with buffer
     const visibleStart = Math.max(0, 
-      Math.floor(this.viewport.scrollTop / this.rowHeight) - this.bufferRows
+      Math.floor(this.viewportInfo.scrollTop / this.rowHeight) - this.bufferRows
     );
     const visibleEnd = Math.min(this.entities.length,
-      Math.ceil((this.viewport.scrollTop + this.viewport.containerHeight) / this.rowHeight) + this.bufferRows
+      Math.ceil((this.viewportInfo.scrollTop + this.viewportInfo.containerHeight) / this.rowHeight) + this.bufferRows
     );
     
-    if (visibleStart !== this.viewport.visibleStart || visibleEnd !== this.viewport.visibleEnd) {
-      this.viewport.visibleStart = visibleStart;
-      this.viewport.visibleEnd = visibleEnd;
+    if (visibleStart !== this.viewportInfo.visibleStart || visibleEnd !== this.viewportInfo.visibleEnd) {
+      this.viewportInfo.visibleStart = visibleStart;
+      this.viewportInfo.visibleEnd = visibleEnd;
       
       if (this.options.debug) {
         log.info('[UltraTableRenderer] Viewport updated:', {
-          scrollTop: this.viewport.scrollTop,
+          scrollTop: this.viewportInfo.scrollTop,
           visibleRange: `${visibleStart}-${visibleEnd}`,
           totalRows: this.entities.length
         });
@@ -594,15 +594,15 @@ export class UltraTableRenderer {
       if (this.scrollRAF) return;
       
       this.scrollRAF = requestAnimationFrame(() => {
-        this.viewport.scrollTop = this.viewport.scrollTop;
-        this.viewport.scrollLeft = this.viewport.scrollLeft;
+        this.viewportInfo.scrollTop = this.viewport.scrollTop;
+        this.viewportInfo.scrollLeft = this.viewport.scrollLeft;
         
         this.updateViewport();
         this.renderVisibleRows();
         this.syncHeaderScroll();
         
         // Notify scroll
-        this.options.onScroll?.(this.viewport.scrollTop, this.viewport.scrollLeft);
+        this.options.onScroll?.(this.viewportInfo.scrollTop, this.viewportInfo.scrollLeft);
         
         this.scrollRAF = null;
       });
@@ -615,7 +615,7 @@ export class UltraTableRenderer {
   
   private syncHeaderScroll(): void {
     // Sync header horizontal scroll with body
-    this.headerContainer.style.transform = `translateX(-${this.viewport.scrollLeft}px)`;
+    this.headerContainer.style.transform = `translateX(-${this.viewportInfo.scrollLeft}px)`;
   }
   
   private handleCellClick(rowId: string, columnId: string, value: any, rowData: any): void {
