@@ -157,8 +157,21 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
  * Create a synced entity observable using Legend State patterns
  */
 function createEntityObservable(orgId: string, entityName: string, schema?: any) {
-  const baseUrl = `/api/dataforge/orgs/${orgId}/data/${entityName}`
-  const syncUrl = `/api/dataforge/orgs/${orgId}/sync/${entityName}`
+  // CRITICAL FIX: When in universe mode (orgId = 'universe'), extract the real organization ID
+  // from the entity schema to make proper API calls
+  let actualOrgId = orgId
+  let actualEntityName = entityName
+  
+  if (orgId === 'universe' && schema) {
+    // In universe mode, use the actual organization ID from the schema
+    actualOrgId = schema._organizationId || orgId
+    actualEntityName = schema._originalName || entityName
+    
+    log.info(`[Observable] Universe mode - using actual org ${actualOrgId} for entity ${actualEntityName} (was ${entityName})`)
+  }
+  
+  const baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
+  const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
   
   // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
@@ -244,8 +257,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-Entity-Name': entityName, // Help server debugging
-            'X-Org-Context': orgId,      // Audit trail
+            'X-Entity-Name': actualEntityName, // Help server debugging
+            'X-Org-Context': actualOrgId,      // Audit trail
             'X-User-Context': orgContext$.userId.peek() || 'unknown', // User context
           },
           credentials: 'include',
@@ -306,8 +319,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-Entity-Name': entityName,
-            'X-Org-Context': orgId,
+            'X-Entity-Name': actualEntityName,
+            'X-Org-Context': actualOrgId,
             'X-User-Context': orgContext$.userId.peek() || 'unknown',
             'X-Record-Id': item.id, // Help with server-side debugging
           },
@@ -361,8 +374,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           credentials: 'include',
           headers: { 
             'Accept': 'application/json',
-            'X-Entity-Name': entityName,
-            'X-Org-Context': orgId,
+            'X-Entity-Name': actualEntityName,
+            'X-Org-Context': actualOrgId,
             'X-User-Context': orgContext$.userId.peek() || 'unknown',
             'X-Record-Id': item.id,
           }
@@ -414,8 +427,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-Entity-Name': entityName,
-            'X-Org-Context': orgId,
+            'X-Entity-Name': actualEntityName,
+            'X-Org-Context': actualOrgId,
             'X-User-Context': orgContext$.userId.peek() || 'unknown',
             'X-Batch-Size': items.length.toString(),
           },
@@ -1251,12 +1264,26 @@ export const entityOperations = {
         log.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
         
         // Fallback: trigger a manual server delete (bypass Legend State sync)
-        const orgId = orgContext$.orgId.peek()
-        if (!orgId) {
+        const contextOrgId = orgContext$.orgId.peek()
+        if (!contextOrgId) {
           throw new Error('No organization context available')
         }
         
-        const baseUrl = `/api/dataforge/orgs/${orgId}/data/${entityName}`
+        // Extract actual org ID if in universe mode
+        let deleteOrgId = contextOrgId
+        let deleteEntityName = entityName
+        if (contextOrgId === 'universe') {
+          // Need to get the entity schema to extract the real org ID
+          const currentSchema = orgContext$.schema.peek()
+          const entitySchema = currentSchema?.entities?.[entityName]
+          if (entitySchema) {
+            deleteOrgId = entitySchema._organizationId || contextOrgId
+            deleteEntityName = entitySchema._originalName || entityName
+            log.info(`[Observable] Delete fallback - using actual org ${deleteOrgId} for entity ${deleteEntityName}`)
+          }
+        }
+        
+        const baseUrl = `/api/dataforge/orgs/${deleteOrgId}/data/${deleteEntityName}`
         const response = await fetch(`${baseUrl}/${id}`, {
           method: 'DELETE',
           headers: {
