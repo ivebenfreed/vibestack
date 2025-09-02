@@ -9,7 +9,7 @@ import { Context, Next } from 'hono';
 import type { Env } from '../types/env';
 import { getAuth } from '../lib/auth';
 import { OrgAccessService } from '../services/org-access-service';
-import { getKysely } from '../lib/database-manager';
+import { withKysely, createKyselyForPersistentUse } from '../lib/database-manager';
 import { apiLogger } from './logger';
 
 const MODULE_NAME = 'context-validation';
@@ -206,12 +206,13 @@ export async function requireOrganization() {
         }, MODULE_NAME);
 
         // For admin users, we need to fetch the organization data directly
-        const kysely = getKysely();
-        const organization = await kysely
-          .selectFrom('organizations')
-          .select(['id', 'slug', 'name'])
-          .where('slug', '=', organizationSlug)
-          .executeTakeFirst();
+        const organization = await withKysely(async (kysely) => {
+          return await kysely
+            .selectFrom('organizations')
+            .select(['id', 'slug', 'name'])
+            .where('slug', '=', organizationSlug)
+            .executeTakeFirst();
+        });
 
         if (!organization) {
           apiLogger.warn('Organization not found', {
@@ -237,7 +238,7 @@ export async function requireOrganization() {
         };
       } else {
         // Regular user access check
-        const kysely = getKysely();
+        const kysely = createKyselyForPersistentUse();
         const orgAccessService = new OrgAccessService(kysely, c.env);
         
         orgAccess = await orgAccessService.checkUserOrgAccess(

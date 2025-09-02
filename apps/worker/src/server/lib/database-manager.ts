@@ -8,134 +8,193 @@ import { dbLogger } from '../middleware/logger';
 type Database = any;
 
 /**
- * Centralized Database Connection for Cloudflare Workers
+ * Cloudflare Workers Database Connection
  * 
- * Creates one postgres.js connection per Worker request, shared by both
- * Kysely ORM and raw SQL operations. No pooling - each Worker execution
- * gets a single connection that's automatically cleaned up.
- * 
- * Workers pattern: connection per request, not connection pooling
+ * Following postgres.js documentation for Workers:
+ * - Create fresh connection per request (no sharing across requests)  
+ * - Workers handle connection lifecycle automatically
+ * - Use Hyperdrive when available for connection pooling
  */
 
-let requestConnection: {
-  pgClient: ReturnType<typeof postgres>;
-  kyselyInstance: Kysely<Database>;
-  env: Env;
-} | null = null;
+// Store env for creating connections on-demand
+let workerEnv: Env | null = null;
 
 /**
- * Create database connection for this Worker request
- * Call once at the start of request processing
+ * Initialize database manager with environment
+ * Call once at worker startup
  */
-export function createDatabaseConnection(env: Env): void {
-  // Clean up any existing connection first
-  if (requestConnection) {
-    console.log('⚠️ Cleaning up existing connection before creating new one');
-    cleanupDatabaseConnection();
+export function initializeDatabaseManager(env: Env): void {
+  workerEnv = env;
+  console.log('🔧 Database manager initialized');
+}
+
+/**
+ * Create fresh postgres.js connection for each request
+ * Following Cloudflare Workers best practices
+ */
+function createPostgresConnection(): ReturnType<typeof postgres> {
+  if (!workerEnv) {
+    throw new Error('Database manager not initialized. Call initializeDatabaseManager(env) first.');
   }
 
   // Determine connection string
-  const isLocal = env.ENVIRONMENT === 'local' || env.ENVIRONMENT === 'development';
+  const isLocal = workerEnv.ENVIRONMENT === 'local' || workerEnv.ENVIRONMENT === 'development';
   const connectionString = isLocal 
-    ? env.DATABASE_URL 
-    : (env.HYPERDRIVE_DB?.connectionString || env.DATABASE_URL);
+    ? workerEnv.DATABASE_URL 
+    : (workerEnv.HYPERDRIVE_DB?.connectionString || workerEnv.DATABASE_URL);
   
   if (!connectionString) {
     throw new Error('No database connection available. Please provide either HYPERDRIVE_DB or DATABASE_URL');
   }
 
-  const source = isLocal ? 'Direct (Local)' : (env.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct');
-  console.log(`🚀 Creating single postgres.js connection for Worker request (${source})...`);
+  const source = isLocal ? 'Direct (Local)' : (workerEnv.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct');
+  
+  // Create fresh postgres.js connection for this request
+  // postgres.js handles Workers-specific optimizations automatically
+  const pgClient = postgres(connectionString);
+  
+  console.log(`🚀 Created fresh postgres.js connection (${source})`);
+  return pgClient;
+}
 
-  // Single postgres.js connection for this Worker execution - NO POOLING
-  const pgClient = postgres(connectionString, {
-    // Workers-specific: single connection, no pooling
-    max: 1,                    // One connection only
-    idle_timeout: 0,           // No idle timeout - Worker handles lifecycle
-    connect_timeout: 5,        // Quick connection timeout
-    fetch_types: false,        // Reduce latency
-    prepare: false,            // No prepared statements
-    transform: undefined,      // No transforms
-    debug: false,              // No debug logging
-  });
+/**
+ * Execute queries using Kysely with automatic connection cleanup
+ * This creates a connection, executes the queries, and immediately closes the connection
+ */
+export async function withKysely<T>(fn: (db: Kysely<Database>) => Promise<T>): Promise<T> {
+  if (!workerEnv) {
+    throw new Error('Database manager not initialized. Call initializeDatabaseManager(env) first.');
+  }
 
-  // Create Kysely instance using the same postgres.js connection
-  const kyselyInstance = new Kysely<Database>({
+  const pgClient = createPostgresConnection();
+  const source = workerEnv.ENVIRONMENT === 'local' || workerEnv.ENVIRONMENT === 'development'
+    ? 'Direct (Local)' 
+    : (workerEnv.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct');
+
+  const db = new Kysely<Database>({
     dialect: new PostgresJSDialectPatched(pgClient),
     log: (event) => {
       if (event.level === 'query') {
-        console.log(`🔍 KYSELY QUERY (${source}):`, event.query.sql);
         dbLogger.debug(`Kysely ${source} Query`, {
           sql: event.query.sql,
           parameters: event.query.parameters,
           duration: event.queryDurationMillis
         }, `kysely-${source.toLowerCase()}`);
       } else if (event.level === 'error') {
-        console.log(`❌ KYSELY ${source.toUpperCase()} ERROR:`, event.error);
         dbLogger.error(`Kysely ${source} Error`, event.error, undefined, `kysely-${source.toLowerCase()}`);
       }
     }
   });
 
-  // Store connection for this request
-  requestConnection = { pgClient, kyselyInstance, env };
-  console.log(`✅ Single database connection created for Worker request (${source})`);
+  try {
+    return await fn(db);
+  } finally {
+    // Always close the connection after queries complete
+    try {
+      await db.destroy();
+    } catch (error) {
+      console.warn('Connection cleanup warning:', error);
+    }
+  }
 }
 
 /**
- * Get Kysely ORM instance for this request
- * Uses the single postgres.js connection
+ * Execute queries using postgres.js client with automatic connection cleanup
+ */
+export async function withPostgresClient<T>(fn: (client: ReturnType<typeof postgres>) => Promise<T>): Promise<T> {
+  const client = createPostgresConnection();
+  try {
+    return await fn(client);
+  } finally {
+    // Always close the connection after queries complete
+    try {
+      await client.end();
+    } catch (error) {
+      console.warn('Connection cleanup warning:', error);
+    }
+  }
+}
+
+/**
+ * Create a long-lived Kysely instance for systems that need persistent connections
+ * ONLY use this for Better Auth and other systems that manage their own connection lifecycle
+ * This creates a connection that MUST be manually destroyed when done
+ */
+export function createKyselyForPersistentUse(): Kysely<Database> {
+  if (!workerEnv) {
+    throw new Error('Database manager not initialized. Call initializeDatabaseManager(env) first.');
+  }
+
+  const pgClient = createPostgresConnection();
+  const source = workerEnv.ENVIRONMENT === 'local' || workerEnv.ENVIRONMENT === 'development'
+    ? 'Direct (Local)' 
+    : (workerEnv.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct');
+
+  console.warn('⚠️ Creating long-lived Kysely connection - ensure it gets destroyed!');
+
+  return new Kysely<Database>({
+    dialect: new PostgresJSDialectPatched(pgClient),
+    log: (event) => {
+      if (event.level === 'query') {
+        dbLogger.debug(`Kysely ${source} Query`, {
+          sql: event.query.sql,
+          parameters: event.query.parameters,
+          duration: event.queryDurationMillis
+        }, `kysely-${source.toLowerCase()}`);
+      } else if (event.level === 'error') {
+        dbLogger.error(`Kysely ${source} Error`, event.error, undefined, `kysely-${source.toLowerCase()}`);
+      }
+    }
+  });
+}
+
+/**
+ * @deprecated Use withKysely() to ensure connections are properly closed
+ * Legacy function that creates unclosed connections - DO NOT USE
  */
 export function getKysely(): Kysely<Database> {
-  if (!requestConnection) {
-    throw new Error('No database connection. Call createDatabaseConnection(env) first.');
-  }
-  return requestConnection.kyselyInstance;
+  console.error('❌ getKysely() is deprecated and creates connection leaks! Use withKysely() instead');
+  throw new Error('getKysely() is disabled to prevent connection leaks. Use withKysely() instead.');
 }
 
 /**
- * Get raw postgres.js client for this request
- * Same connection used by Kysely - no additional connections
+ * @deprecated Use withPostgresClient() to ensure connections are properly closed
+ * Legacy function that creates unclosed connections - DO NOT USE
  */
 export function getPostgresClient(): ReturnType<typeof postgres> {
-  if (!requestConnection) {
-    throw new Error('No database connection. Call createDatabaseConnection(env) first.');
-  }
-  return requestConnection.pgClient;
+  console.error('❌ getPostgresClient() is deprecated and creates connection leaks! Use withPostgresClient() instead');
+  throw new Error('getPostgresClient() is disabled to prevent connection leaks. Use withPostgresClient() instead.');
 }
 
 /**
- * Execute raw SQL query using the shared postgres.js connection
+ * Execute raw SQL query with fresh connection
+ * Connection is automatically closed after query completes
  */
 export async function executeSQL<T = any>(query: string, params: any[] = []): Promise<T[]> {
-  const client = getPostgresClient();
+  const client = createPostgresConnection();
   try {
     const result = await client.unsafe(query, params);
     return result as T[];
   } catch (error) {
     console.error('SQL query error:', error);
     throw error;
+  } finally {
+    // Close connection after query completes
+    await client.end();
   }
 }
 
-/**
- * Cleanup database connection for this Worker request
- * Workers handle this automatically, but can be called manually
- */
-export function cleanupDatabaseConnection(): void {
-  if (requestConnection) {
-    try {
-      // postgres.js connections clean up automatically in Workers
-      // Just clear the reference
-      requestConnection = null;
-      console.log('✅ Database connection cleaned up');
-    } catch (error) {
-      console.error('❌ Database cleanup error:', error);
-    }
-  }
-}
-
-// Convenience exports that match existing patterns
-export const db = getKysely;
-export const pgClient = getPostgresClient; 
+// New safe exports that ensure connections are closed
+export const db = withKysely;
+export const pgClient = withPostgresClient; 
 export const sql = executeSQL;
+
+// Legacy compatibility - create database connection (now just initializes manager)
+export function createDatabaseConnection(env: Env): void {
+  initializeDatabaseManager(env);
+}
+
+// Legacy cleanup function (no-op since we don't share connections)
+export function cleanupDatabaseConnection(): void {
+  // No-op: postgres.js connections clean up automatically in Workers
+}

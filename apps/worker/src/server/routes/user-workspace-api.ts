@@ -9,7 +9,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
-import { db } from '../lib/kysely';
+import { withKysely } from '../lib/database-manager';
 
 const workspaceApi = new Hono();
 
@@ -45,20 +45,22 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
 
   try {
     // Get all organizations user belongs to
-    const userOrganizations = await db(c.env)
-      .selectFrom('organization_members as om')
-      .innerJoin('organizations as o', 'o.id', 'om.organization_id')
-      .select([
-        'o.id',
-        'o.name',
-        'o.slug',
-        'o.type',
-        'om.role',
-        'om.created_at as joined_at'
-      ])
-      .where('om.user_id', '=', userId)
-      .orderBy('o.name', 'asc')
-      .execute();
+    const userOrganizations = await withKysely(async (db) => {
+      return await db
+        .selectFrom('organization_members as om')
+        .innerJoin('organizations as o', 'o.id', 'om.organization_id')
+        .select([
+          'o.id',
+          'o.name',
+          'o.slug',
+          'o.type',
+          'om.role',
+          'om.created_at as joined_at'
+        ])
+        .where('om.user_id', '=', userId)
+        .orderBy('o.name', 'asc')
+        .execute();
+    });
 
     if (userOrganizations.length === 0) {
       return c.json({
@@ -81,88 +83,94 @@ workspaceApi.get('/complete', zValidator('query', WorkspaceQuerySchema), async (
     const orgIds = userOrganizations.map(org => org.id);
 
     // Get personal worlds (from user's personal organization)
-    let personalWorldsQuery = db(c.env)
-      .selectFrom('worlds as w')
-      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
-      .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
-          .on('om.user_id', '=', (eb) => eb.val(userId))
-      )
-      .select([
-        'w.id',
-        'w.organization_id', 
-        'w.name',
-        'w.description',
-        'w.state',
-        'w.world_type',
-        'w.priority',
-        'w.created_at',
-        'w.updated_at'
-      ])
-      .where('o.type', '=', 'personal')
+    const personalWorlds = await withKysely(async (db) => {
+      let personalWorldsQuery = db
+        .selectFrom('worlds as w')
+        .innerJoin('organizations as o', 'o.id', 'w.organization_id')
+        .innerJoin('organization_members as om', (join) =>
+          join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
+            .on('om.user_id', '=', (eb) => eb.val(userId))
+        )
+        .select([
+          'w.id',
+          'w.organization_id', 
+          'w.name',
+          'w.description',
+          'w.state',
+          'w.world_type',
+          'w.priority',
+          'w.created_at',
+          'w.updated_at'
+        ])
+        .where('o.type', '=', 'personal');
 
-    if (!includeInactive) {
-      personalWorldsQuery = personalWorldsQuery.where('w.state', 'in', ['active', 'developing']);
-    }
-    if (!includeArchived) {
-      personalWorldsQuery = personalWorldsQuery.where('w.state', '!=', 'archived');
-    }
+      if (!includeInactive) {
+        personalWorldsQuery = personalWorldsQuery.where('w.state', 'in', ['active', 'developing']);
+      }
+      if (!includeArchived) {
+        personalWorldsQuery = personalWorldsQuery.where('w.state', '!=', 'archived');
+      }
 
-    const personalWorlds = await personalWorldsQuery.execute();
+      return await personalWorldsQuery.execute();
+    });
 
     // Get business worlds (from business organizations user belongs to)  
-    let businessWorldsQuery = db(c.env)
-      .selectFrom('worlds as w')
-      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
-      .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
-      .leftJoin('team_memberships as tm', (join) =>
-        join.on('tm.team_id', '=', (eb) => eb.ref('w.team_id'))
-          .on('tm.user_id', '=', (eb) => eb.val(userId))
-      )
-      .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
-          .on('om.user_id', '=', (eb) => eb.val(userId))
-      )
-      .select([
-        'w.id',
-        'w.organization_id',
-        'w.team_id',
-        'w.name', 
-        'w.description',
-        'w.state',
-        'w.world_type',
-        'w.priority',
-        'w.created_at',
-        'w.updated_at',
-        't.name as team_name'
-      ])
-      .where('o.type', '=', 'business')
-      .where('w.organization_id', 'in', orgIds);
+    const businessWorlds = await withKysely(async (db) => {
+      let businessWorldsQuery = db
+        .selectFrom('worlds as w')
+        .innerJoin('organizations as o', 'o.id', 'w.organization_id')
+        .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
+        .leftJoin('team_memberships as tm', (join) =>
+          join.on('tm.team_id', '=', (eb) => eb.ref('w.team_id'))
+            .on('tm.user_id', '=', (eb) => eb.val(userId))
+        )
+        .innerJoin('organization_members as om', (join) =>
+          join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
+            .on('om.user_id', '=', (eb) => eb.val(userId))
+        )
+        .select([
+          'w.id',
+          'w.organization_id',
+          'w.team_id',
+          'w.name', 
+          'w.description',
+          'w.state',
+          'w.world_type',
+          'w.priority',
+          'w.created_at',
+          'w.updated_at',
+          't.name as team_name'
+        ])
+        .where('o.type', '=', 'business')
+        .where('w.organization_id', 'in', orgIds);
 
-    if (!includeInactive) {
-      businessWorldsQuery = businessWorldsQuery.where('w.state', 'in', ['active', 'developing']);
-    }
-    if (!includeArchived) {
-      businessWorldsQuery = businessWorldsQuery.where('w.state', '!=', 'archived');
-    }
+      if (!includeInactive) {
+        businessWorldsQuery = businessWorldsQuery.where('w.state', 'in', ['active', 'developing']);
+      }
+      if (!includeArchived) {
+        businessWorldsQuery = businessWorldsQuery.where('w.state', '!=', 'archived');
+      }
 
-    const businessWorlds = await businessWorldsQuery.execute();
+      return await businessWorldsQuery.execute();
+    });
 
     // Get team memberships
-    const teamMemberships = await db(c.env)
-      .selectFrom('team_memberships as tm')
-      .innerJoin('teams as t', 't.id', 'tm.team_id')
-      .select([
-        'tm.role as team_role',
-        't.id as team_id',
-        't.organization_id',
-        't.name as team_name',
-        't.description as team_description',
-        't.team_type'
-      ])
-      .where('tm.user_id', '=', userId)
-      .where('t.organization_id', 'in', orgIds)
-      .execute();
+    const teamMemberships = await withKysely(async (db) => {
+      return await db
+        .selectFrom('team_memberships as tm')
+        .innerJoin('teams as t', 't.id', 'tm.team_id')
+        .select([
+          'tm.role as team_role',
+          't.id as team_id',
+          't.organization_id',
+          't.name as team_name',
+          't.description as team_description',
+          't.team_type'
+        ])
+        .where('tm.user_id', '=', userId)
+        .where('t.organization_id', 'in', orgIds)
+        .execute();
+    });
 
     // Build the workspace data structure with actual data
     const workspaceData = {
@@ -237,34 +245,36 @@ workspaceApi.get('/personal', zValidator('query', WorkspaceQuerySchema), async (
 
   try {
     // Get user's personal worlds from their personal organization
-    let personalWorldsQuery = db(c.env)
-      .selectFrom('worlds as w')
-      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
-      .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
-          .on('om.user_id', '=', (eb) => eb.val(userId))
-      )
-      .select([
-        'w.id',
-        'w.organization_id',
-        'w.name',
-        'w.description',
-        'w.state',
-        'w.world_type',
-        'w.priority',
-        'w.created_at',
-        'w.updated_at'
-      ])
-      .where('o.type', '=', 'personal')
+    const personalWorlds = await withKysely(async (db) => {
+      let personalWorldsQuery = db
+        .selectFrom('worlds as w')
+        .innerJoin('organizations as o', 'o.id', 'w.organization_id')
+        .innerJoin('organization_members as om', (join) =>
+          join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
+            .on('om.user_id', '=', (eb) => eb.val(userId))
+        )
+        .select([
+          'w.id',
+          'w.organization_id',
+          'w.name',
+          'w.description',
+          'w.state',
+          'w.world_type',
+          'w.priority',
+          'w.created_at',
+          'w.updated_at'
+        ])
+        .where('o.type', '=', 'personal');
 
-    if (!includeInactive) {
-      personalWorldsQuery = personalWorldsQuery.where('w.state', 'in', ['active', 'developing']);
-    }
-    if (!includeArchived) {
-      personalWorldsQuery = personalWorldsQuery.where('w.state', '!=', 'archived');
-    }
+      if (!includeInactive) {
+        personalWorldsQuery = personalWorldsQuery.where('w.state', 'in', ['active', 'developing']);
+      }
+      if (!includeArchived) {
+        personalWorldsQuery = personalWorldsQuery.where('w.state', '!=', 'archived');
+      }
 
-    const personalWorlds = await personalWorldsQuery.execute();
+      return await personalWorldsQuery.execute();
+    });
 
     return c.json({
       success: true,
@@ -300,20 +310,22 @@ workspaceApi.get('/organizations', zValidator('query', WorkspaceQuerySchema), as
 
   try {
     // Get all organizations with user's role
-    const organizations = await db(c.env)
-      .selectFrom('organization_members as om')
-      .innerJoin('organizations as o', 'o.id', 'om.organization_id')
-      .select([
-        'o.id',
-        'o.name',
-        'o.slug',
-        'o.type',
-        'om.role',
-        'om.created_at as joined_at'
-      ])
-      .where('om.user_id', '=', userId)
-      .orderBy('o.name', 'asc')
-      .execute();
+    const organizations = await withKysely(async (db) => {
+      return await db
+        .selectFrom('organization_members as om')
+        .innerJoin('organizations as o', 'o.id', 'om.organization_id')
+        .select([
+          'o.id',
+          'o.name',
+          'o.slug',
+          'o.type',
+          'om.role',
+          'om.created_at as joined_at'
+        ])
+        .where('om.user_id', '=', userId)
+        .orderBy('o.name', 'asc')
+        .execute();
+    });
 
     if (organizations.length === 0) {
       return c.json({
@@ -329,60 +341,64 @@ workspaceApi.get('/organizations', zValidator('query', WorkspaceQuerySchema), as
     const orgIds = organizations.map(org => org.id);
 
     // Get business worlds and teams for all business organizations
-    let businessWorldsQuery = db(c.env)
-      .selectFrom('worlds as w')
-      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
-      .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
-      .leftJoin('team_memberships as tm', (join) =>
-        join.on('tm.team_id', '=', (eb) => eb.ref('w.team_id'))
-          .on('tm.user_id', '=', (eb) => eb.val(userId))
-      )
-      .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
-          .on('om.user_id', '=', (eb) => eb.val(userId))
-      )
-      .select([
-        'w.id',
-        'w.organization_id',
-        'w.team_id',
-        'w.name',
-        'w.description',
-        'w.state',
-        'w.world_type',
-        'w.priority',
-        'w.created_at',
-        'w.updated_at',
-        't.name as team_name',
-        'tm.role as team_role',
-        'om.role as org_role'
-      ])
-      .where('o.type', '=', 'business')
-      .where('w.organization_id', 'in', orgIds);
+    const businessWorlds = await withKysely(async (db) => {
+      let businessWorldsQuery = db
+        .selectFrom('worlds as w')
+        .innerJoin('organizations as o', 'o.id', 'w.organization_id')
+        .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
+        .leftJoin('team_memberships as tm', (join) =>
+          join.on('tm.team_id', '=', (eb) => eb.ref('w.team_id'))
+            .on('tm.user_id', '=', (eb) => eb.val(userId))
+        )
+        .innerJoin('organization_members as om', (join) =>
+          join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
+            .on('om.user_id', '=', (eb) => eb.val(userId))
+        )
+        .select([
+          'w.id',
+          'w.organization_id',
+          'w.team_id',
+          'w.name',
+          'w.description',
+          'w.state',
+          'w.world_type',
+          'w.priority',
+          'w.created_at',
+          'w.updated_at',
+          't.name as team_name',
+          'tm.role as team_role',
+          'om.role as org_role'
+        ])
+        .where('o.type', '=', 'business')
+        .where('w.organization_id', 'in', orgIds);
 
-    if (!includeInactive) {
-      businessWorldsQuery = businessWorldsQuery.where('w.state', 'in', ['active', 'developing']);
-    }
-    if (!includeArchived) {
-      businessWorldsQuery = businessWorldsQuery.where('w.state', '!=', 'archived');
-    }
+      if (!includeInactive) {
+        businessWorldsQuery = businessWorldsQuery.where('w.state', 'in', ['active', 'developing']);
+      }
+      if (!includeArchived) {
+        businessWorldsQuery = businessWorldsQuery.where('w.state', '!=', 'archived');
+      }
 
-    const businessWorlds = await businessWorldsQuery.execute();
+      return await businessWorldsQuery.execute();
+    });
 
     // Get team memberships
-    const teamMemberships = await db(c.env)
-      .selectFrom('team_memberships as tm')
-      .innerJoin('teams as t', 't.id', 'tm.team_id')
-      .select([
-        'tm.role as team_role',
-        't.id as team_id',
-        't.organization_id',
-        't.name as team_name',
-        't.description as team_description',
-        't.team_type'
-      ])
-      .where('tm.user_id', '=', userId)
-      .where('t.organization_id', 'in', orgIds)
-      .execute();
+    const teamMemberships = await withKysely(async (db) => {
+      return await db
+        .selectFrom('team_memberships as tm')
+        .innerJoin('teams as t', 't.id', 'tm.team_id')
+        .select([
+          'tm.role as team_role',
+          't.id as team_id',
+          't.organization_id',
+          't.name as team_name',
+          't.description as team_description',
+          't.team_type'
+        ])
+        .where('tm.user_id', '=', userId)
+        .where('t.organization_id', 'in', orgIds)
+        .execute();
+    });
 
     // Organize by organization
     const organizationsData = organizations.map(org => ({
@@ -428,46 +444,48 @@ workspaceApi.get('/activity', zValidator('query', ActivityQuerySchema), async (c
     // Get recent updates across worlds and teams (simplified architecture)
     // This is a simplified version - in a real implementation, you'd have a dedicated activity log
 
-    const recentWorldUpdates = await db(c.env)
-      .selectFrom('worlds as w')
-      .innerJoin('organizations as o', 'o.id', 'w.organization_id')
-      .innerJoin('organization_members as om', (join) =>
-        join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
-          .on('om.user_id', '=', (eb) => eb.val(userId))
-      )
-      .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
-      .select([
-        'w.id',
-        'w.name',
-        'w.organization_id',
-        'w.team_id',
-        'w.updated_at',
-        't.name as team_name',
-        'o.type as org_type',
-        (eb) => eb.lit('world_updated').as('activity_type')
-      ])
-      .where('w.updated_at', '>=', cutoffDate)
-      // Apply org-scoped access control
-      .where((eb) => eb.or([
-        // Personal worlds: user's personal org (already filtered by organization membership)
-        eb('o.type', '=', 'personal'),
-        // Business worlds: accessible based on org membership and team access
-        eb.and([
-          eb('o.type', '=', 'business'),
-          eb.or([
-            eb.and([eb('w.team_id', 'is', null), eb('w.state', '=', 'active')]),
-            eb('w.team_id', 'in', 
-              eb.selectFrom('team_memberships')
-                .select('team_id')
-                .where('user_id', '=', userId)
-            ),
-            eb('om.role', 'in', ['admin', 'owner'])
-          ])
+    const recentWorldUpdates = await withKysely(async (db) => {
+      return await db
+        .selectFrom('worlds as w')
+        .innerJoin('organizations as o', 'o.id', 'w.organization_id')
+        .innerJoin('organization_members as om', (join) =>
+          join.on('om.organization_id', '=', (eb) => eb.ref('w.organization_id'))
+            .on('om.user_id', '=', (eb) => eb.val(userId))
+        )
+        .leftJoin('teams as t', (join) => join.on('t.id', '=', (eb) => eb.ref('w.team_id')))
+        .select([
+          'w.id',
+          'w.name',
+          'w.organization_id',
+          'w.team_id',
+          'w.updated_at',
+          't.name as team_name',
+          'o.type as org_type',
+          (eb) => eb.lit('world_updated').as('activity_type')
         ])
-      ]))
-      .orderBy('w.updated_at', 'desc')
-      .limit(limit)
-      .execute();
+        .where('w.updated_at', '>=', cutoffDate)
+        // Apply org-scoped access control
+        .where((eb) => eb.or([
+          // Personal worlds: user's personal org (already filtered by organization membership)
+          eb('o.type', '=', 'personal'),
+          // Business worlds: accessible based on org membership and team access
+          eb.and([
+            eb('o.type', '=', 'business'),
+            eb.or([
+              eb.and([eb('w.team_id', 'is', null), eb('w.state', '=', 'active')]),
+              eb('w.team_id', 'in', 
+                eb.selectFrom('team_memberships')
+                  .select('team_id')
+                  .where('user_id', '=', userId)
+              ),
+              eb('om.role', 'in', ['admin', 'owner'])
+            ])
+          ])
+        ]))
+        .orderBy('w.updated_at', 'desc')
+        .limit(limit)
+        .execute();
+    });
 
     // Sort activity by most recent
     const allActivity = [...recentWorldUpdates]

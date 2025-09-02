@@ -1,6 +1,6 @@
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
-import { getKysely } from './database-manager';
+import { createKyselyForPersistentUse } from './database-manager';
 import { uuidv7 } from 'uuidv7';
 
 /**
@@ -9,7 +9,7 @@ import { uuidv7 } from 'uuidv7';
  */
 export function createKVSessionInterceptor(env: Env) {
   // Database connection already established by middleware
-  const kyselyInstance = getKysely();
+  const kyselyInstance = createKyselyForPersistentUse();
   
   // Create a proxy that intercepts session operations
   return new Proxy(kyselyInstance, {

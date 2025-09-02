@@ -1,7 +1,7 @@
 import type { Env } from '../types/env';
 import type { ReplicationConfig } from './types';
 import { replicationLogger } from '../middleware/logger';
-import { createDatabaseConnection, getPostgresClient, cleanupDatabaseConnection } from '../lib/database-manager';
+import { createDatabaseConnection, withPostgresClient, cleanupDatabaseConnection } from '../lib/database-manager';
 import type { MinimalContext } from '../types/hono';
 import type { TableChange } from '@repo/sync-types';
 import { StateManager } from './state-manager';
@@ -541,39 +541,35 @@ export class PollingManager {
 
   private async pollForChanges(): Promise<WALData[] | null> {
     try {      
-      replicationLogger.debug('Polling for changes using centralized DB connection', {
+      replicationLogger.debug('Polling for changes using safe connection pattern', {
         slot: this.config.slot,
         batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
       }, MODULE_NAME);
       
-      // Use centralized postgres.js client - no new connection creation
-      const client = getPostgresClient();
-      
-      const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
-      
-      // Consume changes and advance LSN automatically - no need to track LSN state
-      const result = await client`
-        SELECT data, lsn, xid 
-        FROM pg_logical_slot_get_changes(
-          ${this.config.slot},
-          NULL,
-          NULL,
-          'include-xids', '1',
-          'include-timestamp', 'true'
-        )
-        LIMIT ${batchSize}
-      `;
-      
-      // Using centralized connection - no manual cleanup needed
-      // Connection is shared across all database operations in this Worker
-      
-      const newChanges = result.map(row => ({
-        data: row.data as string,
-        lsn: row.lsn as string,
-        xid: row.xid as string
-      }));
-      
-      return newChanges.length > 0 ? newChanges : null;
+      return await withPostgresClient(async (client) => {
+        const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
+        
+        // Consume changes and advance LSN automatically - no need to track LSN state
+        const result = await client.unsafe(`
+          SELECT data, lsn, xid 
+          FROM pg_logical_slot_get_changes(
+            $1,
+            NULL,
+            NULL,
+            'include-xids', '1',
+            'include-timestamp', 'true'
+          )
+          LIMIT $2
+        `, [this.config.slot, batchSize]);
+        
+        const newChanges = result.map(row => ({
+          data: row.data as string,
+          lsn: row.lsn as string,
+          xid: row.xid as string
+        }));
+        
+        return newChanges.length > 0 ? newChanges : null;
+      });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       const errorStack = err instanceof Error ? err.stack : undefined;
@@ -584,16 +580,7 @@ export class PollingManager {
         errorType: errorName,
         slot: this.config.slot,
         currentLSN: await this.stateManager.getLSN().catch(() => 'unknown'),
-        stack: errorStack,
-        // Add raw error for debugging if it has additional properties
-        rawError: err && typeof err === 'object' ? Object.getOwnPropertyNames(err).reduce((acc, key) => {
-          try {
-            acc[key] = (err as any)[key];
-          } catch (e) {
-            acc[key] = '[Unserializable]';
-          }
-          return acc;
-        }, {} as any) : String(err)
+        stack: errorStack
       };
       
       if (errorMsg.includes('replication slot') && errorMsg.includes('is active for PID')) {
@@ -605,10 +592,8 @@ export class PollingManager {
           possibleCauses: [
             'DATABASE_URL misconfigured',
             'PostgreSQL database not running',
-            'Network connectivity issues',
-            'Hyperdrive connection failure'
-          ],
-          connectionType: 'Centralized database manager'
+            'Network connectivity issues'
+          ]
         }, MODULE_NAME);
         throw err;
       } else if (errorMsg.includes('does not exist')) {
@@ -618,10 +603,9 @@ export class PollingManager {
         }, MODULE_NAME);
         throw err;
       } else {
-        replicationLogger.error('Polling error with centralized connection', errorDetails, MODULE_NAME);
+        replicationLogger.error('Polling error with safe connection', errorDetails, MODULE_NAME);
         throw err;
       }
     }
-    // No finally block needed - centralized connection management handles cleanup
   }
 } 

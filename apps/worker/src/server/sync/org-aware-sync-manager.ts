@@ -10,7 +10,7 @@ import type { Env } from '../types/env';
 import type { MinimalContext } from '../types/hono';
 import { initializeAuth } from '../lib/auth';
 import { OrgAccessService } from '../services/org-access-service';
-import { getKysely } from '../lib/database-manager';
+import { createKyselyForPersistentUse, withKysely } from '../lib/database-manager';
 import type { TableChange } from '@repo/sync-types';
 import { syncLogger } from '../middleware/logger';
 
@@ -76,11 +76,8 @@ export class OrgAwareSyncManager {
    * Creates isolated connections to avoid I/O context sharing
    */
   private async getOrgAccessService(): Promise<OrgAccessService> {
-    // Create fresh database connection for this DO operation
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-    createDatabaseConnection(this.env);
-    const kysely = getKysely();
-    
+    // Create persistent database connection for this DO operation (like Better Auth)
+    const kysely = createKyselyForPersistentUse();
     return new OrgAccessService(kysely, this.env);
   }
 
@@ -238,21 +235,19 @@ export class OrgAwareSyncManager {
       }, MODULE_NAME);
 
       // Direct PostgreSQL query to avoid Organization Actor cache (prevents I/O context sharing)
-      const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-      createDatabaseConnection(this.env);
-      const kysely = getKysely();
-
-      const userOrgs = await kysely
-        .selectFrom('organizations as o')
-        .innerJoin('organization_members as m', 'm.organization_id', 'o.id')
-        .select([
-          'o.id as org_id',
-          'o.name as org_name', 
-          'o.slug as org_slug',
-          'm.role as member_role'
-        ])
-        .where('m.user_id', '=', sessionData.user.id)
-        .execute();
+      const userOrgs = await withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('organizations as o')
+          .innerJoin('organization_members as m', 'm.organization_id', 'o.id')
+          .select([
+            'o.id as org_id',
+            'o.name as org_name', 
+            'o.slug as org_slug',
+            'm.role as member_role'
+          ])
+          .where('m.user_id', '=', sessionData.user.id)
+          .execute();
+      });
 
       if (userOrgs.length === 0) {
         return {

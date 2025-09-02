@@ -17,33 +17,18 @@ export interface QueryResultRow {
 }
 
 /**
- * @deprecated Use getPostgresClient() from database-manager instead
+ * @deprecated This function creates connection leaks! Use withPostgresClient() instead
  * 
  * Legacy function - creates new connections which can leak.
  * New pattern: 
- * import { createDatabaseConnection, pgClient } from './database-manager';
- * createDatabaseConnection(env); // Once per Worker
- * const client = pgClient(); // Reuse connection
+ * import { withPostgresClient } from './database-manager';
+ * const result = await withPostgresClient(async (client) => {
+ *   return await client.unsafe('SELECT * FROM users');
+ * });
  */
 export const getDBClient = (c: AppContext | MinimalContext | { env: Env }) => {
-  console.warn('⚠️ getDBClient() is deprecated. Use createDatabaseConnection() and pgClient() from database-manager');
-  
-  const env = 'env' in c && typeof c.env === 'object' && c.env !== null 
-    ? c.env as Env
-    : undefined;
-    
-  if (!env) {
-    throw new Error('Environment variables not available');
-  }
-  
-  // For backward compatibility, create connection if not exists and return client
-  try {
-    return getPostgresClient();
-  } catch (error) {
-    // Connection not initialized, initialize it
-    createDatabaseConnection(env);
-    return getPostgresClient();
-  }
+  console.error('❌ getDBClient() is disabled to prevent connection leaks! Use withPostgresClient() instead');
+  throw new Error('getDBClient() is disabled to prevent connection leaks. Use withPostgresClient() pattern from database-manager instead.');
 };
 
 /**
@@ -193,22 +178,8 @@ export const DOMAIN_TABLES = [
 
 // Fetch data from all domain tables
 export async function fetchDomainTableData(c: AppContext | MinimalContext): Promise<TableData[]> {
-  const client = getDBClient(c);
-  const tableData = [];
-
-  // Fetch data from each domain table
-  for (const tableName of DOMAIN_TABLES) {
-    const rows = await client.unsafe(`
-      SELECT * FROM "${tableName}";
-    `);
-    
-    tableData.push({
-      tableName,
-      rows: rows as any[]
-    });
-  }
-
-  return tableData;
+  console.error('❌ fetchDomainTableData() is deprecated and uses connection leaks! Use withPostgresClient() pattern instead');
+  throw new Error('fetchDomainTableData() is disabled to prevent connection leaks. Use withPostgresClient() pattern from database-manager instead.');
 }
 
 // Health check
@@ -219,47 +190,6 @@ export async function checkDatabaseHealth(c: AppContext | MinimalContext): Promi
   tableCount?: number;
   error?: string;
 }> {
-  const start = Date.now();
-  const client = getDBClient(c);
-  
-  try {
-    await client.unsafe('SELECT 1');
-    
-    // Get table information
-    const tablesResult = await client.unsafe<{ tablename: string }>(`
-      SELECT tablename 
-      FROM pg_tables 
-      WHERE schemaname = 'public'
-      ORDER BY tablename;
-    `);
-    
-    const tables = [];
-    
-    // Get row count for each table
-    for (const { tablename } of tablesResult) {
-      const countResult = await client.unsafe<{ count: number }>(`
-        SELECT COUNT(*) as count FROM "${tablename}";
-      `);
-      
-      const rowCount = Number(countResult[0]?.count || 0);
-      
-      tables.push({
-        name: tablename,
-        rowCount
-      });
-    }
-    
-    return {
-      healthy: true,
-      latency: Date.now() - start,
-      tables,
-      tableCount: tables.length
-    };
-  } catch (error) {
-    return {
-      healthy: false,
-      latency: Date.now() - start,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
+  console.error('❌ checkDatabaseHealth() is deprecated and uses connection leaks! Use withPostgresClient() pattern instead');
+  throw new Error('checkDatabaseHealth() is disabled to prevent connection leaks. Use withPostgresClient() pattern from database-manager instead.');
 } 

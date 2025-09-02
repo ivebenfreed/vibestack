@@ -11,7 +11,7 @@ import { createEmailService } from '../services/EmailService';
 import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
-import { getKysely } from './database-manager';
+import { createKyselyForPersistentUse } from './database-manager';
 import { createKVSessionInterceptor } from './kv-session-adapter';
 
 // Helper function to get allowed origins for unified worker
@@ -22,6 +22,9 @@ function getAllowedOrigins(env: Env): string[] {
   if (isDev) {
     // In development, allow localhost with any port (Vite handles dynamic ports)
     return [
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://localhost:5173',
       'http://localhost',
       'https://localhost', 
       'http://127.0.0.1',
@@ -214,7 +217,7 @@ export function initializeAuth(env: Env, request?: Request) {
     kyselyInstance = createKVSessionInterceptor(env);
     dbLogger.info('Using KV storage for sessions', {}, 'auth');
   } else {
-    kyselyInstance = getKysely();
+    kyselyInstance = createKyselyForPersistentUse();
     dbLogger.info('Using PostgreSQL for sessions', {}, 'auth');
   }
 

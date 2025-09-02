@@ -132,25 +132,25 @@ dataforgeRouter.get('/orgs/:orgId/entities',
         return c.json({ error: 'Access denied' }, 403);
       }
       
-      const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+      const { withKysely } = await import('../lib/database-manager');
       const { sql } = await import('kysely');
-      createDatabaseConnection(c.env);
-      const kysely = getKysely();
       
       // Query entity schemas for this organization
-      const entities = await sql<any>`
-        SELECT 
-          entity_name,
-          table_name,
-          archetype,
-          business_metadata,
-          created_at,
-          updated_at
-        FROM entity_schemas
-        WHERE org_id = ${orgId}
-          AND (deleted = false OR deleted IS NULL)
-        ORDER BY created_at DESC
-      `.execute(kysely);
+      const entities = await withKysely(async (kysely) => {
+        return await sql<any>`
+          SELECT 
+            entity_name,
+            table_name,
+            archetype,
+            business_metadata,
+            created_at,
+            updated_at
+          FROM entity_schemas
+          WHERE org_id = ${orgId}
+            AND (deleted = false OR deleted IS NULL)
+          ORDER BY created_at DESC
+        `.execute(kysely);
+      });
       
       // Parse and format entities
       const formattedEntities = entities.rows.map((entity: any) => {
@@ -247,9 +247,7 @@ dataforgeRouter.post('/orgs/:orgId/entities',
     // Access control handled by hybrid security:
     // - PostgreSQL RLS provides organization-level data isolation
     // - Organization Actor cache provided instant permission validation
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const { withKysely } = await import('../lib/database-manager');
     
     console.log(`[DataForge] User ${user?.email || 'unknown'} creating entity in org ${security.organizationId} - hybrid security active`);
 
@@ -348,19 +346,21 @@ dataforgeRouter.post('/orgs/:orgId/entities',
     console.log(`Creating table for ${entityName}:`, createTableSQL);
     
     // Execute the table creation using Kysely - split multi-statement DDL
-    const { sql } = await import('kysely');
-    
-    // Split DDL into individual statements and execute each one
-    const statements = createTableSQL
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+    await withKysely(async (kysely) => {
+      const { sql } = await import('kysely');
       
-    for (const statement of statements) {
-      if (statement.trim().length > 0) {
-        await sql`${sql.raw(statement)}`.execute(kysely);
+      // Split DDL into individual statements and execute each one
+      const statements = createTableSQL
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+        
+      for (const statement of statements) {
+        if (statement.trim().length > 0) {
+          await sql`${sql.raw(statement)}`.execute(kysely);
+        }
       }
-    }
+    });
     
     // Apply RLS policies to the newly created table
     // TODO: Fix RLS function to handle UUID organization_id correctly
@@ -1360,14 +1360,15 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     // 2. Cache miss - fallback to PostgreSQL and populate cache
     console.log(`[Schema Cache] ❌ CACHE MISS - fetching from PostgreSQL`);
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    // Since ArchetypeEntityManager expects a kysely instance but we need to use safe patterns,
+    // we'll need to use createKyselyForPersistentUse for this manager
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
 
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const schemaManager = new OrgSchemaManager();
     const schemaGenerator = new RuntimeSchemaGenerator();
@@ -1443,14 +1444,13 @@ dataforgeRouter.post('/orgs/:orgId/validate/:entityName',
     const entityName = c.req.param('entityName');
     const data = await c.req.json();
 
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager: ArchetypeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
     const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
 
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const schemaManager = new OrgSchemaManager();
     const schemaGenerator = new RuntimeSchemaGenerator();

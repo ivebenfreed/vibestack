@@ -16,7 +16,7 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
 import { syncLogger } from './logger';
 import { createOrgActorCache, type OrganizationActorCacheService, type RoleInfo } from '../lib/organization-actor-cache';
-import { getKysely } from '../lib/database-manager';
+import { withKysely } from '../lib/database-manager';
 import { sql } from 'kysely';
 
 const MODULE_NAME = 'HybridRLSOrgActor';
@@ -72,13 +72,11 @@ async function setPostgreSQLContext(
 ): Promise<void> {
   try {
     // Create fresh database connection for this request context to avoid I/O sharing
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-    createDatabaseConnection(env);
-    const database = getKysely();
-    
-    // Set simplified RLS context (no role needed)
-    // Use sql template with proper parameterized query
-    await sql`select set_simplified_rls_context(${organizationId}, ${userId}) as result limit 1`.execute(database);
+    await withKysely(async (database) => {
+      // Set simplified RLS context (no role needed)
+      // Use sql template with proper parameterized query
+      await sql`select set_simplified_rls_context(${organizationId}, ${userId}) as result limit 1`.execute(database);
+    });
     
     syncLogger.debug('PostgreSQL RLS context set', {
       organizationId: organizationId.substring(0, 8) + '...',
@@ -112,21 +110,24 @@ async function getUserRole(
       // Fallback: Fetch role from PostgreSQL  
       try {
         // Create fresh database connection for this request context to avoid I/O sharing
-        const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-        createDatabaseConnection(env);
-        const database = getKysely();
+        const result = await withKysely(async (database) => {
+          const member = await database
+            .selectFrom('organization_members')
+            .select(['role'])
+            .where('organization_id', '=', organizationId)
+            .where('user_id', '=', userId)
+            .executeTakeFirst();
+          
+          if (member) {
+            // Map role to permissions
+            const permissions = mapRoleToPermissions(member.role);
+            return { role: member.role, permissions };
+          }
+          return null;
+        });
         
-        const member = await database
-          .selectFrom('organization_members')
-          .select(['role'])
-          .where('organization_id', '=', organizationId)
-          .where('user_id', '=', userId)
-          .executeTakeFirst();
-        
-        if (member) {
-          // Map role to permissions
-          const permissions = mapRoleToPermissions(member.role);
-          return { role: member.role, permissions };
+        if (result) {
+          return result;
         }
         
         return null;

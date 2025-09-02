@@ -70,12 +70,11 @@ dataforgeRouter.get('/orgs/:orgId/entities',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -100,11 +99,10 @@ dataforgeRouter.post('/orgs/:orgId/entities',
     
     const { entityName, archetype, customFields = {} } = body;
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -165,12 +163,11 @@ dataforgeRouter.get('/orgs/:orgId/entities/:entityName',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -234,12 +231,11 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     
     // 2. Cache miss - fallback to PostgreSQL and populate cache
     console.log(`[Schema Cache] 💾 CACHE MISS - falling back to PostgreSQL`);
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -299,12 +295,11 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -365,12 +360,11 @@ dataforgeRouter.get('/orgs/:orgId/sync/:entityName',
     const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 1000;
     const includeDeleted = c.req.query('includeDeleted') === 'true';
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -486,12 +480,11 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName',
       }
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -549,12 +542,11 @@ dataforgeRouter.post('/orgs/:orgId/data/:entityName',
     
     const createData = await c.req.json();
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -610,12 +602,11 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName/:id',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -641,12 +632,11 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
     
     const updateData = await c.req.json();
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -672,12 +662,11 @@ dataforgeRouter.delete('/orgs/:orgId/data/:entityName/:id',
     
     const permanent = c.req.query('permanent') === 'true';
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
@@ -711,11 +700,10 @@ dataforgeRouter.post('/orgs/:orgId/bulk/:entityName/create',
     }
 
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
 
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
@@ -746,11 +734,10 @@ dataforgeRouter.put('/orgs/:orgId/bulk/:entityName/update',
     }
 
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
 
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
@@ -781,10 +768,9 @@ dataforgeRouter.delete('/orgs/:orgId/bulk/:entityName/delete',
     }
 
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
 
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const entityManager = new DataForgeEntityManager({ kysely, env: c.env } as any);
 
     const result = await entityManager.bulkDeleteRecords(
@@ -821,12 +807,11 @@ dataforgeRouter.post('/orgs/:orgId/entities/:entityName/fields',
       return c.json({ error: 'fields array is required and must not be empty' }, 400);
     }
 
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -855,12 +840,11 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName/fields/:fieldName',
       return c.json({ error: 'Access denied' }, 403);
     }
 
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -890,12 +874,11 @@ dataforgeRouter.get('/orgs/:orgId/trash',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -923,12 +906,11 @@ dataforgeRouter.post('/orgs/:orgId/trash/:entityName/restore',
     
     console.log(`[DataForge] User ${user?.email} restoring entity ${entityName} from trash`);
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -959,12 +941,11 @@ dataforgeRouter.delete('/orgs/:orgId/trash/:entityName/permanent',
     
     console.log(`[DataForge] User ${user?.email} permanently deleting entity ${entityName} and its table`);
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const kysely = createKyselyForPersistentUse();
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
     
@@ -990,9 +971,8 @@ dataforgeRouter.get('/system-options/:optionType/:archetype',
   async (c) => {
     const { optionType, archetype } = c.req.param();
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const kysely = createKyselyForPersistentUse();
     
     try {
       const systemOptions = await kysely
@@ -1046,9 +1026,8 @@ dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
-    createDatabaseConnection(c.env);
-    const kysely = getKysely();
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const kysely = createKyselyForPersistentUse();
     
     try {
       const customOptions = await kysely
