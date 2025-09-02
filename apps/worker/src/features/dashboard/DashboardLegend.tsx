@@ -5,19 +5,23 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ContentContainer } from '@/components/layout/content-container'
 import { TopNav } from '@/components/layout/top-nav'
+import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth'
 import { EntityCreationDialog } from './EntityCreationDialog'
 import { EntityCard } from './EntityCard'
 import { QuickEntityCreate } from './QuickEntityCreate'
-import { PlusCircle } from 'lucide-react'
+import { PlusCircle, Globe, Building } from 'lucide-react'
 import { 
   orgContext$,
   getEntity$,
-  removeEntityFromSchema
+  removeEntityFromSchema,
+  loadOrgContext,
+  loadUniverseContext
 } from '@/legend-state'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { use$ } from '@legendapp/state/react'
 import { uiLog } from '@/logger'
+import { useParams } from '@tanstack/react-router'
 
 // Create logger instance for this file
 const log = uiLog('features/dashboard/DashboardLegend.tsx');
@@ -57,12 +61,65 @@ const DashboardLegend = observer(function DashboardLegend() {
   const currentOrgId = currentOrganization?.id;
   const userId = user?.id;
 
-  // Use Legend State observables
+  // Check if we're in an organization-specific route
+  const params = useParams({ strict: false }) as { orgId?: string };
+  const routeOrgId = params?.orgId;
+  
+  // Determine context mode based on route
+  const isUniverseMode = !routeOrgId;
+  const contextOrgId = routeOrgId || 'universe';
+  
+  log.info('DashboardLegend route analysis:', { 
+    routeOrgId, 
+    isUniverseMode, 
+    contextOrgId,
+    currentOrgId 
+  });
+
+  // Use Legend State observables - orgContext$ handles both universe and single org modes
   const loading = use$(orgContext$.loading);
   const schema = use$(orgContext$.schema);
+  const error = use$(orgContext$.error);
+  
+  const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
 
-  // Components should only consume observables, not trigger loads
-  // Loading is handled by auth state machines
+  // Load appropriate context based on route parameters
+  useEffect(() => {
+    if (!userId) {
+      log.info('User not authenticated, skipping context load');
+      return;
+    }
+
+    const currentSchemaOrgId = schema?.orgId;
+    
+    // Only reload context if route requires different context than currently loaded
+    if (currentSchemaOrgId !== contextOrgId) {
+      log.info('Route requires different context, loading:', { 
+        currentSchemaOrgId, 
+        contextOrgId,
+        isUniverseMode 
+      });
+      
+      if (isUniverseMode) {
+        // Load universe context with all user organizations
+        const orgIds = currentOrganization?.id ? [currentOrganization.id] : [];
+        loadUniverseContext(userId, orgIds).then(() => {
+          log.info('Universe context loaded for route');
+        }).catch((error) => {
+          console.error('Failed to load universe context for route:', error);
+        });
+      } else {
+        // Load specific organization context - FIXED: orgId first, then userId
+        loadOrgContext(routeOrgId!, userId).then(() => {
+          log.info('Organization context loaded for route:', routeOrgId);
+        }).catch((error) => {
+          console.error('Failed to load organization context for route:', error);
+        });
+      }
+    } else {
+      log.info('Context already matches route requirements:', { currentSchemaOrgId, contextOrgId });
+    }
+  }, [userId, contextOrgId, isUniverseMode, routeOrgId, schema?.orgId, currentOrganization?.id]);
 
   // Track when schema is ready - don't wait for data loading
   useEffect(() => {
@@ -147,7 +204,13 @@ const DashboardLegend = observer(function DashboardLegend() {
         </div>
         
         <TabsContent value='overview' className='space-y-4'>
-          <DashboardContent />
+          <DashboardContent 
+            isUniverseMode={isUniverseMode}
+            schema={schema}
+            error={error}
+            entityCount={entityCount}
+            routeOrgId={routeOrgId}
+          />
         </TabsContent>
       </Tabs>
 
@@ -159,16 +222,34 @@ const DashboardLegend = observer(function DashboardLegend() {
   )
 })
 
-const DashboardContent = observer(function DashboardContent() {
-  // Use the schema from the observable
-  const schema = use$(orgContext$.schema)
+const DashboardContent = observer(function DashboardContent({
+  isUniverseMode,
+  schema,
+  error,
+  entityCount,
+  routeOrgId
+}: {
+  isUniverseMode: boolean
+  schema: any
+  error: string | null
+  entityCount: number
+  routeOrgId?: string
+}) {
+  log.info('DashboardContent render:', { isUniverseMode, schema: !!schema, error, entityCount })
 
-  log.info('Using schema:', schema)
-
-  if (!schema?.entities) {
+  if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No schema loaded for this organization</p>
+        <p className="text-red-500">Error loading data: {error}</p>
+      </div>
+    )
+  }
+
+  if (!schema?.entities) {
+    const contextLabel = isUniverseMode ? 'universe' : 'organization'
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">No schema loaded for {contextLabel}</p>
       </div>
     )
   }
@@ -177,22 +258,36 @@ const DashboardContent = observer(function DashboardContent() {
   log.info('Entity list from schema:', entityList)
 
   if (entityList.length === 0) {
+    const contextLabel = isUniverseMode ? 'universe' : 'organization'
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No entities found for this organization</p>
+        <p className="text-muted-foreground">No entities found for {contextLabel}</p>
       </div>
     )
   }
 
   return (
-    <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
-      {entityList.map(entityName => (
-        <EntityCardWithData 
-          key={entityName}
-          entityName={entityName}
-          entityDef={schema.entities[entityName]}
-        />
-      ))}
+    <div className='space-y-6'>
+      <div className="flex items-center gap-2">
+        {isUniverseMode ? (
+          <><Globe className="h-5 w-5 text-primary" /><span className="font-medium">Universe View</span></>
+        ) : (
+          <><Building className="h-5 w-5 text-primary" /><span className="font-medium">Organization View</span></>
+        )}
+        <Badge variant="outline">{entityCount} entities</Badge>
+      </div>
+      
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+        {entityList.map(entityName => (
+          <EntityCardWithData 
+            key={entityName}
+            entityName={entityName}
+            entityDef={schema.entities[entityName]}
+            isUniverseMode={isUniverseMode}
+            orgId={isUniverseMode ? undefined : routeOrgId}
+          />
+        ))}
+      </div>
     </div>
   )
 })
@@ -200,10 +295,14 @@ const DashboardContent = observer(function DashboardContent() {
 // Separate component to handle entity data loading
 const EntityCardWithData = observer(function EntityCardWithData({
   entityName,
-  entityDef
+  entityDef,
+  isUniverseMode,
+  orgId
 }: {
   entityName: string
   entityDef: any
+  isUniverseMode: boolean
+  orgId?: string
 }) {
   const { currentOrganization } = useAuth()
   
@@ -285,9 +384,12 @@ const EntityCardWithData = observer(function EntityCardWithData({
       entityName={entityName}
       entityDef={entityDef}
       count={displayCount}
+      orgId={orgId}
+      isUniverseMode={isUniverseMode}
       onDelete={handleDelete}
     />
   )
 })
+
 
 export default DashboardLegend

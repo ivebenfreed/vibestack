@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict rgg0GTi51XJRdrByGG1ikoC2xJITc2vMr3H8ERLFEVGWs0C1m4c5Gkdy1LXVIuP
+\restrict pe67XEHbjerZUrEdfZPWts8Ul0elkZyhc8e1bMNiR8t7QBrCqsP2GGozbMehakb
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict rgg0GTi51XJRdrByGG1ikoC2xJITc2vMr3H8ERLFEVGWs0C1m4c5Gkdy1LXVIuP
+\unrestrict pe67XEHbjerZUrEdfZPWts8Ul0elkZyhc8e1bMNiR8t7QBrCqsP2GGozbMehakb
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict CpkMGextQOFMLhI6G6aVwmOE0Xr4SS1QCe2IH4txpKS6gnQNZp9DFWUPRoVGhKd
+\restrict bQrmq1MA2iQTsgsgdZfYjin3yilDmcEB9dHFVmlRjJlxQeWe7z24fwIXZdGhswG
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CpkMGextQOFMLhI6G6aVwmOE0Xr4SS1QCe2IH4txpKS6gnQNZp9DFWUPRoVGhKd
+\unrestrict bQrmq1MA2iQTsgsgdZfYjin3yilDmcEB9dHFVmlRjJlxQeWe7z24fwIXZdGhswG
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict S0cTZeGqLw0LeBANwX5WoO9ZndJqc1j9xYfzasQXkzWA8bmVIUfZKCSsuoW6j2A
+\restrict ITLA8UiPxLxfepuY3A4G1gfBgM1bLFhQF5xdMOWvIzqj7immhjxwIreViNbet3P
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict S0cTZeGqLw0LeBANwX5WoO9ZndJqc1j9xYfzasQXkzWA8bmVIUfZKCSsuoW6j2A
+\unrestrict ITLA8UiPxLxfepuY3A4G1gfBgM1bLFhQF5xdMOWvIzqj7immhjxwIreViNbet3P
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict EIj0aTkBZluP2e62p3fDa6Qj2F4Q6oNLxrDnPfBUKIq1Uny4XL89gCvDOudELPE
+\restrict zNPcWu9aaVpr9j44UMrlg6OhAth4gxhndYsQtqOVdhykbqBGcj4rpmt3Ke0FdGz
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict EIj0aTkBZluP2e62p3fDa6Qj2F4Q6oNLxrDnPfBUKIq1Uny4XL89gCvDOudELPE
+\unrestrict zNPcWu9aaVpr9j44UMrlg6OhAth4gxhndYsQtqOVdhykbqBGcj4rpmt3Ke0FdGz
 \connect vibestack_dev
-\restrict EIj0aTkBZluP2e62p3fDa6Qj2F4Q6oNLxrDnPfBUKIq1Uny4XL89gCvDOudELPE
+\restrict zNPcWu9aaVpr9j44UMrlg6OhAth4gxhndYsQtqOVdhykbqBGcj4rpmt3Ke0FdGz
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1806,28 +1806,6 @@ CREATE TABLE neon_control_plane.endpoints (
 ALTER TABLE neon_control_plane.endpoints OWNER TO postgres;
 
 --
--- Name: 01920000_1000_7000_8000_000000000001_worlds; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public."01920000_1000_7000_8000_000000000001_worlds" (
-    id text NOT NULL,
-    name text NOT NULL,
-    description text,
-    universe_id text,
-    state text DEFAULT 'exploring'::text,
-    world_type text DEFAULT 'personal'::text,
-    priority text DEFAULT 'medium'::text,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted boolean DEFAULT false,
-    deleted_at timestamp without time zone,
-    organization_id text DEFAULT '01920000-1000-7000-8000-000000000001'::text
-);
-
-
-ALTER TABLE public."01920000_1000_7000_8000_000000000001_worlds" OWNER TO postgres;
-
---
 -- Name: account; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3239,14 +3217,6 @@ ALTER TABLE ONLY neon_control_plane.endpoints
 
 
 --
--- Name: 01920000_1000_7000_8000_000000000001_worlds 01920000_1000_7000_8000_000000000001_worlds_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public."01920000_1000_7000_8000_000000000001_worlds"
-    ADD CONSTRAINT "01920000_1000_7000_8000_000000000001_worlds_pkey" PRIMARY KEY (id);
-
-
---
 -- Name: account account_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4507,7 +4477,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EIj0aTkBZluP2e62p3fDa6Qj2F4Q6oNLxrDnPfBUKIq1Uny4XL89gCvDOudELPE
+\unrestrict zNPcWu9aaVpr9j44UMrlg6OhAth4gxhndYsQtqOVdhykbqBGcj4rpmt3Ke0FdGz
 
 --
 -- PostgreSQL database cluster dump complete

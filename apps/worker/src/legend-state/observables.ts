@@ -37,7 +37,7 @@ let currentSchemaVersion: string | null = null
 
 /**
  * Universe context observable - tracks schemas from ALL user organizations
- * This enables cross-organization entity access in universe view
+ * Used for data aggregation in universe view only
  */
 export const universeContext$ = observable({
   userId: null as string | null,
@@ -53,7 +53,8 @@ export const universeContext$ = observable({
 })
 
 /**
- * Legacy orgContext$ for backward compatibility - now points to combined universe data
+ * Universe aggregation context - for universe dashboard only
+ * All entity access goes through organization-specific routes
  */
 export const orgContext$ = observable(() => {
   const universe = universeContext$.get()
@@ -69,13 +70,14 @@ export const orgContext$ = observable(() => {
     }
   }
   
-  // Combine schemas from all organizations
+  // Universe view - combine schemas for aggregation only
+  // Entities include organization metadata for navigation
   const combinedEntities: Record<string, any> = {}
   organizations.forEach(org => {
     if (org.schema?.entities) {
       Object.entries(org.schema.entities).forEach(([entityName, entitySchema]) => {
-        // Prefix entity names with org info to avoid conflicts
-        const prefixedName = organizations.length > 1 ? `${org.name}_${entityName}` : entityName
+        // Use org UUID prefix for unique keys, but include clean names for navigation
+        const prefixedName = `${org.orgId}_${entityName}`
         combinedEntities[prefixedName] = {
           ...entitySchema,
           _organizationId: org.orgId,
@@ -716,8 +718,7 @@ async function initializePersistence(userId: string, organizationIds: string[], 
  * Legacy function for backward compatibility - now loads universe context
  */
 export async function loadOrgContext(orgId: string, userId: string) {
-  // For now, just load this single organization
-  // In the future, this should be replaced with loadUniverseContext
+  // Load the specific organization data - no mode switching needed
   await loadUniverseContext(userId, [orgId])
 }
 

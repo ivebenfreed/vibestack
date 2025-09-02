@@ -56,7 +56,10 @@ import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './ro
 import { Route as AuthenticatedDebugLegendTableRouteImport } from './routes/_authenticated/debug/legend-table'
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
+import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
 import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
+import { Route as AuthenticatedOrgOrgIdDashboardRouteImport } from './routes/_authenticated/org/$orgId/dashboard'
+import { Route as AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport } from './routes/_authenticated/org/$orgId/entities/$entityName'
 
 const AuthenticatedDebugUltraTableLazyRouteImport = createFileRoute(
   '/_authenticated/debug/ultra-table',
@@ -379,11 +382,29 @@ const AuthenticatedDebugEntityRoutesTestRoute =
     path: '/entity-routes-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedOrgOrgIdIndexRoute =
+  AuthenticatedOrgOrgIdIndexRouteImport.update({
+    id: '/org/$orgId/',
+    path: '/org/$orgId/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsAdminUsersRoute =
   AuthenticatedSettingsAdminUsersRouteImport.update({
     id: '/admin/users',
     path: '/admin/users',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
+const AuthenticatedOrgOrgIdDashboardRoute =
+  AuthenticatedOrgOrgIdDashboardRouteImport.update({
+    id: '/org/$orgId/dashboard',
+    path: '/org/$orgId/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedOrgOrgIdEntitiesEntityNameRoute =
+  AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport.update({
+    id: '/org/$orgId/entities/$entityName',
+    path: '/org/$orgId/entities/$entityName',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -437,7 +458,10 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/worlds': typeof AuthenticatedWorldsIndexRoute
+  '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
+  '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
+  '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
 export interface FileRoutesByTo {
   '/debug-public': typeof DebugPublicRoute
@@ -488,7 +512,10 @@ export interface FileRoutesByTo {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/worlds': typeof AuthenticatedWorldsIndexRoute
+  '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
+  '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
+  '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -543,7 +570,10 @@ export interface FileRoutesById {
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/universe/': typeof AuthenticatedUniverseIndexRoute
   '/_authenticated/worlds/': typeof AuthenticatedWorldsIndexRoute
+  '/_authenticated/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/_authenticated/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
+  '/_authenticated/org/$orgId/': typeof AuthenticatedOrgOrgIdIndexRoute
+  '/_authenticated/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -598,7 +628,10 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/universe'
     | '/worlds'
+    | '/org/$orgId/dashboard'
     | '/settings/admin/users'
+    | '/org/$orgId'
+    | '/org/$orgId/entities/$entityName'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/debug-public'
@@ -649,7 +682,10 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/universe'
     | '/worlds'
+    | '/org/$orgId/dashboard'
     | '/settings/admin/users'
+    | '/org/$orgId'
+    | '/org/$orgId/entities/$entityName'
   id:
     | '__root__'
     | '/_authenticated'
@@ -703,7 +739,10 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks/'
     | '/_authenticated/universe/'
     | '/_authenticated/worlds/'
+    | '/_authenticated/org/$orgId/dashboard'
     | '/_authenticated/settings/admin/users'
+    | '/_authenticated/org/$orgId/'
+    | '/_authenticated/org/$orgId/entities/$entityName'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1085,12 +1124,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugEntityRoutesTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/org/$orgId/': {
+      id: '/_authenticated/org/$orgId/'
+      path: '/org/$orgId'
+      fullPath: '/org/$orgId'
+      preLoaderRoute: typeof AuthenticatedOrgOrgIdIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings/admin/users': {
       id: '/_authenticated/settings/admin/users'
       path: '/admin/users'
       fullPath: '/settings/admin/users'
       preLoaderRoute: typeof AuthenticatedSettingsAdminUsersRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/org/$orgId/dashboard': {
+      id: '/_authenticated/org/$orgId/dashboard'
+      path: '/org/$orgId/dashboard'
+      fullPath: '/org/$orgId/dashboard'
+      preLoaderRoute: typeof AuthenticatedOrgOrgIdDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/org/$orgId/entities/$entityName': {
+      id: '/_authenticated/org/$orgId/entities/$entityName'
+      path: '/org/$orgId/entities/$entityName'
+      fullPath: '/org/$orgId/entities/$entityName'
+      preLoaderRoute: typeof AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
@@ -1187,6 +1247,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUniverseIndexRoute: typeof AuthenticatedUniverseIndexRoute
   AuthenticatedWorldsIndexRoute: typeof AuthenticatedWorldsIndexRoute
+  AuthenticatedOrgOrgIdDashboardRoute: typeof AuthenticatedOrgOrgIdDashboardRoute
+  AuthenticatedOrgOrgIdIndexRoute: typeof AuthenticatedOrgOrgIdIndexRoute
+  AuthenticatedOrgOrgIdEntitiesEntityNameRoute: typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1204,6 +1267,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUniverseIndexRoute: AuthenticatedUniverseIndexRoute,
   AuthenticatedWorldsIndexRoute: AuthenticatedWorldsIndexRoute,
+  AuthenticatedOrgOrgIdDashboardRoute: AuthenticatedOrgOrgIdDashboardRoute,
+  AuthenticatedOrgOrgIdIndexRoute: AuthenticatedOrgOrgIdIndexRoute,
+  AuthenticatedOrgOrgIdEntitiesEntityNameRoute:
+    AuthenticatedOrgOrgIdEntitiesEntityNameRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

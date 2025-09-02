@@ -4,7 +4,7 @@
  */
 
 import * as React from 'react'
-import { Link, useLocation } from '@tanstack/react-router'
+import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import { useAuth } from '@/state-machines'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -73,11 +73,14 @@ const bottomNavigation: NavItem[] = [
 
 export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { isAdmin, isSuperAdmin } = useAuth()
   
-  // Navigation state: null = universe view, orgId = organization view
-  const [currentView, setCurrentView] = React.useState<string | null>(null)
-  const isUniverseView = currentView === null
+  // Determine current context from URL instead of observables
+  const routeOrgId = location.pathname.startsWith('/org/') 
+    ? location.pathname.split('/')[2] // Extract orgId from /org/{orgId}/...
+    : null
+  const isUniverseView = !routeOrgId
   
   const isActive = (href: string) => {
     if (href === '/') {
@@ -128,13 +131,13 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
           {isUniverseView ? (
             <UniverseView 
               isCollapsed={isCollapsed} 
-              onEnterOrg={setCurrentView}
+              onEnterOrg={(orgId: string) => navigate({ to: `/org/${orgId}` })}
             />
           ) : (
             <OrganizationView 
-              orgId={currentView} 
+              orgId={routeOrgId!} 
               isCollapsed={isCollapsed}
-              onBackToUniverse={() => setCurrentView(null)}
+              onBackToUniverse={() => navigate({ to: '/universe' })}
             />
           )}
 

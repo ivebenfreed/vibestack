@@ -1,10 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
-import Dashboard from '@/features/dashboard' // Main dashboard
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/')({
-  loader: async () => {
-    // Data loading handled by components
-    return null
+  beforeLoad: async () => {
+    // Redirect authenticated users to the universe dashboard
+    throw redirect({
+      to: '/universe'
+    })
   },
-  component: Dashboard,
 })

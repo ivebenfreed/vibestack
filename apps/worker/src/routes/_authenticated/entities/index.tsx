@@ -293,8 +293,11 @@ const EntitiesListPage = observer(function EntitiesListPage() {
                   <TableRow key={`${item._entityName}-${item._id}`}>
                     <TableCell className="font-medium">
                       <Link
-                        to="/entities/$entityName"
-                        params={{ entityName: item._entityName }}
+                        to="/org/$orgId/entities/$entityName"
+                        params={{ 
+                          orgId: item._entityName.includes('_') ? item._entityName.split('_')[0] : 'unknown',
+                          entityName: item._entityName.includes('_') ? item._entityName.split('_')[1] : item._entityName
+                        }}
                         className="hover:underline"
                       >
                         {item.name || item.title || 'Untitled'}
@@ -324,8 +327,11 @@ const EntitiesListPage = observer(function EntitiesListPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem asChild>
                             <Link
-                              to="/entities/$entityName"
-                              params={{ entityName: item._entityName }}
+                              to="/org/$orgId/entities/$entityName"
+                              params={{ 
+                                orgId: item._entityName.includes('_') ? item._entityName.split('_')[0] : 'unknown',
+                                entityName: item._entityName.includes('_') ? item._entityName.split('_')[1] : item._entityName
+                              }}
                             >
                               <Eye className="mr-2 h-4 w-4" />
                               View
@@ -386,8 +392,11 @@ const EntitiesListPage = observer(function EntitiesListPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
                         <Link
-                          to="/entities/$entityName"
-                          params={{ entityName: item._entityName }}
+                          to="/org/$orgId/entities/$entityName"
+                          params={{ 
+                            orgId: item._entityName.includes('_') ? item._entityName.split('_')[0] : 'unknown',
+                            entityName: item._entityName.includes('_') ? item._entityName.split('_')[1] : item._entityName
+                          }}
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View

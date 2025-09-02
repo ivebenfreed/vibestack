@@ -50,6 +50,8 @@ interface EntityCardProps {
   entityDef: any
   count: number | string
   archetype?: string
+  orgId?: string // Organization ID for routing context
+  isUniverseMode?: boolean // Whether we're in universe view
   onDelete?: (entityName: string) => void
 }
 
@@ -65,7 +67,7 @@ const ARCHETYPE_CONFIG = {
   collection: { icon: Layers, color: 'bg-indigo-500/10 text-indigo-600', label: 'Collection' },
 }
 
-export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, onDelete }: EntityCardProps) {
+export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, orgId, isUniverseMode, onDelete }: EntityCardProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
   
@@ -135,10 +137,37 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
     return `${displayName} records`
   }
 
+  // Always navigate to organization context - universe is aggregation only
+  const getEntityRoute = () => {
+    // Get organization ID from entity definition (universe mode) or route context
+    const targetOrgId = entityDef?._organizationId || orgId
+    const cleanEntityName = entityDef?._originalName || entityName
+    
+    if (!targetOrgId) {
+      console.warn('No organization ID available for entity navigation:', entityName)
+      // Fallback - shouldn't happen in normal usage
+      return {
+        to: "/universe" as const,
+        params: {}
+      }
+    }
+
+    // All entity access goes through organization context
+    return {
+      to: "/org/$orgId/entities/$entityName" as const,
+      params: { 
+        orgId: targetOrgId, 
+        entityName: cleanEntityName 
+      }
+    }
+  }
+
+  const route = getEntityRoute()
+
   return (
     <>
       <Card className="hover:shadow-lg transition-shadow cursor-pointer relative group overflow-visible">
-        <Link to="/entities/$entityName" params={{ entityName }} className="block">
+        <Link to={route.to} params={route.params} className="block">
           <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
             <div className="flex items-center gap-2">
               <CardTitle className='text-sm font-medium'>
