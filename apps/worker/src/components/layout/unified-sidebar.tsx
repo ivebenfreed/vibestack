@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { observer } from '@legendapp/state/react'
-import { entityGroups$, currentOrganizations$, universeHelpers } from '@/legend-state'
+import { entityGroups$, createEntityGroups, currentOrganizations$, universeHelpers } from '@/legend-state'
 import { use$ } from '@legendapp/state/react'
 import { 
   Home, 
@@ -24,8 +24,33 @@ import {
   Activity,
   Building,
   Globe,
-  Map
+  Map,
+  CheckSquare,
+  FolderOpen,
+  Database,
+  FileText,
+  MessageSquare,
+  File,
+  Circle
 } from 'lucide-react'
+
+// Icon resolver for dynamic entity icons
+const IconMap: Record<string, React.ElementType> = {
+  CheckSquare,
+  FolderOpen,
+  Database,
+  FileText,
+  Activity,
+  MessageSquare,
+  File,
+  Globe,
+  Map,
+  Circle
+}
+
+function getIconComponent(iconName: string): React.ElementType {
+  return IconMap[iconName] || Circle
+}
 
 interface SidebarProps {
   isCollapsed: boolean
@@ -298,7 +323,9 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
   onBackToUniverse: () => void
 }) {
   const allOrganizations = use$(currentOrganizations$)
-  const entityNavGroups = entityGroups$.get()
+  // Create organization-specific entity groups
+  const orgEntityGroups$ = React.useMemo(() => createEntityGroups(orgId), [orgId])
+  const entityNavGroups = use$(orgEntityGroups$)
   const location = useLocation()
 
   const currentOrg = allOrganizations.find(org => org.info.id === orgId)
@@ -306,7 +333,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
     return <div className="p-4 text-sm text-muted-foreground">Organization not found</div>
   }
 
-  // Get real worlds for this organization
+  // Get worlds for this organization (simplified org-scoped model)
   const orgWorlds = currentOrg?.worlds || []
 
   if (isCollapsed) {
@@ -412,22 +439,25 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
           <AccordionContent className="pb-2">
             <div className="space-y-1 ml-2">
               {entityNavGroups?.map(group => 
-                group.items?.map(item => (
-                  <Link
-                    key={item.url}
-                    to={item.url}
-                    className={cn(
-                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                      location.pathname.startsWith(item.url)
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                        : 'text-sidebar-foreground'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span className="truncate">{item.title}</span>
-                  </Link>
-                ))
+                group.items?.map(item => {
+                  const IconComponent = getIconComponent(item.icon)
+                  return (
+                    <Link
+                      key={item.url}
+                      to={item.url}
+                      className={cn(
+                        'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                        'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                        location.pathname.startsWith(item.url)
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                          : 'text-sidebar-foreground'
+                      )}
+                    >
+                      <IconComponent className="h-4 w-4" />
+                      <span className="truncate">{item.title}</span>
+                    </Link>
+                  )
+                })
               )}
               {(!entityNavGroups || entityNavGroups.length === 0) && (
                 <div className="text-xs text-muted-foreground px-3 py-2">

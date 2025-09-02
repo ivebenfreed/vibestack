@@ -130,6 +130,12 @@ export class OrgSchemaClient {
           syncableFields.updated_at = { type: 'timestamp', required: false, syncable: false };
         }
 
+        log.info('🔍 Processing entity:', {
+          entityName: entity.entityName,
+          tableName: entity.tableName,
+          archetype: entity.archetype
+        });
+        
         entities[entity.entityName] = {
           tableName: entity.tableName,
           archetype: entity.archetype,

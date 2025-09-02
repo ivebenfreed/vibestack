@@ -61,7 +61,7 @@ class UniverseLoader {
     const { includeInactive = false, includeArchived = false } = options;
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/workspace/personal?` + new URLSearchParams({
+      const response = await fetch(`${this.baseUrl}/api/universe/personal?` + new URLSearchParams({
         includeInactive: String(includeInactive),
         includeArchived: String(includeArchived)
       }), {

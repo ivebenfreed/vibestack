@@ -163,7 +163,7 @@ export const loadWorkspaceData = async (): Promise<any> => {
   log.info('[UniverseWorkspace] Loading complete workspace data');
   
   try {
-    const response = await fetch('/api/workspace/complete?includeInactive=false&includeArchived=false&includeCounts=true', {
+    const response = await fetch('/api/universe/complete?includeInactive=false&includeArchived=false&includeCounts=true', {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json'

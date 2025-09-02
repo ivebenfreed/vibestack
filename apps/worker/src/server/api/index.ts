@@ -14,7 +14,7 @@ import debugTableDataRouter from './debug/table-data'
 // Core business logic APIs (Worlds, Teams)
 import { teamsApi } from '../routes/teams-api.js'
 import { worldsApi } from '../routes/worlds-api.js'
-import { workspaceApi } from '../routes/user-workspace-api.js'
+import { universeApi } from '../routes/universe-api.js'
 // Custom organization routes removed - using Better Auth endpoints instead
 
 // Create API router
@@ -42,7 +42,7 @@ api.route('/debug', debugTableDataRouter)
 // Core business logic API routes
 api.route('/teams', teamsApi)
 api.route('/worlds', worldsApi)
-api.route('/workspace', workspaceApi)
+api.route('/universe', universeApi)
 
 // Import and mount Kysely-based generic API
 import { genericKysely } from './generic-kysely'

@@ -11,7 +11,7 @@ import {
   requireAdmin,
   requireOwner
 } from '../middleware/hybrid-rls-org-actor';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { withKysely, createKyselyForPersistentUse } from '../lib/database-manager';
 import type { 
   CreateOrganizationInput, 
   UpdateOrganizationInput,

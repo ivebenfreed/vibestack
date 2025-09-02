@@ -36,14 +36,67 @@ let currentOrgId: string | null = null
 let currentSchemaVersion: string | null = null
 
 /**
- * Organization context observable
+ * Universe context observable - tracks schemas from ALL user organizations
+ * This enables cross-organization entity access in universe view
  */
-export const orgContext$ = observable({
-  orgId: null as string | null,
+export const universeContext$ = observable({
   userId: null as string | null,
-  schema: null as any | null,
+  organizations: {} as Record<string, {
+    orgId: string,
+    name: string,
+    schema: any,
+    loading: boolean,
+    error: string | null
+  }>,
   loading: false,
   error: null as string | null,
+})
+
+/**
+ * Legacy orgContext$ for backward compatibility - now points to combined universe data
+ */
+export const orgContext$ = observable(() => {
+  const universe = universeContext$.get()
+  const organizations = Object.values(universe.organizations)
+  
+  if (organizations.length === 0) {
+    return {
+      orgId: null,
+      userId: universe.userId,
+      schema: null,
+      loading: universe.loading,
+      error: universe.error
+    }
+  }
+  
+  // Combine schemas from all organizations
+  const combinedEntities: Record<string, any> = {}
+  organizations.forEach(org => {
+    if (org.schema?.entities) {
+      Object.entries(org.schema.entities).forEach(([entityName, entitySchema]) => {
+        // Prefix entity names with org info to avoid conflicts
+        const prefixedName = organizations.length > 1 ? `${org.name}_${entityName}` : entityName
+        combinedEntities[prefixedName] = {
+          ...entitySchema,
+          _organizationId: org.orgId,
+          _organizationName: org.name,
+          _originalName: entityName
+        }
+      })
+    }
+  })
+  
+  return {
+    orgId: 'universe', // Special identifier for universe view
+    userId: universe.userId,
+    schema: {
+      entities: combinedEntities,
+      version: 'universe-' + Date.now(),
+      orgId: 'universe'
+    },
+    loading: universe.loading || organizations.some(org => org.loading),
+    error: universe.error || organizations.find(org => org.error)?.error || null
+  }
 })
 
 /**
@@ -497,124 +550,162 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
 }
 
 /**
- * Load organization context and initialize entity stores
+ * Load universe context - schemas from ALL user organizations
  * This should only be called by auth state machines, not components
  */
-export async function loadOrgContext(orgId: string, userId: string) {
-  // Guard: Don't reload if already loaded with same org
-  const currentContext = orgContext$.peek()
-  if (currentContext.orgId === orgId && currentContext.userId === userId && currentContext.schema) {
-    log.info(`[Observable] Context already loaded for ${orgId}, skipping reload`)
-    return
-  }
-  
-  log.info(`[Observable] Loading org context for ${orgId}`)
+export async function loadUniverseContext(userId: string, organizationIds: string[]) {
+  log.info(`[Observable] Loading universe context for ${organizationIds.length} organizations`)
   
   // Update loading state
-  orgContext$.loading.set(true)
-  orgContext$.error.set(null)
+  universeContext$.loading.set(true)
+  universeContext$.error.set(null)
+  universeContext$.userId.set(userId)
   
   try {
-    // Load schema from API
-    const schemaResult = await orgSchemaClient.loadOrgSchema(orgId)
-    if (!schemaResult.success || !schemaResult.schema) {
-      throw new Error('Failed to load schema')
-    }
-    
-    // Initialize PersistenceManager and IndexedDB configuration only when schema changes
-    const entities = schemaResult.schema.entities || {}
-    const schemaVersion = schemaResult.schema.version || 'unknown'
-    
-    // FIXED: Only recreate persistence if org or schema version changed
-    // Issue was: IndexedDB persistence was causing continuous Document POST requests
-    // Solution: Configure persistence more carefully to prevent auto-sync conflicts
-    log.info(`[Observable] PERSISTENCE ENABLED WITH SAFEGUARDS - Schema change detected`, {
-      prevOrgId: currentOrgId,
-      newOrgId: orgId,
-      prevVersion: currentSchemaVersion,
-      newVersion: schemaVersion
+    // Load schemas from all organizations in parallel
+    const schemaPromises = organizationIds.map(async (orgId) => {
+      try {
+        universeContext$.organizations[orgId].loading.set(true)
+        universeContext$.organizations[orgId].error.set(null)
+        
+        const schemaResult = await orgSchemaClient.loadOrgSchema(orgId)
+        if (!schemaResult.success || !schemaResult.schema) {
+          throw new Error(`Failed to load schema for org ${orgId}`)
+        }
+        
+        return {
+          orgId,
+          schema: schemaResult.schema,
+          success: true
+        }
+      } catch (error) {
+        log.error(`[Observable] Failed to load schema for org ${orgId}:`, error)
+        return {
+          orgId,
+          error: error instanceof Error ? error.message : 'Failed to load schema',
+          success: false
+        }
+      }
     })
-    try {
-      const entityKeys = entities && typeof entities === 'object' ? Object.keys(entities) : []
-      if (entityKeys.length > 0 && 
-          (currentOrgId !== orgId || currentSchemaVersion !== schemaVersion)) {
-      
-      log.info(`[Observable] Schema change detected - recreating persistence with safeguards`, {
-        prevOrgId: currentOrgId,
-        newOrgId: orgId,
-        prevVersion: currentSchemaVersion,
-        newVersion: schemaVersion
-      })
-      
-        // Create persistence manager for this organization
-        persistenceManager = createPersistenceManager(orgId, userId)
-        
-        // Get IndexedDB configuration from persistence manager
-        const indexedDBPlugin = persistenceManager.createIndexedDBConfig(entityKeys)
-        
-        // Create syncedCrud with proper persistence configuration
-        // CRITICAL: retrySync must be TRUE for changesSince to work properly
-        syncedCrudWithPersistence = configureSynced(syncedCrud, {
-          persist: {
-            plugin: indexedDBPlugin,
-            retrySync: true, // REQUIRED for differential sync - stores sync timestamps
-          }
+    
+    const results = await Promise.all(schemaPromises)
+    
+    // Process results and update universe context
+    results.forEach(result => {
+      if (result.success && result.schema) {
+        universeContext$.organizations[result.orgId].assign({
+          orgId: result.orgId,
+          name: result.schema.name || result.orgId,
+          schema: result.schema,
+          loading: false,
+          error: null
         })
         
-        // Update tracking variables
-        currentOrgId = orgId
-        currentSchemaVersion = schemaVersion
-        
-        log.info(`[Observable] IndexedDB persistence configured with safeguards for ${entityKeys.length} entities`)
-      } else if (currentOrgId === orgId && currentSchemaVersion === schemaVersion) {
-        log.info(`[Observable] Schema unchanged - reusing existing persistence configuration`)
+        const entityCount = result.schema.entities ? Object.keys(result.schema.entities).length : 0
+        log.info(`[Observable] Loaded ${entityCount} entities from org ${result.orgId}`)
+      } else {
+        universeContext$.organizations[result.orgId].assign({
+          orgId: result.orgId,
+          name: result.orgId,
+          schema: null,
+          loading: false,
+          error: result.error
+        })
       }
-    } catch (entitiesError) {
-      log.error('[Observable] Error processing entities for persistence:', entitiesError)
-      // Continue without persistence if there's an error
-      log.info('[Observable] Continuing without IndexedDB persistence due to error')
-    }
-    
-    // Update context
-    orgContext$.assign({
-      orgId,
-      userId,
-      schema: schemaResult.schema,
-      loading: false,
-      error: null,
     })
     
-    // Pre-initialize commonly used entities to avoid race conditions with table components
-    // This triggers the lazy getters in a controlled way after schema is loaded
-    const entityCount = entities && typeof entities === 'object' ? Object.keys(entities).length : 0
-    log.info(`[Observable] Org context loaded with ${entityCount} entities`)
+    universeContext$.loading.set(false)
     
-    // Pre-initialize common entities by accessing them (triggers lazy creation)
-    if (entities && typeof entities === 'object') {
-      const commonEntities = ['Task', 'Project', 'Client', 'Invoice'] // Most commonly used entities
-      commonEntities.forEach(entityName => {
-        if (entities[entityName]) {
-          try {
-            // Access the entity to trigger lazy getter initialization
-            const entityObs = entities[entityName]
-            if (entityObs) {
-              log.info(`[Observable] Pre-initialized ${entityName} entity observable`)
-            }
-          } catch (error) {
-            log.warn(`[Observable] Could not pre-initialize ${entityName}:`, error)
-          }
-        }
-      })
-    }
+    const totalEntities = results.reduce((total, result) => {
+      return total + (result.schema?.entities ? Object.keys(result.schema.entities).length : 0)
+    }, 0)
+    
+    log.info(`[Observable] Universe context loaded with ${totalEntities} total entities across ${organizationIds.length} organizations`)
+    
+    // Initialize persistence configuration after schemas are loaded
+    await initializePersistence(userId, organizationIds, totalEntities)
     
   } catch (error) {
-    log.error('[Observable] Failed to load org context:', error)
-    orgContext$.assign({
+    log.error('[Observable] Failed to load universe context:', error)
+    universeContext$.assign({
       loading: false,
-      error: error instanceof Error ? error.message : 'Failed to load organization'
+      error: error instanceof Error ? error.message : 'Failed to load universe context'
     })
     throw error
   }
+}
+
+/**
+ * Initialize persistence configuration for loaded organizations
+ */
+async function initializePersistence(userId: string, organizationIds: string[], totalEntities: number) {
+  // Skip if no entities or already initialized
+  if (totalEntities === 0 || (persistenceManager && syncedCrudWithPersistence)) {
+    log.info(`[Observable] Skipping persistence initialization: entities=${totalEntities}, already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
+    return
+  }
+  
+  try {
+    // Use primary organization for persistence (first in list)
+    const primaryOrgId = organizationIds[0]
+    if (!primaryOrgId) {
+      log.warn('[Observable] No organization ID available for persistence setup')
+      return
+    }
+    
+    // Get all entity names from the current schema
+    const currentSchema = orgContext$.schema.peek()
+    const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
+    
+    if (entityKeys.length === 0) {
+      log.info('[Observable] No entities found, skipping persistence setup')
+      return
+    }
+    
+    log.info(`[Observable] Initializing persistence for ${entityKeys.length} entities in org ${primaryOrgId}`)
+    
+    // Create persistence manager
+    persistenceManager = createPersistenceManager(primaryOrgId, userId)
+    
+    // Create IndexedDB configuration
+    const indexedDBPlugin = persistenceManager.createIndexedDBConfig(entityKeys)
+    
+    // Configure synced CRUD with persistence
+    syncedCrudWithPersistence = configureSynced(syncedCrud, {
+      persist: {
+        plugin: indexedDBPlugin
+      }
+    })
+    
+    // Update tracking variables
+    currentOrgId = primaryOrgId
+    currentSchemaVersion = currentSchema?.version || 'unknown'
+    
+    log.info(`[Observable] Persistence initialized successfully`, {
+      orgId: primaryOrgId,
+      entityCount: entityKeys.length,
+      schemaVersion: currentSchemaVersion,
+      hasPersistenceManager: !!persistenceManager,
+      hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence
+    })
+    
+  } catch (error) {
+    log.error('[Observable] Failed to initialize persistence:', error)
+    // Reset variables on failure
+    persistenceManager = null
+    syncedCrudWithPersistence = null
+    currentOrgId = null
+    currentSchemaVersion = null
+  }
+}
+
+/**
+ * Legacy function for backward compatibility - now loads universe context
+ */
+export async function loadOrgContext(orgId: string, userId: string) {
+  // For now, just load this single organization
+  // In the future, this should be replaced with loadUniverseContext
+  await loadUniverseContext(userId, [orgId])
 }
 
 // Persistent cache for entity observables across schema changes
@@ -765,11 +856,10 @@ export function clearContext() {
   currentOrgId = null
   currentSchemaVersion = null
   
-  // Clear context - this will automatically clear all entity observables due to reactivity
-  orgContext$.set({
-    orgId: null,
+  // Clear universe context - this will automatically clear all entity observables due to reactivity
+  universeContext$.set({
     userId: null,
-    schema: null,
+    organizations: {},
     loading: false,
     error: null,
   })
@@ -858,25 +948,93 @@ export const currentOrg$ = orgContext$.orgId
 export const currentSchema$ = orgContext$.schema
 
 // Entity groups for sidebar (computed from schema) - fully reactive
-export const entityGroups$ = observable(() => {
-  const schema = orgContext$.schema.get()
+// Returns array of groups with items, matching sidebar expectation
+// Can be filtered by organization when in organization view
+export const createEntityGroups = (filterOrgId?: string) => observable(() => {
+  const schema = orgContext$.get().schema
   if (!schema?.entities) return []
   
   // Safely get entity keys with error handling
   try {
     const entityKeys = schema.entities && typeof schema.entities === 'object' ? Object.keys(schema.entities) : []
-    return entityKeys.map(name => ({
-      name,
-      path: `/entities/${name}`,
-      icon: 'Database'
-      // NOTE: Removed count$ to prevent automatic entity observable initialization
-      // Count will be loaded lazily when the entity page is actually accessed
+    
+    // Filter by organization if specified
+    const filteredEntityKeys = filterOrgId 
+      ? entityKeys.filter(entityName => {
+          const entitySchema = schema.entities[entityName]
+          return entitySchema._organizationId === filterOrgId
+        })
+      : entityKeys
+    
+    // Group entities by archetype for better organization
+    const entityGroups: Record<string, any[]> = {}
+    
+    filteredEntityKeys.forEach(entityName => {
+      const entitySchema = schema.entities[entityName]
+      const archetype = entitySchema?.archetype || 'other'
+      
+      if (!entityGroups[archetype]) {
+        entityGroups[archetype] = []
+      }
+      
+      // Use original entity name if available, otherwise use prefixed name
+      const displayName = entitySchema._originalName || entityName
+      const orgName = entitySchema._organizationName
+      
+      entityGroups[archetype].push({
+        title: displayName,
+        url: `/entities/${entityName}`,
+        icon: getArchetypeIcon(archetype),
+        organizationName: orgName,
+        organizationId: entitySchema._organizationId
+      })
+    })
+    
+    // Convert to array format expected by sidebar
+    return Object.entries(entityGroups).map(([archetype, items]) => ({
+      name: formatArchetypeName(archetype),
+      items: items.sort((a, b) => a.title.localeCompare(b.title))
     }))
+    
   } catch (error) {
     log.error('[Observable] Error creating entity groups:', error)
     return []
   }
 })
+
+// Default entity groups (all organizations)
+export const entityGroups$ = createEntityGroups()
+
+// Helper function to get icon component based on archetype
+function getArchetypeIcon(archetype: string) {
+  // Map entity archetypes to lucide-react icon names
+  const iconMap: Record<string, string> = {
+    'task': 'CheckSquare',
+    'project': 'FolderOpen', 
+    'record': 'Database',
+    'document': 'FileText',
+    'activity': 'Activity',
+    'discussion': 'MessageSquare',
+    'file': 'File',
+    'other': 'Circle'
+  }
+  return iconMap[archetype] || 'Circle'
+}
+
+// Helper function to format archetype names for display
+function formatArchetypeName(archetype: string): string {
+  const nameMap: Record<string, string> = {
+    'task': 'Tasks',
+    'project': 'Projects',
+    'record': 'Records', 
+    'document': 'Documents',
+    'activity': 'Activities',
+    'discussion': 'Discussions',
+    'file': 'Files',
+    'other': 'Other'
+  }
+  return nameMap[archetype] || archetype.charAt(0).toUpperCase() + archetype.slice(1)
+}
 
 /**
  * Batch operation utilities for components

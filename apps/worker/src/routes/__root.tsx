@@ -133,20 +133,34 @@ if (!authMachineActor) {
         };
         connectSync();
         
-        // Load Legend State org context and universe context in parallel
-        import('../legend-state').then(({ loadOrgContext, universeHelpers }) => {
+        // Load universe context with ALL user organizations
+        import('../legend-state').then(({ loadUniverseContext, universeHelpers }) => {
           // Initialize universe context for organizations display
-          universeHelpers.setAuthenticated(true, user.id).then(() => {
+          universeHelpers.setAuthenticated(true, user.id).then(async () => {
             log.info('Universe context authenticated and workspace data loaded')
+            
+            // Refresh workspace data (this loads organization data)
+            await universeHelpers.refresh()
+            
+            // Import the universe context observable to get the data
+            const { universeContext$ } = await import('../legend-state/observables/universe-context')
+            const universeData = universeContext$.get()
+            const orgIds = universeData && universeData.organizations ? Object.keys(universeData.organizations) : []
+            
+            if (orgIds.length > 0) {
+              log.info(`Loading entity schemas from ${orgIds.length} organizations:`, orgIds)
+              
+              // Load entity schemas from ALL user organizations
+              return loadUniverseContext(user.id, orgIds)
+            } else {
+              log.warn('No organizations found for user - loading current org only')
+              // Fallback to current org if no universe data
+              return loadUniverseContext(user.id, [currentOrganization.id])
+            }
+          }).then(() => {
+            log.info('Complete universe context loaded successfully (entities + worlds)')
           }).catch((error) => {
-            console.error('[ROOT] Failed to initialize universe context:', error)
-          })
-          
-          // Load entity schema context
-          loadOrgContext(currentOrganization.id, user.id).then(() => {
-            log.info('Legend State org context loaded successfully')
-          }).catch((error) => {
-            console.error('[ROOT] Failed to load Legend State org context:', error)
+            console.error('[ROOT] Failed to initialize complete universe context:', error)
           })
         }).catch((error) => {
           console.error('[ROOT] Failed to import Legend State:', error)
@@ -187,19 +201,33 @@ if (!authMachineActor) {
       connectSync();
       
       // Dynamic import to avoid circular dependencies
-      import('../legend-state').then(({ loadOrgContext, universeHelpers }) => {
+      import('../legend-state').then(({ loadUniverseContext, universeHelpers }) => {
         // Initialize universe context for organizations display
-        universeHelpers.setAuthenticated(true, user.id).then(() => {
+        universeHelpers.setAuthenticated(true, user.id).then(async () => {
           log.info('Universe context authenticated and workspace data loaded (initial)')
+          
+          // Refresh workspace data (this loads organization data)
+          await universeHelpers.refresh()
+          
+          // Import the universe context observable to get the data
+          const { universeContext$ } = await import('../legend-state/observables/universe-context')
+          const universeData = universeContext$.get()
+          const orgIds = universeData && universeData.organizations ? Object.keys(universeData.organizations) : []
+          
+          if (orgIds.length > 0) {
+            log.info(`Loading entity schemas from ${orgIds.length} organizations (initial):`, orgIds)
+            
+            // Load entity schemas from ALL user organizations
+            return loadUniverseContext(user.id, orgIds)
+          } else {
+            log.warn('No organizations found for user - loading current org only (initial)')
+            // Fallback to current org if no universe data
+            return loadUniverseContext(user.id, [currentOrganization.id])
+          }
+        }).then(() => {
+          log.info('Complete universe context loaded successfully (initial - entities + worlds)')
         }).catch((error) => {
-          console.error('[ROOT] Failed to initialize universe context (initial):', error)
-        })
-        
-        // Load entity schema context
-        loadOrgContext(currentOrganization.id, user.id).then(() => {
-          log.info('Legend State org context loaded successfully (initial)')
-        }).catch((error) => {
-          console.error('[ROOT] Failed to load Legend State org context (initial):', error)
+          console.error('[ROOT] Failed to initialize complete universe context (initial):', error)
         })
       }).catch((error) => {
         console.error('[ROOT] Failed to import Legend State (initial):', error)
