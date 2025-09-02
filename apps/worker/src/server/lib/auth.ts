@@ -11,7 +11,7 @@ import { createEmailService } from '../services/EmailService';
 import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
-import { createDatabaseConnection, getKysely } from './database-manager';
+import { getKysely } from './database-manager';
 import { createKVSessionInterceptor } from './kv-session-adapter';
 
 // Helper function to get allowed origins for unified worker
@@ -207,8 +207,7 @@ export function initializeAuth(env: Env, request?: Request) {
   // Get configured Kysely instance or KV-intercepted version
   let kyselyInstance;
   
-  // Always establish database connection first
-  createDatabaseConnection(env);
+  // Database connection is already established by middleware
   
   if (env.USE_KV_SESSIONS && env.SESSIONS) {
     // Use KV interceptor for session storage (requires database connection to be initialized)

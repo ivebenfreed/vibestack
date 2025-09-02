@@ -16,7 +16,7 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
 import { syncLogger } from './logger';
 import { createOrgActorCache, type OrganizationActorCacheService, type RoleInfo } from '../lib/organization-actor-cache';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { getKysely } from '../lib/database-manager';
 import { sql } from 'kysely';
 
 const MODULE_NAME = 'HybridRLSOrgActor';
@@ -71,6 +71,8 @@ async function setPostgreSQLContext(
   env: any
 ): Promise<void> {
   try {
+    // Create fresh database connection for this request context to avoid I/O sharing
+    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
     createDatabaseConnection(env);
     const database = getKysely();
     
@@ -107,10 +109,12 @@ async function getUserRole(
     organizationId,
     userId,
     async () => {
-      // Fallback: Fetch role from PostgreSQL
+      // Fallback: Fetch role from PostgreSQL  
       try {
+        // Create fresh database connection for this request context to avoid I/O sharing
+        const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
         createDatabaseConnection(env);
-    const database = getKysely();
+        const database = getKysely();
         
         const member = await database
           .selectFrom('organization_members')

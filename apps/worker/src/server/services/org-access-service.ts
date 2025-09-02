@@ -52,6 +52,24 @@ export class OrgAccessService {
   ) {}
 
   /**
+   * Get organization by ID - used by sync manager
+   */
+  async getOrganizationById(organizationId: string): Promise<{ id: string; slug: string; name: string } | null> {
+    try {
+      const org = await this.kysely
+        .selectFrom('organizations')
+        .select(['id', 'slug', 'name'])
+        .where('id', '=', organizationId)
+        .executeTakeFirst();
+
+      return org || null;
+    } catch (error) {
+      console.error('Failed to get organization by ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Check user access with cache-first lookup
    * Falls back to PostgreSQL if cache miss or stale
    */
@@ -71,21 +89,31 @@ export class OrgAccessService {
         return { hasAccess: false };
       }
 
-      // 2. Check cache first (Organization Actor)
+      // 2. Check cache first (Organization Actor) - with proper I/O context isolation
       if (this.env.ORGANIZATION_ACTOR) {
         try {
+          // Create fresh Organization Actor reference for this request context
           const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${org.id}`);
           const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
           
-          const response = await orgActor.fetch(new Request(`https://internal/role-check?userId=${userId}&organizationId=${org.id}`));
+          // Use fresh Request object to avoid I/O context sharing
+          const freshRequest = new Request(`https://internal/role-check?userId=${userId}&organizationId=${org.id}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Request-Context': 'org-access-service'
+            }
+          });
+          
+          const response = await orgActor.fetch(freshRequest);
           if (response.ok) {
             const cacheResult = await response.json();
             
             // If cache is fresh and user has role, return immediately
             if (cacheResult.cached && cacheResult.role) {
               console.log('🔍 OrgAccessService Organization Actor cache hit:', {
-                userId,
-                orgId: org.id,
+                userId: userId.substring(0, 8) + '...',
+                orgId: org.id.substring(0, 8) + '...',
                 orgSlug,
                 cachedRole: cacheResult.role.role,
                 cacheResult
@@ -174,23 +202,6 @@ export class OrgAccessService {
     }
   }
 
-  /**
-   * Get organization by ID
-   */
-  async getOrganizationById(organizationId: string): Promise<{ id: string; name: string; slug: string } | null> {
-    try {
-      const org = await this.kysely
-        .selectFrom('organizations as o')
-        .select(['o.id', 'o.name', 'o.slug'])
-        .where('o.id', '=', organizationId)
-        .executeTakeFirst();
-
-      return org || null;
-    } catch (error) {
-      console.error('Failed to get organization by ID:', error);
-      return null;
-    }
-  }
 
   /**
    * Get user's organizations with caching
@@ -394,6 +405,7 @@ export class OrgAccessService {
     }
 
     try {
+      // Create fresh Organization Actor reference for this request context
       const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${orgId}`);
       const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
       
@@ -404,16 +416,22 @@ export class OrgAccessService {
         permissions: this.getRolePermissions(member.role)
       }));
       
-      const response = await orgActor.fetch(new Request('https://internal/bulk-cache-roles', {
+      // Use fresh Request object to avoid I/O context sharing
+      const freshRequest = new Request('https://internal/bulk-cache-roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-Context': 'org-access-service-sync' 
+        },
         body: JSON.stringify({
           roles: roles.map(role => ({
             ...role,
             organizationId: orgId
           }))
         })
-      }));
+      });
+
+      const response = await orgActor.fetch(freshRequest);
 
       if (!response.ok) {
         console.warn('Organization Actor cache sync failed:', await response.text());
@@ -464,15 +482,21 @@ export class OrgAccessService {
     if (!this.env.ORGANIZATION_ACTOR) return;
 
     try {
+      // Create fresh Organization Actor reference for this request context
       const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${orgId}`);
       const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
       
-      // Invalidate all cached roles to force fresh sync
-      const response = await orgActor.fetch(new Request('https://internal/invalidate-role', {
+      // Use fresh Request object to avoid I/O context sharing
+      const freshRequest = new Request('https://internal/invalidate-role', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Request-Context': 'org-access-service-invalidate'
+        },
         body: JSON.stringify({ organizationId: orgId })
-      }));
+      });
+
+      const response = await orgActor.fetch(freshRequest);
 
       if (!response.ok) {
         console.warn('Organization Actor cache invalidation failed:', await response.text());

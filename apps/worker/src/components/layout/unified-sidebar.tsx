@@ -1,6 +1,6 @@
 /**
- * Unified Sidebar - Single sidebar with hierarchical navigation
- * Replaces the complex dual sidebar system with a clean, simple approach
+ * Unified Sidebar - 2-Level Navigation: Universe → Organization
+ * Clean implementation with Universe view and Organization view
  */
 
 import * as React from 'react'
@@ -9,46 +9,20 @@ import { useAuth } from '@/state-machines'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { useSelector } from '@xstate/store/react'
-import { shallowEqual } from '@xstate/store'
 import { observer } from '@legendapp/state/react'
-import { Project, ProjectStatus } from '@/db/client-entities'
-// Import from Legend State for entity groups
-import { entityGroups$ } from '@/legend-state'
-import { shouldHideBusinessRoutes } from './data/dynamic-sidebar-data'
-import { PowerSidebar } from '@/components/power-sidebar/PowerSidebar'
-import type { NavGroup } from './types'
+import { entityGroups$, currentOrganizations$, universeHelpers } from '@/legend-state'
+import { use$ } from '@legendapp/state/react'
 import { 
   Home, 
-  FolderKanban, 
-  CheckSquare, 
   Settings, 
   Bug,
-  Plus,
-  MessageSquare,
-  Package,
   HelpCircle,
-  Folder,
-  FolderOpen,
-  Dot,
-  Circle,
   ChevronDown,
   ChevronRight,
-  RefreshCw,
   Activity,
-  Zap,
-  Grid3X3,
-  FileText,
   Building,
-  Users,
-  Calendar,
-  ClipboardList,
-  DollarSign,
-  Clock,
-  Database,
   Globe,
   Map
 } from 'lucide-react'
@@ -66,20 +40,6 @@ interface NavItem {
   badge?: string
 }
 
-interface NavSection {
-  id: string
-  label: string
-  items: NavItem[]
-}
-
-// Remove static navigation - PowerSidebar handles this now
-const staticNavigation: NavItem[] = []
-
-const businessNavigation: NavItem[] = [
-  { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/projects' },
-  { id: 'tasks', label: 'Tasks', icon: CheckSquare, href: '/tasks' },
-]
-
 const bottomNavigation: NavItem[] = [
   { id: 'help-center', label: 'Help Center', icon: HelpCircle, href: '/help-center' },
   { id: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
@@ -88,20 +48,11 @@ const bottomNavigation: NavItem[] = [
 
 export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation()
-  const { isAdmin, isSuperAdmin, user, currentOrganization } = useAuth()
-  const currentOrgId = currentOrganization?.id
+  const { isAdmin, isSuperAdmin } = useAuth()
   
-  // Get entity groups from Legend Central computed observable - automatically updates when schema changes
-  const entityNavGroups = entityGroups$.get()
-  
-  // Entity nav groups come directly from the computed observable
-  const navGroups = entityNavGroups || []
-  
-  // Determine which navigation to show
-  const hideBusinessRoutes = shouldHideBusinessRoutes()
-  const mainNavigation = hideBusinessRoutes 
-    ? staticNavigation 
-    : [...staticNavigation, ...businessNavigation]
+  // Navigation state: null = universe view, orgId = organization view
+  const [currentView, setCurrentView] = React.useState<string | null>(null)
+  const isUniverseView = currentView === null
   
   const isActive = (href: string) => {
     if (href === '/') {
@@ -113,7 +64,6 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
   // Filter navigation items based on user permissions
   const filteredBottomNavigation = bottomNavigation.filter(item => {
     if (item.id === 'debug') {
-      // Only show debug link to admins and super admins
       return isAdmin || isSuperAdmin
     }
     return true
@@ -127,8 +77,8 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
         'h-screen',
         isCollapsed ? 'w-16' : 'w-full'
       )}>
-      {/* Header - only show on desktop (collapsed sidebar) */}
-      {isCollapsed && (
+      {/* Header */}
+      {isCollapsed ? (
         <header className="border-b border-border flex-shrink-0">
           <div className="flex h-14 items-center justify-center">
             <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-md">
@@ -136,10 +86,7 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
             </div>
           </div>
         </header>
-      )}
-      
-      {/* Mobile/Expanded Header */}
-      {!isCollapsed && (
+      ) : (
         <header className="border-b border-border flex-shrink-0">
           <div className="flex h-14 items-center justify-center">
             <div className="font-semibold text-sidebar-foreground px-4">
@@ -152,36 +99,22 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <div className="px-3 py-4">
-          
-          {/* Main Navigation - Only show if there are items */}
-          {mainNavigation.length > 0 && (
-            <div className="space-y-1 mb-6">
-              {mainNavigation.map((item) => (
-                <NavItem
-                  key={item.id}
-                  item={item}
-                  isActive={isActive(item.href)}
-                  isCollapsed={isCollapsed}
-                />
-              ))}
-            </div>
-          )}
-          
-          {/* PowerSidebar - Dynamic Entity Navigation with Universe/Worlds */}
-          <PowerSidebar isCollapsed={isCollapsed} />
-
-          {/* Context-sensitive content - but NOT debug */}
-          {!location.pathname.startsWith('/debug') && (
-            <ContextualNavigation 
-              location={location.pathname} 
+          {/* 2-Level Navigation Structure */}
+          {isUniverseView ? (
+            <UniverseView 
               isCollapsed={isCollapsed} 
+              onEnterOrg={setCurrentView}
+            />
+          ) : (
+            <OrganizationView 
+              orgId={currentView} 
+              isCollapsed={isCollapsed}
+              onBackToUniverse={() => setCurrentView(null)}
             />
           )}
 
-          {/* Always show divider between main content and bottom nav */}
-          <Separator className="my-4" />
-
           {/* Bottom Navigation */}
+          <Separator className="my-4" />
           <div className="space-y-1">
             {filteredBottomNavigation.map((item) => (
               <NavItem
@@ -192,17 +125,6 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
               />
             ))}
           </div>
-          
-          {/* Debug navigation - shown AFTER bottom navigation */}
-          {location.pathname.startsWith('/debug') && (
-            <>
-              <Separator className="my-4" />
-              <ContextualNavigation 
-                location={location.pathname} 
-                isCollapsed={isCollapsed} 
-              />
-            </>
-          )}
         </div>
       </div>
     </div>
@@ -259,27 +181,33 @@ function NavItem({ item, isActive, isCollapsed }: {
   return content
 }
 
-function EntityNavGroup({ navGroup, isActive, isCollapsed }: {
-  navGroup: NavGroup
-  isActive: (href: string) => boolean
+// Universe View Component - Level 1
+function UniverseView({ isCollapsed, onEnterOrg }: {
   isCollapsed: boolean
+  onEnterOrg: (orgId: string) => void
 }) {
-  const [isExpanded, setIsExpanded] = React.useState(true)
-  
+  const organizations = use$(currentOrganizations$)
+  const location = useLocation()
+
+  const universeNavItems = [
+    { id: 'universe-dashboard', label: 'Universe Dashboard', icon: Globe, href: '/universe' },
+    { id: 'universe-analytics', label: 'Analytics', icon: Activity, href: '/universe/analytics' },
+  ]
+
   if (isCollapsed) {
-    // In collapsed mode, show items directly without grouping
     return (
-      <div className="space-y-1">
-        {navGroup.items.map((item) => (
-          <TooltipProvider key={item.url}>
-            <Tooltip>
+      <TooltipProvider>
+        <div className="space-y-1">
+          {/* Universe Dashboard */}
+          {universeNavItems.map(item => (
+            <Tooltip key={item.id}>
               <TooltipTrigger asChild>
                 <Link
-                  to={item.url}
+                  to={item.href}
                   className={cn(
                     'flex items-center justify-center rounded-md p-2 text-sm transition-colors',
                     'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    isActive(item.url)
+                    location.pathname.startsWith(item.href)
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                       : 'text-sidebar-foreground'
                   )}
@@ -288,502 +216,228 @@ function EntityNavGroup({ navGroup, isActive, isCollapsed }: {
                 </Link>
               </TooltipTrigger>
               <TooltipContent side="right">
-                {item.title}
+                {item.label}
               </TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-        ))}
-      </div>
-    )
-  }
+          ))}
 
-  return (
-    <div>
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-sidebar-accent/50 rounded-md transition-colors"
-      >
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          {navGroup.title}
-        </span>
-        {isExpanded ? (
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-3 w-3 text-muted-foreground" />
-        )}
-      </button>
-      {isExpanded && (
-        <div className="space-y-1 mt-1">
-          {navGroup.items.map((item) => (
-            <Link
-              key={item.url}
-              to={item.url}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ml-2",
-                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isActive(item.url)
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.title}</span>
-            </Link>
+          {/* Organizations */}
+          <Separator className="my-2" />
+          {organizations.slice(0, 3).map(org => (
+            <Tooltip key={org.info.id}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-full justify-center p-2"
+                  onClick={() => onEnterOrg(org.info.id)}
+                >
+                  <Building className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {org.info.name}
+              </TooltipContent>
+            </Tooltip>
           ))}
         </div>
-      )}
-    </div>
-  )
-}
-
-function ContextualNavigation({ location, isCollapsed }: {
-  location: string
-  isCollapsed: boolean
-}) {
-  // Get the expanded content first
-  let expandedContent = null
-  
-  if (location.startsWith('/universe')) {
-    expandedContent = <UniverseNavigation isCollapsed={false} />
-  } else if (location.startsWith('/worlds')) {
-    expandedContent = <WorldsNavigation isCollapsed={false} />
-  } else if (location.startsWith('/settings')) {
-    expandedContent = <SettingsNavigation isCollapsed={false} />
-  } else if (location.startsWith('/debug')) {
-    expandedContent = <DebugNavigation isCollapsed={false} />
-  }
-  
-  // If no content, return null
-  if (!expandedContent) return null
-  
-  // If collapsed, show the caret with popover containing the same content
-  if (isCollapsed) {
-    return (
-      <CollapsedContextualNav location={location}>
-        {expandedContent}
-      </CollapsedContextualNav>
+      </TooltipProvider>
     )
   }
-  
-  // If expanded, show the content directly
-  return expandedContent
-}
-
-
-// Simple collapsed navigation - shows exact same content as expanded sidebar
-function CollapsedContextualNav({ location, children }: {
-  location: string
-  children: React.ReactNode
-}) {
-  if (!children) return null
-  
-  const [isOpen, setIsOpen] = React.useState(false)
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
-  
-  // Handle wheel events to prevent them from bubbling to the page
-  const handleWheel = React.useCallback((e: React.WheelEvent) => {
-    const container = scrollContainerRef.current
-    if (!container) return
-    
-    const { scrollTop, scrollHeight, clientHeight } = container
-    const atTop = scrollTop === 0
-    const atBottom = scrollTop + clientHeight >= scrollHeight
-    
-    // If scrolling up at top or scrolling down at bottom, allow event to bubble
-    // Otherwise, prevent bubbling to keep scroll within popover
-    if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
-      return // Let it bubble to parent
-    }
-    
-    e.stopPropagation()
-  }, [])
-  
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          className="w-full h-8 p-0 flex items-center justify-center hover:bg-sidebar-accent mt-2"
-        >
-          <ChevronDown className="h-3 w-3" />
-          <span className="sr-only">Show navigation</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent 
-        side="right" 
-        align="start" 
-        className="w-64 p-0 max-h-[calc(100vh-4rem)] flex flex-col"
-        sideOffset={8}
-        onWheel={handleWheel}
-      >
-        <div 
-          ref={scrollContainerRef}
-          className="overflow-y-auto flex-1 p-3"
-          onWheel={handleWheel}
-        >
-          {React.cloneElement(children as React.ReactElement, { 
-            onNavigate: () => setIsOpen(false)
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function ProjectNavigation({ isCollapsed, onNavigate }: { 
-  isCollapsed: boolean
-  onNavigate?: () => void 
-}) {
-  const location = useLocation()
-  
-  // TODO: Replace with Dexie queries
-  const activeProjects: any[] = []
-  const inactiveProjects: any[] = []
-  const archivedProjects: any[] = []
-  const completedProjects: any[] = []
-  const totalProjects = 0
-
-  // Group for easy iteration (no new object creation in selector)
-  const projectsByStatus = {
-    [ProjectStatus.ACTIVE]: activeProjects,
-    [ProjectStatus.INACTIVE]: inactiveProjects,
-    [ProjectStatus.ARCHIVED]: archivedProjects,
-    [ProjectStatus.COMPLETED]: completedProjects
-  }
-
-  // Get status color helper function
-  const getStatusColor = (status: ProjectStatus) => {
-    switch (status) {
-      case ProjectStatus.ACTIVE:
-        return 'bg-green-500'
-      case ProjectStatus.INACTIVE:
-        return 'bg-yellow-500'
-      case ProjectStatus.ARCHIVED:
-        return 'bg-gray-500'
-      case ProjectStatus.COMPLETED:
-        return 'bg-blue-500'
-      default:
-        return 'bg-gray-400'
-    }
-  }
-
-  // Status sections configuration
-  const statusSections = [
-    { 
-      status: ProjectStatus.ACTIVE, 
-      label: 'Active', 
-      projects: activeProjects 
-    },
-    { 
-      status: ProjectStatus.INACTIVE, 
-      label: 'Inactive', 
-      projects: inactiveProjects 
-    },
-    { 
-      status: ProjectStatus.ARCHIVED, 
-      label: 'Archived', 
-      projects: archivedProjects 
-    },
-    { 
-      status: ProjectStatus.COMPLETED, 
-      label: 'Completed', 
-      projects: completedProjects 
-    }
-  ]
 
   return (
-    <div className="mt-4">
-      {/* Project Status Accordion */}
-      <Accordion type="single" collapsible>
-        {statusSections.map((section) => {
-          if (section.projects.length === 0) return null
-
-          return (
-            <AccordionItem key={section.status} value={section.status}>
-              <AccordionTrigger className="px-3 py-2 hover:bg-sidebar-accent/50 rounded-md [&[data-state=open]>svg]:rotate-180">
-                <div className="flex items-center gap-2">
-                  <div className={cn("h-2 w-2 rounded-full", getStatusColor(section.status))} />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {section.label} ({section.projects.length})
-                  </span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-2">
-                <div className="space-y-1 ml-4">
-                  {section.projects.map((project) => (
-                    <Link
-                      key={project.id}
-                      to={`/projects/${project.id}`}
-                      onClick={onNavigate}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                        location.pathname === `/projects/${project.id}`
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                          : "text-sidebar-foreground"
-                      )}
-                    >
-                      <span className="truncate">{project.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          )
-        })}
-      </Accordion>
-
-      {/* Empty state */}
-      {totalProjects === 0 && (
-        <div className="px-3 py-4 text-center">
-          <p className="text-xs text-muted-foreground">No projects yet</p>
-          <Button variant="ghost" size="sm" className="mt-2 h-6 text-xs">
-            <Plus className="h-3 w-3 mr-1" />
-            Create Project
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TasksNavigation({ isCollapsed, onNavigate }: { 
-  isCollapsed: boolean
-  onNavigate?: () => void 
-}) {
-  const location = useLocation()
-  
-  const taskItems = [
-    { label: 'Table View', href: '/tasks?view=table' },
-    { label: 'Kanban View', href: '/tasks?view=kanban' },
-    { label: 'Timeline View', href: '/tasks?view=timeline' },
-  ]
-  
-  return (
-    <div className="mt-4 space-y-1">
-      <div className="px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Task Views
-        </span>
-      </div>
-      {taskItems.map((item) => (
-        <Link
-          key={item.href}
-          to={item.href}
-          onClick={onNavigate}
-          className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            location.pathname === item.href
-              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-              : "text-sidebar-foreground"
-          )}
-        >
-          <span className="truncate">{item.label}</span>
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-function SettingsNavigation({ isCollapsed, onNavigate }: { 
-  isCollapsed: boolean
-  onNavigate?: () => void 
-}) {
-  const location = useLocation()
-  const settingsItems = [
-    { label: 'Profile', href: '/settings' },
-    { label: 'Account', href: '/settings/account' },
-    { label: 'Appearance', href: '/settings/appearance' },
-    { label: 'Notifications', href: '/settings/notifications' },
-    { label: 'Display', href: '/settings/display' },
-  ]
-
-
-  return (
-    <div className="mt-4">
-      <div className="px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Settings
-        </span>
-      </div>
+    <div className="space-y-4">
+      {/* Universe Dashboard Links */}
       <div className="space-y-1">
-        {settingsItems.map((item) => (
+        <div className="text-xs text-muted-foreground px-2 mb-2">Universe</div>
+        {universeNavItems.map(item => (
           <Link
-            key={item.href}
+            key={item.id}
             to={item.href}
-            onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              location.pathname === item.href
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                : "text-sidebar-foreground"
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+              'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+              location.pathname.startsWith(item.href)
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                : 'text-sidebar-foreground'
             )}
           >
-            <span className="truncate">{item.label}</span>
+            <item.icon className="h-4 w-4" />
+            <span>{item.label}</span>
           </Link>
         ))}
       </div>
+
+      {/* Organizations List */}
+      <div className="space-y-1">
+        <div className="text-xs text-muted-foreground px-2 mb-2 flex items-center justify-between">
+          <span>Organizations</span>
+          <span className="text-xs bg-muted px-2 py-0.5 rounded">{organizations.length}</span>
+        </div>
+        {organizations.map(org => (
+          <Button
+            key={org.info.id}
+            variant="ghost"
+            className="w-full justify-start px-3 py-2 h-auto font-normal"
+            onClick={() => onEnterOrg(org.info.id)}
+          >
+            <Building className="h-4 w-4 mr-3" />
+            <span className="truncate">{org.info.name}</span>
+            <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }
 
-function DebugNavigation({ isCollapsed, onNavigate }: { 
+// Organization View Component - Level 2  
+function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
+  orgId: string
   isCollapsed: boolean
-  onNavigate?: () => void 
+  onBackToUniverse: () => void
 }) {
+  const allOrganizations = use$(currentOrganizations$)
+  const entityNavGroups = entityGroups$.get()
   const location = useLocation()
-  const [systemExpanded, setSystemExpanded] = React.useState(true)
-  const [errorExpanded, setErrorExpanded] = React.useState(false)
-  
-  const debugSections = [
-    {
-      title: 'Core Debug Tools',
-      expanded: systemExpanded,
-      setExpanded: setSystemExpanded,
-      items: [
-        { label: 'Sync System', href: '/debug/sync' },
-        { label: 'Database', href: '/debug/database' },
-        { label: 'Integrity', href: '/debug/integrity' },
-        { label: 'Kanban Debug', href: '/debug/kanban' },
-        { label: 'React Flow Positioning', href: '/debug/reactflow-positioning' },
-      ]
-    },
-    {
-      title: 'Error Pages',
-      expanded: errorExpanded,
-      setExpanded: setErrorExpanded,
-      items: [
-        { label: 'Unauthorized (401)', href: '/401' },
-        { label: 'Forbidden (403)', href: '/403' },
-        { label: 'Not Found (404)', href: '/404' },
-        { label: 'Server Error (500)', href: '/500' },
-        { label: 'Maintenance (503)', href: '/503' },
-      ]
-    }
-  ]
 
+  const currentOrg = allOrganizations.find(org => org.info.id === orgId)
+  if (!currentOrg) {
+    return <div className="p-4 text-sm text-muted-foreground">Organization not found</div>
+  }
 
-  return (
-    <div className="mt-4 space-y-4">
-      {debugSections.map((section) => (
-        <div key={section.title}>
-          <button
-            onClick={() => section.setExpanded(!section.expanded)}
-            className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-sidebar-accent/50 rounded-md transition-colors"
-          >
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {section.title}
-            </span>
-            {section.expanded ? (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            )}
-          </button>
-          {section.expanded && (
-            <div className="space-y-1">
-              {section.items.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ml-2",
-                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    location.pathname === item.href
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-sidebar-foreground"
-                  )}
-                >
-                  <span className="truncate">{item.label}</span>
-                </Link>
+  // Get real worlds for this organization
+  const orgWorlds = currentOrg?.worlds || []
+
+  if (isCollapsed) {
+    return (
+      <TooltipProvider>
+        <div className="space-y-1">
+          {/* Back to Universe */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-full justify-center p-2"
+                onClick={onBackToUniverse}
+              >
+                <Globe className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              Back to Universe
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Worlds */}
+          {orgWorlds.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              {orgWorlds.slice(0, 3).map(world => (
+                <Tooltip key={world.id}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to={`/worlds/${world.id}`}
+                      className="flex items-center justify-center rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent"
+                    >
+                      <Map className="h-4 w-4" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {world.name}
+                  </TooltipContent>
+                </Tooltip>
               ))}
-            </div>
+            </>
           )}
         </div>
-      ))}
-    </div>
-  )
-}
-
-// Navigation Components for Contextual Sidebar Content
-
-function UniverseNavigation({ isCollapsed, onNavigate }: { 
-  isCollapsed: boolean
-  onNavigate?: () => void 
-}) {
-  const location = useLocation()
-  
-  const universeItems = [
-    { label: 'Overview', href: '/universe' },
-    { label: 'Personal Worlds', href: '/universe?tab=personal' },
-    { label: 'Analytics', href: '/universe?tab=analytics' },
-    { label: 'Settings', href: '/universe?tab=settings' },
-  ]
+      </TooltipProvider>
+    )
+  }
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground">
-        <Globe className="h-3 w-3" />
-        <span>Your Universe</span>
-      </div>
-      {universeItems.map((item) => (
-        <Link
-          key={item.href}
-          to={item.href}
-          onClick={onNavigate}
-          className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            location.pathname === item.href
-              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-              : "text-sidebar-foreground"
-          )}
+    <div className="space-y-4">
+      {/* Breadcrumb Header */}
+      <div className="flex items-center gap-2 px-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBackToUniverse}
+          className="text-xs text-muted-foreground hover:text-foreground p-1 h-auto"
         >
-          <span className="truncate">{item.label}</span>
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-function WorldsNavigation({ isCollapsed, onNavigate }: { 
-  isCollapsed: boolean
-  onNavigate?: () => void 
-}) {
-  const location = useLocation()
-  
-  const worldsItems = [
-    { label: 'All Worlds', href: '/worlds' },
-    { label: 'Personal Worlds', href: '/worlds?type=personal' },
-    { label: 'Business Worlds', href: '/worlds?type=business' },
-    { label: 'Active Projects', href: '/worlds?view=projects' },
-    { label: 'Create World', href: '/worlds?action=create' },
-  ]
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground">
-        <Map className="h-3 w-3" />
-        <span>Worlds</span>
+          <Globe className="h-3 w-3 mr-1" />
+          Universe
+        </Button>
+        <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        <span className="text-sm font-medium truncate">{currentOrg.info.name}</span>
       </div>
-      {worldsItems.map((item) => (
-        <Link
-          key={item.href}
-          to={item.href}
-          onClick={onNavigate}
-          className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            location.pathname === item.href
-              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-              : "text-sidebar-foreground"
-          )}
-        >
-          <span className="truncate">{item.label}</span>
-        </Link>
-      ))}
+
+      {/* Worlds Section */}
+      {orgWorlds.length > 0 ? (
+        <div className="space-y-1">
+          <div className="text-xs text-muted-foreground px-2 mb-2 flex items-center justify-between">
+            <span>Worlds</span>
+            <span className="text-xs bg-muted px-2 py-0.5 rounded">{orgWorlds.length}</span>
+          </div>
+          {orgWorlds.map(world => (
+            <Link
+              key={world.id}
+              to={`/worlds/${world.id}`}
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                location.pathname.startsWith(`/worlds/${world.id}`)
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground'
+              )}
+            >
+              <Map className="h-4 w-4" />
+              <span className="truncate">{world.name}</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground px-2 py-4">
+          No worlds in this organization
+        </div>
+      )}
+
+      {/* All Entities Dropdown */}
+      <Accordion type="single" collapsible defaultValue="entities">
+        <AccordionItem value="entities">
+          <AccordionTrigger className="px-2 py-2 text-xs text-muted-foreground hover:bg-sidebar-accent/50 rounded-md [&[data-state=open]>svg]:rotate-180">
+            <span>All Entities</span>
+          </AccordionTrigger>
+          <AccordionContent className="pb-2">
+            <div className="space-y-1 ml-2">
+              {entityNavGroups?.map(group => 
+                group.items?.map(item => (
+                  <Link
+                    key={item.url}
+                    to={item.url}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      location.pathname.startsWith(item.url)
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                        : 'text-sidebar-foreground'
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span className="truncate">{item.title}</span>
+                  </Link>
+                ))
+              )}
+              {(!entityNavGroups || entityNavGroups.length === 0) && (
+                <div className="text-xs text-muted-foreground px-3 py-2">
+                  No entities available
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   )
 }

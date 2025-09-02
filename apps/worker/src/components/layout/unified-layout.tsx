@@ -125,13 +125,13 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   const fullHeightPages = ['/tasks']
   const isFullHeight = fullHeightPages.some(page => location.pathname.startsWith(page))
   
-  // Get page title based on route
+  // Get page title based on route - removed broken references
   const getPageTitle = () => {
     if (location.pathname === '/') return 'Dashboard'
-    if (location.pathname.startsWith('/projects')) return 'Projects'
     if (location.pathname.startsWith('/tasks')) return 'Tasks'
-    if (location.pathname.startsWith('/apps')) return 'Apps'
-    if (location.pathname.startsWith('/chats')) return 'Chats'
+    if (location.pathname.startsWith('/entities')) return 'Entities'
+    if (location.pathname.startsWith('/universe')) return 'Universe'
+    if (location.pathname.startsWith('/worlds')) return 'Worlds'
     if (location.pathname.startsWith('/help-center')) return 'Help Center'
     if (location.pathname.startsWith('/settings')) return 'Settings'
     if (location.pathname.startsWith('/debug')) return 'Debug'

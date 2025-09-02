@@ -4,7 +4,7 @@
  */
 
 import { Context, Next } from 'hono';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { getKysely } from '../lib/database-manager';
 import { dbLogger } from './logger';
 import { sql } from 'kysely';
 
@@ -82,7 +82,6 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
   }
 
   // Check user's membership in this organization
-  createDatabaseConnection(c.env);
   const db = getKysely();
   const membership = await db
     .selectFrom('organization_members')
@@ -113,7 +112,6 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
  * Set RLS context in database session
  */
 async function setRLSContext(c: Context, context: RLSContext): Promise<void> {
-  createDatabaseConnection(c.env);
   const db = getKysely();
   
   try {
@@ -149,7 +147,6 @@ async function setRLSContext(c: Context, context: RLSContext): Promise<void> {
  * Clear RLS context after request
  */
 async function clearRLSContext(c: Context): Promise<void> {
-  createDatabaseConnection(c.env);
   const db = getKysely();
   
   try {
@@ -358,7 +355,6 @@ export async function setManualRLSContext(
  * Validate RLS is working correctly
  */
 export async function validateRLSSecurity(c: Context): Promise<boolean> {
-  createDatabaseConnection(c.env);
   const db = getKysely();
   
   try {

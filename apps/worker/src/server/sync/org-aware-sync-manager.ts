@@ -10,7 +10,7 @@ import type { Env } from '../types/env';
 import type { MinimalContext } from '../types/hono';
 import { initializeAuth } from '../lib/auth';
 import { OrgAccessService } from '../services/org-access-service';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { getKysely } from '../lib/database-manager';
 import type { TableChange } from '@repo/sync-types';
 import { syncLogger } from '../middleware/logger';
 
@@ -27,9 +27,31 @@ export interface SyncConnection {
   validatedAt: Date;
 }
 
+export interface OrganizationAccess {
+  id: string;
+  slug: string;
+  name: string;
+  role: string;
+  permissions: string[];
+}
+
+export interface MultiOrgSyncConnection {
+  clientId: string;
+  userId: string;
+  organizations: OrganizationAccess[];
+  sessionData: any;
+  validatedAt: Date;
+}
+
 export interface OrgSyncValidation {
   isValid: boolean;
   connection?: SyncConnection;
+  error?: string;
+}
+
+export interface MultiOrgSyncValidation {
+  isValid: boolean;
+  connection?: MultiOrgSyncConnection;
   error?: string;
 }
 
@@ -41,15 +63,25 @@ export interface SyncPermissions {
 }
 
 export class OrgAwareSyncManager {
-  private orgAccessService: OrgAccessService;
   
   constructor(
     private env: Env,
     private context: MinimalContext
   ) {
-    createDatabaseConnection(env);
+    // Database connections are now created per-operation to avoid sharing across request contexts
+  }
+
+  /**
+   * Get OrgAccessService with fresh database connection for this operation
+   * Creates isolated connections to avoid I/O context sharing
+   */
+  private async getOrgAccessService(): Promise<OrgAccessService> {
+    // Create fresh database connection for this DO operation
+    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    createDatabaseConnection(this.env);
     const kysely = getKysely();
-    this.orgAccessService = new OrgAccessService(kysely, env);
+    
+    return new OrgAccessService(kysely, this.env);
   }
 
   /**
@@ -82,7 +114,8 @@ export class OrgAwareSyncManager {
         // Check if organizationId is provided and convert to slug
         if (!targetOrgSlug && organizationId) {
           // Look up organization slug by ID
-          const orgByID = await this.orgAccessService.getOrganizationById(organizationId);
+          const orgAccessService = await this.getOrgAccessService();
+          const orgByID = await orgAccessService.getOrganizationById(organizationId);
           if (orgByID) {
             targetOrgSlug = orgByID.slug;
             syncLogger.info('Resolved organization ID to slug', {
@@ -101,7 +134,7 @@ export class OrgAwareSyncManager {
         
         if (!targetOrgSlug) {
           // Get user's first organization as default
-          const userOrgs = await this.orgAccessService.getUserOrganizations(sessionData.user.id, sessionData.user.role);
+          const userOrgs = await this.getOrgAccessService().getUserOrganizations(sessionData.user.id, sessionData.user.role);
           if (userOrgs.length === 0) {
             return {
               isValid: false,
@@ -119,7 +152,8 @@ export class OrgAwareSyncManager {
         providedOrganizationId: organizationId
       }, MODULE_NAME);
       
-      const orgAccess = await this.orgAccessService.checkUserOrgAccess(
+      const orgAccessService = await this.getOrgAccessService();
+      const orgAccess = await orgAccessService.checkUserOrgAccess(
         sessionData.user.id,
         targetOrgSlug
       );
@@ -176,6 +210,142 @@ export class OrgAwareSyncManager {
         isValid: false,
         error: `Connection validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
+    }
+  }
+
+  /**
+   * Validate multi-organization sync connection for a user
+   * Returns all organizations the user has access to
+   */
+  async validateMultiOrgSyncConnection(
+    request: Request,
+    clientId: string
+  ): Promise<MultiOrgSyncValidation> {
+    try {
+      // 1. Extract session from request (cookie or Authorization header)
+      const sessionData = await this.extractSession(request);
+      if (!sessionData?.user) {
+        return {
+          isValid: false,
+          error: 'No valid session found - authentication required for sync'
+        };
+      }
+
+      // 2. Get all organizations the user has access to (PostgreSQL direct, no cache)
+      syncLogger.info('Getting all user organizations for multi-org sync', {
+        userId: sessionData.user.id,
+        clientId
+      }, MODULE_NAME);
+
+      // Direct PostgreSQL query to avoid Organization Actor cache (prevents I/O context sharing)
+      const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+      createDatabaseConnection(this.env);
+      const kysely = getKysely();
+
+      const userOrgs = await kysely
+        .selectFrom('organizations as o')
+        .innerJoin('organization_members as m', 'm.organization_id', 'o.id')
+        .select([
+          'o.id as org_id',
+          'o.name as org_name', 
+          'o.slug as org_slug',
+          'm.role as member_role'
+        ])
+        .where('m.user_id', '=', sessionData.user.id)
+        .execute();
+
+      if (userOrgs.length === 0) {
+        return {
+          isValid: false,
+          error: 'User is not a member of any organization'
+        };
+      }
+
+      // 3. Build multi-org connection context
+      const organizations: OrganizationAccess[] = userOrgs.map(orgData => ({
+        id: orgData.org_id,
+        slug: orgData.org_slug,
+        name: orgData.org_name,
+        role: orgData.member_role,
+        permissions: this.getRolePermissions(orgData.member_role)
+      }));
+
+      const connection: MultiOrgSyncConnection = {
+        clientId,
+        userId: sessionData.user.id,
+        organizations,
+        sessionData,
+        validatedAt: new Date()
+      };
+
+      syncLogger.info('Multi-org sync connection validated', {
+        clientId,
+        userId: sessionData.user.id,
+        organizationCount: organizations.length,
+        organizationIds: organizations.map(org => org.id),
+        organizationSlugs: organizations.map(org => org.slug)
+      }, MODULE_NAME);
+
+      return {
+        isValid: true,
+        connection
+      };
+
+    } catch (error) {
+      syncLogger.error('Failed to validate multi-org sync connection', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+
+      return {
+        isValid: false,
+        error: `Multi-org connection validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Get role-based permissions (moved from private to reuse)
+   */
+  private getRolePermissions(role: string): string[] {
+    switch (role) {
+      case 'owner':
+        return [
+          'org:read', 'org:write', 'org:admin', 'org:delete', 'org:billing',
+          'members:read', 'members:write', 'members:admin',
+          'entities:read', 'entities:write', 'entities:admin',
+          'invitations:send', 'invitations:manage',
+          'roles:assign', 'roles:revoke'
+        ];
+      case 'admin':
+        return [
+          'org:read', 'org:write', 'org:admin',
+          'members:read', 'members:write', 'members:admin',
+          'entities:read', 'entities:write', 'entities:admin',
+          'invitations:send', 'invitations:manage',
+          'roles:assign' // Can assign up to manager role
+        ];
+      case 'manager':
+        return [
+          'org:read', 'org:write',
+          'members:read', 'members:invite',
+          'entities:read', 'entities:write', 'entities:admin',
+          'invitations:send'
+        ];
+      case 'member':
+        return [
+          'org:read',
+          'members:read',
+          'entities:read', 'entities:write'
+        ];
+      case 'viewer':
+        return [
+          'org:read',
+          'members:read',
+          'entities:read'
+        ];
+      default:
+        return [];
     }
   }
 
@@ -387,7 +557,7 @@ export class OrgAwareSyncManager {
   async refreshConnectionValidation(connection: SyncConnection): Promise<SyncConnection | null> {
     try {
       // Re-validate user's organization access
-      const orgAccess = await this.orgAccessService.checkUserOrgAccess(
+      const orgAccess = await this.getOrgAccessService().checkUserOrgAccess(
         connection.userId,
         connection.organizationSlug
       );

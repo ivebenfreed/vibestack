@@ -133,8 +133,16 @@ if (!authMachineActor) {
         };
         connectSync();
         
-        // Load Legend State org context in parallel
-        import('../legend-state').then(({ loadOrgContext }) => {
+        // Load Legend State org context and universe context in parallel
+        import('../legend-state').then(({ loadOrgContext, universeHelpers }) => {
+          // Initialize universe context for organizations display
+          universeHelpers.setAuthenticated(true, user.id).then(() => {
+            log.info('Universe context authenticated and workspace data loaded')
+          }).catch((error) => {
+            console.error('[ROOT] Failed to initialize universe context:', error)
+          })
+          
+          // Load entity schema context
           loadOrgContext(currentOrganization.id, user.id).then(() => {
             log.info('Legend State org context loaded successfully')
           }).catch((error) => {
@@ -179,7 +187,15 @@ if (!authMachineActor) {
       connectSync();
       
       // Dynamic import to avoid circular dependencies
-      import('../legend-state').then(({ loadOrgContext }) => {
+      import('../legend-state').then(({ loadOrgContext, universeHelpers }) => {
+        // Initialize universe context for organizations display
+        universeHelpers.setAuthenticated(true, user.id).then(() => {
+          log.info('Universe context authenticated and workspace data loaded (initial)')
+        }).catch((error) => {
+          console.error('[ROOT] Failed to initialize universe context (initial):', error)
+        })
+        
+        // Load entity schema context
         loadOrgContext(currentOrganization.id, user.id).then(() => {
           log.info('Legend State org context loaded successfully (initial)')
         }).catch((error) => {

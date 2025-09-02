@@ -21,6 +21,7 @@ import { OrganizationActor } from './actors/OrganizationActor';
 import { getAuth, AuthType, initializeAuth } from './lib/auth';
 import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
+import { databaseInit } from './middleware/database-init'; // <-- Import database initialization middleware
 import authRouter from './api/auth';
 import polarWebhooksRouter from './api/polar-webhooks';
 import debugBillingRouter from './api/debug-billing';
@@ -495,6 +496,9 @@ apiApp.route('/', polarWebhooksRouter);
 // Mount debug endpoints BEFORE auth middleware (for testing)
 apiApp.route('/', debugBillingRouter);
 
+// Initialize database connection ONCE per request before auth and other operations
+apiApp.use('*', databaseInit);
+
 // Apply the authentication middleware to check session status on all requests
 // for routes mounted AFTER this middleware.
 apiApp.use('*', authMiddleware);
@@ -618,7 +622,11 @@ const worker = {
       let authenticatedUser: any = null; // Declare outside try block
       
       try {
-        const auth = initializeAuth(env); // Initialize auth using env
+        // WebSocket operations need their own database connections (separate from HTTP middleware)
+        const { createDatabaseConnection } = await import('./lib/database-manager');
+        createDatabaseConnection(env);
+        
+        const auth = initializeAuth(env); // Initialize auth with fresh DB connection
         
         // Debug: Log all headers and cookies
         console.log(`[${requestId}] [Sync Auth DEBUG] Request headers:`, Object.fromEntries(request.headers.entries()));

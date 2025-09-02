@@ -9,7 +9,7 @@ import { Context, Next } from 'hono';
 import type { Env } from '../types/env';
 import { getAuth } from '../lib/auth';
 import { OrgAccessService } from '../services/org-access-service';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { getKysely } from '../lib/database-manager';
 import { apiLogger } from './logger';
 
 const MODULE_NAME = 'context-validation';
@@ -206,7 +206,6 @@ export async function requireOrganization() {
         }, MODULE_NAME);
 
         // For admin users, we need to fetch the organization data directly
-        createDatabaseConnection(c.env);
         const kysely = getKysely();
         const organization = await kysely
           .selectFrom('organizations')
@@ -238,7 +237,6 @@ export async function requireOrganization() {
         };
       } else {
         // Regular user access check
-        createDatabaseConnection(c.env);
         const kysely = getKysely();
         const orgAccessService = new OrgAccessService(kysely, c.env);
         

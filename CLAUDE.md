@@ -154,8 +154,8 @@ log.error('Validation failed', error); // Always logs
 **Docker Setup**:
 ```bash
 # Start local PostgreSQL database with git-tracked data
-cd docker-configs
-docker compose up -d postgres
+cd main-postgres
+docker compose up -d
 
 # Database will be available at:
 # postgres://postgres:postgres@localhost:5432/vibestack_dev
@@ -190,8 +190,8 @@ If you see database connection errors:
 
 1. **Start PostgreSQL container** (if not running):
    ```bash
-   cd docker-configs
-   docker compose up -d postgres
+   cd main-postgres
+   docker compose up -d
    ```
 
 2. **Verify git-tracked data exists**:

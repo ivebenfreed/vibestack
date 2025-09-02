@@ -242,25 +242,48 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       return new Response('Missing clientId parameter', { status: 400 });
     }
 
-    // 2. Validate organization access BEFORE WebSocket upgrade
-    const validation = await this.orgAwareSyncManager.validateSyncConnection(
+    // 2. Validate multi-organization access BEFORE WebSocket upgrade
+    const multiOrgValidation = await this.orgAwareSyncManager.validateMultiOrgSyncConnection(
       request,
-      clientId,
-      organizationSlug,
-      organizationId
+      clientId
     );
 
-    if (!validation.isValid) {
-      syncLogger.error('WebSocket upgrade rejected - organization validation failed', {
+    if (!multiOrgValidation.isValid) {
+      syncLogger.error('WebSocket upgrade rejected - multi-org validation failed', {
         clientId,
         organizationSlug,
-        error: validation.error
+        error: multiOrgValidation.error
       }, MODULE_NAME);
-      return new Response(validation.error || 'Organization access denied', { status: 403 });
+      return new Response(multiOrgValidation.error || 'Organization access denied', { status: 403 });
     }
 
-    // 3. Store validated connection context
-    this.syncConnection = validation.connection!;
+    // 3. Convert multi-org connection to single-org connection for backward compatibility
+    const multiOrgConnection = multiOrgValidation.connection!;
+    
+    // Determine primary organization - use the one specified in URL or the first one
+    let primaryOrg = multiOrgConnection.organizations[0]; // Default to first
+    
+    if (organizationId) {
+      // Find the organization matching the requested ID
+      const requestedOrg = multiOrgConnection.organizations.find(org => org.id === organizationId);
+      if (requestedOrg) {
+        primaryOrg = requestedOrg;
+      }
+    }
+    
+    // Convert to single-org connection for backward compatibility
+    const singleOrgConnection = {
+      clientId,
+      userId: multiOrgConnection.userId,
+      organizationId: primaryOrg.id,
+      organizationSlug: primaryOrg.slug,
+      userRole: primaryOrg.role,
+      permissions: primaryOrg.permissions,
+      sessionData: multiOrgConnection.sessionData,
+      validatedAt: multiOrgConnection.validatedAt
+    };
+    
+    this.syncConnection = singleOrgConnection;
     this.clientId = clientId;
     
     // Store context in WebSocket attachment for hibernation recovery
@@ -273,12 +296,14 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       timestamp: Date.now()
     });
 
-    syncLogger.info('WebSocket connection validated for organization', {
+    syncLogger.info('Multi-org WebSocket connection validated - using primary org', {
       clientId,
       userId: this.syncConnection.userId,
-      organizationId: this.syncConnection.organizationId,
-      organizationSlug: this.syncConnection.organizationSlug,
-      userRole: this.syncConnection.userRole,
+      primaryOrgId: this.syncConnection.organizationId,
+      primaryOrgSlug: this.syncConnection.organizationSlug,
+      primaryOrgRole: this.syncConnection.userRole,
+      totalOrganizations: multiOrgConnection.organizations.length,
+      allOrganizations: multiOrgConnection.organizations.map(org => ({ id: org.id, slug: org.slug, role: org.role })),
       rawLSN,
       clientLSN,
       defaultedTo0: !rawLSN

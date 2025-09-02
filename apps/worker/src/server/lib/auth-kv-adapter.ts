@@ -1,7 +1,7 @@
 import { SessionKVService, type SessionData } from '../services/session/SessionKVService';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
-import { createDatabaseConnection, getKysely } from './database-manager';
+import { getKysely } from './database-manager';
 import { uuidv7 } from 'uuidv7';
 import type { Adapter } from 'better-auth';
 
@@ -42,7 +42,6 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    createDatabaseConnection(this.env);
     const db = getKysely();
     
     switch (model) {
@@ -97,7 +96,6 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    createDatabaseConnection(this.env);
     const db = getKysely();
     
     switch (model) {
@@ -169,7 +167,6 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    createDatabaseConnection(this.env);
     const db = getKysely();
     
     let query: any;
@@ -215,7 +212,6 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    createDatabaseConnection(this.env);
     const db = getKysely();
     
     switch (model) {
@@ -273,7 +269,6 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    createDatabaseConnection(this.env);
     const db = getKysely();
     
     switch (model) {
@@ -335,7 +330,6 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // Get user from PostgreSQL
-    createDatabaseConnection(this.env);
     const db = getKysely();
     const user = await db
       .selectFrom('user')
