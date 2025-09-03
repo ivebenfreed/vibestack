@@ -192,7 +192,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
     enableDragAndDrop,
   } = props;
 
-  // Use the stable tableId and entityType from props
+  // Use the tableId and entityType from props
   const { tableId, entityType } = props;
   
   // Load persisted state before creating machine config
@@ -333,8 +333,25 @@ export function VibeGrid<T extends Record<string, any> = any>(
     // Clean up previous bridge if it exists
     if (atomicBridge.current) {
       log.debug('Cleaning up previous atomic bridge', { entityType });
-      atomicBridge.current();
+      (window as any).__vibegrid_atomic_bridge_cleaning = true;
+      try {
+        atomicBridge.current();
+        log.debug('Atomic bridge cleanup function executed successfully');
+      } catch (error) {
+        console.error('Error during atomic bridge cleanup:', error);
+      }
       atomicBridge.current = null;
+      // Signal cleanup completion after a longer delay to ensure cleanup
+      setTimeout(() => {
+        delete (window as any).__vibegrid_atomic_bridge_cleaning;
+        log.debug('Atomic bridge cleanup flag cleared');
+      }, 25);
+    }
+    
+    // Don't setup new bridge if cleanup is active
+    if ((window as any).__vibegrid_cleanup_active) {
+      log.debug('VibeGrid cleanup active, deferring atomic bridge setup', { entityType });
+      return;
     }
     
     // Dynamically import and setup new atomic bridge
@@ -346,6 +363,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
         
         // Create atomic observer with proper event handling
         const cleanup = bridge.createAtomicObservableBridge(entityType, (event) => {
+          // Don't process events if cleanup is active
+          if ((window as any).__vibegrid_cleanup_active) {
+            log.debug('Ignoring atomic event during cleanup', { entityType, eventType: event.type });
+            return;
+          }
+          
           log.debug('Atomic change detected via bridge', {
             entityType,
             eventType: event.type,
@@ -372,9 +395,20 @@ export function VibeGrid<T extends Record<string, any> = any>(
     // Cleanup on unmount or entityType change
     return () => {
       if (atomicBridge.current) {
-        log.debug('Cleaning up atomic bridge', { entityType });
-        atomicBridge.current();
+        log.debug('Cleaning up atomic bridge on unmount', { entityType });
+        (window as any).__vibegrid_atomic_bridge_cleaning = true;
+        try {
+          atomicBridge.current();
+          log.debug('Atomic bridge cleanup on unmount completed successfully');
+        } catch (error) {
+          console.error('Error during atomic bridge cleanup on unmount:', error);
+        }
         atomicBridge.current = null;
+        // Signal cleanup completion after a longer delay to ensure cleanup
+        setTimeout(() => {
+          delete (window as any).__vibegrid_atomic_bridge_cleaning;
+          log.debug('Atomic bridge cleanup flag cleared on unmount');
+        }, 25);
       }
     };
   }, [entityType, tableSend]);
@@ -415,8 +449,17 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const initStartTime = performance.now();
       if (process.env.NODE_ENV === 'development') {
         log.info('Container attached, initializing renderer synchronously', {
-          timestamp: initStartTime
+          timestamp: initStartTime,
+          entityType: entityType
         });
+      }
+      
+      // CRITICAL: Ensure this is a stable, connected DOM node
+      if (!node.isConnected) {
+        if (process.env.NODE_ENV === 'development') {
+          log.error('Node not connected to DOM - cannot initialize', { entityType });
+        }
+        return;
       }
       
       // Store container separately to avoid circular structure in XState events
@@ -428,19 +471,50 @@ export function VibeGrid<T extends Record<string, any> = any>(
           timestamp: performance.now()
         });
       }
-      // Defer renderer initialization to avoid blocking React's batching
-      requestAnimationFrame(() => {
+      
+      // Simplified initialization - wait for cleanup and proceed
+      const attemptInitialization = async () => {
+        // Wait for any previous cleanup to complete
+        const previousCleanup = (window as any).__vibegrid_cleanup_promise;
+        if (previousCleanup) {
+          try {
+            await previousCleanup;
+            if (process.env.NODE_ENV === 'development') {
+              log.debug('Previous VibeGrid cleanup completed, proceeding with initialization');
+            }
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              log.debug('Previous cleanup failed, proceeding anyway:', error);
+            }
+          }
+          delete (window as any).__vibegrid_cleanup_promise;
+        }
+        
+        // Ensure node is still connected and proceed
+        if (!node.isConnected) {
+          if (process.env.NODE_ENV === 'development') {
+            log.error('DOM node not connected - aborting initialization');
+          }
+          return;
+        }
+        
         tableSend({
           type: 'INITIALIZE_RENDERER',
-          // Don't include container in event payload to prevent circular JSON structure
           options: {
             ...pendingRendererOptionsRef.current,
-            containerAvailable: true // Signal that container is available on window
+            containerAvailable: true,
+            container: node // Pass the container directly to avoid global reference issues
           }
         });
         
         rendererInitializedRef.current = true;
-      });
+        
+        if (process.env.NODE_ENV === 'development') {
+          log.debug('Renderer initialization successful');
+        }
+      };
+      
+      attemptInitialization();
     }
     
     containerRef.current = node;
@@ -449,28 +523,74 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // Cleanup window variable on unmount and clean up EditingOverlay
   useEffect(() => {
     return () => {
+      // CRITICAL: Set blocking cleanup flag immediately to prevent new initializations
+      (window as any).__vibegrid_cleanup_active = true;
+      
+      // Mark component as unmounting to prevent late initializations
+      rendererInitializedRef.current = false;
+      
+      log.debug('Starting synchronous cleanup phase', { entityType });
+      
+      // SYNCHRONOUS cleanup - block immediately
       delete (window as any).__vibegrid_renderer_options;
       delete (window as any).__vibegrid_renderer_container;
       delete (window as any).__vibegrid_renderer_instance;
       
-      // Cleanup store if exists
+      // Cleanup store synchronously if exists
       if ((window as any).__vibegrid_store_cleanup && typeof (window as any).__vibegrid_store_cleanup === 'function') {
-        (window as any).__vibegrid_store_cleanup();
+        try {
+          (window as any).__vibegrid_store_cleanup();
+          log.debug('Synchronous store cleanup completed');
+        } catch (error) {
+          console.error('Error during synchronous store cleanup:', error);
+        }
         delete (window as any).__vibegrid_store_cleanup;
       }
       
-      // Import and call cleanup functions to ensure global overlays are cleaned up
-      import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
-        cleanupEditingOverlay();
-        log.debug('Cleaned up EditingOverlay on unmount');
+      // Force synchronous DOM cleanup
+      const existingRenderer = document.querySelector('.vibegridx-renderer');
+      if (existingRenderer) {
+        existingRenderer.innerHTML = '';
+        log.debug('Synchronous DOM cleanup completed');
+      }
+      
+      // Create cleanup promise to coordinate with new instances
+      const cleanupPromise = Promise.all([
+        import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
+          cleanupEditingOverlay();
+          log.debug('Cleaned up EditingOverlay on unmount');
+        }),
+        import('./machines/table-machine/event-handlers/contextmenu-handlers').then(({ cleanupContextMenuManager }) => {
+          cleanupContextMenuManager();
+          log.debug('Cleaned up ContextMenuManager on unmount');
+        }),
+        // Add atomic bridge cleanup coordination
+        new Promise<void>((resolve) => {
+          // Check if atomic bridge is currently cleaning up
+          if ((window as any).__vibegrid_atomic_bridge_cleaning) {
+            const waitForAtomicCleanup = () => {
+              if (!(window as any).__vibegrid_atomic_bridge_cleaning) {
+                log.debug('Atomic bridge cleanup completed during unmount coordination');
+                resolve();
+              } else {
+                setTimeout(waitForAtomicCleanup, 5);
+              }
+            };
+            waitForAtomicCleanup();
+          } else {
+            resolve();
+          }
+        })
+      ]).finally(() => {
+        // Clear the blocking flag after async cleanup completes
+        delete (window as any).__vibegrid_cleanup_active;
+        log.debug('All cleanup completed, ready for new instances', { entityType });
       });
       
-      import('./machines/table-machine/event-handlers/contextmenu-handlers').then(({ cleanupContextMenuManager }) => {
-        cleanupContextMenuManager();
-        log.debug('Cleaned up ContextMenuManager on unmount');
-      });
+      // Store cleanup promise globally so new instances can wait for it
+      (window as any).__vibegrid_cleanup_promise = cleanupPromise;
     };
-  }, []);
+  }, [entityType]);
 
   // Setup unified event handling system
   useEffect(() => {

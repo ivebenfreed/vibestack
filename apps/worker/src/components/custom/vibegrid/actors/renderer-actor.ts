@@ -217,8 +217,71 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               }
             };
             
-            // Get container from window object to avoid circular structure in events
-            const container = (window as any).__vibegrid_renderer_container || mergedOptions.container;
+            // Prioritize container from event options (direct pass) over window global to avoid race conditions
+            // Direct container passing is more reliable during navigation than global window references
+            const container = event.options.container || mergedOptions.container || (window as any).__vibegrid_renderer_container;
+            
+            // Validate container before proceeding - check both existence and DOM connection
+            if (!container || !container.isConnected) {
+              log.debug('RendererActor: Container validation failed during navigation', {
+                hasContainer: !!container,
+                isConnected: container?.isConnected,
+                containerTagName: container?.tagName
+              });
+              
+              // For navigation race conditions, retry container validation with progressive backoff
+              // This allows the new VibeGrid component's DOM to stabilize
+              const retryValidation = (attempt = 1, maxAttempts = 5) => {
+                const delay = Math.min(50 * attempt, 200); // Progressive backoff: 50ms, 100ms, 150ms, 200ms, 200ms
+                
+                setTimeout(() => {
+                  // Prioritize original event container over window reference for reliability
+                  const retryContainer = event.options.container || (window as any).__vibegrid_renderer_container;
+                  if (retryContainer && retryContainer.isConnected) {
+                    log.debug(`RendererActor: Container validation succeeded on retry ${attempt}`);
+                    // Continue with renderer creation using the valid container
+                    const finalOptions = { ...mergedOptions, container: retryContainer };
+                    
+                    renderer = new CleanTableRenderer(finalOptions);
+                    isInitializing = false;
+                    isInitialized = true;
+                    
+                    // Store renderer instance on window for access by view handlers
+                    (window as any).__vibegridx_renderer_instance = renderer;
+                    
+                    log.info(`RendererActor: Renderer created successfully on retry ${attempt}`);
+                    sendBack({ type: 'RENDERER_READY' });
+                    
+                    // Process any queued render events
+                    if (pendingRenderEvents.length > 0) {
+                      log.info('RendererActor: Processing', pendingRenderEvents.length, 'queued render events');
+                      for (const queuedEvent of pendingRenderEvents) {
+                        log.info('RendererActor: Processing queued', queuedEvent.type, 'event');
+                        // Handle queued events (simplified - just RENDER events for now)
+                        if (queuedEvent.type === 'RENDER' && queuedEvent.state && renderer) {
+                          renderer.render(queuedEvent.state.columns, queuedEvent.state.rows);
+                        }
+                      }
+                      pendingRenderEvents = [];
+                    }
+                  } else if (attempt < maxAttempts) {
+                    log.debug(`RendererActor: Container invalid on retry ${attempt}/${maxAttempts}, retrying...`);
+                    retryValidation(attempt + 1, maxAttempts);
+                  } else {
+                    log.debug(`RendererActor: Container still invalid after ${maxAttempts} retries, aborting`);
+                    isInitializing = false;
+                  }
+                }, delay);
+              };
+              
+              retryValidation();
+              return;
+              
+              // If no cleanup is active and container is invalid, silently abort
+              // This is expected behavior when components unmount/remount quickly
+              isInitializing = false;
+              return;
+            }
             
             // Update merged options with container
             const finalOptions = { ...mergedOptions, container };

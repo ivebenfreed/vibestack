@@ -11,25 +11,63 @@ import { useEffect } from 'react'
 
 export const Route = createFileRoute('/_authenticated/entities/$entityName')({
   component: EntityPage,
+  loader: async ({ params }) => {
+    const { entityName } = params
+    
+    // Preload entity schema and data
+    try {
+      // Wait for org context to be ready
+      const orgContext = orgContext$.get()
+      if (!orgContext.schema) {
+        // Schema not ready yet, let component handle loading
+        return { entityName, preloadedData: null }
+      }
+      
+      // Get entity store and preload data
+      const entityStore = getEntity$(entityName)
+      if (entityStore) {
+        const entityData = entityStore.get()
+        return {
+          entityName,
+          preloadedData: {
+            entities: entityData ? Object.values(entityData) : [],
+            schema: orgContext.schema?.entities?.[entityName] || null
+          }
+        }
+      }
+      
+      return { entityName, preloadedData: null }
+    } catch (error) {
+      console.warn('Route loader failed, component will handle loading:', error)
+      return { entityName, preloadedData: null }
+    }
+  }
 })
 
-// Force new component instance for each entity by using a wrapper
+// Allow React to handle state changes naturally without forced remount
 function EntityPage() {
   const { entityName } = Route.useParams()
+  const loaderData = Route.useLoaderData()
   
-  // Key prop on EntityPageInner forces remount when entity changes
-  return <EntityPageInner key={entityName} entityName={entityName} />
+  // Remove key prop to prevent unnecessary DOM destruction during navigation
+  return <EntityPageInner entityName={entityName} preloadedData={loaderData?.preloadedData} />
 }
 
-const EntityPageInner = observer(function EntityPageInner({ entityName }: { entityName: string }) {
+const EntityPageInner = observer(function EntityPageInner({ 
+  entityName, 
+  preloadedData 
+}: { 
+  entityName: string
+  preloadedData?: { entities: any[], schema: any } | null
+}) {
   const { currentOrganization, user } = useAuth()
   const currentOrgId = currentOrganization?.id
   const userId = user?.id
   
-  // Use Legend State observables
+  // Use Legend State observables, but prefer preloaded data
   const loading = use$(orgContext$.loading)
   const error = use$(orgContext$.error)
-  const schema = use$(orgContext$.schema)
+  const schema = preloadedData?.schema ? { entities: { [entityName]: preloadedData.schema } } : use$(orgContext$.schema)
   
   // Components should only consume observables, not trigger loads
   // Loading is handled by auth state machines
@@ -57,8 +95,8 @@ const EntityPageInner = observer(function EntityPageInner({ entityName }: { enti
   const isEntityLoading = false // Simplified for now
   const hasEntityLoaded = true // Simplified for now
   
-  // Convert object to array for display
-  const entityArray = entityData ? Object.values(entityData) : []
+  // Convert object to array for display - prefer preloaded data
+  const entityArray = preloadedData?.entities?.length ? preloadedData.entities : (entityData ? Object.values(entityData) : [])
   
   // Get entity schema with case-insensitive lookup
   const entitySchema = (() => {

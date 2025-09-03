@@ -102,6 +102,37 @@ export const orgContext$ = observable(() => {
 })
 
 /**
+ * Get organization-specific context for a given organization ID
+ * This is used by entity routes and organization-specific components
+ */
+export function getOrgContext$(orgId: string) {
+  return observable(() => {
+    const universe = universeContext$.get()
+    
+    // If no organization data loaded yet
+    if (!universe.organizations[orgId]) {
+      return {
+        orgId,
+        userId: universe.userId,
+        schema: null,
+        loading: universe.loading,
+        error: universe.error
+      }
+    }
+    
+    const org = universe.organizations[orgId]
+    
+    return {
+      orgId,
+      userId: universe.userId,
+      schema: org.schema,
+      loading: org.loading,
+      error: org.error
+    }
+  })
+}
+
+/**
  * Validate item against server-side validation rules
  */
 async function validateItem(orgId: string, entityName: string, item: any, operation: 'create' | 'update'): Promise<boolean> {

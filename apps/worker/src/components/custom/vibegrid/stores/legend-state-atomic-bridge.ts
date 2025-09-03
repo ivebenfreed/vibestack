@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { observe, when, batch } from '@legendapp/state';
-import { getEntity$, orgContext$ } from '@/legend-state/observables';
+import { getEntity$, getUniverseEntity$, orgContext$ } from '@/legend-state/observables';
 import { fromStore } from '@xstate/store';
 import { uiLog } from '@/logger';
 
@@ -45,10 +45,34 @@ export function createAtomicObservableBridge(
     });
     
     try {
-      // Use the fixed getEntity$ function instead of entities$.get()
-      const entityObservable = getEntity$(entityTableName);
+      // CRITICAL FIX: Handle org-prefixed entity names in universe context
+      // When we're in org routes like /org/123/entities/Task, the entity is stored as "123_Task" in universe mode
+      let actualEntityName = entityTableName;
+      
+      // Check if we're in universe mode and need to construct org-prefixed name
+      const orgContextData = orgContext$.get();
+      if (orgContextData.orgId === 'universe' && orgContextData.schema?.entities) {
+        // Find the org-prefixed version of this entity in the schema
+        const entityKeys = Object.keys(orgContextData.schema.entities);
+        const orgPrefixedKey = entityKeys.find(key => {
+          // Look for pattern: "{orgId}_{entityName}" where entityName matches our target
+          const parts = key.split('_');
+          return parts.length === 2 && parts[1] === entityTableName;
+        });
+        
+        if (orgPrefixedKey) {
+          actualEntityName = orgPrefixedKey;
+          log.info(`🔗 AtomicBridge: Using org-prefixed entity name ${actualEntityName} instead of ${entityTableName}`);
+        }
+      }
+      
+      // Use the getUniverseEntity$ function which handles org-prefixed names correctly
+      const entityObservable = actualEntityName.includes('_') ? 
+        getUniverseEntity$(actualEntityName) : 
+        getEntity$(actualEntityName);
+      
       if (!entityObservable) {
-        log.info(`🔗 AtomicBridge: Entity observable ${entityTableName} not available yet`);
+        log.info(`🔗 AtomicBridge: Entity observable ${actualEntityName} (original: ${entityTableName}) not available yet`);
         return;
       }
       

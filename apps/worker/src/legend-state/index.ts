@@ -8,6 +8,7 @@
 // Main observable exports - direct Legend State patterns
 export {
   orgContext$,
+  getOrgContext$,
   loadOrgContext,
   loadUniverseContext,
   getEntity$,
