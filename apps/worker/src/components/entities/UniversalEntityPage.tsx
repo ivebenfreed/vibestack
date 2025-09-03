@@ -224,12 +224,13 @@ export function UniversalEntityPage({
             className="h-full"
             height="100%"
             onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
-              console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, rowId, updates });
+              const fullEntityName = orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName;
+              console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, fullEntityName, rowId, updates });
               try {
-                await entityOperations.updateEntity(entityName, rowId, updates);
-                console.log('✅ UniversalEntityPage: Entity updated successfully', { entityName, rowId, updates });
+                await entityOperations.updateEntity(fullEntityName, rowId, updates);
+                console.log('✅ UniversalEntityPage: Entity updated successfully', { entityName, fullEntityName, rowId, updates });
               } catch (error) {
-                console.error('❌ UniversalEntityPage: Entity update failed', { entityName, rowId, updates, error });
+                console.error('❌ UniversalEntityPage: Entity update failed', { entityName, fullEntityName, rowId, updates, error });
                 throw error;
               }
             }}

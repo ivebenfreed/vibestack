@@ -170,6 +170,23 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     actualEntityName = schema._originalName || entityName
     
     log.info(`[Observable] Universe mode - using actual org ${actualOrgId} for entity ${actualEntityName} (was ${entityName})`)
+  } else if (entityName.includes('_')) {
+    // CRITICAL FIX: For prefixed entity names like "01920000-1000-7000-8000-000000000001_Task"
+    // extract the base entity name for API calls while keeping the full name for observable keys
+    const parts = entityName.split('_')
+    if (parts.length === 2) {
+      // Extract org ID and entity name from prefixed format
+      const extractedOrgId = parts[0]
+      const baseEntityName = parts[1]
+      
+      // Use the extracted org ID if we don't have a specific org context
+      if (orgId === extractedOrgId || orgId === 'universe') {
+        actualOrgId = extractedOrgId
+        actualEntityName = baseEntityName
+        
+        log.info(`[Observable] Prefixed entity - using org ${actualOrgId} for entity ${actualEntityName} (from ${entityName})`)
+      }
+    }
   }
   
   const baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
@@ -679,18 +696,52 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     
     log.info(`[Observable] Initializing persistence for ${entityKeys.length} entities in org ${primaryOrgId}`)
     
-    // Create persistence manager
+    // Create persistence manager with enhanced error handling
     persistenceManager = createPersistenceManager(primaryOrgId, userId)
     
-    // Create IndexedDB configuration
+    // Create IndexedDB configuration with error recovery
     const indexedDBPlugin = persistenceManager.createIndexedDBConfig(entityKeys)
     
-    // Configure synced CRUD with persistence
-    syncedCrudWithPersistence = configureSynced(syncedCrud, {
-      persist: {
-        plugin: indexedDBPlugin
-      }
-    })
+    // Configure synced CRUD with or without persistence
+    if (indexedDBPlugin) {
+      // IndexedDB plugin available - use it with error handling
+      syncedCrudWithPersistence = configureSynced(syncedCrud, {
+        persist: {
+          plugin: indexedDBPlugin,
+          // Add error handling at the Legend State level
+          onError: (error: any) => {
+            log.warn('[Observable] Legend State persistence error:', error)
+            
+            // Check for IndexedDB object store errors
+            if (error?.name === 'NotFoundError' || 
+                error?.message?.includes('object stores was not found') ||
+                error?.message?.includes('Error loading local cache')) {
+              log.info('[Observable] Detected IndexedDB schema mismatch - clearing cache and continuing with server data')
+              
+              // Clear the problematic data and continue without persistence
+              if (persistenceManager) {
+                persistenceManager.clearOrganizationData().catch(clearError => {
+                  log.warn('[Observable] Failed to clear organization data:', clearError)
+                })
+              }
+              
+              // Don't throw - let the app continue with server-only sync
+              return true // Indicate error was handled
+            }
+            
+            // For other errors, log but don't block the application
+            log.error('[Observable] Unhandled persistence error:', error)
+            return true // Continue without persistence
+          }
+        }
+      })
+      
+      log.info('[Observable] Persistence configured with IndexedDB plugin')
+    } else {
+      // No IndexedDB plugin - use syncedCrud without persistence
+      syncedCrudWithPersistence = syncedCrud
+      log.info('[Observable] Persistence disabled - using server-only sync')
+    }
     
     // Update tracking variables
     currentOrgId = primaryOrgId
@@ -706,11 +757,31 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     
   } catch (error) {
     log.error('[Observable] Failed to initialize persistence:', error)
-    // Reset variables on failure
+    
+    // Check for specific IndexedDB errors and provide user-friendly handling
+    if (error?.name === 'NotFoundError' || 
+        error?.message?.includes('object stores was not found') ||
+        error?.message?.includes('Error loading local cache')) {
+      log.info('[Observable] IndexedDB schema issue detected - continuing without persistence')
+      
+      // Clear any corrupted IndexedDB data
+      try {
+        if (persistenceManager) {
+          await persistenceManager.clearOrganizationData()
+        }
+      } catch (clearError) {
+        log.warn('[Observable] Failed to clear corrupted data:', clearError)
+      }
+    }
+    
+    // Reset variables on failure but don't crash the app
     persistenceManager = null
     syncedCrudWithPersistence = null
     currentOrgId = null
     currentSchemaVersion = null
+    
+    // Continue with server-only sync - the app will still work
+    log.info('[Observable] Continuing with server-only sync (no local persistence)')
   }
 }
 
@@ -1386,9 +1457,76 @@ export const entityOperations = {
   }
 }
 
+// Setup global error handling for Legend State IndexedDB issues
+if (typeof window !== 'undefined') {
+  // Override console.error to catch and handle Legend State IndexedDB errors
+  const originalConsoleError = console.error
+  console.error = function(...args: any[]) {
+    const errorMessage = args.join(' ')
+    
+    // Check for Legend State IndexedDB errors
+    if (errorMessage.includes('[legend-state] Error loading local cache') ||
+        errorMessage.includes('NotFoundError: Failed to execute \'transaction\' on \'IDBDatabase\'') ||
+        errorMessage.includes('One of the specified object stores was not found')) {
+      
+      log.info('[Observable] Intercepted Legend State IndexedDB error - handling gracefully')
+      
+      // Clear IndexedDB data to fix schema mismatch
+      if (persistenceManager) {
+        persistenceManager.clearOrganizationData().catch(clearError => {
+          originalConsoleError('[Observable] Failed to clear corrupted IndexedDB data:', clearError)
+        })
+      }
+      
+      // Show user-friendly message in development
+      if (import.meta.env.DEV) {
+        console.warn('[VibeStack] IndexedDB cache cleared due to schema changes. This is normal and the app will continue working with fresh data from the server.')
+      }
+      
+      return // Don't log the scary error message
+    }
+    
+    // Call original console.error for other messages
+    originalConsoleError.apply(console, args)
+  }
+
+  // Add window error handler for unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    const errorMessage = event.reason?.message || String(event.reason)
+    
+    if (errorMessage.includes('NotFoundError') && 
+        errorMessage.includes('object stores was not found')) {
+      log.info('[Observable] Caught unhandled IndexedDB error - preventing crash')
+      
+      // Clear corrupted data
+      if (persistenceManager) {
+        persistenceManager.clearOrganizationData().catch(() => {
+          // Silent failure - don't cascade errors
+        })
+      }
+      
+      event.preventDefault() // Prevent the error from crashing the app
+      
+      if (import.meta.env.DEV) {
+        console.warn('[VibeStack] Prevented IndexedDB error from crashing the app. Data cleared and app continues normally.')
+      }
+    }
+  })
+}
+
 // Debug: Expose to window in development
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as any).vibestackOrgContext = orgContext$
   ;(window as any).vibestackBatchOps = batchOperations
   ;(window as any).vibestackEntityOps = entityOperations
+  
+  // Add debug function to manually clear IndexedDB
+  ;(window as any).vibestackClearIndexedDB = async () => {
+    if (persistenceManager) {
+      await persistenceManager.clearOrganizationData()
+      console.log('[VibeStack Debug] IndexedDB data cleared. Refresh the page to see changes.')
+    } else {
+      console.log('[VibeStack Debug] No persistence manager available')
+    }
+  }
 }

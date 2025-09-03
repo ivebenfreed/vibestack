@@ -715,9 +715,15 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
       return c.json({ error: `Entity ${entityName} not found` }, 404);
     }
     
+    // Validate and prepare data
+    const validationResult = validateUniversalArchetypeData(updateData, entityDef);
+    if (!validationResult.valid) {
+      return c.json({ error: 'Validation failed', details: validationResult.errors }, 400);
+    }
+    
     // Add system fields for update
     const saveData = {
-      ...updateData,
+      ...validationResult.data,
       updated_at: new Date()
     };
     
@@ -754,6 +760,16 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
     
   } catch (error) {
     console.error('DataForge data update error:', error);
+    
+    // Handle PostgreSQL replica identity error
+    if (error instanceof Error && error.message.includes('does not have a replica identity and publishes updates')) {
+      return c.json({ 
+        error: 'Database configuration error',
+        details: 'Table is not configured for replication. Please contact administrator.',
+        code: 'REPLICA_IDENTITY_MISSING'
+      }, 500);
+    }
+    
     return c.json({ 
       error: 'Failed to update data', 
       details: error instanceof Error ? error.message : 'Unknown error' 

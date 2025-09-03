@@ -229,6 +229,9 @@ CREATE TABLE ${definition.tableName} (${systemColumns},
   ${columns}
 );
 
+-- Set replica identity for WAL replication support
+ALTER TABLE ${definition.tableName} REPLICA IDENTITY FULL;
+
 -- Indexes for performance
 CREATE INDEX idx_${definition.tableName}_org_status ON ${definition.tableName}(organization_id);
 CREATE INDEX idx_${definition.tableName}_created_at ON ${definition.tableName}(created_at);
