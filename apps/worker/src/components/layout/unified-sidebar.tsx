@@ -31,7 +31,8 @@ import {
   FileText,
   MessageSquare,
   File,
-  Circle
+  Circle,
+  BarChart3
 } from 'lucide-react'
 
 // Icon resolver for dynamic entity icons
@@ -336,8 +337,6 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
     return <div className="p-4 text-sm text-muted-foreground">Organization not found</div>
   }
 
-  // Get worlds for this organization (simplified org-scoped model)
-  const orgWorlds = currentOrg?.worlds || []
 
   if (isCollapsed) {
     return (
@@ -360,27 +359,26 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
             </TooltipContent>
           </Tooltip>
 
-          {/* Worlds */}
-          {orgWorlds.length > 0 && (
-            <>
-              <Separator className="my-2" />
-              {orgWorlds.slice(0, 3).map(world => (
-                <Tooltip key={world.id}>
-                  <TooltipTrigger asChild>
-                    <Link
-                      to={`/worlds/${world.id}`}
-                      className="flex items-center justify-center rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent"
-                    >
-                      <Map className="h-4 w-4" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {world.name}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </>
-          )}
+          {/* Organization Dashboard */}
+          <Separator className="my-2" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to={`/org/${orgId}/dashboard`}
+                className={cn(
+                  "flex items-center justify-center rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  location.pathname.startsWith(`/org/${orgId}/dashboard`)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground"
+                )}
+              >
+                <BarChart3 className="h-4 w-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {currentOrg.info.name} Dashboard
+            </TooltipContent>
+          </Tooltip>
         </div>
       </TooltipProvider>
     )
@@ -388,50 +386,45 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb Header */}
-      <div className="flex items-center gap-2 px-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onBackToUniverse}
-          className="text-xs text-muted-foreground hover:text-foreground p-1 h-auto"
-        >
-          <Globe className="h-3 w-3 mr-1" />
-          Universe
-        </Button>
-        <ChevronRight className="h-3 w-3 text-muted-foreground" />
-        <span className="text-sm font-medium truncate">{currentOrg.info.name}</span>
+      {/* Enhanced Breadcrumb Header */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 px-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBackToUniverse}
+            className="text-xs text-muted-foreground hover:text-foreground p-1 h-auto"
+          >
+            <Globe className="h-3 w-3 mr-1" />
+            Universe
+          </Button>
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-medium truncate">{currentOrg.info.name}</span>
+            <span className="text-xs text-muted-foreground truncate">Organization</span>
+          </div>
+        </div>
       </div>
 
-      {/* Worlds Section */}
-      {orgWorlds.length > 0 ? (
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground px-2 mb-2 flex items-center justify-between">
-            <span>Worlds</span>
-            <span className="text-xs bg-muted px-2 py-0.5 rounded">{orgWorlds.length}</span>
-          </div>
-          {orgWorlds.map(world => (
-            <Link
-              key={world.id}
-              to={`/worlds/${world.id}`}
-              className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                location.pathname.startsWith(`/worlds/${world.id}`)
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground'
-              )}
-            >
-              <Map className="h-4 w-4" />
-              <span className="truncate">{world.name}</span>
-            </Link>
-          ))}
+      {/* Organization Dashboard */}
+      <div className="space-y-1">
+        <div className="text-xs text-muted-foreground px-2 mb-2">
+          <span>Dashboard</span>
         </div>
-      ) : (
-        <div className="text-xs text-muted-foreground px-2 py-4">
-          No worlds in this organization
-        </div>
-      )}
+        <Link
+          to={`/org/${orgId}/dashboard`}
+          className={cn(
+            'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            location.pathname.startsWith(`/org/${orgId}/dashboard`)
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+              : 'text-sidebar-foreground'
+          )}
+        >
+          <BarChart3 className="h-4 w-4" />
+          <span className="truncate">{currentOrg.info.name} Overview</span>
+        </Link>
+      </div>
 
       {/* All Entities Dropdown */}
       <Accordion type="single" collapsible defaultValue="entities">
