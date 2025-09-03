@@ -50,4 +50,5 @@ export type CellType =
   | 'boolean' 
   | 'date' 
   | 'select'
-  | 'select-multi';
+  | 'select-multi'
+  | 'reference-select';

@@ -1060,7 +1060,7 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
       
       entityGroups[archetype].push({
         title: displayName,
-        url: `/entities/${entityName}`,
+        url: `/org/${entitySchema._organizationId}/entities/${displayName}`,
         icon: getArchetypeIcon(archetype),
         organizationName: orgName,
         organizationId: entitySchema._organizationId

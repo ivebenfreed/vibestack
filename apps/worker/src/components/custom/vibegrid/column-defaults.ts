@@ -10,7 +10,8 @@ export const COLUMN_DEFAULTS: Record<CellType, { width: number; minWidth: number
   date: { width: 150, minWidth: 120, maxWidth: 200 },
   boolean: { width: 80, minWidth: 70, maxWidth: 100 },
   select: { width: 140, minWidth: 100, maxWidth: 200 },
-  'select-multi': { width: 200, minWidth: 150, maxWidth: 350 }
+  'select-multi': { width: 200, minWidth: 150, maxWidth: 350 },
+  'reference-select': { width: 160, minWidth: 120, maxWidth: 300 }
 } as const;
 
 /**
@@ -18,7 +19,21 @@ export const COLUMN_DEFAULTS: Record<CellType, { width: number; minWidth: number
  */
 export function applyColumnDefaults<T>(columns: Column<T>[]): Column<T>[] {
   return columns.map(col => {
-    const defaults = COLUMN_DEFAULTS[col.cellType];
+    const defaults = COLUMN_DEFAULTS[col.cellType as CellType];
+    
+    // Fallback to text defaults if cellType is not recognized
+    if (!defaults) {
+      console.warn(`[applyColumnDefaults] Unknown cellType '${col.cellType}', using text defaults`);
+      const textDefaults = COLUMN_DEFAULTS.text;
+      return {
+        ...col,
+        width: col.width ?? textDefaults.width,
+        minWidth: col.minWidth ?? textDefaults.minWidth,
+        maxWidth: col.maxWidth ?? textDefaults.maxWidth,
+        editable: col.editable ?? true
+      };
+    }
+    
     return {
       ...col,
       width: col.width ?? defaults.width,

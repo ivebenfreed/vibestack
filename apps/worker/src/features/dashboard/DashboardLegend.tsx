@@ -81,7 +81,7 @@ const DashboardLegend = observer(function DashboardLegend() {
   const schema = use$(orgContext$.schema);
   const error = use$(orgContext$.error);
   
-  const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
+  // Entity count will be calculated in DashboardContent after filtering
 
   // Load appropriate context based on route parameters
   useEffect(() => {
@@ -208,7 +208,6 @@ const DashboardLegend = observer(function DashboardLegend() {
             isUniverseMode={isUniverseMode}
             schema={schema}
             error={error}
-            entityCount={entityCount}
             routeOrgId={routeOrgId}
           />
         </TabsContent>
@@ -226,16 +225,14 @@ const DashboardContent = observer(function DashboardContent({
   isUniverseMode,
   schema,
   error,
-  entityCount,
   routeOrgId
 }: {
   isUniverseMode: boolean
   schema: any
   error: string | null
-  entityCount: number
   routeOrgId?: string
 }) {
-  log.info('DashboardContent render:', { isUniverseMode, schema: !!schema, error, entityCount })
+  log.info('DashboardContent render:', { isUniverseMode, schema: !!schema, error, routeOrgId })
 
   if (error) {
     return (
@@ -254,8 +251,24 @@ const DashboardContent = observer(function DashboardContent({
     )
   }
 
-  const entityList = Object.keys(schema.entities)
-  log.info('Entity list from schema:', entityList)
+  // Filter entities based on context mode
+  const entityList = (() => {
+    const allEntityKeys = Object.keys(schema.entities)
+    
+    if (isUniverseMode) {
+      // Universe mode: show all entities
+      return allEntityKeys
+    } else {
+      // Organization mode: only show entities belonging to this organization
+      const orgPrefix = `${routeOrgId}_`
+      const filteredKeys = allEntityKeys.filter(key => key.startsWith(orgPrefix))
+      log.info('Filtered entity list for org:', { routeOrgId, orgPrefix, filteredKeys, allKeys: allEntityKeys })
+      return filteredKeys
+    }
+  })()
+  
+  const entityCount = entityList.length
+  log.info('Entity list from schema:', { entityList, entityCount, isUniverseMode, routeOrgId })
 
   if (entityList.length === 0) {
     const contextLabel = isUniverseMode ? 'universe' : 'organization'
