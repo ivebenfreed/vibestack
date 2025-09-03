@@ -1617,6 +1617,49 @@ on: {
             source: (event as any).source,
             currentState: self.getSnapshot().value
           });
+        },
+        
+        // Send render command to renderer with updated rows
+        ({ context }) => {
+          if (context.actors.rendererActor) {
+            // Get visible columns using centralized logic
+            const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
+            const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
+            
+            // Get store state for render data
+            const storeSnapshot = context.storeActor?.getSnapshot();
+            const columnVisibility = storeSnapshot?.context?.columnVisibility || {};
+            
+            // Merge column widths from coordinate mapping into columns (if available)
+            const columnsWithWidths = columnsWithSelection.map(col => {
+              if (context.coordinateMapping) {
+                const coordCol = context.coordinateMapping.columns.find(c => c.columnId === col.id);
+                return coordCol ? { ...col, width: coordCol.width } : col;
+              }
+              return col;
+            });
+            
+            log.info('TableMachine: Sending RENDER after STORE_DATA_UPDATED', {
+              rowCount: context.rows.length,
+              hasCoordinateMapping: !!context.coordinateMapping
+            });
+            
+            context.actors.rendererActor.send({
+              type: 'RENDER',
+              state: {
+                rows: context.rows,
+                columns: columnsWithWidths,
+                selectedCells: context.selectedCells,
+                editingCell: null,
+                groupedData: [],
+                optimisticOperations: new Map(),
+                version: context.version,
+                sortBy: storeSnapshot?.context?.sortBy || [],
+                columnVisibility: columnVisibility,
+                coordinateMapping: context.coordinateMapping
+              }
+            });
+          }
         }
       ]
     },

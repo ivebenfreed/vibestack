@@ -4,6 +4,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { VibeGrid } from '@/components/custom/vibegrid'
 import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
 import { entityOperations } from '@/legend-state'
@@ -54,6 +57,10 @@ export function UniversalEntityPage({
   orgId,
   archetype: propArchetype 
 }: UniversalEntityPageProps) {
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [formData, setFormData] = useState<Record<string, any>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const displayName = entityName.charAt(0).toUpperCase() + entityName.slice(1)
   
   // Get archetype from props, schema, or default to 'record'
@@ -86,6 +93,10 @@ export function UniversalEntityPage({
     safeData,
     count,
     schema,
+    schemaType: typeof schema,
+    schemaFields: schema?.fields,
+    schemaHasFields: !!schema?.fields,
+    schemaKeys: schema ? Object.keys(schema) : null,
     archetype,
     orgId,
     orgIdType: typeof orgId
@@ -131,10 +142,288 @@ export function UniversalEntityPage({
         </div>
         
         <div className="flex items-center gap-1">
-          <Button size="sm" className="h-7 px-2 text-xs">
-            <Plus className="h-3 w-3 mr-1" />
-            Add
-          </Button>
+          <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="h-7 px-2 text-xs">
+                <Plus className="h-3 w-3 mr-1" />
+                Add
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New {displayName}</DialogTitle>
+                <DialogDescription>
+                  Create a new {displayName.toLowerCase()} record
+                </DialogDescription>
+              </DialogHeader>
+              
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                setIsSubmitting(true)
+                
+                try {
+                  // Client-side validation
+                  if (!formData.name || !formData.name.trim()) {
+                    alert('Name is required')
+                    return
+                  }
+                  
+                  // Email validation if provided
+                  if (formData.email && formData.email.trim() && !formData.email.includes('@')) {
+                    alert('Please enter a valid email address')
+                    return
+                  }
+                  
+                  // Prepare the data with required timestamps and system fields
+                  const now = new Date().toISOString()
+                  const recordData = {
+                    ...formData,
+                    id: crypto.randomUUID(),
+                    created_at: now,
+                    updated_at: now,
+                    // Add commonly required fields with sensible defaults
+                    organization_id: orgId,
+                    record_type: entityName.toLowerCase(), // e.g., 'invoice', 'client', etc.
+                    status: formData.status || 'draft',
+                    priority: formData.priority || 'medium'
+                  }
+                  
+                  // Determine the full entity name (with org prefix if needed)
+                  const fullEntityName = orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName
+                  
+                  console.log('🚀 Creating entity:', { entityName, fullEntityName, recordData })
+                  
+                  // Create the entity using entityOperations
+                  await entityOperations.createEntity(fullEntityName, recordData)
+                  
+                  // Reset form and close modal
+                  setFormData({})
+                  setAddModalOpen(false)
+                  
+                  console.log('✅ Entity created successfully')
+                } catch (error) {
+                  console.error('❌ Error creating entity:', error)
+                  alert(`Error creating ${entityName}: ${error.message || 'Unknown error'}`)
+                } finally {
+                  setIsSubmitting(false)
+                }
+              }} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Use schema fields if available, otherwise provide fallback fields based on visible columns */}
+                  {schema?.fields ? (
+                    Object.entries(schema.fields).map(([fieldName, fieldDef]: [string, any]) => {
+                      const safeFieldDef = fieldDef && typeof fieldDef === 'object' ? fieldDef : {}
+                      const fieldType = String(safeFieldDef.type || 'text')
+                      const fieldDescription = String(safeFieldDef.description || '')
+                      const isRequired = Boolean(safeFieldDef.required)
+                      
+                      // Skip system fields that are auto-generated
+                      if (['id', 'created_at', 'updated_at'].includes(fieldName)) {
+                        return null
+                      }
+                      
+                      return (
+                        <div key={fieldName} className="space-y-2">
+                          <Label htmlFor={fieldName} className="text-sm font-medium">
+                            {fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {isRequired && <span className="text-red-500 ml-1">*</span>}
+                          </Label>
+                          
+                          {fieldType === 'text' || fieldType === 'varchar' ? (
+                            fieldDescription.toLowerCase().includes('long') || fieldDescription.toLowerCase().includes('description') || fieldName.toLowerCase().includes('notes') ? (
+                              <Textarea
+                                id={fieldName}
+                                placeholder={fieldDescription || `Enter ${fieldName}`}
+                                value={formData[fieldName] || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
+                                required={isRequired}
+                                className="min-h-[80px]"
+                              />
+                            ) : (
+                              <Input
+                                id={fieldName}
+                                type="text"
+                                placeholder={fieldDescription || `Enter ${fieldName}`}
+                                value={formData[fieldName] || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
+                                required={isRequired}
+                              />
+                            )
+                          ) : fieldType === 'integer' || fieldType === 'number' ? (
+                            <Input
+                              id={fieldName}
+                              type="number"
+                              placeholder={fieldDescription || `Enter ${fieldName}`}
+                              value={formData[fieldName] || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value ? Number(e.target.value) : '' }))}
+                              required={isRequired}
+                            />
+                          ) : fieldType === 'boolean' ? (
+                            <div className="flex items-center space-x-2">
+                              <input
+                                id={fieldName}
+                                type="checkbox"
+                                checked={formData[fieldName] || false}
+                                onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.checked }))}
+                                className="rounded border-gray-300"
+                              />
+                              <Label htmlFor={fieldName} className="text-sm text-muted-foreground">
+                                {fieldDescription || `Enable ${fieldName}`}
+                              </Label>
+                            </div>
+                          ) : fieldType === 'email' || fieldName.toLowerCase().includes('email') ? (
+                            <Input
+                              id={fieldName}
+                              type="email"
+                              placeholder={fieldDescription || `Enter ${fieldName}`}
+                              value={formData[fieldName] || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
+                              required={isRequired}
+                            />
+                          ) : (
+                            // Default to text input for unknown types
+                            <Input
+                              id={fieldName}
+                              type="text"
+                              placeholder={fieldDescription || `Enter ${fieldName}`}
+                              value={formData[fieldName] || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
+                              required={isRequired}
+                            />
+                          )}
+                          
+                          {fieldDescription && (
+                            <p className="text-xs text-muted-foreground">{fieldDescription}</p>
+                          )}
+                        </div>
+                      )
+                    })
+                  ) : (
+                    /* Fallback form fields based on commonly visible columns */
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-sm font-medium">
+                          Name <span className="text-red-500 ml-1">*</span>
+                        </Label>
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="Enter name"
+                          value={formData.name || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-sm font-medium">
+                          Email
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter email"
+                          value={formData.email || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-sm font-medium">
+                          Phone
+                        </Label>
+                        <Input
+                          id="phone"
+                          type="text"
+                          placeholder="Enter phone number"
+                          value={formData.phone || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="company" className="text-sm font-medium">
+                          Company
+                        </Label>
+                        <Input
+                          id="company"
+                          type="text"
+                          placeholder="Enter company name"
+                          value={formData.company || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="status" className="text-sm font-medium">
+                          Status
+                        </Label>
+                        <select
+                          id="status"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={formData.status || 'draft'}
+                          onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                        >
+                          <option value="draft">Draft</option>
+                          <option value="active">Active</option>
+                          <option value="pending">Pending</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="priority" className="text-sm font-medium">
+                          Priority
+                        </Label>
+                        <select
+                          id="priority"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={formData.priority || 'medium'}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="notes" className="text-sm font-medium">
+                          Notes
+                        </Label>
+                        <Textarea
+                          id="notes"
+                          placeholder="Enter notes or description"
+                          value={formData.notes || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                <div className="flex justify-end space-x-2 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setFormData({})
+                      setAddModalOpen(false)
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Creating...' : `Create ${displayName}`}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -217,24 +506,28 @@ export function UniversalEntityPage({
             </div>
           </div>
         ) : columns.length > 0 ? (
-          <VibeGrid
-            entityType={orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName}
-            columns={columns}
-            tableId={`${entityName}-entity-table`}
-            className="h-full"
-            height="100%"
-            onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
-              const fullEntityName = orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName;
-              console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, fullEntityName, rowId, updates });
-              try {
-                await entityOperations.updateEntity(fullEntityName, rowId, updates);
-                console.log('✅ UniversalEntityPage: Entity updated successfully', { entityName, fullEntityName, rowId, updates });
-              } catch (error) {
-                console.error('❌ UniversalEntityPage: Entity update failed', { entityName, fullEntityName, rowId, updates, error });
-                throw error;
-              }
-            }}
-          />
+          (() => {
+            const fullEntityName = orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName;
+            return (
+              <VibeGrid
+                entityType={fullEntityName}
+                columns={columns}
+                tableId={`${entityName}-entity-table`}
+                className="h-full"
+                height="100%"
+                onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
+                  console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, fullEntityName, rowId, updates });
+                  try {
+                    await entityOperations.updateEntity(fullEntityName, rowId, updates);
+                    console.log('✅ UniversalEntityPage: Entity updated successfully', { entityName, fullEntityName, rowId, updates });
+                  } catch (error) {
+                    console.error('❌ UniversalEntityPage: Entity update failed', { entityName, fullEntityName, rowId, updates, error });
+                    throw error;
+                  }
+                }}
+              />
+            );
+          })()
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center">

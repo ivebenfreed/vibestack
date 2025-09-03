@@ -89,6 +89,12 @@ export class CleanTableRenderer {
     this.options = options;
     this.container = options.container;
     
+    // Validate container
+    if (!this.container) {
+      console.error('[CleanTableRenderer] Constructor received undefined container');
+      throw new Error('CleanTableRenderer requires a valid container element');
+    }
+    
     // Extract callbacks from options
     this.callbacks = {
       onSort: options.onColumnClick,
@@ -120,6 +126,12 @@ export class CleanTableRenderer {
   // ====================================
   
   private initializeDOM(): void {
+    // Check if container is available
+    if (!this.container) {
+      console.error('[CleanTableRenderer] Container is undefined - cannot initialize DOM');
+      return;
+    }
+    
     // Clear container
     this.container.innerHTML = '';
     
@@ -379,7 +391,24 @@ export class CleanTableRenderer {
   // ====================================
   
   private renderRows(state: RenderState): void {
-    if (!state.rows || !state.columns || !state.coordinateMapping) return;
+    log.info('CleanTableRenderer: renderRows called', {
+      hasRows: !!state.rows,
+      rowCount: state.rows?.length || 0,
+      hasColumns: !!state.columns,
+      columnCount: state.columns?.length || 0,
+      hasCoordinateMapping: !!state.coordinateMapping
+    });
+    
+    if (!state.rows || !state.columns) {
+      log.info('CleanTableRenderer: renderRows early return - missing rows or columns');
+      return;
+    }
+    
+    // For basic rendering, we can work without coordinate mapping
+    // Coordinate mapping is only needed for advanced features like column reordering
+    if (!state.coordinateMapping) {
+      log.info('CleanTableRenderer: renderRows proceeding without coordinateMapping (using fallback widths)');
+    }
     
     const { start, end } = this.visibleRange;
     const visibleRows = state.rows.slice(start, end);
@@ -427,7 +456,7 @@ export class CleanTableRenderer {
   }
   
   private renderCells(row: TableRow, rowEl: HTMLElement, state: RenderState): void {
-    if (!state.coordinateMapping || !state.columns) return;
+    if (!state.columns) return;
     
     // Always clear and re-render cells to ensure correct order
     // This is necessary when columns are reordered
