@@ -1,6 +1,6 @@
 import { fromStore } from '@xstate/store';
 // NOTE: @repo/dataforge/dexie-schema was deprecated - using Legend State
-import { getEntity$, orgContext$, entities$ } from '@/legend-state/observables';
+import { getEntity$, getUniverseEntity$, orgContext$, entities$ } from '@/legend-state/observables';
 import { when } from '@legendapp/state';
 import { uiLog } from '@/logger';
 import { 
@@ -960,8 +960,8 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     });
   }
   
-  // ✅ CORRECT: Use getEntity$() function directly
-  const entity$ = getEntity$(entityTableName);
+  // ✅ CORRECT: Use getUniverseEntity$() for org-prefixed entities, getEntity$() for regular entities
+  const entity$ = entityTableName.includes('_') ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
   
   if (!entity$) {
     log.warn('📊 TableStore: Entity observable not ready for', entityTableName, '- waiting...');
@@ -969,7 +969,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     // Wait for entity observable to be ready instead of returning empty data
     return new Promise((resolve) => {
       const checkReady = () => {
-        const entity$ = getEntity$(entityTableName);
+        const entity$ = entityTableName.includes('_') ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
         
         if (entity$) {
           log.info('📊 TableStore: Entity observable is now ready for', entityTableName);
@@ -1067,7 +1067,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   // Load relationships and junctions in parallel using Legend State
   const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
     Promise.all(relationshipTables.map(async (tableName) => {
-      const relationshipEntity$ = getEntity$(tableName);
+      const relationshipEntity$ = tableName.includes('_') ? getUniverseEntity$(tableName) : getEntity$(tableName);
       if (!relationshipEntity$) return [];
       try {
         const data = relationshipEntity$.peek?.() || relationshipEntity$;
@@ -1078,7 +1078,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
       }
     })),
     Promise.all(junctionTables.map(async (tableName) => {
-      const junctionEntity$ = getEntity$(tableName);
+      const junctionEntity$ = tableName.includes('_') ? getUniverseEntity$(tableName) : getEntity$(tableName);
       if (!junctionEntity$) return [];
       try {
         const data = junctionEntity$.peek?.() || junctionEntity$;
@@ -1227,8 +1227,8 @@ export async function loadPage(
     pageSize
   });
   
-  // ✅ CORRECT: Use getEntity$() function directly
-  const entity$ = getEntity$(entityTableName);
+  // ✅ CORRECT: Use getUniverseEntity$() for org-prefixed entities, getEntity$() for regular entities
+  const entity$ = entityTableName.includes('_') ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
   
   if (!entity$) {
     throw new Error(`Entity ${entityTableName} not found or not ready`);
@@ -1256,7 +1256,7 @@ export async function loadPage(
   // Load relationships and junctions in parallel using Legend State
   const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
     Promise.all(relationshipTables.map(async (tableName) => {
-      const relationshipEntity$ = getEntity$(tableName);
+      const relationshipEntity$ = tableName.includes('_') ? getUniverseEntity$(tableName) : getEntity$(tableName);
       if (!relationshipEntity$) return [];
       try {
         const data = relationshipEntity$.peek?.() || relationshipEntity$;
@@ -1267,7 +1267,7 @@ export async function loadPage(
       }
     })),
     Promise.all(junctionTables.map(async (tableName) => {
-      const junctionEntity$ = getEntity$(tableName);
+      const junctionEntity$ = tableName.includes('_') ? getUniverseEntity$(tableName) : getEntity$(tableName);
       if (!junctionEntity$) return [];
       try {
         const data = junctionEntity$.peek?.() || junctionEntity$;

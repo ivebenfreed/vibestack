@@ -11,6 +11,7 @@ export {
   loadOrgContext,
   loadUniverseContext,
   getEntity$,
+  getUniverseEntity$,
   clearContext,
   handleTableNotification,
   removeEntityFromSchema,

@@ -1,28 +1,190 @@
 /**
  * VibeGrid with Legend State Integration
- * Using the actual VibeGrid table component with Legend State
+ * Universal entity display with dynamic entity selection
  */
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { VibeGrid } from '@/components/custom/vibegrid'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
-import { entityOperations } from '@/legend-state'
+import { entityOperations, getEntity$, getUniverseEntity$, universeContext$, orgContext$ } from '@/legend-state'
 import { debugLog } from '@/logger'
+import { observer } from '@legendapp/state/react'
 
 // Create logger instance for this file
 const log = debugLog('features/debug/components/LegendStateIntegrationDemo.tsx');
 
-export function LegendStateIntegrationDemo() {
-  const { columns, isLoading, error } = usePrecomputedEntityColumns('Client')
+export const LegendStateIntegrationDemo = observer(() => {
+  const [selectedEntity, setSelectedEntity] = useState('')
+  const [entityData, setEntityData] = useState<Record<string, any>>({})
+  const [dataLoading, setDataLoading] = useState(false)
   
-  log.info('Precomputed columns:', { 
-    columns, 
+  // Get universe and org contexts
+  const universeContext = universeContext$.get()
+  const currentOrgContext = orgContext$.get()
+  
+  // Extract available entities from all organizations in universe
+  const availableEntities = React.useMemo(() => {
+    const entities: Array<{value: string, label: string, orgName: string, recordCount: number}> = []
+    
+    // Add entities from current org context if available
+    if (currentOrgContext?.schema?.entities) {
+      Object.keys(currentOrgContext.schema.entities).forEach(entityName => {
+        // Skip org-prefixed entities in regular org context
+        if (!entityName.includes('_')) {
+          entities.push({
+            value: entityName,
+            label: `${entityName} (Current Org)`,
+            orgName: 'Current Organization',
+            recordCount: 0
+          })
+        }
+      })
+    }
+    
+    // Add entities from universe context (org-prefixed)
+    if (currentOrgContext?.schema?.entities) {
+      Object.entries(currentOrgContext.schema.entities).forEach(([entityKey, entitySchema]: [string, any]) => {
+        if (entityKey.includes('_') && entitySchema._organizationName) {
+          // This is an org-prefixed entity
+          entities.push({
+            value: entityKey,
+            label: `${entitySchema._originalName} (${entitySchema._organizationName})`,
+            orgName: entitySchema._organizationName,
+            recordCount: 0 // We'll update this when we load data
+          })
+        }
+      })
+    }
+    
+    return entities
+  }, [universeContext, currentOrgContext])
+  
+  // Set default selected entity if none selected
+  React.useEffect(() => {
+    if (!selectedEntity && availableEntities.length > 0) {
+      // Look for Client entities first, or take the first available
+      const clientEntity = availableEntities.find(e => e.value.includes('Client'))
+      setSelectedEntity(clientEntity?.value || availableEntities[0].value)
+    }
+  }, [availableEntities, selectedEntity])
+  
+  // Get columns based on the base entity name (strip org prefix if present)
+  const baseEntityName = selectedEntity.includes('_') ? selectedEntity.split('_')[1] : selectedEntity
+  const { columns, isLoading, error } = usePrecomputedEntityColumns(baseEntityName)
+  
+  log.info('Component state:', { 
+    selectedEntity,
+    baseEntityName,
+    availableEntitiesCount: availableEntities.length,
+    columns: columns.length,
     isLoading, 
-    error, 
-    referenceColumns: columns.filter(col => col.cellType?.startsWith('reference')).length,
-    totalColumns: columns.length
+    error,
+    universeOrganizations: Object.keys(universeContext?.organizations || {}).length,
+    currentOrgId: currentOrgContext?.orgId,
+    dataLoading,
+    entityDataCount: Object.keys(entityData).length
   })
+  
+  // Load entity data when entity changes
+  useEffect(() => {
+    if (!selectedEntity) return
+    
+    const loadEntityData = async () => {
+      setDataLoading(true)
+      try {
+        // Use universe-aware entity access
+        const entityObs = getUniverseEntity$(selectedEntity)
+        
+        if (entityObs) {
+          const data = entityObs.get()
+          setEntityData(data || {})
+          log.info(`Loaded ${selectedEntity} data:`, { 
+            recordCount: Object.keys(data || {}).length,
+            sampleRecord: Object.values(data || {})[0],
+            entityObservableType: typeof entityObs,
+            hasGetMethod: typeof entityObs.get === 'function'
+          })
+        } else {
+          log.warn(`Entity ${selectedEntity} not available via getUniverseEntity$`)
+          setEntityData({})
+        }
+      } catch (err) {
+        log.error('Failed to load entity data:', err)
+        setEntityData({})
+      } finally {
+        setDataLoading(false)
+      }
+    }
+
+    loadEntityData()
+  }, [selectedEntity])
+
+  // Create sample data for testing if no data exists
+  const createSampleData = async () => {
+    try {
+      const sampleId = `sample-${Date.now()}`
+      let sampleData: Record<string, any>
+      const entityNameForCreation = selectedEntity.includes('_') ? selectedEntity.split('_')[1] : selectedEntity
+      
+      switch (entityNameForCreation) {
+        case 'Client':
+          sampleData = {
+            id: sampleId,
+            name: `Sample Client ${Date.now()}`,
+            email: 'sample@example.com',
+            company_name: 'Sample Corp',
+            contact_person: 'John Doe',
+            phone: '+1-555-0123',
+            industry: 'Technology',
+            status: 'active',
+            priority: 'medium',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+          break
+        case 'Task':
+          sampleData = {
+            id: sampleId,
+            title: `Sample Task ${Date.now()}`,
+            description: 'A sample task for testing',
+            priority_option: 'medium',
+            status_option: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+          break
+        case 'Project':
+          sampleData = {
+            id: sampleId,
+            title: `Sample Project ${Date.now()}`,
+            description: 'A sample project for testing',
+            priority_option: 'medium',
+            status_option: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+          break
+        default:
+          sampleData = {
+            id: sampleId,
+            name: `Sample ${entityNameForCreation} ${Date.now()}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+      }
+      
+      // Use the base entity name for creation, not the org-prefixed name
+      await entityOperations.createEntity(entityNameForCreation, sampleData)
+      log.info(`Created sample ${entityNameForCreation} (from ${selectedEntity}):`, sampleData)
+    } catch (err) {
+      log.error('Failed to create sample data:', err)
+    }
+  }
+
+  const recordCount = Object.keys(entityData).length
 
   return (
     <div className="p-6 space-y-6">
@@ -35,12 +197,65 @@ export function LegendStateIntegrationDemo() {
         </div>
       </div>
 
+      {/* Entity Selection & Controls */}
+      <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Entity:</span>
+          <Select value={selectedEntity} onValueChange={setSelectedEntity}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Select an entity..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableEntities.map((entity) => (
+                <SelectItem key={entity.value} value={entity.value}>
+                  <div className="flex flex-col">
+                    <span>{entity.label}</span>
+                    {entity.orgName && (
+                      <span className="text-xs text-muted-foreground">
+                        {entity.orgName}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">
+            {recordCount} records
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            {columns.length} columns
+          </Badge>
+          {currentOrgContext?.orgId && (
+            <Badge variant="outline" className="text-xs">
+              {currentOrgContext.orgId === 'universe' ? 'Universe View' : `Org: ${currentOrgContext.orgId.slice(0, 8)}...`}
+            </Badge>
+          )}
+        </div>
+        
+        <Button 
+          onClick={createSampleData} 
+          size="sm" 
+          variant="outline"
+          disabled={dataLoading}
+        >
+          Add Sample Data
+        </Button>
+      </div>
+
       <div className="h-[600px] border rounded-lg">
-        {isLoading ? (
+        {isLoading || dataLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="text-lg font-semibold">Loading schema...</div>
-              <div className="text-sm text-muted-foreground">Generating dynamic columns</div>
+              <div className="text-lg font-semibold">
+                {isLoading ? 'Loading schema...' : 'Loading data...'}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {isLoading ? 'Generating dynamic columns' : `Fetching ${selectedEntity} records`}
+              </div>
             </div>
           </div>
         ) : error ? (
@@ -52,17 +267,17 @@ export function LegendStateIntegrationDemo() {
           </div>
         ) : columns.length > 0 ? (
           <VibeGrid
-            entityType="Client"
+            entityType={selectedEntity}
             columns={columns}
-            tableId="debug-clients-table"
+            tableId={`debug-${selectedEntity.toLowerCase()}-table`}
             className="h-full"
             onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
-              console.log('🔄 LegendStateIntegrationDemo: Entity update requested', { rowId, updates });
+              log.info('Entity update requested:', { entityType: selectedEntity, rowId, updates });
               try {
-                await entityOperations.updateEntity('Client', rowId, updates);
-                console.log('✅ LegendStateIntegrationDemo: Entity updated successfully', { rowId, updates });
+                await entityOperations.updateEntity(selectedEntity, rowId, updates);
+                log.info('Entity updated successfully:', { entityType: selectedEntity, rowId, updates });
               } catch (error) {
-                console.error('❌ LegendStateIntegrationDemo: Entity update failed', { rowId, updates, error });
+                log.error('Entity update failed:', { entityType: selectedEntity, rowId, updates, error });
                 throw error;
               }
             }}
@@ -71,11 +286,11 @@ export function LegendStateIntegrationDemo() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-muted-foreground">
               <div className="text-lg font-semibold">No Columns</div>
-              <div className="text-sm">No schema fields found for Client entity</div>
+              <div className="text-sm">No schema fields found for {selectedEntity} entity</div>
             </div>
           </div>
         )}
       </div>
     </div>
   )
-}
+})

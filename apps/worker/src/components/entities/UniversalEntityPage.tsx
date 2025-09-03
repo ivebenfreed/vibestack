@@ -236,7 +236,7 @@ export function UniversalEntityPage({
               </div>
             ) : columns.length > 0 ? (
               <VibeGrid
-                entityType={entityName}
+                entityType={orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName}
                 columns={columns}
                 tableId={`${entityName}-entity-table`}
                 className="h-full"

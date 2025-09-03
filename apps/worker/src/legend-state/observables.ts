@@ -852,6 +852,69 @@ export function getEntity$(entityName: string) {
 }
 
 /**
+ * Universe-aware entity getter - handles both regular and org-prefixed entity names
+ * For universe context: getUniverseEntity$('01920000-1000-7000-8000-000000000001_Client')  
+ * For regular context: getUniverseEntity$('Client') - falls back to current org
+ */
+export function getUniverseEntity$(entityIdentifier: string) {
+  try {
+    // Check if this is an org-prefixed entity name (contains UUID pattern)
+    const orgPrefixMatch = entityIdentifier.match(/^([a-f0-9-]{36})_(.+)$/)
+    
+    if (orgPrefixMatch) {
+      // Extract org ID and entity name from prefixed identifier
+      const [, orgId, entityName] = orgPrefixMatch
+      log.info(`[UniverseObservable] Accessing org-prefixed entity ${entityName} from org ${orgId}`)
+      
+      // For org-prefixed entities, we need to check if the current org context has this entity
+      // The schema contains org-prefixed entity keys, so check for the full identifier
+      const currentOrgContext = orgContext$.peek()
+      
+      if (!currentOrgContext?.schema?.entities?.[entityIdentifier]) {
+        log.warn(`[UniverseObservable] Org-prefixed entity ${entityIdentifier} not available in current universe schema`)
+        log.info(`[UniverseObservable] Available entities:`, Object.keys(currentOrgContext?.schema?.entities || {}))
+        return null
+      }
+      
+      // Use the org-specific cache key
+      const cacheKey = `${orgId}:${entityName}`
+      
+      // Check cache first
+      if (globalEntityCache[cacheKey]) {
+        log.info(`[UniverseObservable] Retrieved cached org-prefixed ${entityIdentifier} observable`)
+        return globalEntityCache[cacheKey]
+      }
+      
+      // Create observable for this specific organization's entity
+      try {
+        log.info(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
+        const observable = createEntityObservable(orgId, entityName, currentOrgContext.schema.entities[entityIdentifier])
+        globalEntityCache[cacheKey] = observable
+        
+        log.info(`[UniverseObservable] Created ${entityIdentifier} observable`, {
+          orgId,
+          entityName,
+          type: typeof observable,
+          hasGet: typeof observable?.get === 'function'
+        })
+        
+        return observable
+      } catch (createError) {
+        log.error(`[UniverseObservable] Error creating observable for ${entityIdentifier}:`, createError)
+        return null
+      }
+    } else {
+      // No org prefix - fall back to regular getEntity$ behavior
+      log.info(`[UniverseObservable] No org prefix detected, falling back to regular getEntity$ for ${entityIdentifier}`)
+      return getEntity$(entityIdentifier)
+    }
+  } catch (error) {
+    log.error(`[UniverseObservable] Error getting universe entity observable for ${entityIdentifier}:`, error)
+    return null
+  }
+}
+
+/**
  * Clear all observables (for logout or org switching)
  */
 export function clearContext() {
