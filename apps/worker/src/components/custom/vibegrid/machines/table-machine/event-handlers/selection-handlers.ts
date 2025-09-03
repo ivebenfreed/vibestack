@@ -32,7 +32,18 @@ export const selectionHandlers = {
         
         // Only proceed if we have valid context
         if (!context.coordinateMapping) {
-          log.warn('SelectionHandler: Missing coordinate mapping');
+          log.warn('SelectionHandler: Missing coordinate mapping - deferring selection');
+          // Instead of returning, trigger coordinate calculation if we have renderer
+          if (context.actors?.rendererActor) {
+            log.info('SelectionHandler: Triggering coordinate calculation for deferred selection');
+            self.send({
+              type: 'CALCULATE_INITIAL_COORDINATES',
+              deferredEvent: {
+                type: 'selection.cell.select',
+                ...event
+              }
+            });
+          }
           return;
         }
         
@@ -196,7 +207,18 @@ export const selectionHandlers = {
         
         // Only proceed if we have valid context
         if (!context.coordinateMapping) {
-          log.warn('SelectionHandler: Missing coordinate mapping');
+          log.warn('SelectionHandler: Missing coordinate mapping - deferring row selection');
+          // Instead of returning, trigger coordinate calculation if we have renderer
+          if (context.actors?.rendererActor) {
+            log.info('SelectionHandler: Triggering coordinate calculation for deferred row selection');
+            self.send({
+              type: 'CALCULATE_INITIAL_COORDINATES',
+              deferredEvent: {
+                type: 'selection.checkbox.toggle',
+                ...event
+              }
+            });
+          }
           return;
         }
         
@@ -293,7 +315,18 @@ export const selectionHandlers = {
         
         // Only proceed if we have valid context
         if (!context.coordinateMapping) {
-          log.warn('SelectionHandler: Missing coordinate mapping');
+          log.warn('SelectionHandler: Missing coordinate mapping - deferring select all');
+          // Instead of returning, trigger coordinate calculation if we have renderer
+          if (context.actors?.rendererActor) {
+            log.info('SelectionHandler: Triggering coordinate calculation for deferred select all');
+            self.send({
+              type: 'CALCULATE_INITIAL_COORDINATES',
+              deferredEvent: {
+                type: 'selection.checkbox.all',
+                ...event
+              }
+            });
+          }
           return;
         }
         

@@ -962,64 +962,6 @@ export const tableBaseMachine = setup({
         ]
       },
       
-      // Handle coordinate calculation response from renderer
-      COORDINATES_CALCULATED: {
-        actions: [
-          // Update coordinate mapping
-          assign({
-            coordinateMapping: ({ event }) => event.mapping,
-            version: ({ context }) => context.version + 1
-          }),
-          
-          // Send coordinates to canvas if available
-          ({ context, event }) => {
-            if (context.actors.canvasActor) {
-              context.actors.canvasActor.send({
-                type: 'UPDATE_COORDINATES',
-                mapping: event.mapping
-              });
-            }
-          },
-          
-          // Send render command to renderer with full state
-          ({ context }) => {
-            if (context.actors.rendererActor) {
-              // Get visible columns using centralized logic
-              const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
-              const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
-              
-              // Get store state for render data
-              const storeSnapshot = context.storeActor?.getSnapshot();
-              const columnVisibility = storeSnapshot?.context?.columnVisibility || {};
-              
-              // Merge column widths from coordinate mapping into columns
-              const columnsWithWidths = columnsWithSelection.map(col => {
-                if (context.coordinateMapping) {
-                  const coordCol = context.coordinateMapping.columns.find(c => c.columnId === col.id);
-                  return coordCol ? { ...col, width: coordCol.width } : col;
-                }
-                return col;
-              });
-              
-              context.actors.rendererActor.send({
-                type: 'RENDER',
-                state: {
-                  rows: context.rows,
-                  columns: columnsWithWidths,
-                  selectedCells: context.selectedCells,
-                  editingCell: null,
-                  groupedData: [],
-                  optimisticOperations: new Map(),
-                  version: context.version,
-                  sortBy: storeSnapshot?.context?.sortBy || [],
-                  columnVisibility: columnVisibility,
-                  coordinateMapping: context.coordinateMapping
-                }
-              });
-            }
-          }
-        ]
-      },
       
       // PERFORMANCE: Initialize canvas actor for selection (post-render spawning)
       SPAWN_CANVAS_ACTOR_FOR_SELECTION: {
@@ -1642,6 +1584,104 @@ on: {
             log.info('TableMachine: Sending RENDER after STORE_DATA_UPDATED', {
               rowCount: context.rows.length,
               hasCoordinateMapping: !!context.coordinateMapping
+            });
+            
+            context.actors.rendererActor.send({
+              type: 'RENDER',
+              state: {
+                rows: context.rows,
+                columns: columnsWithWidths,
+                selectedCells: context.selectedCells,
+                editingCell: null,
+                groupedData: [],
+                optimisticOperations: new Map(),
+                version: context.version,
+                sortBy: storeSnapshot?.context?.sortBy || [],
+                columnVisibility: columnVisibility,
+                coordinateMapping: context.coordinateMapping
+              }
+            });
+          }
+        }
+      ]
+    },
+    
+    // Handle coordinate mapping calculation requests from selection handlers
+    CALCULATE_INITIAL_COORDINATES: {
+      actions: [
+        ({ context, event }) => {
+          log.info('TableMachine: Triggering coordinate calculation for deferred event', {
+            deferredEventType: event.deferredEvent?.type,
+            hasRendererActor: !!context.actors.rendererActor,
+            hasStoreActor: !!context.storeActor
+          });
+          
+          if (context.actors.rendererActor && context.storeActor) {
+            // Get visible columns using centralized logic
+            const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
+            const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
+            
+            // Send coordinate calculation request
+            context.actors.rendererActor.send({
+              type: 'CALCULATE_COORDINATES',
+              rows: context.rows,
+              columns: columnsWithSelection,
+              columnWidths: null, // Will use default widths
+              deferredEvent: event.deferredEvent
+            });
+          }
+        }
+      ]
+    },
+    
+    // Enhanced coordinate calculation response handler
+    COORDINATES_CALCULATED: {
+      actions: [
+        // Update coordinate mapping
+        assign({
+          coordinateMapping: ({ event }) => event.mapping,
+          version: ({ context }) => context.version + 1
+        }),
+        
+        // Send coordinates to canvas if available
+        ({ context, event }) => {
+          if (context.actors.canvasActor) {
+            context.actors.canvasActor.send({
+              type: 'UPDATE_COORDINATES',
+              mapping: event.mapping
+            });
+          }
+        },
+        
+        // Process deferred event if present
+        ({ context, event, self }) => {
+          if ((event as any).deferredEvent) {
+            log.info('TableMachine: Processing deferred selection event after coordinate mapping', {
+              deferredEventType: (event as any).deferredEvent.type
+            });
+            
+            // Re-send the deferred event now that we have coordinate mapping
+            setTimeout(() => {
+              self.send((event as any).deferredEvent);
+            }, 0);
+          }
+        },
+        
+        // Send render command to renderer with full state
+        ({ context }) => {
+          if (context.actors.rendererActor) {
+            // Get visible columns using centralized logic
+            const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
+            const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
+            
+            // Get store state for render data
+            const storeSnapshot = context.storeActor?.getSnapshot();
+            const columnVisibility = storeSnapshot?.context?.columnVisibility || {};
+            
+            // Merge column widths from coordinate mapping into columns
+            const columnsWithWidths = columnsWithSelection.map(col => {
+              const coordCol = context.coordinateMapping.columns.find(c => c.columnId === col.id);
+              return coordCol ? { ...col, width: coordCol.width } : col;
             });
             
             context.actors.rendererActor.send({

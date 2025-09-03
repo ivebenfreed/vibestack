@@ -32,7 +32,7 @@ export type RendererActorEvent =
   | { type: 'UPDATE_SELECTED_ROWS'; selectedRows: Set<string> }
   | { type: 'REMOVE_ROW'; rowId: string }
   | { type: 'SURGICAL_UPDATE'; changes: any[]; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
-  | { type: 'CALCULATE_COORDINATES'; rows: any[]; columns: Column[]; columnWidths?: Record<string, number> }
+  | { type: 'CALCULATE_COORDINATES'; rows: any[]; columns: Column[]; columnWidths?: Record<string, number>; deferredEvent?: any }
   | { type: 'DESTROY' };
 
 export type RendererActorResponse =
@@ -43,7 +43,7 @@ export type RendererActorResponse =
   | { type: 'COLUMNS_UPDATED' }
   | { type: 'COLUMN_WIDTH_UPDATED' }
   | { type: 'COORDINATES_UPDATED' }
-  | { type: 'COORDINATES_CALCULATED'; mapping: any; version: number }
+  | { type: 'COORDINATES_CALCULATED'; mapping: any; version: number; deferredEvent?: any }
   | { type: 'SELECTED_ROWS_UPDATED' }
   | { type: 'RENDERER_ERROR'; error: string };
 
@@ -667,7 +667,8 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             sendBack({
               type: 'COORDINATES_CALCULATED',
               mapping: coordinateMapping,
-              version: coordinateMapping.version
+              version: coordinateMapping.version,
+              deferredEvent: event.deferredEvent
             });
           } catch (error) {
             log.error('RendererActor: Error calculating coordinates:', error);
