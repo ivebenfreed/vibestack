@@ -34,16 +34,20 @@ class SimpleLogger {
 
   private loadConfig() {
     // Simple: just read enabled contexts and log level
-    const contexts = import.meta.env.VITE_LOG_CONTEXTS || '';
+    const contexts = import.meta.env.VITE_LOG_CONTEXTS;
     const level = import.meta.env.VITE_LOG_LEVEL || 'info';
     
     this.logLevel = level as LogLevel;
     
-    if (contexts) {
-      this.enabledContexts = new Set(contexts.split(',').filter(Boolean) as LogContext[]);
-    } else {
-      // If no contexts specified, enable all
+    if (contexts === undefined) {
+      // No env var specified, enable all contexts
       this.enabledContexts = new Set(['sync', 'ui', 'data', 'auth', 'routing', 'performance', 'state', 'testing', 'debug']);
+    } else if (contexts === '') {
+      // Empty string explicitly set, disable all contexts (quiet mode)
+      this.enabledContexts = new Set();
+    } else {
+      // Specific contexts set
+      this.enabledContexts = new Set(contexts.split(',').filter(Boolean) as LogContext[]);
     }
   }
 
