@@ -77,6 +77,15 @@ export const authClient = createAuthClient({
         url: context.request?.url 
       });
       
+      // Handle session failures by triggering immediate sign-out
+      if (response?.status && [401, 403].includes(response.status)) {
+        log.info("[AUTH] Session failure detected, triggering sign-out");
+        // Dispatch custom event to trigger auth machine sign-out
+        window.dispatchEvent(new CustomEvent('auth:session-fault', {
+          detail: { status: response.status, url: context.request?.url }
+        }));
+      }
+      
       // Don't log expected auth errors as warnings in dev mode
       if (import.meta.env.DEV && response?.status && [401, 403].includes(response.status)) {
         return;

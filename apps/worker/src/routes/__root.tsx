@@ -94,6 +94,20 @@ if (!authMachineActor) {
   // Store globally
   ;(window as any).authMachineActor = authMachineActor
   
+  // Add event listener for session faults
+  const handleSessionFault = (event: CustomEvent) => {
+    log.info('[ROOT] Session fault detected, sending SESSION_FAULT event to auth machine:', event.detail)
+    authMachineActor.send({ type: 'SESSION_FAULT' })
+  }
+  window.addEventListener('auth:session-fault', handleSessionFault as EventListener)
+  
+  // Clean up event listener on HMR
+  if (import.meta.hot) {
+    import.meta.hot.accept(() => {
+      window.removeEventListener('auth:session-fault', handleSessionFault as EventListener)
+    })
+  }
+  
   // Set up subscriptions for new actor
   authMachineActor.subscribe((snapshot) => {
     // Persist snapshot for proper XState persistence

@@ -137,18 +137,8 @@ export const checkAuthActor = fromPromise(async () => {
         retryable: true
       };
     } else if (isAuthError) {
-      // Actual auth errors - only sign out if we don't have valid persisted auth
-      if (hasValidPersistedAuth) {
-        log.info('[checkAuthActor] Auth error but have valid persisted session, not signing out yet');
-        return { 
-          authenticated: false, 
-          shouldSignOut: false, 
-          errorType: 'auth',
-          error: errorMessage,
-          retryable: true
-        };
-      }
-      log.info('[checkAuthActor] Authentication error detected, will sign out');
+      // Actual auth errors - immediately sign out for better UX
+      log.info('[checkAuthActor] Authentication error detected, signing out immediately');
       return { 
         authenticated: false, 
         shouldSignOut: true, 
@@ -156,14 +146,13 @@ export const checkAuthActor = fromPromise(async () => {
         error: errorMessage 
       };
     } else {
-      // Unknown errors - be conservative, don't sign out immediately
-      log.info('[checkAuthActor] Unknown error, not signing out to be safe');
+      // Unknown errors - sign out to be safe and provide clear UX
+      log.info('[checkAuthActor] Unknown error, signing out for safety and clear UX');
       return { 
         authenticated: false, 
-        shouldSignOut: false, 
+        shouldSignOut: true, 
         errorType: 'unknown',
-        error: errorMessage,
-        retryable: true
+        error: errorMessage
       };
     }
   }

@@ -34,6 +34,7 @@ export interface AuthContext {
 export type AuthEvent =
   | { type: 'SIGN_IN'; credentials: { email: string; password: string } }
   | { type: 'SIGN_OUT' }
+  | { type: 'SESSION_FAULT' }
   | { type: 'CHECK_AUTH' }
   | { type: 'CLEAR_ERROR' }
   | { type: 'RESTORED_SESSION' }
@@ -793,6 +794,15 @@ export const authMachine = setup({
       
       on: {
         SIGN_OUT: 'signingOut',
+        SESSION_FAULT: {
+          target: 'signingOut',
+          actions: [
+            ({ context }) => log.info('[AuthMachine] Session fault detected, signing out:', context.user?.email),
+            assign({
+              authError: 'Session has expired or become invalid'
+            })
+          ]
+        },
         CHECK_AUTH: 'checking',
       }
     },

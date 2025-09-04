@@ -193,13 +193,26 @@ async function handleKVOperation(
         }
         
         if (whereConditions.token) {
+          dbLogger.info('Attempting to retrieve session from KV', { 
+            token: whereConditions.token,
+            tokenLength: whereConditions.token.length,
+            kvKey: `session:${whereConditions.token}`
+          }, 'kv-adapter');
+          
           const data = await kv.get(`session:${whereConditions.token}`);
           if (data) {
             const session = JSON.parse(data);
-            dbLogger.debug('Session retrieved from KV', { token: whereConditions.token }, 'kv-adapter');
+            dbLogger.info('Session successfully retrieved from KV', { 
+              token: whereConditions.token,
+              sessionId: session.id,
+              userId: session.userId
+            }, 'kv-adapter');
             return [session];
           } else {
-            dbLogger.debug('Session not found in KV', { token: whereConditions.token }, 'kv-adapter');
+            dbLogger.warn('Session not found in KV - token may be expired or invalid', { 
+              token: whereConditions.token,
+              kvKey: `session:${whereConditions.token}`
+            }, 'kv-adapter');
           }
         } else if (whereConditions.userId) {
           // List sessions for user

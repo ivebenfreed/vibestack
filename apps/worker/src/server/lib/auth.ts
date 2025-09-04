@@ -12,7 +12,7 @@ import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
 import { createKyselyForPersistentUse } from './database-manager';
-import { createKVSessionInterceptor } from './kv-session-adapter';
+// import { createKVSessionInterceptor } from './kv-session-adapter'; // Replaced with Better Auth native secondaryStorage
 
 // Helper function to get allowed origins for unified worker
 function getAllowedOrigins(env: Env): string[] {
@@ -55,8 +55,8 @@ function getAllowedOrigins(env: Env): string[] {
 function getBaseUrl(env: Env): string {
   if (env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local") {
     // For unified worker, the base URL is just the worker origin
-    // Use dynamic port from WEB_PORT environment variable
-    const port = env.WEB_PORT || '5174';
+    // Use DEV_PORT for consistency with the unified worker architecture
+    const port = env.DEV_PORT || '4000';
     return `http://localhost:${port}`;
   } else if (env.ENVIRONMENT === "staging") {
     return "https://dev.codevibesmatter.com";
@@ -220,17 +220,13 @@ export const auth = betterAuth({
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
-  // Get configured Kysely instance or KV-intercepted version
-  let kyselyInstance;
+  // Get configured Kysely instance
+  const kyselyInstance = createKyselyForPersistentUse();
   
   // Database connection is already established by middleware
-  
   if (env.USE_KV_SESSIONS && env.SESSIONS) {
-    // Use KV interceptor for session storage (requires database connection to be initialized)
-    kyselyInstance = createKVSessionInterceptor(env);
-    dbLogger.info('Using KV storage for sessions', {}, 'auth');
+    dbLogger.info('Using KV secondaryStorage for sessions', {}, 'auth');
   } else {
-    kyselyInstance = createKyselyForPersistentUse();
     dbLogger.info('Using PostgreSQL for sessions', {}, 'auth');
   }
 
@@ -241,7 +237,7 @@ export function initializeAuth(env: Env, request?: Request) {
     secretType: typeof env.BETTER_AUTH_SECRET,
     trustedOrigins: trustedOrigins,
     organizationPlugin: 'disabled - using custom system',
-    sessionStorage: env.SESSIONS ? 'Cloudflare KV (via better-auth-cloudflare)' : 'PostgreSQL',
+    sessionStorage: env.SESSIONS ? 'Cloudflare KV (via Better Auth secondaryStorage)' : 'PostgreSQL',
     kvNamespaceBound: !!env.SESSIONS
   }, 'auth');
 
@@ -260,6 +256,25 @@ export function initializeAuth(env: Env, request?: Request) {
       type: "postgres" as const
       // Remove custom casing - let Better Auth use defaults
     },
+    // Native Better Auth secondaryStorage for KV sessions
+    ...(env.USE_KV_SESSIONS && env.SESSIONS ? {
+      secondaryStorage: {
+        get: async (key: string) => {
+          dbLogger.debug('SecondaryStorage GET', { key }, 'auth');
+          const value = await env.SESSIONS!.get(key);
+          return value || null;
+        },
+        set: async (key: string, value: string, ttl?: number) => {
+          dbLogger.debug('SecondaryStorage SET', { key, hasValue: !!value, ttl }, 'auth');
+          const options = ttl ? { expirationTtl: ttl } : undefined;
+          await env.SESSIONS!.put(key, value, options);
+        },
+        delete: async (key: string) => {
+          dbLogger.debug('SecondaryStorage DELETE', { key }, 'auth');
+          await env.SESSIONS!.delete(key);
+        }
+      }
+    } : {}), 
     secret: env.BETTER_AUTH_SECRET,
     baseURL: baseUrl, // Fix: Use baseURL (capital URL) not baseUrl
     logger: {
