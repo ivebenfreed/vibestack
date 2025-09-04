@@ -348,12 +348,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
       }, 25);
     }
     
-    // Don't setup new bridge if cleanup is active
-    if ((window as any).__vibegrid_cleanup_active) {
-      log.debug('VibeGrid cleanup active, deferring atomic bridge setup', { entityType });
-      return;
-    }
-    
     // Dynamically import and setup new atomic bridge
     const setupAtomicBridge = async () => {
       try {
@@ -390,7 +384,43 @@ export function VibeGrid<T extends Record<string, any> = any>(
       }
     };
     
-    setupAtomicBridge();
+    // If cleanup is active, wait for it to complete and retry
+    if ((window as any).__vibegrid_cleanup_active) {
+      log.debug('VibeGrid cleanup active, waiting for completion to setup atomic bridge', { entityType });
+      
+      // Wait for cleanup to complete and retry
+      const waitForCleanupAndSetup = async () => {
+        // Wait for cleanup to complete
+        const cleanupPromise = (window as any).__vibegrid_cleanup_promise;
+        if (cleanupPromise) {
+          try {
+            await cleanupPromise;
+            log.debug('Cleanup completed, setting up atomic bridge', { entityType });
+          } catch (error) {
+            log.debug('Cleanup had errors, proceeding with atomic bridge setup anyway', error);
+          }
+        }
+        
+        // Double-check cleanup flag is cleared
+        let retries = 0;
+        while ((window as any).__vibegrid_cleanup_active && retries < 20) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          retries++;
+        }
+        
+        if ((window as any).__vibegrid_cleanup_active) {
+          log.warn('Cleanup flag still active after waiting, proceeding anyway', { entityType });
+        }
+        
+        // Now setup the bridge
+        await setupAtomicBridge();
+      };
+      
+      waitForCleanupAndSetup();
+    } else {
+      // No cleanup active, setup immediately
+      setupAtomicBridge();
+    }
     
     // Cleanup on unmount or entityType change
     return () => {
