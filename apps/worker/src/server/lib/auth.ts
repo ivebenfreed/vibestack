@@ -20,8 +20,12 @@ function getAllowedOrigins(env: Env): string[] {
   const isDev = env.ENVIRONMENT === 'development' || env.ENVIRONMENT === 'local';
   
   if (isDev) {
-    // In development, allow localhost with any port (Vite handles dynamic ports)
-    return [
+    // In development, allow localhost with dynamic port and common fallbacks
+    const port = env.WEB_PORT || '5174';
+    const origins = [
+      `http://localhost:${port}`, // Current dynamic port
+      'http://localhost:4000',    // Fixed port for worktrees
+      'http://localhost:4174',    // Common fallback ports
       'http://localhost:5174',
       'http://localhost:5175',
       'http://localhost:5173',
@@ -30,6 +34,9 @@ function getAllowedOrigins(env: Env): string[] {
       'http://127.0.0.1',
       'https://127.0.0.1'
     ];
+    
+    // Remove duplicates in case WEB_PORT matches one of the fallbacks
+    return [...new Set(origins)];
   } else {
     // Production/staging origins
     return [
@@ -43,8 +50,9 @@ function getAllowedOrigins(env: Env): string[] {
 function getBaseUrl(env: Env): string {
   if (env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local") {
     // For unified worker, the base URL is just the worker origin
-    // No separate ports or proxy needed
-    return `http://localhost:5175`;
+    // Use dynamic port from WEB_PORT environment variable
+    const port = env.WEB_PORT || '5174';
+    return `http://localhost:${port}`;
   } else if (env.ENVIRONMENT === "staging") {
     return "https://dev.codevibesmatter.com";
   } else {

@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import type { Kysely } from 'kysely';
 import { dbLogger } from '../../middleware/logger';
-import { createDatabaseConnection, getKysely } from '../../lib/database-manager';
+import { createDatabaseConnection, withKysely } from '../../lib/database-manager';
 import type { 
   Organization, 
   CreateOrganizationInput, 
@@ -16,12 +16,8 @@ import type {
  * Handles CRUD operations for organizations
  */
 export class OrganizationService {
-  private db: Kysely<any>;
-
-  constructor(context: Context) {
-    // Initialize centralized database connection
-    createDatabaseConnection(context.env);
-    this.db = getKysely();
+  constructor(private context: Context) {
+    // Database connections are now managed through withKysely() calls
   }
 
   /**
@@ -287,20 +283,22 @@ export class OrganizationService {
    */
   async getOrganizationsByUser(userId: string): Promise<OrganizationServiceResponse<Organization[]>> {
     try {
-      const organizations = await this.db
-        .selectFrom('organizations')
-        .innerJoin('organization_members', 'organization_members.organization_id', 'organizations.id')
-        .where('organization_members.user_id', '=', userId)
-        .select([
-          'organizations.id', 
-          'organizations.name', 
-          'organizations.slug',
-          'organizations.settings',
-          'organizations.created_at', 
-          'organizations.updated_at'
-        ])
-        .orderBy('organizations.created_at', 'desc')
-        .execute();
+      const organizations = await withKysely(async (db) => {
+        return await db
+          .selectFrom('organizations')
+          .innerJoin('organization_members', 'organization_members.organization_id', 'organizations.id')
+          .where('organization_members.user_id', '=', userId)
+          .select([
+            'organizations.id', 
+            'organizations.name', 
+            'organizations.slug',
+            'organizations.settings',
+            'organizations.created_at', 
+            'organizations.updated_at'
+          ])
+          .orderBy('organizations.created_at', 'desc')
+          .execute();
+      });
 
       return {
         success: true,

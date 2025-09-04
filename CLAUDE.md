@@ -6,7 +6,7 @@
 
 **Single Worker App Architecture:**
 
-- **Unified Application**: `http://localhost:5174` (or `http://localhost:5175` if 5174 is in use)
+- **Unified Application**: `http://localhost:4000` (configurable via `DEV_PORT` env var)
 - **Frontend & Backend**: Single Cloudflare Worker with integrated Vite dev server
 - **Database**: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
 - **Architecture**: Full-stack React app with Cloudflare Workers backend, unified in single app
@@ -32,7 +32,7 @@
 
 ### Development Workflow
 1. **Start dev server**: `pnpm dev` 
-2. **Single URL**: `http://localhost:5174` (or 5175) serves both app and API
+2. **Single URL**: `http://localhost:4000` (or `DEV_PORT`) serves both app and API
 3. **Hot reloading**: Works for both React components and Worker API code
 4. **API routes**: Available at same origin (e.g., `/api/auth/sign-in/email`)
 5. **No CORS issues**: Frontend and backend on same origin
@@ -100,12 +100,23 @@ Bash(command="pnpm test --watch", run_in_background=true)
 ### Development Server Details:
 ```bash
 # Start unified Cloudflare Worker with Vite integration
-pnpm dev  # Typically runs on port 5174 or 5175
+pnpm dev  # Runs on port 4000 by default
 
-# Test API directly (adjust port as needed)
-curl -X GET http://localhost:5175/health
+# Configure port for worktrees (recommended)
+export DEV_PORT=4001  # For issue-123 worktree
+export DEV_PORT=4002  # For issue-456 worktree
+pnpm dev
+
+# Test API directly
+curl -X GET http://localhost:4000/health
 psql postgres://postgres:postgres@localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
 ```
+
+### Port Configuration for Worktrees:
+- **Main branch**: `DEV_PORT=4000` (default)
+- **Worktrees**: Set `DEV_PORT=400X` where X is unique per worktree
+- **StrictPort**: Enabled to prevent port confusion - server will fail if port is unavailable
+- **Environment**: Add `export DEV_PORT=4001` to your shell profile for persistent worktree ports
 
 ## Contextual Logging System
 

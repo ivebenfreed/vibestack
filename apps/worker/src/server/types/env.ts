@@ -33,6 +33,9 @@ export interface Env {
   // Deployment environment (set by Cloudflare Workers)
   ENVIRONMENT: DeploymentEnv;
 
+  // Development server port (for dynamic port allocation)
+  WEB_PORT?: string;
+
   // Database connection info
   DATABASE_URL: string;
   API_URL: string;

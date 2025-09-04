@@ -251,15 +251,14 @@ organizationsRouter.get('/', async (c) => {
       return c.json({ error: result.error }, 400);
     }
 
-    // Get Kysely instance to fetch user's default organization info
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const userInfo = await db
-      .selectFrom('user')
-      .select(['default_organization_id', 'last_used_organization_id', 'last_org_access_at'])
-      .where('id', '=', user.id)
-      .executeTakeFirst();
+    // Get user's default organization info using withKysely pattern
+    const userInfo = await withKysely(async (db) => {
+      return await db
+        .selectFrom('user')
+        .select(['default_organization_id', 'last_used_organization_id', 'last_org_access_at'])
+        .where('id', '=', user.id)
+        .executeTakeFirst();
+    });
 
     // Enhance organization data with user context
     const enhancedOrgs = result.data.map((org: any) => ({
