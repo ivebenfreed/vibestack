@@ -149,55 +149,37 @@ curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 - **StrictPort**: Enabled to prevent port confusion - server will fail if port is unavailable
 - **Environment**: Add `export DEV_PORT=4001` to your shell profile for persistent worktree ports
 
-## Simple Contextual Logging System
+## Contextual Logging System
 
-**✅ Simplified logging system with just 2 environment variables and easy runtime controls.**
+**Control frontend logging to prevent console pollution and focus on specific areas during development.**
 
-### Configuration (2 Environment Variables)
-
-**In `apps/worker/.env.local`:**
-```bash
-# What contexts to show (if empty, shows all)
-VITE_LOG_CONTEXTS=sync,state
-
-# Log level threshold  
-VITE_LOG_LEVEL=debug
-```
+**✅ Updated for unified worker architecture** - All logging scripts now target `/apps/worker/.env.local`.
 
 ### Quick Commands
 ```bash
-pnpm log:sync      # Focus on sync + state logs
-pnpm log:state     # State management only  
-pnpm log:ui        # UI components only
-pnpm log:data      # Data operations only
-pnpm log:all       # All contexts enabled
-pnpm log:none      # Only errors show
-pnpm log:clear     # Remove all config
-
-# Custom combinations
-pnpm log:focus sync,ui,data
+pnpm dev:quiet      # Silent mode (errors only)
+pnpm dev:sync       # Focus on sync operations  
+pnpm dev:ui         # Focus on UI components only
+pnpm dev:debug      # Debug mode (sync, state, ui, data contexts)
+pnpm dev:all        # All contexts enabled
 ```
 
-### Runtime Controls (Browser Console)
+### Runtime Control (Browser Console)
 ```javascript
-// Quick controls
-logControl.only('sync', 'state');  // Only these contexts
-logControl.enable('ui');            // Add UI logs  
-logControl.disable('data');         // Remove data logs
-logControl.all();                   // Enable everything
-logControl.none();                  // Only errors
-logControl.status();                // Show current config
+logControl.focus('ui');           // Only UI logs
+logControl.focus('none');         // Silent mode
+logControl.only('ui', 'sync');    // Multiple contexts
+logControl.clear();               // Clear context filters
+logControl.status();              // Check current filters
 ```
 
 ### Usage in Code
 ```typescript
-import { syncLog, stateLog, uiLog } from '@/logger';
+import { uiLog, syncLog, dataLog } from '@/logger';
 
-// In any component/file
-const log = syncLog('MyFile.ts');
-log.debug('WebSocket connected', { url });
-log.info('Sync completed', { changes: 5 });
-log.error('Connection failed', error); // Always shows
+const log = uiLog('components/MyComponent.tsx');
+log.debug('Component rendered', { props });
+log.error('Validation failed', error); // Always logs
 ```
 
 ### Available Contexts
@@ -212,16 +194,14 @@ log.error('Connection failed', error); // Always shows
 - `testing` - Test-related logging
 - `debug` - General debugging
 
-### Troubleshooting
+### Troubleshooting Logger Issues
 
-**Logs not showing?**
-1. Check contexts: `logControl.status()` in browser console
-2. Check level: Lower level in `.env.local` (use `debug`)  
-3. Restart dev server after env changes
+If logging modes aren't changing or no logs appear:
 
-**Too many logs?**
-1. Focus on specific contexts: `pnpm log:sync` 
-2. Use browser console: `logControl.only('sync', 'state')`
+1. **Clear cached context filters**: `logControl.clear()` in browser console
+2. **Check current status**: `logControl.status()` to see active filters  
+3. **Restart dev server**: Environment changes need server restart
+4. **Verify logger loaded**: Check `typeof window.logControl === 'object'`
 
 **📖 Complete documentation:** [`apps/worker/src/logger/README.md`](apps/worker/src/logger/README.md)
 
