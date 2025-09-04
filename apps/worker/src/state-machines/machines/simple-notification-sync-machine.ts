@@ -14,7 +14,7 @@ import { setup, assign, fromPromise } from 'xstate'
 import { getSyncWebSocketUrl, getOrgActorWebSocketUrl } from '../../sync/config'
 import { syncLogger } from '../../sync/utils/SyncLogger'
 import { syncLog } from '@/logger';
-const log = syncLog('state-machines/machines/simple-notification-sync-machine.ts');
+const log = syncLog('sync/simple-notification-sync-machine.ts');
 
 // Simple context for table notifications only
 export interface SimpleNotificationSyncContext {
@@ -95,8 +95,10 @@ export const simpleNotificationSyncMachine = setup({
   
   actions: {
     setupWebSocketListeners: ({ context, self }) => {
+      console.log('🔧 DIRECT CONSOLE LOG: Setting up WebSocket listeners')
       log.info('🔧 [SimpleNotificationSync] Setting up WebSocket listeners')
       if (!context.webSocket) {
+        console.log('❌ DIRECT CONSOLE LOG: No WebSocket to set up listeners on')
         log.info('❌ [SimpleNotificationSync] No WebSocket to set up listeners on')
         return
       }
