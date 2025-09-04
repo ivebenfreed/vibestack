@@ -63,20 +63,44 @@ apps/worker/
 **Working curl commands for backend API testing:**
 
 ```bash
-# Login with test user (use current dev server port)
-curl -X POST "http://localhost:5175/api/auth/sign-in/email" \
+# RECOMMENDED: Use JSON file to avoid special character escaping issues
+echo '{"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}' > /tmp/login_payload.json
+curl -X POST "http://localhost:4000/api/auth/sign-in/email" \
+  -H "Content-Type: application/json" \
+  -d @/tmp/login_payload.json \
+  -c cookies.txt
+
+# Alternative: Direct JSON (requires careful escaping)
+curl -X POST "http://localhost:4000/api/auth/sign-in/email" \
   -H "Content-Type: application/json" \
   -d "{\"email\": \"ceo@widecorp.com\", \"password\": \"WideCorp2024!CEO\"}" \
   -c cookies.txt
 
 # Test protected API endpoints
-curl -X GET "http://localhost:5175/api/organizations" -b cookies.txt
+curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 ```
 
 **Key points:**
 - Correct endpoint: `/api/auth/sign-in/email` (not `/sign-in`)
-- Proper JSON escaping in bash
+- **Use JSON file approach** to avoid bash escaping problems with special characters
 - Cookie authentication works for all protected endpoints
+- Port should match current dev server (4000 by default, check with `pnpm dev` output)
+
+### Quick API Testing Script
+
+**Use the test script for convenient API testing:**
+
+```bash
+# Test different user roles with complete workflow
+./scripts/test-api-login.sh CEO test     # Login + test protected endpoints
+./scripts/test-api-login.sh CTO orgs     # Login + get organizations
+./scripts/test-api-login.sh DEV1 login   # Login only
+./scripts/test-api-login.sh PM1 health   # Health check
+
+# Available user roles: CEO, CTO, PM1, DEV1 (all Wide Corp credentials)
+```
+
+The script handles JSON file creation automatically and includes all Wide Corp test credentials.
 
 ## Development Server Management
 
@@ -110,6 +134,13 @@ pnpm dev
 # Test API directly
 curl -X GET http://localhost:4000/health
 psql postgres://postgres:postgres@localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
+
+# Test authentication (recommended approach using JSON file)
+echo '{"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}' > /tmp/login_payload.json
+curl -X POST "http://localhost:4000/api/auth/sign-in/email" -H "Content-Type: application/json" -d @/tmp/login_payload.json -c cookies.txt
+
+# Test protected endpoints with cookies
+curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 ```
 
 ### Port Configuration for Worktrees:
