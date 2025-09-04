@@ -30,60 +30,12 @@ export class ConflictError extends Error {
   }
 }
 
-// Reactive persistence configuration - managed by auth machine
-let legacyPersistenceManager: PersistenceManager | null = null // Legacy - kept for compatibility
+// Reactive persistence configuration - created after schema loads
+let persistenceManager: PersistenceManager | null = null
 let syncedCrudWithPersistence: any = null
 let persistenceConfig: { persistOptions: any; entityTableMap: Record<string, string> } | null = null
 let currentOrgId: string | null = null
 let currentSchemaVersion: string | null = null
-
-/**
- * Get persistence context from auth machine
- */
-function getPersistenceFromAuthMachine() {
-  try {
-    const authActor = (window as any).authMachineActor;
-    if (!authActor) {
-      return null;
-    }
-    
-    const snapshot = authActor.getSnapshot();
-    const context = snapshot.context;
-    
-    if (context.persistenceSetupComplete && context.persistenceContext) {
-      return context.persistenceContext;
-    }
-    
-    return null;
-  } catch (error) {
-    log.warn('[Observable] Failed to get persistence from auth machine:', error);
-    return null;
-  }
-}
-
-/**
- * Update persistence configuration from auth machine context
- */
-function updatePersistenceFromAuthMachine() {
-  const authPersistence = getPersistenceFromAuthMachine();
-  
-  if (authPersistence) {
-    log.info('[Observable] Using persistence configuration from auth machine');
-    legacyPersistenceManager = authPersistence.persistenceManager;
-    syncedCrudWithPersistence = authPersistence.persistOptions || syncedCrud;
-    persistenceConfig = {
-      persistOptions: authPersistence.persistOptions,
-      entityTableMap: authPersistence.entityTableMap
-    };
-    return true;
-  } else {
-    log.info('[Observable] No auth machine persistence available, using server-only sync');
-    legacyPersistenceManager = null;
-    syncedCrudWithPersistence = syncedCrud;
-    persistenceConfig = null;
-    return false;
-  }
-}
 
 /**
  * Universe context observable - tracks schemas from ALL user organizations
@@ -240,6 +192,13 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
  * Create a synced entity observable using Legend State patterns
  */
 function createEntityObservable(orgId: string, entityName: string, schema?: any) {
+  // Check if persistence is available and configured
+  const hasPersistenceConfig = !!persistenceConfig?.entityTableMap
+  
+  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+    log.info(`[Observable] Creating ${entityName} observable - persistence: ${hasPersistenceConfig ? 'available' : 'not available'}`)
+  }
+  
   // CRITICAL FIX: When in universe mode (orgId = 'universe'), extract the real organization ID
   // from the entity schema to make proper API calls
   let actualOrgId = orgId
@@ -273,14 +232,10 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   const baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
   
-  // Update persistence configuration from auth machine
-  const authPersistenceReady = updatePersistenceFromAuthMachine();
-  const persistenceReady = !!syncedCrudWithPersistence && !!persistenceConfig;
   log.info(`[Observable] Creating entity observable for ${entityName}`, {
-    authPersistenceReady,
-    persistenceReady,
-    hasConfig: !!persistenceConfig,
-    hasCrud: !!syncedCrudWithPersistence
+    hasPersistenceManager: !!persistenceManager,
+    hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence,
+    hasConfig: !!persistenceConfig
   });
   
   // Create the syncedCrud configuration with proper differential sync
@@ -593,11 +548,6 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // syncedCrud needs this to know it should start loading data
     initial: {},
     
-    // Add waitFor to delay sync until persistence is ready
-    ...(syncedCrudWithPersistence && legacyPersistenceManager ? {
-      waitFor: new Promise(resolve => setTimeout(resolve, 100)) // Small delay for persistence
-    } : {}),
-    
     // PERSISTENCE: Each entity needs proper table name even with Legend State v3 configureSynced
     // Extract the base entity name (e.g., 'Task' from '01920000-1000-7000-8000-000000000001_Task')
     ...(persistenceConfig?.entityTableMap ? {
@@ -649,35 +599,19 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   }
   
   
-  const syncedCrudFn = syncedCrudWithPersistence || syncedCrud
+  // Use persistence-enabled sync if available and configured, otherwise server-only
+  const syncedCrudFn = (persistenceConfig && syncedCrudWithPersistence) || syncedCrud
   
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    log.info(`[Observable] Creating syncedCrud for ${entityName}`)
+    log.info(`[Observable] Creating syncedCrud for ${entityName}, hasPersistenceConfig: ${!!persistenceConfig?.entityTableMap}`)
   }
   
   // CRITICAL FIX: syncedCrud must be wrapped in observable() to create proper observable with .get()/.set() methods
   // The correct pattern is: observable(syncedCrud(config))
   const syncedObservable = observable(syncedCrudFn(crudConfig))
   
-  // CRITICAL FIX: Force initial data load for syncedCrud observable on client-side
-  // Legend State syncedCrud needs to be triggered when first accessed
-  if (typeof window !== 'undefined') {
-    // Client-side: trigger data loading after a short delay
-    setTimeout(() => {
-      try {
-        log.info(`[Observable] Triggering initial client-side data load for ${entityName}`)
-        // Access the observable to trigger Legend State's built-in data loading
-        const initialData = syncedObservable.get()
-        log.info(`[Observable] Initial data trigger completed for ${entityName}`, {
-          hasData: !!initialData,
-          dataType: typeof initialData,
-          dataKeys: initialData && typeof initialData === 'object' ? Object.keys(initialData).length : 'not-object'
-        })
-      } catch (error) {
-        log.warn(`[Observable] Initial data trigger failed for ${entityName}:`, error?.message || error)
-      }
-    }, 100) // Small delay to allow observable to be fully initialized
-  }
+  // LAZY LOADING: Let Legend State handle data loading naturally when observables are accessed
+  // No aggressive pre-loading to avoid API spam - syncedCrud will load data when .get() is called
   
   return syncedObservable
 }
@@ -755,8 +689,8 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     
     log.info(`[Observable] Universe context loaded with ${totalEntities} total entities across ${organizationIds.length} organizations`)
     
-    // SKIP persistence initialization - now handled by auth machine
-    log.info('[Observable] Skipping persistence initialization - handled by auth machine')
+    // Initialize persistence configuration after schemas are loaded
+    await initializePersistence(userId, organizationIds, totalEntities)
     
   } catch (error) {
     log.error('[Observable] Failed to load universe context:', error)
@@ -769,23 +703,98 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
 }
 
 /**
- * Initialize persistence configuration using robust InitializationManager
- * DEPRECATED: Now handled by auth machine - kept for backward compatibility
+ * Initialize persistence configuration for loaded organizations
  */
 async function initializePersistence(userId: string, organizationIds: string[], totalEntities: number) {
-  log.info('[Observable] DEPRECATED: initializePersistence called - persistence is now handled by auth machine')
-  
-  // Check if auth machine has already set up persistence
-  if (syncedCrudWithPersistence && persistenceConfig) {
-    log.info('[Observable] Persistence already set up by auth machine, skipping initialization')
+  // Skip if no entities or already initialized
+  if (totalEntities === 0 || (persistenceManager && syncedCrudWithPersistence)) {
+    log.info(`[Observable] Skipping persistence initialization: entities=${totalEntities}, already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
     return
   }
   
-  // Fallback to server-only sync if auth machine hasn't set up persistence yet
-  log.warn('[Observable] Auth machine persistence not ready, falling back to server-only sync')
-  syncedCrudWithPersistence = syncedCrud
-  persistenceConfig = null
-  legacyPersistenceManager = null
+  try {
+    // Use primary organization for persistence (first in list)
+    const primaryOrgId = organizationIds[0]
+    if (!primaryOrgId) {
+      log.warn('[Observable] No organization ID available for persistence setup')
+      return
+    }
+    
+    // Get all entity names from the current schema
+    const currentSchema = orgContext$.schema.peek()
+    const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
+    
+    if (entityKeys.length === 0) {
+      log.info('[Observable] No entities found, skipping persistence setup')
+      return
+    }
+    
+    log.info(`[Observable] Initializing persistence for ${entityKeys.length} entities in org ${primaryOrgId}`)
+    
+    // Create persistence manager with enhanced error handling
+    persistenceManager = createPersistenceManager(primaryOrgId, userId)
+    
+    // Create IndexedDB configuration with error recovery using Legend State v3 pattern
+    const indexedDBConfig = await persistenceManager.createIndexedDBConfig(entityKeys)
+    
+    // Configure synced CRUD with or without persistence
+    if (indexedDBConfig) {
+      // IndexedDB configuration available - use the proper v3 pattern
+      const { persistOptions, entityTableMap } = indexedDBConfig
+      
+      // Store the persistOptions globally for use in individual entity creation
+      persistenceConfig = { persistOptions, entityTableMap }
+      
+      // In Legend State v3, persistOptions IS the function that wraps syncedCrud with persistence
+      syncedCrudWithPersistence = persistOptions
+      
+      log.info('[Observable] Persistence configured with IndexedDB plugin')
+    } else {
+      // No IndexedDB plugin - use syncedCrud without persistence
+      syncedCrudWithPersistence = syncedCrud
+      log.info('[Observable] Persistence disabled - using server-only sync')
+    }
+    
+    // Update tracking variables
+    currentOrgId = primaryOrgId
+    currentSchemaVersion = currentSchema?.version || 'unknown'
+    
+    log.info(`[Observable] Persistence initialized successfully`, {
+      orgId: primaryOrgId,
+      entityCount: entityKeys.length,
+      schemaVersion: currentSchemaVersion,
+      hasPersistenceManager: !!persistenceManager,
+      hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence
+    })
+    
+  } catch (error) {
+    log.error('[Observable] Failed to initialize persistence:', error)
+    
+    // Check for specific IndexedDB errors and provide user-friendly handling
+    if (error?.name === 'NotFoundError' || 
+        error?.message?.includes('object stores was not found') ||
+        error?.message?.includes('Error loading local cache')) {
+      log.info('[Observable] IndexedDB schema issue detected - continuing without persistence')
+      
+      // Clear any corrupted IndexedDB data
+      try {
+        if (persistenceManager) {
+          await persistenceManager.clearOrganizationData()
+        }
+      } catch (clearError) {
+        log.warn('[Observable] Failed to clear corrupted data:', clearError)
+      }
+    }
+    
+    // Reset variables on failure but don't crash the app
+    persistenceManager = null
+    syncedCrudWithPersistence = null
+    currentOrgId = null
+    currentSchemaVersion = null
+    
+    // Continue with server-only sync - the app will still work
+    log.info('[Observable] Continuing with server-only sync (no local persistence)')
+  }
 }
 
 /**
@@ -1003,13 +1012,13 @@ export function clearContext() {
   initializationManager.reset()
   
   // Clear legacy persistence manager data if it exists
-  if (legacyPersistenceManager) {
+  if (persistenceManager) {
     try {
-      legacyPersistenceManager.clearOrganizationData()
+      persistenceManager.clearOrganizationData()
     } catch (error) {
       log.warn('[Observable] Error clearing legacy persistence data:', error)
     }
-    legacyPersistenceManager = null
+    persistenceManager = null
   }
   
   // Reset persistence configuration
@@ -1496,8 +1505,8 @@ if (typeof window !== 'undefined') {
       log.info('[Observable] Intercepted Legend State IndexedDB error - handling gracefully')
       
       // Clear IndexedDB data to fix schema mismatch
-      if (legacyPersistenceManager) {
-        legacyPersistenceManager.clearOrganizationData().catch(clearError => {
+      if (persistenceManager) {
+        persistenceManager.clearOrganizationData().catch(clearError => {
           originalConsoleError('[Observable] Failed to clear corrupted IndexedDB data:', clearError)
         })
       }
@@ -1523,8 +1532,8 @@ if (typeof window !== 'undefined') {
       log.info('[Observable] Caught unhandled IndexedDB error - preventing crash')
       
       // Clear corrupted data
-      if (legacyPersistenceManager) {
-        legacyPersistenceManager.clearOrganizationData().catch(() => {
+      if (persistenceManager) {
+        persistenceManager.clearOrganizationData().catch(() => {
           // Silent failure - don't cascade errors
         })
       }
@@ -1548,10 +1557,16 @@ if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') 
   ;(window as any).vibestackEntityOps = entityOperations
   ;(window as any).vibestackInitManager = initializationManager
   
+  // Expose key functions for debugging
+  ;(window as any).entities$ = entities$
+  ;(window as any).getEntity$ = getEntity$
+  ;(window as any).loadUniverseContext = loadUniverseContext
+  ;(window as any).loadOrgContext = loadOrgContext
+  
   // Add debug function to manually clear IndexedDB
   ;(window as any).vibestackClearIndexedDB = async () => {
-    if (legacyPersistenceManager) {
-      await legacyPersistenceManager.clearOrganizationData()
+    if (persistenceManager) {
+      await persistenceManager.clearOrganizationData()
       console.log('[VibeStack Debug] Legacy IndexedDB data cleared. Refresh the page to see changes.')
     } else {
       console.log('[VibeStack Debug] No legacy persistence manager available')
