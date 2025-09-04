@@ -38,17 +38,13 @@
     "setup:env": "node scripts/setup-worktree-env.js",
     "setup:worktree": "pnpm install && node scripts/setup-worktree-env.js && echo '✅ Worktree setup complete'",
     "log:focus": "./scripts/set-log-focus.sh",
-    "log:vibegrid": "./scripts/set-log-focus.sh vibegrid",
     "log:sync": "./scripts/set-log-focus.sh sync",
-    "log:quiet": "./scripts/set-log-focus.sh quiet",
-    "log:quiet-except": "./scripts/set-log-focus.sh quiet-except",
-    "log:clear": "./scripts/set-log-focus.sh clear",
-    "log:analyze": "./scripts/migrate-logging.sh analyze",
-    "log:migrate": "./scripts/migrate-logging.sh migrate",
-    "log:migrate:dry": "./scripts/migrate-logging.sh migrate --dry-run",
-    "log:validate": "./scripts/migrate-logging.sh validate",
-    "log:fix": "./scripts/fix-logging-imports.sh",
-    "log:rollback": "./scripts/migrate-logging.sh rollback"
+    "log:state": "./scripts/set-log-focus.sh state", 
+    "log:ui": "./scripts/set-log-focus.sh ui",
+    "log:data": "./scripts/set-log-focus.sh data",
+    "log:all": "./scripts/set-log-focus.sh all",
+    "log:none": "./scripts/set-log-focus.sh none",
+    "log:clear": "./scripts/set-log-focus.sh clear"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

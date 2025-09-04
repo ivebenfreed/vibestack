@@ -1,9 +1,14 @@
-// Logger implementation - cannot use self-import
 /**
- * Contextual Logging System with Focus Modes
+ * Simple Contextual Logging System
  * 
- * Environment + Pattern-Based logging with context isolation
- * to prevent log pollution when working on specific parts of the app.
+ * Single environment variable controls what logs show:
+ * - VITE_LOG_CONTEXTS: comma-separated list (sync,state,ui,data,auth,routing,performance,testing,debug)
+ * - VITE_LOG_LEVEL: debug|info|warn|error (default: info)
+ * 
+ * Usage:
+ *   import { syncLog } from '@/logger';
+ *   const log = syncLog('MyFile.ts');
+ *   log.debug('message', data);
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -18,163 +23,66 @@ export type LogContext =
   | 'testing'        // Test-related logging
   | 'debug';         // General debugging
 
-export interface LoggerConfig {
-  enabled: boolean;
-  level: LogLevel;
-  context: LogContext;
-  prefix: string;
-  enableTimestamps: boolean;
-}
-
-class LoggingManager {
-  private patterns: string[] = [];
-  private disabledPatterns: string[] = [];
-  private globalLevel: LogLevel = 'info';
-  private focusMode: LogContext | 'all' | 'none' = 'all';
-  private contextFilters: Set<LogContext> = new Set();
+class SimpleLogger {
+  private enabledContexts: Set<LogContext> = new Set();
+  private logLevel: LogLevel = 'info';
+  private logLevels = ['debug', 'info', 'warn', 'error'];
 
   constructor() {
-    this.loadEnvironmentConfig();
+    this.loadConfig();
   }
 
-  private loadEnvironmentConfig() {
-    // Environment-based configuration
-    const patterns = import.meta.env.VITE_LOG_PATTERNS || '';
-    const disabledPatterns = import.meta.env.VITE_LOG_DISABLED_PATTERNS || '';
+  private loadConfig() {
+    // Simple: just read enabled contexts and log level
+    const contexts = import.meta.env.VITE_LOG_CONTEXTS || '';
     const level = import.meta.env.VITE_LOG_LEVEL || 'info';
-    const focusMode = import.meta.env.VITE_LOG_FOCUS_MODE || 'all';
-    const contextFilters = import.meta.env.VITE_LOG_CONTEXTS || '';
-
-    this.patterns = patterns.split(',').filter(Boolean);
-    this.disabledPatterns = disabledPatterns.split(',').filter(Boolean);
-    this.globalLevel = level as LogLevel;
-    this.focusMode = focusMode as LogContext | 'all' | 'none';
     
-    if (contextFilters) {
-      this.contextFilters = new Set(contextFilters.split(',') as LogContext[]);
+    this.logLevel = level as LogLevel;
+    
+    if (contexts) {
+      this.enabledContexts = new Set(contexts.split(',').filter(Boolean) as LogContext[]);
+    } else {
+      // If no contexts specified, enable all
+      this.enabledContexts = new Set(['sync', 'ui', 'data', 'auth', 'routing', 'performance', 'state', 'testing', 'debug']);
     }
   }
 
-  private matchesPattern(filePath: string, patterns: string[]): boolean {
-    return patterns.some(pattern => {
-      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-      return regex.test(filePath);
-    });
-  }
-
-  private shouldLogForFile(filePath: string): boolean {
-    // Check if file is disabled
-    if (this.disabledPatterns.length && this.matchesPattern(filePath, this.disabledPatterns)) {
-      return false;
-    }
-
-    // If no patterns specified, log everything (unless disabled)
-    if (this.patterns.length === 0) return true;
-
-    // Check if file matches enabled patterns
-    return this.matchesPattern(filePath, this.patterns);
-  }
-
-  private shouldLogForContext(context: LogContext): boolean {
-    // Focus mode overrides everything
-    if (this.focusMode === 'none') return false;
-    if (this.focusMode !== 'all' && this.focusMode !== context) return false;
-
-    // Context filters
-    if (this.contextFilters.size > 0) {
-      return this.contextFilters.has(context);
-    }
-
-    return true;
-  }
-
-  shouldLog(filePath: string, context: LogContext, level: LogLevel): boolean {
-    // Errors always log (unless focus mode is 'none')
-    if (level === 'error' && this.focusMode !== 'none') return true;
-
-    // Check file pattern matching
-    if (!this.shouldLogForFile(filePath)) return false;
-
-    // Check context filtering
-    if (!this.shouldLogForContext(context)) return false;
-
+  shouldLog(context: LogContext, level: LogLevel): boolean {
+    // Errors always show
+    if (level === 'error') return true;
+    
+    // Check if context is enabled
+    if (!this.enabledContexts.has(context)) return false;
+    
     // Check log level
-    const levels = ['debug', 'info', 'warn', 'error'];
-    const currentLevelIndex = levels.indexOf(this.globalLevel);
-    const messageLevelIndex = levels.indexOf(level);
+    const currentLevelIndex = this.logLevels.indexOf(this.logLevel);
+    const messageLevelIndex = this.logLevels.indexOf(level);
     
     return messageLevelIndex >= currentLevelIndex;
   }
 
-  // Runtime configuration methods
-  setFocusMode(mode: LogContext | 'all' | 'none') {
-    this.focusMode = mode;
-    console.info(`🎯 Log focus mode: ${mode}`);
-  }
+  log(context: LogContext, level: LogLevel, filePath: string, message: string, data?: any): void {
+    if (!this.shouldLog(context, level)) return;
 
-  addContextFilter(...contexts: LogContext[]) {
-    contexts.forEach(ctx => this.contextFilters.add(ctx));
-    console.info(`🔍 Added context filters: ${contexts.join(', ')}`);
-  }
-
-  removeContextFilter(...contexts: LogContext[]) {
-    contexts.forEach(ctx => this.contextFilters.delete(ctx));
-    console.info(`🚫 Removed context filters: ${contexts.join(', ')}`);
-  }
-
-  clearContextFilters() {
-    this.contextFilters.clear();
-    console.info('🗑️ Cleared all context filters');
-  }
-
-  getFocusMode() {
-    return this.focusMode;
-  }
-
-  getContextFilters() {
-    return Array.from(this.contextFilters);
-  }
-}
-
-const loggingManager = new LoggingManager();
-
-export class Logger {
-  private config: LoggerConfig;
-  private logLevels = ['debug', 'info', 'warn', 'error'];
-  private filePath: string;
-
-  constructor(filePath: string, context: LogContext, config: Partial<LoggerConfig> = {}) {
-    this.filePath = filePath;
-    
     const fileName = filePath.split('/').pop()?.replace(/\.(ts|tsx|js|jsx)$/, '') || 'App';
-    
-    this.config = {
-      enabled: true,
-      level: 'info',
-      context,
-      prefix: `[${context.toUpperCase()}:${fileName}]`,
-      enableTimestamps: true,
-      ...config
-    };
-  }
-
-  private shouldLog(level: LogLevel): boolean {
-    return loggingManager.shouldLog(this.filePath, this.config.context, level);
-  }
-
-  private formatMessage(level: LogLevel, message: string): string {
-    const timestamp = this.config.enableTimestamps ? 
-      new Date().toISOString().substr(11, 12) : '';
+    const timestamp = new Date().toISOString().substr(11, 12);
+    const contextIcon = this.getContextIcon(context);
     const levelIcon = this.getLevelIcon(level);
-    const contextIcon = this.getContextIcon(this.config.context);
     
-    let formatted = `${this.config.prefix} ${contextIcon} ${levelIcon} ${message}`;
+    const formatted = `${timestamp} [${context.toUpperCase()}:${fileName}] ${contextIcon} ${levelIcon} ${message}`;
     
-    if (this.config.enableTimestamps) {
-      formatted = `${timestamp} ${formatted}`;
+    switch (level) {
+      case 'debug':
+      case 'info':
+        console.info(formatted, data ?? '');
+        break;
+      case 'warn':
+        console.warn(formatted, data ?? '');
+        break;
+      case 'error':
+        console.error(formatted, data ?? '');
+        break;
     }
-    
-    return formatted;
   }
 
   private getLevelIcon(level: LogLevel): string {
@@ -202,86 +110,73 @@ export class Logger {
     }
   }
 
-  private log(level: LogLevel, message: string, data?: any): void {
-    if (!this.shouldLog(level)) return;
-
-    const formatted = this.formatMessage(level, message);
-    
-    switch (level) {
-      case 'debug':
-      case 'info':
-        console.info(formatted, data ?? '');
-        break;
-      case 'warn':
-        console.warn(formatted, data ?? '');
-        break;
-      case 'error':
-        console.error(formatted, data ?? '');
-        break;
-    }
+  // Runtime control - simple context toggling
+  enable(...contexts: LogContext[]): void {
+    contexts.forEach(ctx => this.enabledContexts.add(ctx));
+    console.info('✅ Enabled contexts:', contexts.join(', '));
   }
 
-  // Main logging methods
-  debug(message: string, data?: any): void {
-    this.log('debug', message, data);
+  disable(...contexts: LogContext[]): void {
+    contexts.forEach(ctx => this.enabledContexts.delete(ctx));
+    console.info('❌ Disabled contexts:', contexts.join(', '));
   }
 
-  info(message: string, data?: any): void {
-    this.log('info', message, data);
+  only(...contexts: LogContext[]): void {
+    this.enabledContexts.clear();
+    contexts.forEach(ctx => this.enabledContexts.add(ctx));
+    console.info('🎯 Only enabled contexts:', contexts.join(', '));
   }
 
-  warn(message: string, data?: any): void {
-    this.log('warn', message, data);
+  all(): void {
+    this.enabledContexts = new Set(['sync', 'ui', 'data', 'auth', 'routing', 'performance', 'state', 'testing', 'debug']);
+    console.info('🌍 All contexts enabled');
   }
 
-  error(message: string, data?: any): void {
-    this.log('error', message, data);
+  none(): void {
+    this.enabledContexts.clear();
+    console.info('🔇 All contexts disabled (errors will still show)');
+  }
+
+  status(): void {
+    console.info('📊 Enabled contexts:', Array.from(this.enabledContexts));
+    console.info('📏 Log level:', this.logLevel);
   }
 }
 
-// Factory functions
-export const createLogger = (
-  filePath: string, 
-  context: LogContext, 
-  config?: Partial<LoggerConfig>
-): Logger => {
-  return new Logger(filePath, context, config);
-};
+const logger = new SimpleLogger();
 
-// Convenience function that auto-detects file path
-export const useLogger = (context: LogContext, config?: Partial<LoggerConfig>): Logger => {
-  // In a real implementation, you'd use a build-time transform to inject __filename
-  // For now, use stack trace to get caller file
-  const stack = new Error().stack;
-  const callerFile = stack?.split('\n')[2]?.match(/\((.+?):\d+:\d+\)/)?.[1] || 'unknown';
-  return createLogger(callerFile, context, config);
-};
+// Simple logger factory
+function createContextLogger(context: LogContext) {
+  return (filePath: string) => ({
+    debug: (message: string, data?: any) => logger.log(context, 'debug', filePath, message, data),
+    info: (message: string, data?: any) => logger.log(context, 'info', filePath, message, data),
+    warn: (message: string, data?: any) => logger.log(context, 'warn', filePath, message, data),
+    error: (message: string, data?: any) => logger.log(context, 'error', filePath, message, data),
+  });
+}
 
-// Global logging control functions (available in dev console)
+// Context-specific loggers
+export const syncLog = createContextLogger('sync');
+export const uiLog = createContextLogger('ui');
+export const dataLog = createContextLogger('data');
+export const authLog = createContextLogger('auth');
+export const stateLog = createContextLogger('state');
+export const routingLog = createContextLogger('routing');
+export const performanceLog = createContextLogger('performance');
+export const testingLog = createContextLogger('testing');
+export const debugLog = createContextLogger('debug');
+
+// Global control (available in console)
 export const logControl = {
-  focus: (context: LogContext | 'all' | 'none') => loggingManager.setFocusMode(context),
-  only: (...contexts: LogContext[]) => {
-    loggingManager.clearContextFilters();
-    loggingManager.addContextFilter(...contexts);
-  },
-  add: (...contexts: LogContext[]) => loggingManager.addContextFilter(...contexts),
-  remove: (...contexts: LogContext[]) => loggingManager.removeContextFilter(...contexts),
-  clear: () => loggingManager.clearContextFilters(),
-  status: () => {
-    console.info('🎯 Focus mode:', loggingManager.getFocusMode());
-    console.info('🔍 Context filters:', loggingManager.getContextFilters());
-  }
+  enable: (...contexts: LogContext[]) => logger.enable(...contexts),
+  disable: (...contexts: LogContext[]) => logger.disable(...contexts),
+  only: (...contexts: LogContext[]) => logger.only(...contexts),
+  all: () => logger.all(),
+  none: () => logger.none(),
+  status: () => logger.status(),
 };
 
 // Make available in dev console
 if (typeof window !== 'undefined') {
   (window as any).logControl = logControl;
 }
-
-// Quick context-specific loggers
-export const syncLog = (filePath: string) => createLogger(filePath, 'sync');
-export const uiLog = (filePath: string) => createLogger(filePath, 'ui');
-export const dataLog = (filePath: string) => createLogger(filePath, 'data');
-export const authLog = (filePath: string) => createLogger(filePath, 'auth');
-export const stateLog = (filePath: string) => createLogger(filePath, 'state');
-export const debugLog = (filePath: string) => createLogger(filePath, 'debug');

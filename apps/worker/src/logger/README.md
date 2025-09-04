@@ -1,65 +1,107 @@
-# Contextual Logging System
+# Simple Contextual Logging System
 
-Contextual logging with focus modes to prevent log pollution when working on specific parts of the frontend.
+**Simplified logging system with just two environment variables and easy runtime controls.**
 
 ## Quick Start
 
 ```typescript
-import { uiLog, syncLog, dataLog, logControl } from '@/logger';
+import { syncLog, stateLog, uiLog } from '@/logger';
 
 // In any component/file
-const log = uiLog('components/MyComponent.tsx');
-log.debug('Component rendered', { props });
-log.info('User interaction', { action: 'click' });
-log.error('Validation failed', error); // Always logs
+const log = syncLog('MyFile.ts');
+log.debug('WebSocket connected', { url });
+log.info('Sync completed', { changes: 5 });
+log.error('Connection failed', error); // Always shows
 ```
 
-## Focus Modes (3 Ways)
+## Configuration (2 Environment Variables)
 
-### 1. npm Scripts (Recommended)
+**In `apps/worker/.env.local`:**
+
 ```bash
-pnpm log:vibegrid    # Focus on VibeGrid development
-pnpm log:sync        # Debug sync operations  
-pnpm log:quiet       # Silent mode (errors only)
-pnpm log:clear       # Remove all log configuration
-pnpm log:focus       # Show all available options
-```
+# What contexts to show (if empty, shows all)
+VITE_LOG_CONTEXTS=sync,state
 
-### 2. Runtime Control (Browser Console)
-```javascript
-logControl.focus('ui');           // Only UI logs
-logControl.only('ui', 'sync');    // Only UI and sync logs  
-logControl.focus('none');         // Silent mode (errors only)
-logControl.status();              // Check current filters
-```
-
-### 3. Environment Configuration (.env.local)
-```bash
-VITE_LOG_PATTERNS=components/tables/*,sync/*
-VITE_LOG_CONTEXTS=ui,sync
+# Log level threshold  
 VITE_LOG_LEVEL=debug
-VITE_LOG_FOCUS_MODE=ui
 ```
 
-## Context Types
+## Quick Commands
 
-- `ui` - Components, interactions, rendering
-- `sync` - WebSocket, sync operations, state machines  
+```bash
+# Focus on sync operations
+pnpm log:sync          # Shows sync + state logs
+
+# Focus on specific areas  
+pnpm log:state         # State management 
+pnpm log:ui            # UI components
+pnpm log:data          # Data operations
+
+# Control everything
+pnpm log:all           # All contexts enabled
+pnpm log:none          # Only errors show
+pnpm log:clear         # Remove all config
+
+# Custom combinations
+pnpm log:focus sync,ui,data
+```
+
+## Runtime Controls (Browser Console)
+
+```javascript
+// Quick controls
+logControl.only('sync', 'state');  // Only these contexts
+logControl.enable('ui');            // Add UI logs  
+logControl.disable('data');         // Remove data logs
+logControl.all();                   // Enable everything
+logControl.none();                  // Only errors
+logControl.status();                // Show current config
+```
+
+## Available Contexts
+
+- `sync` - WebSocket, sync operations, state machines
+- `state` - State management, stores, Legend State
+- `ui` - Components, interactions, rendering  
 - `data` - CRUD operations, API calls, queries
-- `state` - State management, stores
 - `auth` - Authentication, permissions
 - `routing` - Navigation, route changes
 - `performance` - Performance monitoring
 - `testing` - Test-related logging
 - `debug` - General debugging
 
-## Benefits
+## Benefits ✅
 
-✅ **No more log pollution** - Focus on what you're working on  
-✅ **Context isolation** - Filter by UI, sync, data, etc  
-✅ **Pattern-based control** - Enable entire folders at once  
-✅ **Runtime switching** - Change focus without restarting  
-✅ **Errors always show** - Never miss critical issues  
-✅ **Zero config required** - Works out of the box  
+- **Simple**: Just 2 environment variables
+- **No conflicts**: Runtime controls work predictably
+- **Always errors**: Error logs always show regardless of settings
+- **Easy switching**: Change contexts without restart via console
+- **Clean output**: Contextual filtering prevents log pollution
 
-See `examples.ts` for detailed usage patterns.
+## Migration from Old System
+
+The new system automatically works with existing `syncLog()` and `stateLog()` calls. No code changes needed.
+
+**Old complex env vars removed:**
+- ~~`VITE_LOG_PATTERNS`~~ 
+- ~~`VITE_LOG_DISABLED_PATTERNS`~~
+- ~~`VITE_LOG_FOCUS_MODE`~~
+
+**New simple env vars:**
+- `VITE_LOG_CONTEXTS` - comma-separated contexts
+- `VITE_LOG_LEVEL` - debug|info|warn|error
+
+## Troubleshooting
+
+**Logs not showing?**
+1. Check contexts: `logControl.status()` in browser console
+2. Check level: Lower level in `.env.local` (use `debug`)  
+3. Restart dev server after env changes
+
+**Too many logs?**
+1. Focus on specific contexts: `pnpm log:sync` 
+2. Use browser console: `logControl.only('sync', 'state')`
+
+**No logs at all?**
+1. Enable all: `logControl.all()` or `pnpm log:all`
+2. Check if contexts are empty: `VITE_LOG_CONTEXTS=` shows nothing
