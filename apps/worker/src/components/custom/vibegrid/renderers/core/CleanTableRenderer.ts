@@ -236,7 +236,12 @@ export class CleanTableRenderer {
       this.header.removeChild(this.header.firstChild);
     }
     
-    if (!state.columns || !state.coordinateMapping) return;
+    if (!state.columns) {
+      log.warn('CleanTableRenderer: No columns provided to renderHeader');
+      return;
+    }
+    
+    // Proceed even without coordinateMapping - we'll use default widths
     
     // Create header row container
     const headerRow = this.createElement('div', 'vibegridx-header-row');

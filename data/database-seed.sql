@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict y2ZNwAqtgwx0J7dzgIqABaxWC0ScT0IsIOpFdhUTMFjyxtjlYWih4UWd7o6pDzP
+\restrict bm2CAFg34YiZgC8cKFMpgq7vzsIrq9pLWdhLqC3Uun5y1uNZHImFgj4qNbQjPbp
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -453,7 +453,6 @@ f3bea13e-ea66-4d3a-a109-b8c1866c7ac9	01920000-1000-7000-8000-000000000001	\N	202
 439bb4fe-0214-4381-9e1a-a586304ec468	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:43.268+00	2025-08-24 13:55:43.268+00	Agile Corp	\N	client	inactive	\N	\N	\N	info@agilecorp.test.org	\N	\N	\N	\N	\N	\N	58	standard	Performance test record #27. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 38477759-beb1-4713-b41b-c172cebe05b7	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:43.829+00	2025-08-24 13:55:43.829+00	Omega Prime Co	\N	client	pending	\N	\N	\N	contact@omegaprime.test.org	\N	\N	\N	\N	\N	\N	59	standard	Performance test record #28. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 b3b89cb6-0ebb-4ca5-b375-8f1639dd7a65	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:44.364+00	2025-08-24 13:55:44.364+00	Dynamic Inc	\N	client	inactive	\N	\N	\N	sales@dynamicinc.example.com	\N	\N	\N	\N	\N	\N	71	basic	Performance test record #29. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
-23ffd44c-dba4-48df-8873-f5ad2848d3d1	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:44.918+00	2025-08-24 13:55:44.918+00	Global Nova Co	\N	prospect	pending	\N	\N	\N	info@globalnova.example.com	\N	\N	\N	\N	\N	\N	54	premium	Performance test record #30. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 159adcdb-8000-4eb4-811a-485d119b63a4	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:45.55+00	2025-08-24 13:55:45.55+00	Digital Alpha Solutions	\N	customer	pending	\N	\N	\N	contact@digitalalp.sample.co	\N	\N	\N	\N	\N	\N	71	basic	Performance test record #31. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 4016b73f-f5de-4768-b69a-138ab771acf4	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:46.152+00	2025-08-24 13:55:46.152+00	Cloud Corp	\N	client	pending	\N	\N	\N	info@cloudcorp.mockdata.io	\N	\N	\N	\N	\N	\N	60	standard	Performance test record #32. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 1cff57c3-5c29-4d8c-9d7c-8f96698b7e29	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:46.698+00	2025-08-24 13:55:46.698+00	Quantum Co	\N	customer	pending	\N	\N	\N	admin@quantumco.demo.net	\N	\N	\N	\N	\N	\N	21	standard	Performance test record #33. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
@@ -12202,11 +12201,12 @@ b740366e-f5b0-4397-aecf-a634ba224426	01920000-1000-7000-8000-000000000001	\N	202
 f9d579bf-64f7-4bc5-b83c-0c473fb970af	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:26:07.396+00	2025-08-27 03:52:35.71+00	Updated Client Name - Live Test	\N	lead	active	\N	\N	\N	admin@agilealpha.test.org	\N	\N	Updated Company Live	\N	\N	\N	39	premium	Performance test record #396. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 0000ea8f-914f-442c-bbcb-f6b342249f4b	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:18.715+00	2025-08-27 04:11:55.134+00	Core Prime Co - SURGICAL UPDATE TEST - VISIBLE ID	\N	client	active	\N	\N	\N	office@clouddynam.mockdata.io	\N	\N	\N	Unknown (Updated at 10:09:34 PM)	\N	\N	10	premium	Testing sync reactivity - Updated at $(date)	\N	\N	\N	\N	\N	low
 00167dbc-8467-438c-baaf-d4652a47be9a	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:20:34.794+00	2025-08-27 04:17:57.794+00	TESTING SURGICAL EDITS	\N	lead	active	\N	\N	\N	sales@coreprimec.mockdata.io	\N	\N	\N	\N	\N	\N	47	basic	Performance test record #112. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
-000a4778-83b4-4b6e-8158-79933ac3e090	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:39:59.556795+00	2025-08-27 04:13:15.929+00	FastCorp 11903 - SURGICAL TEST ON VISIBLE ROW	Bulk inserted record 11903 for performance testing	lead	pending	\N	\N	\N	contact11903@fastcorp.com	+1-555-12903	Manufacturing	FastCorp Company 11903	Contact Person 11903	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	medium
 c3f8b52f-822d-4c27-942f-258186eab189	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:26:05.462+00	2025-08-27 04:23:37.633+00	Agile Alpha Corp [UPDATED VIA HYBRID]	\N	lead	active	\N	\N	\N	info@agilealpha.sample.co	\N	\N	\N	\N	\N	\N	25	premium	Performance test record #336. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 000d24a1-8022-4e25-bf49-6af9ed1d9367	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:39:59.556+00	2025-09-03 01:44:31.772+00	FastCorp 11288 456	Bulk inserted record 11288 for performance testing	client	pending	\N	\N	\N	contact1gh1288@fastcorp.com	+1-555-12288	Manufacturing	FastCorp Company 11288	Contact Person 11288	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	medium
 13cb7841-9691-4648-9d7a-9ef78f23a40d	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:27:03.893+00	2025-09-03 02:12:12.139+00	Global sdfLLC 69	\N	customer	active	\N	\N	\N	contact69@globalcorp.com	\N	\N	\N	\N	\N	\N	70	premium	Bulk generated record 70 for performance testing	\N	\N	\N	\N	\N	medium
 134496e3-9ed6-4ebb-a46c-542cbdcd1fff	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:38:28.576+00	2025-09-03 02:13:04.114+00	TechCorp 3776	\N	client	pending	\N	\N	\N	user3776@techcorp.com	\N	\N	\N	\N	\N	\N	77	basic	Bulk record 3776 - high-performance test	\N	\N	\N	\N	\N	critical
+23ffd44c-dba4-48df-8873-f5ad2848d3d1	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:44.918+00	2025-09-03 22:47:58.92+00	Global Nova Co	\N	prospect	inactive	\N	\N	\N	info@globalnova.example.com	\N	\N	\N	\N	\N	\N	54	premium	Performance test record #30. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
+000a4778-83b4-4b6e-8158-79933ac3e090	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:39:59.556+00	2025-09-03 22:59:16.534+00	FastCorp 11903 - SURGICAL TEST ON VISIBLE ROW	Bulk inserted record 11903 for performance testing	lead	pending	\N	\N	\N	contact11903@fastcorp.com	+1-555-12903	Manufacturing	TESTING FIELD MAPPING FIX	Contact Person 11903	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	medium
 \.
 
 
@@ -12886,5 +12886,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict y2ZNwAqtgwx0J7dzgIqABaxWC0ScT0IsIOpFdhUTMFjyxtjlYWih4UWd7o6pDzP
+\unrestrict bm2CAFg34YiZgC8cKFMpgq7vzsIrq9pLWdhLqC3Uun5y1uNZHImFgj4qNbQjPbp
 
