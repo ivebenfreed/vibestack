@@ -1,5 +1,5 @@
 import { setup, assign } from 'xstate';
-import { checkAuthActor, signInActor, signOutActor } from '../auth-actors';
+import { checkAuthActor, signInActor, signOutActor, setupPersistenceActor } from '../auth-actors';
 import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor, switchOrganizationActor } from '../organization-actors';
 import type { UserInfo, OrganizationInfo, CreateOrganizationInput } from '../types';
 import { syncLog } from '@/logger';
@@ -20,6 +20,12 @@ export interface AuthContext {
   isLoadingOrganizations: boolean;
   organizationSetupComplete: boolean;
   needsOrganizationSetup: boolean;
+  
+  // Persistence context - NEW
+  persistenceSetupComplete: boolean;
+  persistenceError: string | null;
+  isSettingUpPersistence: boolean;
+  persistenceContext: any | null;
   
   // Billing context
   subscriptionInfo: any | null;
@@ -67,6 +73,7 @@ export const authMachine = setup({
     checkAuth: checkAuthActor,
     signIn: signInActor,
     signOut: signOutActor,
+    setupPersistence: setupPersistenceActor,
     loadOrganizations: loadOrganizationsActor,
     createOrganization: createOrganizationActor,
     selectOrganization: selectOrganizationActor,
@@ -211,6 +218,29 @@ export const authMachine = setup({
       billingError: ({ event }) => event.output?.error || 'Billing operation failed',
       isLoadingBilling: false,
     }),
+
+    // Persistence actions - NEW
+    setLoadingPersistence: assign({
+      isSettingUpPersistence: true,
+      persistenceError: null,
+    }),
+
+    clearLoadingPersistence: assign({
+      isSettingUpPersistence: false,
+    }),
+
+    setPersistenceSuccess: assign({
+      persistenceSetupComplete: true,
+      persistenceContext: ({ event }) => event.output?.persistenceContext || null,
+      persistenceError: null,
+      isSettingUpPersistence: false,
+    }),
+
+    setPersistenceError: assign({
+      persistenceError: ({ event }) => event.output?.error || 'Persistence setup failed',
+      persistenceSetupComplete: false,
+      isSettingUpPersistence: false,
+    }),
   },
 
   guards: {
@@ -279,6 +309,12 @@ export const authMachine = setup({
       organizationSetupComplete: false,
       needsOrganizationSetup: false,
       
+      // Persistence context - NEW
+      persistenceSetupComplete: false,
+      persistenceError: null,
+      isSettingUpPersistence: false,
+      persistenceContext: null,
+      
       // Billing context
       subscriptionInfo: null,
       billingError: null,
@@ -295,7 +331,7 @@ export const authMachine = setup({
     determiningInitialState: {
       always: [
         {
-          // If we have valid session and organization, go straight to ready
+          // If we have valid session, organization AND persistence setup, go straight to ready
           guard: ({ context }) => {
             if (!context.user || !context.authToken || !context.sessionExpiry) {
               return false;
@@ -307,15 +343,42 @@ export const authMachine = setup({
                                 (now - context.lastActivity) < 24 * 60 * 60 * 1000;
             
             const orgReady = !!context.currentOrganization && context.organizationSetupComplete;
+            const persistenceReady = context.persistenceSetupComplete;
             
-            return sessionValid && orgReady;
+            return sessionValid && orgReady && persistenceReady;
           },
           target: 'authenticated.ready',
           actions: [
-            ({ context }) => log.info(`[AuthMachine] ✅ Restored session: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
+            ({ context }) => log.info(`[AuthMachine] ✅ Restored complete session: ${context.user?.email}, org: ${context.currentOrganization?.name}, persistence: ${context.persistenceSetupComplete}`),
             { 
               type: 'dispatchAuthStateChange',
-              params: { authenticated: true, reason: 'session-restored-with-org' }
+              params: { authenticated: true, reason: 'session-restored-complete' }
+            }
+          ]
+        },
+        {
+          // If we have valid session and org but no persistence, need persistence setup
+          guard: ({ context }) => {
+            if (!context.user || !context.authToken || !context.sessionExpiry) {
+              return false;
+            }
+            
+            const sessionExpiry = new Date(context.sessionExpiry).getTime();
+            const now = Date.now();
+            const sessionValid = sessionExpiry > now && context.lastActivity && 
+                                (now - context.lastActivity) < 24 * 60 * 60 * 1000;
+            
+            const orgReady = !!context.currentOrganization && context.organizationSetupComplete;
+            const persistenceNotReady = !context.persistenceSetupComplete;
+            
+            return sessionValid && orgReady && persistenceNotReady;
+          },
+          target: 'authenticated.settingUpPersistence',
+          actions: [
+            ({ context }) => log.info(`[AuthMachine] ✅ Restored session with org but needs persistence: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
+            { 
+              type: 'dispatchAuthStateChange',
+              params: { authenticated: true, reason: 'session-restored-needs-persistence' }
             }
           ]
         },
@@ -548,13 +611,19 @@ export const authMachine = setup({
             src: 'loadOrganizations',
             onDone: [
               {
-                // If we already have a current organization, go straight to ready
+                // If we already have current organization AND persistence is complete, go to ready
                 target: 'ready',
-                guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete,
+                guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete && context.persistenceSetupComplete,
                 actions: ['setUserOrganizations', 'clearLoadingOrganizations']
               },
               {
-                // Otherwise, continue with the normal flow
+                // If we have current organization but no persistence, set up persistence
+                target: 'settingUpPersistence',
+                guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete && !context.persistenceSetupComplete,
+                actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+              },
+              {
+                // Otherwise, continue with the normal flow (billing then org selection)
                 target: 'loadingBilling',
                 actions: ['setUserOrganizations', 'clearLoadingOrganizations']
               }
@@ -606,13 +675,20 @@ export const authMachine = setup({
               guard: 'hasNoCurrentOrganization'
             },
             {
+              // If we have org and persistence is complete, go to ready
               target: 'ready',
-              guard: ({ context }) => !!context.currentOrganization,
+              guard: ({ context }) => !!context.currentOrganization && context.persistenceSetupComplete,
               actions: []
             },
             {
-              // Auto-select organization and go to ready - this is the fast path
-              target: 'ready',
+              // If we have org but no persistence, set up persistence
+              target: 'settingUpPersistence',
+              guard: ({ context }) => !!context.currentOrganization && !context.persistenceSetupComplete,
+              actions: []
+            },
+            {
+              // Auto-select organization and set up persistence - this is the normal path
+              target: 'settingUpPersistence',
               actions: ['autoSelectOrganization']
             }
           ]
@@ -650,7 +726,7 @@ export const authMachine = setup({
             src: 'createOrganization',
             input: ({ event }) => event.organizationData,
             onDone: {
-              target: 'ready',
+              target: 'settingUpPersistence',
               actions: ['setCurrentOrganization', 'markSetupComplete']
             },
             onError: {
@@ -669,7 +745,7 @@ export const authMachine = setup({
               return { organizationId: orgId };
             },
             onDone: {
-              target: 'loadingBilling',
+              target: 'settingUpPersistence',
               actions: ['setCurrentOrganization']
             },
             onError: {
@@ -685,7 +761,7 @@ export const authMachine = setup({
               target: 'upgradingSubscription'
             },
             CONTINUE_WITH_LIMITS: {
-              target: 'ready',
+              target: 'settingUpPersistence',
               actions: 'markSetupComplete'
             },
             SELECT_ORGANIZATION: {
@@ -703,7 +779,7 @@ export const authMachine = setup({
               paymentData: event.upgradeData?.paymentData
             }),
             onDone: {
-              target: 'ready',
+              target: 'settingUpPersistence',
               actions: ['setBillingInfo', 'markSetupComplete']
             },
             onError: {
@@ -720,7 +796,7 @@ export const authMachine = setup({
               organizationId: event.type === 'SWITCH_ORGANIZATION' ? event.organizationId : ''
             }),
             onDone: {
-              target: 'ready',
+              target: 'settingUpPersistence',
               actions: [
                 assign({
                   user: ({ event }) => event.output.user,
@@ -729,6 +805,9 @@ export const authMachine = setup({
                   currentOrganization: ({ event }) => event.output.organization,
                   organizationSetupComplete: true,
                   organizationError: null,
+                  // Reset persistence setup when switching orgs
+                  persistenceSetupComplete: false,
+                  persistenceContext: null,
                 }),
                 ]
             },
@@ -737,6 +816,34 @@ export const authMachine = setup({
               actions: assign({
                 organizationError: ({ event }) => event.error?.message || 'Failed to switch organization'
               })
+            }
+          }
+        },
+
+        settingUpPersistence: {
+          entry: 'setLoadingPersistence',
+          invoke: {
+            src: 'setupPersistence',
+            input: ({ context }) => {
+              // Get entity keys from organizations - will be empty initially but setupPersistenceActor handles this
+              const entityKeys = context.userOrganizations?.length > 0 ? 
+                // For now, pass empty array - setupPersistenceActor will load schema and get entity keys
+                [] : []
+              
+              return {
+                userId: context.user?.id || '',
+                organizationIds: context.userOrganizations?.map(org => org.id) || (context.currentOrganization ? [context.currentOrganization.id] : []),
+                entityKeys
+              }
+            },
+            onDone: {
+              target: 'ready',
+              actions: ['setPersistenceSuccess', 'clearLoadingPersistence']
+            },
+            onError: {
+              // Don't block auth flow on persistence failure - continue to ready with fallback
+              target: 'ready',
+              actions: ['setPersistenceError', 'clearLoadingPersistence']
             }
           }
         },

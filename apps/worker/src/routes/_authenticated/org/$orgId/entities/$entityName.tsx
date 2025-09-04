@@ -5,7 +5,7 @@ import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
 import { 
   getOrgContext$,
-  getEntity$,
+  getUniverseEntity$,
   loadOrgContext
 } from '@/legend-state'
 import { useEffect } from 'react'
@@ -72,7 +72,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     return expectedEntityKey
   }, [expectedEntityKey, entityName, orgId])
   
-  const entityStore = React.useMemo(() => getEntity$(actualEntityKey), [actualEntityKey])
+  const entityStore = React.useMemo(() => getUniverseEntity$(actualEntityKey), [actualEntityKey])
   const entityData = use$(entityStore)
   
   // ✅ All derived state calculations moved to useMemo with stable dependencies

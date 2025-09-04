@@ -30,12 +30,60 @@ export class ConflictError extends Error {
   }
 }
 
-// Reactive persistence configuration - managed by InitializationManager
+// Reactive persistence configuration - managed by auth machine
 let legacyPersistenceManager: PersistenceManager | null = null // Legacy - kept for compatibility
 let syncedCrudWithPersistence: any = null
 let persistenceConfig: { persistOptions: any; entityTableMap: Record<string, string> } | null = null
 let currentOrgId: string | null = null
 let currentSchemaVersion: string | null = null
+
+/**
+ * Get persistence context from auth machine
+ */
+function getPersistenceFromAuthMachine() {
+  try {
+    const authActor = (window as any).authMachineActor;
+    if (!authActor) {
+      return null;
+    }
+    
+    const snapshot = authActor.getSnapshot();
+    const context = snapshot.context;
+    
+    if (context.persistenceSetupComplete && context.persistenceContext) {
+      return context.persistenceContext;
+    }
+    
+    return null;
+  } catch (error) {
+    log.warn('[Observable] Failed to get persistence from auth machine:', error);
+    return null;
+  }
+}
+
+/**
+ * Update persistence configuration from auth machine context
+ */
+function updatePersistenceFromAuthMachine() {
+  const authPersistence = getPersistenceFromAuthMachine();
+  
+  if (authPersistence) {
+    log.info('[Observable] Using persistence configuration from auth machine');
+    legacyPersistenceManager = authPersistence.persistenceManager;
+    syncedCrudWithPersistence = authPersistence.persistOptions || syncedCrud;
+    persistenceConfig = {
+      persistOptions: authPersistence.persistOptions,
+      entityTableMap: authPersistence.entityTableMap
+    };
+    return true;
+  } else {
+    log.info('[Observable] No auth machine persistence available, using server-only sync');
+    legacyPersistenceManager = null;
+    syncedCrudWithPersistence = syncedCrud;
+    persistenceConfig = null;
+    return false;
+  }
+}
 
 /**
  * Universe context observable - tracks schemas from ALL user organizations
@@ -224,6 +272,16 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   
   const baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
+  
+  // Update persistence configuration from auth machine
+  const authPersistenceReady = updatePersistenceFromAuthMachine();
+  const persistenceReady = !!syncedCrudWithPersistence && !!persistenceConfig;
+  log.info(`[Observable] Creating entity observable for ${entityName}`, {
+    authPersistenceReady,
+    persistenceReady,
+    hasConfig: !!persistenceConfig,
+    hasCrud: !!syncedCrudWithPersistence
+  });
   
   // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
@@ -601,8 +659,25 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   // The correct pattern is: observable(syncedCrud(config))
   const syncedObservable = observable(syncedCrudFn(crudConfig))
   
-  // REVERTED: Remove the data loading trigger - let syncedCrud handle its own initialization
-  // The issue was with the when() coordination logic, not with the data loading itself
+  // CRITICAL FIX: Force initial data load for syncedCrud observable on client-side
+  // Legend State syncedCrud needs to be triggered when first accessed
+  if (typeof window !== 'undefined') {
+    // Client-side: trigger data loading after a short delay
+    setTimeout(() => {
+      try {
+        log.info(`[Observable] Triggering initial client-side data load for ${entityName}`)
+        // Access the observable to trigger Legend State's built-in data loading
+        const initialData = syncedObservable.get()
+        log.info(`[Observable] Initial data trigger completed for ${entityName}`, {
+          hasData: !!initialData,
+          dataType: typeof initialData,
+          dataKeys: initialData && typeof initialData === 'object' ? Object.keys(initialData).length : 'not-object'
+        })
+      } catch (error) {
+        log.warn(`[Observable] Initial data trigger failed for ${entityName}:`, error?.message || error)
+      }
+    }, 100) // Small delay to allow observable to be fully initialized
+  }
   
   return syncedObservable
 }
@@ -680,8 +755,8 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     
     log.info(`[Observable] Universe context loaded with ${totalEntities} total entities across ${organizationIds.length} organizations`)
     
-    // Initialize persistence configuration after schemas are loaded
-    await initializePersistence(userId, organizationIds, totalEntities)
+    // SKIP persistence initialization - now handled by auth machine
+    log.info('[Observable] Skipping persistence initialization - handled by auth machine')
     
   } catch (error) {
     log.error('[Observable] Failed to load universe context:', error)
@@ -695,75 +770,22 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
 
 /**
  * Initialize persistence configuration using robust InitializationManager
- * This replaces the previous race-condition prone initialization
+ * DEPRECATED: Now handled by auth machine - kept for backward compatibility
  */
 async function initializePersistence(userId: string, organizationIds: string[], totalEntities: number) {
-  // Skip if no entities
-  if (totalEntities === 0) {
-    log.info(`[Observable] No entities to initialize (${totalEntities})`)
+  log.info('[Observable] DEPRECATED: initializePersistence called - persistence is now handled by auth machine')
+  
+  // Check if auth machine has already set up persistence
+  if (syncedCrudWithPersistence && persistenceConfig) {
+    log.info('[Observable] Persistence already set up by auth machine, skipping initialization')
     return
   }
   
-  try {
-    // Use primary organization for persistence (first in list)
-    const primaryOrgId = organizationIds[0]
-    if (!primaryOrgId) {
-      log.warn('[Observable] No organization ID available for persistence setup')
-      return
-    }
-    
-    // Get all entity names from the current schema
-    const currentSchema = orgContext$.schema.peek()
-    const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
-    
-    if (entityKeys.length === 0) {
-      log.info('[Observable] No entities found in schema')
-      return
-    }
-    
-    log.info(`[Observable] Using robust InitializationManager for ${entityKeys.length} entities across ${organizationIds.length} orgs`)
-    
-    // For universe mode with multiple orgs, use 'universe' as the org identifier
-    // but pass all entity keys for proper initialization
-    const initOrgId = organizationIds.length > 1 ? 'universe' : primaryOrgId
-    const persistenceContext = await ensureLegendStateReady(initOrgId, userId, entityKeys)
-    
-    if (persistenceContext) {
-      // Update legacy variables for compatibility
-      legacyPersistenceManager = persistenceContext.persistenceManager
-      syncedCrudWithPersistence = persistenceContext.persistOptions || syncedCrud
-      persistenceConfig = {
-        persistOptions: persistenceContext.persistOptions,
-        entityTableMap: persistenceContext.entityTableMap
-      }
-      
-      log.info('[Observable] ✅ Robust persistence initialization complete', {
-        hasPersistence: !!persistenceContext.persistOptions,
-        entityMappings: Object.keys(persistenceContext.entityTableMap).length
-      })
-    } else {
-      // Fallback to server-only sync
-      syncedCrudWithPersistence = syncedCrud
-      log.info('[Observable] ⚠️  Using server-only sync (no persistence)')
-    }
-    
-    // Update tracking variables
-    currentOrgId = primaryOrgId
-    currentSchemaVersion = currentSchema?.version || 'unknown'
-    
-  } catch (error) {
-    log.error('[Observable] Robust initialization failed, falling back to server-only sync:', error)
-    
-    // Fallback to server-only mode
-    legacyPersistenceManager = null
-    syncedCrudWithPersistence = syncedCrud
-    persistenceConfig = null
-    currentOrgId = organizationIds[0]
-    currentSchemaVersion = 'fallback'
-    
-    // Don't throw - let the app continue with server-only sync
-    log.info('[Observable] Continuing with server-only sync after initialization failure')
-  }
+  // Fallback to server-only sync if auth machine hasn't set up persistence yet
+  log.warn('[Observable] Auth machine persistence not ready, falling back to server-only sync')
+  syncedCrudWithPersistence = syncedCrud
+  persistenceConfig = null
+  legacyPersistenceManager = null
 }
 
 /**

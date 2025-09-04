@@ -283,4 +283,66 @@ export const validateTokenActor = fromPromise(async () => {
     log.error('Token validation failed:', error);
     return { valid: false };
   }
+});
+
+// Actor for setting up Legend State persistence during auth initialization
+export const setupPersistenceActor = fromPromise(async ({ input }: {
+  input: { userId: string; organizationIds: string[]; entityKeys?: string[] }
+}) => {
+  try {
+    const { userId, organizationIds, entityKeys = [] } = input;
+    log.info('[setupPersistenceActor] Starting Legend State persistence setup', {
+      userId,
+      organizationCount: organizationIds.length,
+      entityCount: entityKeys.length
+    });
+
+    // Dynamically import to avoid circular dependencies
+    const { ensureLegendStateReady } = await import('@/legend-state/helpers/InitializationManager');
+    const { loadUniverseContext } = await import('@/legend-state/observables');
+    
+    // For universe mode with multiple orgs, use 'universe' as the org identifier
+    const initOrgId = organizationIds.length > 1 ? 'universe' : organizationIds[0];
+    
+    // Load universe context to get entity keys from schemas
+    log.info('[setupPersistenceActor] Loading universe context to get entity schemas');
+    await loadUniverseContext(userId, organizationIds);
+    
+    // Get entity keys from the loaded universe context
+    const { orgContext$ } = await import('@/legend-state/observables');
+    const currentSchema = orgContext$.schema.peek();
+    const dynamicEntityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : [];
+    
+    log.info('[setupPersistenceActor] Found entity keys from schema', {
+      entityKeys: dynamicEntityKeys,
+      schemaVersion: currentSchema?.version
+    });
+    
+    // Initialize persistence configuration with actual entity keys
+    const persistenceContext = await ensureLegendStateReady(initOrgId, userId, dynamicEntityKeys);
+    
+    log.info('[setupPersistenceActor] ✅ Legend State persistence setup complete', {
+      hasPersistence: !!persistenceContext,
+      entityMappings: persistenceContext ? Object.keys(persistenceContext.entityTableMap).length : 0,
+      finalEntityCount: dynamicEntityKeys.length
+    });
+    
+    return {
+      success: true,
+      persistenceContext,
+      orgId: initOrgId,
+      entityCount: dynamicEntityKeys.length,
+      entityKeys: dynamicEntityKeys
+    };
+    
+  } catch (error) {
+    log.error('[setupPersistenceActor] ❌ Failed to setup Legend State persistence:', error);
+    
+    // Don't throw - allow auth to continue with server-only sync
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Persistence setup failed',
+      fallbackMode: 'server-only'
+    };
+  }
 }); 
