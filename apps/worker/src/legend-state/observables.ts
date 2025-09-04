@@ -240,7 +240,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   
   // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
-    // CRITICAL: Enable Legend State's built-in differential sync
+    // CRITICAL: Enable Legend State's built-in differential sync for bandwidth efficiency
     changesSince: 'last-sync',
     
     // CRITICAL: Field mappings for differential sync tracking
@@ -249,7 +249,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     fieldUpdatedAt: 'updated_at',
     fieldDeleted: 'deleted',
     
-    // LIST - Legend State passes lastSync timestamp when changesSince: 'last-sync' is configured
+    // LIST - Proper implementation of changesSince: 'last-sync' pattern
     list: async (params: { lastSync?: number } = {}) => {
       try {
         // DEBUG: Log what Legend State is passing us
@@ -260,12 +260,13 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
           lastSyncDate: params?.lastSync ? new Date(params.lastSync).toISOString() : null
         });
         
-        // Use sync endpoint for differential sync when Legend State provides lastSync timestamp
+        // CORRECT: Use differential sync endpoint when lastSync exists, full load otherwise
+        // This is the proper changesSince: 'last-sync' pattern from Legend State docs
         const url = params?.lastSync ? 
           `${syncUrl}?changesSince=${encodeURIComponent(new Date(params.lastSync).toISOString())}&limit=1000` : 
           baseUrl;
         
-        log.info(`[Observable] ${params?.lastSync ? 'Differential' : 'Full'} sync for ${entityName}:`, url);
+        log.info(`[Observable] ${params?.lastSync ? 'Differential' : 'Initial full'} load for ${entityName}:`, url);
         
         const response = await fetch(url, {
           credentials: 'include',
@@ -294,7 +295,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         if (params?.lastSync) {
           log.info(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${new Date(params.lastSync).toISOString()}`)
         } else {
-          log.info(`[Observable] Full sync ${entityName}: ${data.length} total records`)
+          log.info(`[Observable] Initial full load ${entityName}: ${data.length} total records`)
         }
         
         return data
@@ -610,8 +611,16 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   // The correct pattern is: observable(syncedCrud(config))
   const syncedObservable = observable(syncedCrudFn(crudConfig))
   
-  // LAZY LOADING: Let Legend State handle data loading naturally when observables are accessed
-  // No aggressive pre-loading to avoid API spam - syncedCrud will load data when .get() is called
+  // CRITICAL FIX: Force initial data load for syncedCrud with changesSince: 'last-sync'
+  // The issue was that syncedCrud with differential sync doesn't auto-trigger initial load
+  // We need to explicitly trigger the first load to populate the observable
+  setTimeout(() => {
+    if (typeof window !== 'undefined') {
+      log.info(`[Observable] Triggering initial load for ${entityName}`)
+      // Access the observable to trigger initial syncedCrud list() call
+      syncedObservable.get()
+    }
+  }, 0)
   
   return syncedObservable
 }

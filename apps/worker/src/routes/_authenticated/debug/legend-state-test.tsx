@@ -18,9 +18,9 @@ function LegendStateTestPage() {
     try {
       console.log('🧪 [LegendStateTest] Starting basic observable access test...')
       
-      // Get the Client entity observable
-      const entity$ = getEntity$('Client')
-      console.log('🧪 [LegendStateTest] Retrieved Client observable:', {
+      // Get the Task entity observable (we know this has data)
+      const entity$ = getEntity$('Task')
+      console.log('🧪 [LegendStateTest] Retrieved Task observable:', {
         type: typeof entity$,
         isNull: entity$ === null,
         isUndefined: entity$ === undefined,
@@ -108,28 +108,28 @@ function LegendStateTestPage() {
       }
 
       // Try to access a field observable
-      const phoneField$ = record$.phone
-      console.log('🧪 [LegendStateTest] Phone field observable:', {
-        type: typeof phoneField$,
-        isNull: phoneField$ === null,
-        isUndefined: phoneField$ === undefined,
-        hasSet: typeof phoneField$?.set === 'function',
-        hasAssign: typeof phoneField$?.assign === 'function',
-        keys: phoneField$ ? Object.keys(phoneField$).slice(0, 10) : 'null-or-undefined',
-        currentValue: phoneField$ !== null ? (phoneField$?.peek ? phoneField$.peek() : 'no-peek-method') : 'field-is-null'
+      const titleField$ = record$.title
+      console.log('🧪 [LegendStateTest] Title field observable:', {
+        type: typeof titleField$,
+        isNull: titleField$ === null,
+        isUndefined: titleField$ === undefined,
+        hasSet: typeof titleField$?.set === 'function',
+        hasAssign: typeof titleField$?.assign === 'function',
+        keys: titleField$ ? Object.keys(titleField$).slice(0, 10) : 'null-or-undefined',
+        currentValue: titleField$ !== null ? (titleField$?.peek ? titleField$.peek() : 'no-peek-method') : 'field-is-null'
       })
 
-      // Check what the actual phone value is in the raw data
-      console.log('🧪 [LegendStateTest] Raw record phone value:', record.phone)
+      // Check what the actual title value is in the raw data
+      console.log('🧪 [LegendStateTest] Raw record title value:', record.title)
 
       setTestResult(`✅ Success! Observable structure looks correct:
 - Entity observable: ${typeof entity$}
 - Data records: ${recordIds.length}
 - First record ID: ${firstRecordId}
 - Record observable: ${typeof record$}
-- Phone field observable: ${typeof phoneField$}
-- Phone field has .set(): ${typeof phoneField$?.set === 'function'}
-- Current phone value: ${phoneField$?.peek ? phoneField$.peek() : 'N/A'}`)
+- Title field observable: ${typeof titleField$}
+- Title field has .set(): ${typeof titleField$?.set === 'function'}
+- Current title value: ${titleField$?.peek ? titleField$.peek() : 'N/A'}`)
 
     } catch (error) {
       console.error('🧪 [LegendStateTest] Test failed:', error)
@@ -147,8 +147,8 @@ function LegendStateTestPage() {
     try {
       console.log('🧪 [LegendStateTest] Starting update test...')
       
-      // Get the Client entity observable
-      const entity$ = getEntity$('Client')
+      // Get the Task entity observable (we know this has data)
+      const entity$ = getEntity$('Task')
       if (!entity$) {
         throw new Error('Entity observable is null')
       }
@@ -161,11 +161,11 @@ function LegendStateTestPage() {
       }
 
       const testRecordId = recordIds[0]
-      const testPhoneNumber = `555-TEST-${Date.now()}`
+      const testTitle = `Updated Task ${Date.now()}`
       
-      console.log('🧪 [LegendStateTest] Attempting to update phone field...')
+      console.log('🧪 [LegendStateTest] Attempting to update title field...')
       console.log('🧪 [LegendStateTest] Record ID:', testRecordId)
-      console.log('🧪 [LegendStateTest] New phone:', testPhoneNumber)
+      console.log('🧪 [LegendStateTest] New title:', testTitle)
 
       // Try the update using our current pattern
       const record$ = entity$[testRecordId]
@@ -173,29 +173,29 @@ function LegendStateTestPage() {
         throw new Error(`Record observable ${testRecordId} is null`)
       }
 
-      const phoneField$ = record$.phone
-      if (!phoneField$) {
-        throw new Error('Phone field observable is null')
+      const titleField$ = record$.title
+      if (!titleField$) {
+        throw new Error('Title field observable is null')
       }
 
-      if (typeof phoneField$.set !== 'function') {
-        throw new Error(`Phone field .set is not a function: ${typeof phoneField$.set}`)
+      if (typeof titleField$.set !== 'function') {
+        throw new Error(`Title field .set is not a function: ${typeof titleField$.set}`)
       }
 
       // Perform the update
-      phoneField$.set(testPhoneNumber)
+      titleField$.set(testTitle)
       
       console.log('🧪 [LegendStateTest] Update completed successfully!')
       
       // Verify the update
-      const updatedValue = phoneField$.peek()
+      const updatedValue = titleField$.peek()
       console.log('🧪 [LegendStateTest] Updated value:', updatedValue)
 
       setTestResult(`✅ Update successful! 
 - Record ID: ${testRecordId}
-- New phone: ${testPhoneNumber}
+- New title: ${testTitle}
 - Verified value: ${updatedValue}
-- Update method: entity$[id].phone.set(value)`)
+- Update method: entity$[id].title.set(value)`)
 
     } catch (error) {
       console.error('🧪 [LegendStateTest] Update test failed:', error)
@@ -213,23 +213,23 @@ function LegendStateTestPage() {
     try {
       console.log('🧪 [LegendStateTest] Testing entityOperations.updateEntity...')
       
-      const entity$ = getEntity$('Client')
+      const entity$ = getEntity$('Task')
       // Use same pattern as first test - access entity$ directly 
       const data = entity$
       const recordIds = Object.keys(data)
       const testRecordId = recordIds[0]
-      const testPhoneNumber = `555-ENTITY-${Date.now()}`
+      const testTitle = `EntityOps Task ${Date.now()}`
       
       // Use our updateEntity function
-      const result = await entityOperations.updateEntity('Client', testRecordId, {
-        phone: testPhoneNumber
+      const result = await entityOperations.updateEntity('Task', testRecordId, {
+        title: testTitle
       })
       
       console.log('🧪 [LegendStateTest] entityOperations.updateEntity completed:', result)
 
       setTestResult(`✅ entityOperations.updateEntity successful!
 - Record ID: ${testRecordId}  
-- New phone: ${testPhoneNumber}
+- New title: ${testTitle}
 - Function returned: ${JSON.stringify(result, null, 2)}`)
 
     } catch (error) {
