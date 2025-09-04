@@ -59,8 +59,20 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   
   // ✅ ALWAYS call getEntity$ and use$ to maintain consistent hook order
   // Call this unconditionally even if we don't have schema yet
+  // CRITICAL FIX: In universe mode, entities are org-prefixed, so use the expected entity key
   const expectedEntityKey = React.useMemo(() => `${orgId}_${entityName}`, [orgId, entityName])
-  const entityStore = React.useMemo(() => getEntity$(expectedEntityKey), [expectedEntityKey])
+  
+  // CRITICAL FIX: React uses display schema (simplified keys) but Legend State needs org-prefixed keys
+  // Always use the expectedEntityKey (org-prefixed) for Legend State observables
+  const actualEntityKey = React.useMemo(() => {
+    // Always return the expectedEntityKey (org-prefixed) because:
+    // 1. React components get a display schema with cleaned keys ("Task", "Project", etc.)  
+    // 2. Legend State observables use raw schema with org-prefixed keys ("orgId_Task", etc.)
+    // 3. VibeGrid expects org-prefixed entity types
+    return expectedEntityKey
+  }, [expectedEntityKey, entityName, orgId])
+  
+  const entityStore = React.useMemo(() => getEntity$(actualEntityKey), [actualEntityKey])
   const entityData = use$(entityStore)
   
   // ✅ All derived state calculations moved to useMemo with stable dependencies
@@ -71,32 +83,8 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     const isEntityLoading = false // Simplified for now  
     const hasEntityLoaded = true // Simplified for now
     
-    // Get actual entity name based on schema
-    let actualEntityName = expectedEntityKey
-    if (hasSchema && schema?.entities) {
-      // First try UUID-prefixed exact match
-      if (schema.entities[expectedEntityKey]) {
-        actualEntityName = expectedEntityKey
-      } else {
-        // Then try case-insensitive UUID-prefixed match
-        const entityKeys = Object.keys(schema.entities)
-        const matchedKey = entityKeys.find(key => key.toLowerCase() === expectedEntityKey.toLowerCase())
-        if (matchedKey) {
-          actualEntityName = matchedKey
-        } else {
-          // Fallback: look for any entity ending with the entityName
-          const fallbackKey = entityKeys.find(key => {
-            const parts = key.split('_')
-            if (parts.length === 0) return false
-            const lastPart = parts[parts.length - 1]
-            return lastPart && lastPart.toLowerCase() === entityName.toLowerCase()
-          })
-          if (fallbackKey) {
-            actualEntityName = fallbackKey
-          }
-        }
-      }
-    }
+    // Get actual entity name based on schema - use the already computed actualEntityKey
+    let actualEntityName = actualEntityKey
     
     return {
       hasCorrectContext,
@@ -106,7 +94,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
       hasEntityLoaded,
       actualEntityName
     }
-  }, [schema, expectedEntityKey, entityName])
+  }, [schema, actualEntityKey, entityName])
   
   // ✅ Load organization context based on URL parameters - useEffect hook
   useEffect(() => {
@@ -161,55 +149,13 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   // ✅ Compute derived values after all hooks
   const entityArray = (entityStore && entityData) ? Object.values(entityData) : []
   
-  // Get entity schema with UUID-prefixed lookup for universe context
+  // Get entity schema using the simplified key from display schema
   const entitySchema = React.useMemo(() => {
-    console.log('[EntityRoute] Debug schema lookup:', {
-      entityName,
-      orgId,
-      expectedEntityKey,
-      schemaExists: !!schema,
-      entitiesExists: !!schema?.entities,
-      availableEntities: schema?.entities ? Object.keys(schema.entities) : [],
-      schemaOrgId: schema?.orgId
-    })
-    
     if (!schema?.entities) return null
     
-    // In universe context, entities are prefixed with orgId
-    // Try exact match with UUID prefix
-    if (schema.entities[expectedEntityKey]) {
-      console.log('[EntityRoute] Found UUID-prefixed match:', expectedEntityKey)
-      return schema.entities[expectedEntityKey]
-    }
-    
-    // Try case-insensitive match with UUID prefix
-    const entityKeys = Object.keys(schema.entities)
-    const matchedKey = entityKeys.find(key => key.toLowerCase() === expectedEntityKey.toLowerCase())
-    if (matchedKey) {
-      console.log('[EntityRoute] Found case-insensitive UUID-prefixed match:', { expectedEntityKey, matchedKey })
-      return schema.entities[matchedKey]
-    }
-    
-    // Fallback: look for any entity ending with the entityName (case-insensitive)
-    const fallbackKey = entityKeys.find(key => {
-      const parts = key.split('_')
-      if (parts.length === 0) return false
-      const lastPart = parts[parts.length - 1]
-      return lastPart && lastPart.toLowerCase() === entityName.toLowerCase()
-    })
-    
-    if (fallbackKey) {
-      console.log('[EntityRoute] Found fallback match:', { entityName, fallbackKey })
-      return schema.entities[fallbackKey]
-    }
-    
-    console.log('[EntityRoute] No match found for:', { 
-      entityName, 
-      expectedEntityKey,
-      availableKeys: entityKeys 
-    })
-    return null
-  }, [schema, expectedEntityKey, entityName])
+    // Use the simplified entityName for schema lookup (display schema has "Task", not "orgId_Task")
+    return schema.entities[entityName] || null
+  }, [schema, entityName])
   
   if (!orgId) {
     return (

@@ -601,32 +601,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   // The correct pattern is: observable(syncedCrud(config))
   const syncedObservable = observable(syncedCrudFn(crudConfig))
   
-  // ENHANCED: Robust data hydration with proper coordination
-  // Use when() to ensure initialization is complete before loading data
-  when(
-    () => {
-      // Check if InitializationManager is ready
-      const initState = initializationManager.state$.peek()
-      return initState.status === 'ready' || initState.status === 'error'
-    },
-    () => {
-      try {
-        log.info(`[Observable] Triggering coordinated initial data load for ${entityName}`)
-        
-        // Use a small delay to allow the observable to be fully set up
-        Promise.resolve().then(() => {
-          try {
-            syncedObservable.get() // This triggers the syncedCrud list() function
-            log.info(`[Observable] ✅ Initial data load triggered for ${entityName}`)
-          } catch (error) {
-            log.warn(`[Observable] Failed to trigger initial load for ${entityName}:`, error)
-          }
-        })
-      } catch (error) {
-        log.warn(`[Observable] Failed to set up initial load for ${entityName}:`, error)
-      }
-    }
-  )
+  // REVERTED: Remove the data loading trigger - let syncedCrud handle its own initialization
+  // The issue was with the when() coordination logic, not with the data loading itself
   
   return syncedObservable
 }
@@ -933,6 +909,7 @@ export function getEntity$(entityName: string) {
  * For regular context: getUniverseEntity$('Client') - falls back to current org
  */
 export function getUniverseEntity$(entityIdentifier: string) {
+  log.info(`[UniverseObservable] getUniverseEntity$ called with "${entityIdentifier}"`)
   try {
     // Check if this is an org-prefixed entity name (contains UUID pattern)
     const orgPrefixMatch = entityIdentifier.match(/^([a-f0-9-]{36})_(.+)$/)
@@ -943,11 +920,14 @@ export function getUniverseEntity$(entityIdentifier: string) {
       log.info(`[UniverseObservable] Accessing org-prefixed entity ${entityName} from org ${orgId}`)
       
       // For org-prefixed entities, we need to check if the current org context has this entity
-      // The schema contains org-prefixed entity keys, so check for the full identifier
       const currentOrgContext = orgContext$.peek()
       
-      if (!currentOrgContext?.schema?.entities?.[entityIdentifier]) {
-        log.warn(`[UniverseObservable] Org-prefixed entity ${entityIdentifier} not available in current universe schema`)
+      // CRITICAL FIX: In universe context, schema contains org-prefixed entity names
+      // We need to look for the full entityIdentifier, not the simplified entityName
+      const schemaKey = currentOrgContext?.orgId === 'universe' ? entityIdentifier : entityName
+      
+      if (!currentOrgContext?.schema?.entities?.[schemaKey]) {
+        log.warn(`[UniverseObservable] Entity ${schemaKey} not available in current universe schema`)
         log.info(`[UniverseObservable] Available entities:`, Object.keys(currentOrgContext?.schema?.entities || {}))
         return null
       }
@@ -964,7 +944,7 @@ export function getUniverseEntity$(entityIdentifier: string) {
       // Create observable for this specific organization's entity
       try {
         log.info(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
-        const observable = createEntityObservable(orgId, entityName, currentOrgContext.schema.entities[entityIdentifier])
+        const observable = createEntityObservable(orgId, entityName, currentOrgContext.schema.entities[schemaKey])
         globalEntityCache[cacheKey] = observable
         
         log.info(`[UniverseObservable] Created ${entityIdentifier} observable`, {
@@ -985,6 +965,7 @@ export function getUniverseEntity$(entityIdentifier: string) {
       return getEntity$(entityIdentifier)
     }
   } catch (error) {
+    console.error(`🔥 UNIVERSE DEBUG: Exception in getUniverseEntity$ for ${entityIdentifier}:`, error)
     log.error(`[UniverseObservable] Error getting universe entity observable for ${entityIdentifier}:`, error)
     return null
   }

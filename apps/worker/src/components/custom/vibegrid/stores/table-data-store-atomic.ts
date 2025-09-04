@@ -960,8 +960,29 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     });
   }
   
-  // ✅ CORRECT: Use getUniverseEntity$() for org-prefixed entities, getEntity$() for regular entities
-  const entity$ = entityTableName.includes('_') ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
+  // CRITICAL FIX: When in universe context with org-prefixed entities, always use getUniverseEntity$
+  // Check if this is an org-prefixed entity (UUID_EntityName format)
+  const isOrgPrefixed = entityTableName.includes('_') && entityTableName.match(/^[a-f0-9-]{36}_/);
+  
+  if (process.env.NODE_ENV === 'development') {
+    log.info('📊 TableStore: Entity observable selection', {
+      entityTableName,
+      isOrgPrefixed,
+      willUseUniverse: isOrgPrefixed
+    });
+  }
+  
+  // Debug test - let's see if getUniverseEntity$ exists
+  if (isOrgPrefixed) {
+    log.info('📊 TableStore: DEBUG - About to call getUniverseEntity$ with:', entityTableName);
+    if (typeof getUniverseEntity$ === 'function') {
+      log.info('📊 TableStore: DEBUG - getUniverseEntity$ is a function, calling it...');
+    } else {
+      log.error('📊 TableStore: DEBUG - getUniverseEntity$ is NOT a function!', typeof getUniverseEntity$);
+    }
+  }
+  
+  const entity$ = isOrgPrefixed ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
   
   if (!entity$) {
     log.warn('📊 TableStore: Entity observable not ready for', entityTableName, '- waiting...');
@@ -969,7 +990,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     // Wait for entity observable to be ready instead of returning empty data
     return new Promise((resolve) => {
       const checkReady = () => {
-        const entity$ = entityTableName.includes('_') ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
+        const entity$ = isOrgPrefixed ? getUniverseEntity$(entityTableName) : getEntity$(entityTableName);
         
         if (entity$) {
           log.info('📊 TableStore: Entity observable is now ready for', entityTableName);
@@ -989,6 +1010,18 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   try {
     // ✅ CORRECT: Use .get() to access data and trigger loading if needed
     const entityData = entity$.get();
+    
+    if (process.env.NODE_ENV === 'development') {
+      log.info('📊 TableStore: Entity observable data retrieved', {
+        entityTableName,
+        dataType: typeof entityData,
+        isNull: entityData === null,
+        isUndefined: entityData === undefined,
+        isArray: Array.isArray(entityData),
+        isObject: typeof entityData === 'object',
+        hasKeys: entityData ? Object.keys(entityData).length : 0
+      });
+    }
     
     // Check if data is actually loaded (not undefined or empty on first load)
     if (!entityData) {
