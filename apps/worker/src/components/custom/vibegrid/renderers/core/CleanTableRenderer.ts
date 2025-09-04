@@ -401,11 +401,23 @@ export class CleanTableRenderer {
       rowCount: state.rows?.length || 0,
       hasColumns: !!state.columns,
       columnCount: state.columns?.length || 0,
-      hasCoordinateMapping: !!state.coordinateMapping
+      hasCoordinateMapping: !!state.coordinateMapping,
+      visibleRangeStart: this.visibleRange.start,
+      visibleRangeEnd: this.visibleRange.end
     });
     
-    if (!state.rows || !state.columns) {
-      log.info('CleanTableRenderer: renderRows early return - missing rows or columns');
+    if (!state.columns) {
+      log.warn('CleanTableRenderer: renderRows early return - missing columns');
+      return;
+    }
+    
+    if (!state.rows) {
+      log.warn('CleanTableRenderer: renderRows early return - missing rows');
+      return;
+    }
+    
+    if (state.rows.length === 0) {
+      log.warn('CleanTableRenderer: renderRows - rows array is empty, no data to render');
       return;
     }
     
@@ -559,15 +571,31 @@ export class CleanTableRenderer {
   }
   
   private updateDimensions(state: RenderState): void {
-    if (!state.coordinateMapping) return;
+    let totalWidth = 0;
     
-    const totalWidth = state.coordinateMapping.columns.reduce(
-      (sum: number, col: any) => sum + col.width, 0
-    );
+    if (state.coordinateMapping) {
+      // Use coordinate mapping if available
+      totalWidth = state.coordinateMapping.columns.reduce(
+        (sum: number, col: any) => sum + col.width, 0
+      );
+    } else if (state.columns) {
+      // Fallback: calculate width from columns with default widths
+      totalWidth = state.columns.reduce(
+        (sum: number, col: Column) => sum + (col.width || 120), 0
+      );
+    }
+    
     const totalHeight = state.rows.length * ROW_HEIGHT;
     
     this.body.style.width = `${totalWidth}px`;
     this.body.style.height = `${totalHeight}px`;
+    
+    log.info('CleanTableRenderer: Updated dimensions', {
+      totalWidth,
+      totalHeight,
+      rowCount: state.rows.length,
+      hasCoordinateMapping: !!state.coordinateMapping
+    });
   }
   
   private updateVisibleRange(scrollTop?: number, viewportHeight?: number): void {

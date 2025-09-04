@@ -598,7 +598,20 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   
   // CRITICAL FIX: syncedCrud must be wrapped in observable() to create proper observable with .get()/.set() methods
   // The correct pattern is: observable(syncedCrud(config))
-  return observable(syncedCrudFn(crudConfig))
+  const syncedObservable = observable(syncedCrudFn(crudConfig))
+  
+  // CRITICAL FIX: Trigger initial data load by accessing the observable
+  // This forces syncedCrud to call list() and populate the observable with server data
+  setTimeout(() => {
+    try {
+      log.info(`[Observable] Triggering initial data load for ${entityName}`)
+      syncedObservable.get() // This triggers the syncedCrud list() function
+    } catch (error) {
+      log.warn(`[Observable] Failed to trigger initial load for ${entityName}:`, error)
+    }
+  }, 100) // Small delay to ensure the observable is fully initialized
+  
+  return syncedObservable
 }
 
 /**

@@ -21,11 +21,16 @@ function getAllowedOrigins(env: Env): string[] {
   
   if (isDev) {
     // In development, allow localhost with dynamic port and common fallbacks
-    const port = env.WEB_PORT || '5174';
+    const devPort = env.DEV_PORT || '4000';  // Use DEV_PORT instead of WEB_PORT
+    const webPort = env.WEB_PORT || '5174';   // Keep WEB_PORT for legacy
     const origins = [
-      `http://localhost:${port}`, // Current dynamic port
-      'http://localhost:4000',    // Fixed port for worktrees
-      'http://localhost:4174',    // Common fallback ports
+      `http://localhost:${devPort}`, // Current dev server port (4000 for main, 4001+ for worktrees)
+      `http://localhost:${webPort}`, // Legacy web port support
+      'http://localhost:4000',       // Fixed port for main branch
+      'http://localhost:4001',       // Worktree ports
+      'http://localhost:4002',
+      'http://localhost:4003',
+      'http://localhost:4174',       // Common fallback ports
       'http://localhost:5174',
       'http://localhost:5175',
       'http://localhost:5173',
@@ -240,9 +245,10 @@ export function initializeAuth(env: Env, request?: Request) {
     kvNamespaceBound: !!env.SESSIONS
   }, 'auth');
 
-  // Better Auth baseURL for unified worker
+  // Better Auth baseURL for unified worker - respect DEV_PORT
+  const port = env.DEV_PORT || '4000';  // Default to 4000 for main, allow override for worktrees
   const baseUrl = env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local"
-    ? `http://localhost:5175`  // Unified worker base URL
+    ? `http://localhost:${port}`  // Use dynamic port from environment
     : env.ENVIRONMENT === "staging"
       ? "https://dev.codevibesmatter.com"
       : "https://app.codevibesmatter.com";

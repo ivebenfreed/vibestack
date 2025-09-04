@@ -73,35 +73,37 @@ export class OrganizationService {
       }
 
       // 4. Create organization record (using only existing columns)
-      const organization = await this.db
-        .insertInto('organizations')
-        .values({
-          name: data.name,
-          slug: data.slug,
-          settings: JSON.stringify({
-            ...data.settings,
-            // Store all additional fields in settings JSON
-            description: data.description,
-            industry: data.industry,
-            company_size: data.company_size,
-            website_url: data.website_url,
-            country: data.country,
-            timezone: data.timezone || 'UTC',
-            subscription_tier: data.subscription_tier || 'trial',
-            billing_email: data.billing_email,
-            polar_customer_id: data.polar_customer_id,
-            trial_started_at: new Date().toISOString(),
-            trial_ends_at: new Date(Date.now() + (14 * 24 * 60 * 60 * 1000)).toISOString(),
-            allowed_domains: data.allowed_domains,
-            logo_url: data.logo_url
+      const organization = await this.withDb(async (db) => {
+        return await db
+          .insertInto('organizations')
+          .values({
+            name: data.name,
+            slug: data.slug,
+            settings: JSON.stringify({
+              ...data.settings,
+              // Store all additional fields in settings JSON
+              description: data.description,
+              industry: data.industry,
+              company_size: data.company_size,
+              website_url: data.website_url,
+              country: data.country,
+              timezone: data.timezone || 'UTC',
+              subscription_tier: data.subscription_tier || 'trial',
+              billing_email: data.billing_email,
+              polar_customer_id: data.polar_customer_id,
+              trial_started_at: new Date().toISOString(),
+              trial_ends_at: new Date(Date.now() + (14 * 24 * 60 * 60 * 1000)).toISOString(),
+              allowed_domains: data.allowed_domains,
+              logo_url: data.logo_url
+            })
           })
-        })
-        .returning(['id', 'name', 'slug', 'settings', 'created_at', 'updated_at'])
-        .executeTakeFirstOrThrow();
+          .returning(['id', 'name', 'slug', 'settings', 'created_at', 'updated_at'])
+          .executeTakeFirstOrThrow();
+      });
 
       // 4. Add creator as owner (this will be handled by OrganizationMemberService)
       const { OrganizationMemberService } = await import('./OrganizationMemberService');
-      const memberService = new OrganizationMemberService(this.db);
+      const memberService = new OrganizationMemberService();
       
       await memberService.addMemberDirect(
         organization.id,
@@ -168,12 +170,14 @@ export class OrganizationService {
 
       // 3. Check slug uniqueness if changing
       if (data.slug && data.slug !== existingOrg.data?.slug) {
-        const slugExists = await this.db
-          .selectFrom('organizations')
-          .where('slug', '=', data.slug)
-          .where('id', '!=', id)
-          .selectAll()
-          .executeTakeFirst();
+        const slugExists = await this.withDb(async (db) => {
+          return await db
+            .selectFrom('organizations')
+            .where('slug', '=', data.slug)
+            .where('id', '!=', id)
+            .selectAll()
+            .executeTakeFirst();
+        });
 
         if (slugExists) {
           return {
@@ -210,19 +214,21 @@ export class OrganizationService {
       if (data.allowed_domains !== undefined) updateValues.allowed_domains = data.allowed_domains;
       if (data.logo_url !== undefined) updateValues.logo_url = data.logo_url;
 
-      const updatedOrganization = await this.db
-        .updateTable('organizations')
-        .set(updateValues)
-        .where('id', '=', id)
-        .returning([
-          'id', 'name', 'slug', 'description', 'industry', 'company_size',
-          'website_url', 'country', 'timezone', 'subscription_tier', 
-          'subscription_status', 'billing_email', 'polar_customer_id', 
-          'trial_started_at', 'trial_ends_at', 'max_users', 'max_projects', 
-          'storage_limit_gb', 'api_rate_limit', 'settings', 'sso_enabled', 
-          'enforce_2fa', 'allowed_domains', 'logo_url', 'created_at', 'updated_at'
-        ])
-        .executeTakeFirst();
+      const updatedOrganization = await this.withDb(async (db) => {
+        return await db
+          .updateTable('organizations')
+          .set(updateValues)
+          .where('id', '=', id)
+          .returning([
+            'id', 'name', 'slug', 'description', 'industry', 'company_size',
+            'website_url', 'country', 'timezone', 'subscription_tier', 
+            'subscription_status', 'billing_email', 'polar_customer_id', 
+            'trial_started_at', 'trial_ends_at', 'max_users', 'max_projects', 
+            'storage_limit_gb', 'api_rate_limit', 'settings', 'sso_enabled', 
+            'enforce_2fa', 'allowed_domains', 'logo_url', 'created_at', 'updated_at'
+          ])
+          .executeTakeFirst();
+      });
 
       if (!updatedOrganization) {
         return {
@@ -267,11 +273,13 @@ export class OrganizationService {
    */
   async getOrganizationById(id: string): Promise<OrganizationServiceResponse<Organization>> {
     try {
-      const organization = await this.db
-        .selectFrom('organizations')
-        .where('id', '=', id)
-        .selectAll()
-        .executeTakeFirst();
+      const organization = await this.withDb(async (db) => {
+        return await db
+          .selectFrom('organizations')
+          .where('id', '=', id)
+          .selectAll()
+          .executeTakeFirst();
+      });
 
       if (!organization) {
         return {
@@ -345,10 +353,12 @@ export class OrganizationService {
       }
 
       // 2. Delete organization (hard delete since no deleted_at column)
-      const result = await this.db
-        .deleteFrom('organizations')
-        .where('id', '=', id)
-        .executeTakeFirst();
+      const result = await this.withDb(async (db) => {
+        return await db
+          .deleteFrom('organizations')
+          .where('id', '=', id)
+          .executeTakeFirst();
+      });
 
       if (result.numUpdatedRows === 0) {
         return {
@@ -393,8 +403,8 @@ export class OrganizationService {
     filters: OrganizationListFilters = {}
   ): Promise<OrganizationServiceResponse<Organization[]>> {
     try {
-      let query = this.db
-        .selectFrom('organizations');
+      const organizations = await this.withDb(async (db) => {
+        let query = db.selectFrom('organizations');
 
       // Apply filters
       if (filters.subscription_tier) {
@@ -423,10 +433,11 @@ export class OrganizationService {
         query = query.offset(filters.offset);
       }
 
-      const organizations = await query
-        .selectAll()
-        .orderBy('created_at', 'desc')
-        .execute();
+        return await query
+          .selectAll()
+          .orderBy('created_at', 'desc')
+          .execute();
+      });
 
       return {
         success: true,
@@ -454,25 +465,29 @@ export class OrganizationService {
       }
 
       // Get member counts
-      const memberStats = await this.db
-        .selectFrom('organization_members')
-        .select((eb) => [
-          eb.fn.count('id').as('total_members'),
-          eb.fn.count('id').filterWhere('status', '=', 'active').as('active_members')
-        ])
-        .where('organization_id', '=', organizationId)
-        .executeTakeFirst();
+      const memberStats = await this.withDb(async (db) => {
+        return await db
+          .selectFrom('organization_members')
+          .select((eb) => [
+            eb.fn.count('id').as('total_members'),
+            eb.fn.count('id').filterWhere('status', '=', 'active').as('active_members')
+          ])
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst();
+      });
 
       // Get pending invitation count
-      const invitationStats = await this.db
-        .selectFrom('organization_invitations')
-        .select((eb) => [
-          eb.fn.count('id').as('pending_invitations')
-        ])
-        .where('organization_id', '=', organizationId)
-        .where('status', '=', 'pending')
-        .where('expires_at', '>', new Date())
-        .executeTakeFirst();
+      const invitationStats = await this.withDb(async (db) => {
+        return await db
+          .selectFrom('organization_invitations')
+          .select((eb) => [
+            eb.fn.count('id').as('pending_invitations')
+          ])
+          .where('organization_id', '=', organizationId)
+          .where('status', '=', 'pending')
+          .where('expires_at', '>', new Date())
+          .executeTakeFirst();
+      });
 
       const stats: OrganizationStats = {
         id: org.data.id,
@@ -517,11 +532,13 @@ export class OrganizationService {
       }
 
       // Check if the polar customer ID is already associated with another organization
-      const existingOrgWithCustomer = await this.db
-        .selectFrom('organizations')
-        .where('polar_customer_id', '=', data.polar_customer_id)
-        .selectAll()
-        .executeTakeFirst();
+      const existingOrgWithCustomer = await this.withDb(async (db) => {
+        return await db
+          .selectFrom('organizations')
+          .where('polar_customer_id', '=', data.polar_customer_id)
+          .selectAll()
+          .executeTakeFirst();
+      });
 
       if (existingOrgWithCustomer) {
         return {
