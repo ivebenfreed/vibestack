@@ -101,13 +101,24 @@ const DashboardLegend = observer(function DashboardLegend() {
       });
       
       if (isUniverseMode) {
-        // Load universe context with all user organizations
-        const orgIds = currentOrganization?.id ? [currentOrganization.id] : [];
-        loadUniverseContext(userId, orgIds).then(() => {
-          log.info('Universe context loaded for route');
-        }).catch((error) => {
-          console.error('Failed to load universe context for route:', error);
-        });
+        // Load universe context with ALL user organizations
+        // First fetch the user's complete organization list from the universe API
+        fetch('/api/universe/complete', { credentials: 'include' })
+          .then(response => response.json())
+          .then(universeData => {
+            if (universeData.success && universeData.data?.organizations) {
+              const orgIds = Object.keys(universeData.data.organizations);
+              log.info('Loading universe context with all organizations:', orgIds);
+              return loadUniverseContext(userId, orgIds);
+            } else {
+              throw new Error('Failed to get organization list from universe API');
+            }
+          })
+          .then(() => {
+            log.info('Universe context loaded for route with all organizations');
+          }).catch((error) => {
+            console.error('Failed to load universe context for route:', error);
+          });
       } else {
         // Load specific organization context - FIXED: orgId first, then userId
         loadOrgContext(routeOrgId!, userId).then(() => {
