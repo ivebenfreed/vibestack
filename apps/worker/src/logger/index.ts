@@ -33,22 +33,24 @@ class SimpleLogger {
   }
 
   private loadConfig() {
-    // Simple: just read enabled contexts and log level
+    // Read environment variables set by dev scripts (no .env.local caching issues)
     const contexts = import.meta.env.VITE_LOG_CONTEXTS;
-    const level = import.meta.env.VITE_LOG_LEVEL || 'info';
+    const level = import.meta.env.VITE_LOG_LEVEL || 'error';
     
     this.logLevel = level as LogLevel;
     
     if (contexts === undefined) {
-      // No env var specified, enable all contexts
-      this.enabledContexts = new Set(['sync', 'ui', 'data', 'auth', 'routing', 'performance', 'state', 'testing', 'debug']);
+      // No env var specified, default to quiet mode
+      this.enabledContexts = new Set();
     } else if (contexts === '') {
       // Empty string explicitly set, disable all contexts (quiet mode)
       this.enabledContexts = new Set();
     } else {
-      // Specific contexts set
+      // Specific contexts set via dev script
       this.enabledContexts = new Set(contexts.split(',').filter(Boolean) as LogContext[]);
     }
+    
+    console.log(`🔧 [Logger] Loaded: contexts=${contexts || 'none'}, level=${level}`);
   }
 
   shouldLog(context: LogContext, level: LogLevel): boolean {

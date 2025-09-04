@@ -1,6 +1,8 @@
 # Simple Contextual Logging System
 
-**Simplified logging system with just two environment variables and easy runtime controls.**
+**Single environment variable controls what logs show:**
+- VITE_LOG_CONTEXTS: comma-separated list (sync,state,ui,data,auth,routing,performance,testing,debug)
+- VITE_LOG_LEVEL: debug|info|warn|error (default: info)
 
 ## Quick Start
 
@@ -14,36 +16,25 @@ log.info('Sync completed', { changes: 5 });
 log.error('Connection failed', error); // Always shows
 ```
 
-## Configuration (2 Environment Variables)
+## Dev Scripts Control Logging
 
-**In `apps/worker/.env.local`:**
-
-```bash
-# What contexts to show (if empty, shows all)
-VITE_LOG_CONTEXTS=sync,state
-
-# Log level threshold  
-VITE_LOG_LEVEL=debug
-```
-
-## Quick Commands
+**Environment variables are set by dev scripts, not .env.local files:**
 
 ```bash
-# Focus on sync operations
-pnpm log:sync          # Shows sync + state logs
+# Silent mode (errors only)
+pnpm dev:quiet      # VITE_LOG_CONTEXTS='' VITE_LOG_LEVEL='error'
 
-# Focus on specific areas  
-pnpm log:state         # State management 
-pnpm log:ui            # UI components
-pnpm log:data          # Data operations
+# Focus on sync operations  
+pnpm dev:sync       # VITE_LOG_CONTEXTS='sync,state' VITE_LOG_LEVEL='debug'
 
-# Control everything
-pnpm log:all           # All contexts enabled
-pnpm log:none          # Only errors show
-pnpm log:clear         # Remove all config
+# Focus on UI components
+pnpm dev:ui         # VITE_LOG_CONTEXTS='ui' VITE_LOG_LEVEL='debug'
 
-# Custom combinations
-pnpm log:focus sync,ui,data
+# Debug mode (multiple contexts)
+pnpm dev:debug      # VITE_LOG_CONTEXTS='sync,state,ui,data' VITE_LOG_LEVEL='debug'
+
+# All contexts enabled
+pnpm dev:all        # VITE_LOG_CONTEXTS='sync,state,ui,data,auth,routing,performance,testing,debug' VITE_LOG_LEVEL='debug'
 ```
 
 ## Runtime Controls (Browser Console)
@@ -72,11 +63,25 @@ logControl.status();                // Show current config
 
 ## Benefits ✅
 
-- **Simple**: Just 2 environment variables
-- **No conflicts**: Runtime controls work predictably
+- **Simple**: Environment variables set by dev scripts only
+- **No caching issues**: Dev scripts control everything directly
 - **Always errors**: Error logs always show regardless of settings
 - **Easy switching**: Change contexts without restart via console
 - **Clean output**: Contextual filtering prevents log pollution
+- **Instant quiet mode**: Runtime controls work immediately
+
+## Key Features
+
+### Dev Script Control
+- Initial logging state set by `pnpm dev:*` commands
+- No `.env.local` file dependencies (prevents caching issues)
+- Restart server to change initial logging configuration
+
+### Runtime Controls (No Restart Required)
+- `logControl.none()` - Instant quiet mode
+- `logControl.only('sync')` - Focus on specific contexts
+- `logControl.status()` - Check current state
+- Perfect for quick debugging without server restarts
 
 ## Migration from Old System
 
@@ -86,22 +91,27 @@ The new system automatically works with existing `syncLog()` and `stateLog()` ca
 - ~~`VITE_LOG_PATTERNS`~~ 
 - ~~`VITE_LOG_DISABLED_PATTERNS`~~
 - ~~`VITE_LOG_FOCUS_MODE`~~
+- ~~`.env.local` logging configuration~~
 
-**New simple env vars:**
-- `VITE_LOG_CONTEXTS` - comma-separated contexts
-- `VITE_LOG_LEVEL` - debug|info|warn|error
+**New simple approach:**
+- Dev scripts control initial state via environment variables
+- Runtime controls for instant switching without restarts
 
 ## Troubleshooting
 
 **Logs not showing?**
 1. Check contexts: `logControl.status()` in browser console
-2. Check level: Lower level in `.env.local` (use `debug`)  
-3. Restart dev server after env changes
+2. Use dev script: `pnpm dev:debug` for debug mode
+3. Runtime enable: `logControl.all()` to see everything
 
 **Too many logs?**
-1. Focus on specific contexts: `pnpm log:sync` 
-2. Use browser console: `logControl.only('sync', 'state')`
+1. Use dev scripts: `pnpm dev:quiet` for silent mode
+2. Runtime control: `logControl.none()` for instant quiet
 
-**No logs at all?**
-1. Enable all: `logControl.all()` or `pnpm log:all`
-2. Check if contexts are empty: `VITE_LOG_CONTEXTS=` shows nothing
+**Need to switch contexts quickly?**
+1. Use runtime controls (no restart): `logControl.only('sync', 'state')`
+2. For permanent change: restart with different dev script
+
+**Logger not working?**
+1. Verify logger loaded: `typeof window.logControl === 'object'`
+2. Clear any cached filters: `logControl.clear()`
