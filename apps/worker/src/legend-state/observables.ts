@@ -32,6 +32,7 @@ export class ConflictError extends Error {
 // Reactive persistence configuration - created after schema loads
 let persistenceManager: PersistenceManager | null = null
 let syncedCrudWithPersistence: any = null
+let persistenceConfig: { persistOptions: any; entityTableMap: Record<string, string> } | null = null
 let currentOrgId: string | null = null
 let currentSchemaVersion: string | null = null
 
@@ -79,7 +80,7 @@ export const orgContext$ = observable(() => {
         // Use org UUID prefix for unique keys, but include clean names for navigation
         const prefixedName = `${org.orgId}_${entityName}`
         combinedEntities[prefixedName] = {
-          ...entitySchema,
+          ...(typeof entitySchema === 'object' && entitySchema !== null ? entitySchema : {}),
           _organizationId: org.orgId,
           _organizationName: org.name,
           _originalName: entityName
@@ -538,72 +539,60 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       waitFor: new Promise(resolve => setTimeout(resolve, 100)) // Small delay for persistence
     } : {}),
     
-    // PERSISTENCE: Enable IndexedDB persistence with differential sync support
-    // This is CRITICAL for changesSince to work - Legend State stores sync timestamps here
-    ...(syncedCrudWithPersistence && persistenceManager ? (() => {
-      const persistOptions = persistenceManager.getPersistOptions(entityName)
-      // Persistence configured for entity (logging reduced for performance)
-      return { 
-        persist: {
-          ...persistOptions,
-          // Ensure retrySync is enabled for differential sync
-          retrySync: true
-        }
-      }
-    })() : {
-      // Fallback: Basic persistence for differential sync even without IndexedDB
+    // PERSISTENCE: Each entity needs proper table name even with Legend State v3 configureSynced
+    // Extract the base entity name (e.g., 'Task' from '01920000-1000-7000-8000-000000000001_Task')
+    ...(persistenceConfig?.entityTableMap ? {
       persist: {
-        name: `entity-${entityName}`,
+        name: persistenceConfig.entityTableMap[entityName.split('_').pop() || entityName] || `entity-${entityName}`,
         retrySync: true
       }
-    })
-  }
-  
-  // CRITICAL FIX: Re-enable syncedCrud but fix WebSocket subscription to prevent sync loop
-  // The issue was that refresh() from WebSocket notifications was triggering PUT requests
-  // Solution: Modify subscription to manually update data without calling refresh()
-  
-  // Override the subscription to prevent sync loop
-  crudConfig.subscribe = ({ refresh }) => {
-    const handler = (e: CustomEvent) => {
-      const notification = e.detail
-      
-      // Only log notifications in development for debugging
-      if (import.meta.env.DEV && notification.test) {
-        log.info(`[Observable] ${entityName} received test notification:`, notification)
-      }
-      
-      // Check if notification is for this entity
-      const isRelevantNotification = notification?.tables?.some((tableName: string) => {
-        const expectedTableName = entityName.toLowerCase() + 's'
-        return tableName === expectedTableName
-      })
-      
-      if (isRelevantNotification) {
-        if (import.meta.env.DEV) {
-          log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
+    } : {}),
+
+    // WebSocket subscription for real-time updates
+    subscribe: ({ refresh }: { refresh: () => void }) => {
+      const handler = (e: CustomEvent) => {
+        const notification = e.detail
+        
+        // Only log notifications in development for debugging
+        if (typeof window !== 'undefined' && window.location?.hostname === 'localhost' && notification.test) {
+          log.info(`[Observable] ${entityName} received test notification:`, notification)
         }
-        refresh()
+        
+        // Check if notification is for this entity
+        const isRelevantNotification = notification?.tables?.some((tableName: string) => {
+          const expectedTableName = entityName.toLowerCase() + 's'
+          return tableName === expectedTableName
+        })
+        
+        if (isRelevantNotification) {
+          if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+            log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
+          }
+          refresh()
+        }
       }
-    }
-    
-    // Listen for table change notifications
-    window.addEventListener('vibestack:table-change-notification', handler as any)
-    
-    // WebSocket subscription configured (logging reduced for performance)
-    
-    // Return cleanup function
-    return () => {
-      window.removeEventListener('vibestack:table-change-notification', handler as any)
-      if (import.meta.env.DEV) {
-        log.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+      
+      // Listen for table change notifications
+      if (typeof window !== 'undefined') {
+        window.addEventListener('vibestack:table-change-notification', handler as any)
+      }
+      
+      // Return cleanup function
+      return () => {
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('vibestack:table-change-notification', handler as any)
+          if (window.location?.hostname === 'localhost') {
+            log.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+          }
+        }
       }
     }
   }
+  
   
   const syncedCrudFn = syncedCrudWithPersistence || syncedCrud
   
-  if (import.meta.env.DEV) {
+  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
     log.info(`[Observable] Creating syncedCrud for ${entityName}`)
   }
   
@@ -730,42 +719,19 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     // Create persistence manager with enhanced error handling
     persistenceManager = createPersistenceManager(primaryOrgId, userId)
     
-    // Create IndexedDB configuration with error recovery
-    const indexedDBPlugin = persistenceManager.createIndexedDBConfig(entityKeys)
+    // Create IndexedDB configuration with error recovery using Legend State v3 pattern
+    const indexedDBConfig = await persistenceManager.createIndexedDBConfig(entityKeys)
     
     // Configure synced CRUD with or without persistence
-    if (indexedDBPlugin) {
-      // IndexedDB plugin available - use it with error handling
-      syncedCrudWithPersistence = configureSynced(syncedCrud, {
-        persist: {
-          plugin: indexedDBPlugin,
-          // Add error handling at the Legend State level
-          onError: (error: any) => {
-            log.warn('[Observable] Legend State persistence error:', error)
-            
-            // Check for IndexedDB object store errors
-            if (error?.name === 'NotFoundError' || 
-                error?.message?.includes('object stores was not found') ||
-                error?.message?.includes('Error loading local cache')) {
-              log.info('[Observable] Detected IndexedDB schema mismatch - clearing cache and continuing with server data')
-              
-              // Clear the problematic data and continue without persistence
-              if (persistenceManager) {
-                persistenceManager.clearOrganizationData().catch(clearError => {
-                  log.warn('[Observable] Failed to clear organization data:', clearError)
-                })
-              }
-              
-              // Don't throw - let the app continue with server-only sync
-              return true // Indicate error was handled
-            }
-            
-            // For other errors, log but don't block the application
-            log.error('[Observable] Unhandled persistence error:', error)
-            return true // Continue without persistence
-          }
-        }
-      })
+    if (indexedDBConfig) {
+      // IndexedDB configuration available - use the proper v3 pattern
+      const { persistOptions, entityTableMap } = indexedDBConfig
+      
+      // Store the persistOptions globally for use in individual entity creation
+      persistenceConfig = { persistOptions, entityTableMap }
+      
+      // In Legend State v3, persistOptions IS the function that wraps syncedCrud with persistence
+      syncedCrudWithPersistence = persistOptions
       
       log.info('[Observable] Persistence configured with IndexedDB plugin')
     } else {
@@ -1257,7 +1223,10 @@ export const batchOperations = {
     return {
       successful: results.filter(r => r.status === 'fulfilled').length,
       failed: failures.length,
-      failures: failures.map(f => ({ id: f.id, error: f.result.reason }))
+      failures: failures.map(f => ({ 
+        id: f.id, 
+        error: (f.result as PromiseRejectedResult).reason 
+      }))
     }
   },
 
@@ -1286,7 +1255,10 @@ export const batchOperations = {
     return {
       successful: results.filter(r => r.status === 'fulfilled').length,
       failed: failures.length,
-      failures: failures.map(f => ({ item: f.item, error: f.result.reason })),
+      failures: failures.map(f => ({ 
+        item: f.item, 
+        error: (f.result as PromiseRejectedResult).reason 
+      })),
       created: results
         .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
         .map(r => r.value)
@@ -1510,7 +1482,7 @@ if (typeof window !== 'undefined') {
       }
       
       // Show user-friendly message in development
-      if (import.meta.env.DEV) {
+      if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
         console.warn('[VibeStack] IndexedDB cache cleared due to schema changes. This is normal and the app will continue working with fresh data from the server.')
       }
       
@@ -1538,7 +1510,7 @@ if (typeof window !== 'undefined') {
       
       event.preventDefault() // Prevent the error from crashing the app
       
-      if (import.meta.env.DEV) {
+      if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
         console.warn('[VibeStack] Prevented IndexedDB error from crashing the app. Data cleared and app continues normally.')
       }
     }
@@ -1546,7 +1518,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Debug: Expose to window in development
-if (typeof window !== 'undefined' && import.meta.env.DEV) {
+if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
   (window as any).vibestackOrgContext = orgContext$
   ;(window as any).vibestackBatchOps = batchOperations
   ;(window as any).vibestackEntityOps = entityOperations

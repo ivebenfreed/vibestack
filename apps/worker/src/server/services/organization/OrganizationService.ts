@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import type { Kysely } from 'kysely';
 import { dbLogger } from '../../middleware/logger';
-import { createDatabaseConnection, withKysely } from '../../lib/database-manager';
+import { createDatabaseConnection, withKysely, getKysely } from '../../lib/database-manager';
 import type { 
   Organization, 
   CreateOrganizationInput, 
@@ -18,6 +18,20 @@ import type {
 export class OrganizationService {
   constructor(private context: Context) {
     // Database connections are now managed through withKysely() calls
+  }
+
+  /**
+   * Helper method to access database with proper connection management
+   */
+  private async withDb<T>(fn: (db: Kysely<any>) => Promise<T>): Promise<T> {
+    return withKysely(fn);
+  }
+
+  /**
+   * @deprecated Legacy database getter - Use withDb() instead to prevent connection leaks
+   */
+  private get db() {
+    return getKysely();
   }
 
   /**
@@ -43,11 +57,13 @@ export class OrganizationService {
       }
 
       // 3. Check if slug is unique
-      const existingOrg = await this.db
-        .selectFrom('organizations')
-        .where('slug', '=', data.slug)
-        .selectAll()
-        .executeTakeFirst();
+      const existingOrg = await this.withDb(async (db) => {
+        return await db
+          .selectFrom('organizations')
+          .where('slug', '=', data.slug)
+          .selectAll()
+          .executeTakeFirst();
+      });
 
       if (existingOrg) {
         return {

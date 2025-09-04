@@ -7,7 +7,7 @@
 
 import { type Observable } from '@legendapp/state'
 import { type PersistOptions } from '@legendapp/state/sync'
-import { ObservablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
+import { ObservablePersistIndexedDB, observablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
 import { stateLog } from '@/logger';
 
 const log = stateLog('legend-state/helpers/PersistenceManager.ts');
@@ -58,68 +58,208 @@ export class PersistenceManager {
    * Generate database version based on entity schema to ensure IndexedDB upgrades
    */
   private generateSchemaVersion(entityNames: string[]): number {
-    // Use timestamp-based version to ensure monotonic increase
-    // This prevents IndexedDB version downgrade errors when entities are deleted
-    const currentTime = Date.now()
-    
-    // Store the last version used for this org in localStorage to ensure monotonic increase
     const versionKey = `vibestack_db_version_${this.organizationId}`
-    const lastVersion = parseInt(localStorage.getItem(versionKey) || '0', 10)
+    const schemaHashKey = `vibestack_db_schema_hash_${this.organizationId}`
     
-    // Use the larger of current time or last version + 1 to ensure we never go backwards
-    const newVersion = Math.max(currentTime, lastVersion + 1)
+    // Create a stable hash of the entity names to detect schema changes
+    const currentSchemaHash = this.createSchemaHash(entityNames)
+    const lastSchemaHash = localStorage.getItem(schemaHashKey) || ''
+    const lastVersion = parseInt(localStorage.getItem(versionKey) || '1', 10)
     
-    // Store the new version
+    // Only increment version if schema actually changed
+    if (currentSchemaHash === lastSchemaHash && lastVersion > 0) {
+      log.info(`[PersistenceManager] Schema unchanged, reusing version: ${lastVersion}`)
+      return lastVersion
+    }
+    
+    // Schema changed - increment version
+    const newVersion = lastVersion + 1
+    
+    // Store both the new version and schema hash
     localStorage.setItem(versionKey, newVersion.toString())
+    localStorage.setItem(schemaHashKey, currentSchemaHash)
     
-    log.info(`[PersistenceManager] Version progression: ${lastVersion} -> ${newVersion}`)
+    log.info(`[PersistenceManager] Schema changed, version progression: ${lastVersion} -> ${newVersion}`, {
+      oldHash: lastSchemaHash.substring(0, 8),
+      newHash: currentSchemaHash.substring(0, 8),
+      entityCount: entityNames.length
+    })
     
     return newVersion
   }
   
   /**
-   * Create IndexedDB configuration for all entity tables
+   * Create a stable hash of entity names for schema change detection
    */
-  public createIndexedDBConfig(entityNames: string[]) {
+  private createSchemaHash(entityNames: string[]): string {
+    // Sort entity names to ensure consistent hash regardless of order
+    const sortedNames = [...entityNames].sort()
+    const schemaString = sortedNames.join(',')
+    
+    // Simple hash function - could be more sophisticated but this works for our needs
+    let hash = 0
+    for (let i = 0; i < schemaString.length; i++) {
+      const char = schemaString.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    
+    return `schema_${Math.abs(hash).toString(36)}_${sortedNames.length}`
+  }
+  
+  /**
+   * Create IndexedDB configuration for all entity tables using Legend State v3 pattern
+   */
+  public async createIndexedDBConfig(entityNames: string[]) {
+    console.log(`[PersistenceManager] Creating IndexedDB config for entities:`, entityNames)
+    
     // Create table names for all entities plus metadata tables
+    // For multi-org universe system, entityNames are in format: {orgId}_{EntityName}
+    // We need to create valid IndexedDB table names by sanitizing them
     const tableNames = [
-      ...entityNames.map(name => `vibestack_${name.toLowerCase()}`),
+      ...entityNames.map(name => {
+        // Convert composite key to valid table name by replacing invalid chars
+        const sanitized = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+        return `vibestack_${sanitized}`
+      }),
       'metadata',
       'sync_state'
     ]
+    
+    console.log(`[PersistenceManager] Created table names:`, tableNames)
     
     // Generate dynamic version based on schema to trigger IndexedDB upgrades when needed
     const schemaVersion = this.generateSchemaVersion(entityNames)
     
     log.info(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
-    log.info(`[PersistenceManager] Using dynamic schema version: ${schemaVersion} (based on entity list)`)
+    log.info(`[PersistenceManager] Using schema version: ${schemaVersion}`)
     
     try {
-      // Create and properly initialize the IndexedDB plugin
-      const plugin = new ObservablePersistIndexedDB({
-        databaseName: this.dbName,
-        version: schemaVersion,
-        tableNames: tableNames
+      console.log(`[PersistenceManager] Schema version: ${schemaVersion}, table names:`, tableNames)
+      
+      // Check if we need to clear database due to version downgrade
+      const needsClear = this.checkForVersionDowngrade(schemaVersion)
+      console.log(`[PersistenceManager] Needs clear due to version downgrade:`, needsClear)
+      if (needsClear) {
+        log.info(`[PersistenceManager] Clearing database due to version downgrade`)
+        return await this.createConfigAfterClear(schemaVersion, tableNames, entityNames)
+      }
+      
+      // Use the proper Legend State v3 pattern - configure globally with configureSynced
+      const { configureSynced } = await import('@legendapp/state/sync')
+      
+      const persistOptions = configureSynced({
+        persist: {
+          plugin: observablePersistIndexedDB({
+            databaseName: this.dbName,
+            version: schemaVersion,
+            tableNames: tableNames
+          })
+        }
       })
       
-      // Initialize the plugin immediately to avoid "not initialized" errors
-      // The plugin's initialize method sets up the database connection
-      plugin.initialize({
-        databaseName: this.dbName,
-        version: schemaVersion,
-        tableNames: tableNames
-      })
+      log.info(`[PersistenceManager] Legend State v3 IndexedDB configuration created successfully`)
       
-      log.info(`[PersistenceManager] IndexedDB plugin initialized successfully`)
-      return plugin
+      // Return both the configuration function and entity mapping for table names
+      return {
+        persistOptions,
+        entityTableMap: this.createEntityTableMap(entityNames, tableNames)
+      }
       
     } catch (error) {
-      log.warn(`[PersistenceManager] Failed to create IndexedDB plugin, falling back to localStorage:`, error)
+      console.error(`[PersistenceManager] ERROR - Failed to create IndexedDB plugin:`, error)
+      log.warn(`[PersistenceManager] Failed to create IndexedDB plugin:`, error)
       
-      // Instead of complex fallback, just disable persistence by returning null
-      // This allows the app to work without persistence rather than with a broken plugin
+      // Check if this is a version downgrade error
+      if (error.name === 'VersionError' && error.message?.includes('is less than the existing version')) {
+        log.info(`[PersistenceManager] Detected version downgrade, clearing database and retrying`)
+        return await this.createConfigAfterClear(schemaVersion, tableNames, entityNames)
+      }
+      
+      // For other errors, return null - the calling code will handle fallback
+      log.warn(`[PersistenceManager] Using fallback storage due to IndexedDB error`)
       return null
     }
+  }
+  
+
+
+  /**
+   * Check if the new version would cause a downgrade
+   */
+  private checkForVersionDowngrade(newVersion: number): boolean {
+    // Check if there's a database that might have a higher version
+    const oldVersionKey = `vibestack_db_version_${this.organizationId}`
+    const storedVersion = localStorage.getItem(oldVersionKey)
+    
+    if (!storedVersion) {
+      return false
+    }
+    
+    const existingVersion = parseInt(storedVersion, 10)
+    
+    // If the new version is significantly lower, it's likely a downgrade from timestamp to hash-based versioning
+    if (existingVersion > 1000000 && newVersion < 1000) {
+      log.info(`[PersistenceManager] Detected migration from timestamp (${existingVersion}) to hash-based versioning (${newVersion})`)
+      return true
+    }
+    
+    return false
+  }
+  
+  /**
+   * Create configuration after clearing database
+   */
+  private async createConfigAfterClear(schemaVersion: number, tableNames: string[], entityNames: string[]): Promise<any> {
+    try {
+      // Clear the problematic database
+      await this.clearAndRecreateDatabase()
+      
+      // Wait for the database to be fully cleared
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Use the proper Legend State v3 pattern - configure globally with configureSynced
+      const { configureSynced } = await import('@legendapp/state/sync')
+      
+      const persistOptions = configureSynced({
+        persist: {
+          plugin: observablePersistIndexedDB({
+            databaseName: this.dbName,
+            version: schemaVersion,
+            tableNames: tableNames
+          })
+        }
+      })
+      
+      log.info(`[PersistenceManager] Legend State v3 IndexedDB configuration recreated after database clear`)
+      
+      // Return both the configuration function and entity mapping for table names
+      return {
+        persistOptions,
+        entityTableMap: this.createEntityTableMap(entityNames, tableNames)
+      }
+      
+    } catch (retryError) {
+      log.warn(`[PersistenceManager] Failed to create plugin even after clearing database:`, retryError)
+      log.info(`[PersistenceManager] Falling back to in-memory storage`)
+      return null
+    }
+  }
+  
+  /**
+   * Create mapping from entity names to sanitized table names
+   */
+  private createEntityTableMap(entityNames: string[], tableNames: string[]): Record<string, string> {
+    const entityTableMap: Record<string, string> = {}
+    
+    // Map each entity name to its corresponding sanitized table name
+    entityNames.forEach((entityName, index) => {
+      // Extract the actual entity name from the composite key (remove orgId prefix)
+      const entityKey = entityName.split('_').pop() || entityName
+      entityTableMap[entityKey] = tableNames[index]
+    })
+    
+    return entityTableMap
   }
 
   /**

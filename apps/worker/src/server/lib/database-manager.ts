@@ -150,11 +150,37 @@ export function createKyselyForPersistentUse(): Kysely<Database> {
 
 /**
  * @deprecated Use withKysely() to ensure connections are properly closed
- * Legacy function that creates unclosed connections - DO NOT USE
+ * Temporary implementation - creates a connection that needs manual cleanup
  */
 export function getKysely(): Kysely<Database> {
-  console.error('❌ getKysely() is deprecated and creates connection leaks! Use withKysely() instead');
-  throw new Error('getKysely() is disabled to prevent connection leaks. Use withKysely() instead.');
+  console.warn('⚠️ getKysely() is deprecated and creates connection leaks! Use withKysely() instead');
+  
+  if (!workerEnv) {
+    throw new Error('Database manager not initialized. Call initializeDatabaseManager(env) first.');
+  }
+
+  const pgClient = createPostgresConnection();
+  const source = workerEnv.ENVIRONMENT === 'local' || workerEnv.ENVIRONMENT === 'development'
+    ? 'Direct (Local)' 
+    : (workerEnv.HYPERDRIVE_DB ? 'Hyperdrive' : 'Direct');
+
+  const db = new Kysely<Database>({
+    dialect: new PostgresJSDialectPatched(pgClient),
+    log: (event) => {
+      if (event.level === 'query') {
+        dbLogger.debug(`Kysely ${source} Query`, {
+          sql: event.query.sql,
+          parameters: event.query.parameters,
+          duration: event.queryDurationMillis
+        }, `kysely-${source.toLowerCase()}`);
+      } else if (event.level === 'error') {
+        dbLogger.error(`Kysely ${source} Error`, event.error, undefined, `kysely-${source.toLowerCase()}`);
+      }
+    }
+  });
+
+  console.log(`⚠️ Created long-lived Kysely connection - ensure it gets destroyed!`);
+  return db;
 }
 
 /**
