@@ -25,6 +25,7 @@ export interface LegendStateInitContext {
   userId: string | null
   organizationIds: string[]
   currentOrgId: string | null
+  organizationData?: Array<{ id: string; name: string }>
   
   // Progress tracking
   currentStep: string
@@ -70,19 +71,22 @@ const loadSchemasService = fromPromise(async ({
     userId: string
     organizationIds: string[]
     currentOrgId?: string
+    organizationData?: Array<{ id: string; name: string }>
   } 
 }) => {
-  const { userId, organizationIds, currentOrgId } = input
+  const { userId, organizationIds, currentOrgId, organizationData } = input
   
   log.info('[LegendStateInit] Loading universe schemas:', {
     userId,
     organizationIds,
-    currentOrgId
+    currentOrgId,
+    hasOrgData: !!organizationData,
+    orgDataReceived: organizationData  // Added debug output to see actual data
   })
   
   try {
-    // Always load universe context with all organizations
-    await loadUniverseContext(userId, organizationIds)
+    // Always load universe context with all organizations and their names
+    await loadUniverseContext(userId, organizationIds, organizationData)
     
     // Get the loaded schema to count entities
     const schema = universeSchema$.peek()
@@ -289,6 +293,7 @@ export const legendStateInitMachine = setup({
     userId: input?.userId || null,
     organizationIds: input?.organizationIds || [],
     currentOrgId: null, // Always null in universe mode
+    organizationData: input?.organizationData || undefined,
     
     currentStep: 'idle',
     totalSteps: 4, // loadingSchemas, initializingPersistence, creatingObservables, triggeringInitialLoad
@@ -380,7 +385,8 @@ export const legendStateInitMachine = setup({
         input: ({ context }) => ({
           userId: context.userId!,
           organizationIds: context.organizationIds,
-          currentOrgId: context.currentOrgId || undefined
+          currentOrgId: context.currentOrgId || undefined,
+          organizationData: context.organizationData
         }),
         
         onDone: {

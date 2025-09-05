@@ -51,6 +51,7 @@ interface EntityCardProps {
   count: number | string
   archetype?: string
   orgId?: string // Organization ID for routing context
+  orgName?: string // Organization name for display
   isUniverseMode?: boolean // Whether we're in universe view
   onDelete?: (entityName: string) => void
 }
@@ -67,7 +68,7 @@ const ARCHETYPE_CONFIG = {
   collection: { icon: Layers, color: 'bg-indigo-500/10 text-indigo-600', label: 'Collection' },
 }
 
-export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, orgId, isUniverseMode, onDelete }: EntityCardProps) {
+export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, orgId, orgName, isUniverseMode, onDelete }: EntityCardProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
   
@@ -95,7 +96,26 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
   }
   
   // Get the clean display name for use in descriptions and icon detection
-  const displayName = entityDef?._originalName || entityName;
+  // In universe mode, entityName might be prefixed with org UUID, so extract the actual entity name
+  const displayName = (() => {
+    // First try to use the original name from entity definition
+    if (entityDef?._originalName) {
+      return entityDef._originalName;
+    }
+    
+    // If entityName contains UUID prefix (universe mode), extract the clean name
+    if (entityName.includes('_')) {
+      const parts = entityName.split('_');
+      // Check if first part looks like a UUID (36 chars with dashes)
+      if (parts[0].length === 36 && parts[0].includes('-')) {
+        // Return everything after the UUID prefix
+        return parts.slice(1).join('_');
+      }
+    }
+    
+    // Otherwise return as-is
+    return entityName;
+  })();
 
   // Override icon for specific entity names
   const getEntityIcon = () => {
@@ -157,16 +177,23 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow cursor-pointer relative group overflow-visible">
+      <Card className="hover:shadow-md transition-all duration-200 cursor-pointer relative group border-border/50 bg-card/50 backdrop-blur-sm">
         <Link to={route.to} params={route.params} className="block">
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <div className="flex items-center gap-2">
-              <CardTitle className='text-sm font-medium'>
-                {displayName}
-              </CardTitle>
-              <Badge variant="secondary" className={archetypeConfig.color}>
-                {archetypeConfig.label}
-              </Badge>
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-3'>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <CardTitle className='text-base font-semibold'>
+                  {displayName}
+                </CardTitle>
+                <Badge variant="outline" className={`${archetypeConfig.color} text-xs`}>
+                  {archetypeConfig.label}
+                </Badge>
+              </div>
+              {orgName && (
+                <Badge variant="secondary" className="w-fit text-xs font-normal">
+                  {orgName}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {getEntityIcon()}
@@ -200,14 +227,14 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
               )}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>{count.toLocaleString()}</div>
-            <p className='text-muted-foreground text-xs'>
+          <CardContent className="pt-1">
+            <div className='flex items-baseline gap-2 mb-1'>
+              <div className='text-3xl font-bold'>{count.toLocaleString()}</div>
+              <span className='text-sm text-muted-foreground'>records</span>
+            </div>
+            <p className='text-muted-foreground text-sm'>
               {getEntityDescription()}
             </p>
-            <div className='text-muted-foreground text-xs mt-2'>
-              <p>Table: <span className='font-medium'>{entityDef.tableName?.split('_').pop() || 'unknown'}</span></p>
-            </div>
           </CardContent>
         </Link>
       </Card>
@@ -222,7 +249,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
               <br />
               • Remove the entity definition from your organization
               <br />
-              • Delete all data in the {entityDef.tableName?.split('_').pop() || 'entity'} table
+              • Delete all data in the {displayName} table
               <br />
               • Remove the entity from all menus and dashboards
               <br />

@@ -742,15 +742,23 @@ export const authMachine = setup({
                 src: 'legendStateInit',
                 input: ({ context }) => {
                   const organizationIds = context.userOrganizations?.map(org => org.id) || [];
+                  const organizationData = context.userOrganizations?.map(org => ({
+                    id: org.id,
+                    name: org.name
+                  })) || [];
+                  
                   log.info('[AuthMachine] 🎯 Invoking Legend State machine with:', {
                     userId: context.user?.id,
                     organizationIds,
-                    currentOrgId: context.currentOrganization?.id
+                    currentOrgId: context.currentOrganization?.id,
+                    orgCount: organizationData.length,
+                    orgData: organizationData  // Added debug output
                   });
                   return {
                     userId: context.user?.id || '',
                     organizationIds,
-                    currentOrgId: context.currentOrganization?.id
+                    currentOrgId: context.currentOrganization?.id,
+                    organizationData
                   };
                 },
                 onDone: {
@@ -1063,6 +1071,10 @@ export const authMachine = setup({
             input: ({ context }) => {
               // Always pass ALL organizations for universe mode
               const organizationIds = context.userOrganizations?.map(org => org.id) || [];
+              const organizationData = context.userOrganizations?.map(org => ({
+                id: org.id,
+                name: org.name
+              })) || [];
               
               log.info(`[AuthMachine] Passing to Legend State machine for universe mode:`, {
                 organizationIds,
@@ -1074,6 +1086,7 @@ export const authMachine = setup({
               return {
                 userId: context.user?.id || '',
                 organizationIds,
+                organizationData,
                 // Pass current org for reference but Legend State will load all orgs
                 currentOrgId: context.currentOrganization?.id
               };

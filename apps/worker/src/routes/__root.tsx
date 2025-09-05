@@ -187,6 +187,14 @@ if (!authMachineActor) {
     const userOrganizations = initialSnapshot.context.userOrganizations
     const user = initialSnapshot.context.user
     
+    // Debug log to see what organization data we have
+    log.info('[ROOT] Restored auth state organizations:', {
+      orgCount: userOrganizations?.length,
+      hasNames: userOrganizations?.[0]?.name ? true : false,
+      firstOrgName: userOrganizations?.[0]?.name || 'NO NAME',
+      firstOrgId: userOrganizations?.[0]?.id
+    })
+    
     if (userOrganizations?.length > 0 && user?.id) {
       log.info('Initial auth already ready - loading Legend State universe context')
       
@@ -210,14 +218,15 @@ if (!authMachineActor) {
       
       // Note: For restored sessions, persistence is already handled by auth machine
       // Only initialize universe helpers for organization display
-      import('../legend-state').then(({ universeHelpers }) => {
+      import('../legend-state').then(({ universeHelpers, universeLoader }) => {
         // Initialize universe context for organizations display
         universeHelpers.setAuthenticated(true, user.id).then(async () => {
-          log.info('Universe context authenticated and workspace data loaded (initial)')
+          log.info('Universe context authenticated, loading workspace data...')
           
-          // No need to refresh - Legend State init machine handles all loading
+          // Load workspace data using the universe loader
+          await universeLoader.loadWorkspaceData()
           
-          log.info('Universe helpers setup complete (initial) - persistence handled by Legend State init machine')
+          log.info('Universe helpers setup complete (initial) - workspace data loaded')
         }).catch((error) => {
           console.error('[ROOT] Failed to initialize universe helpers (initial):', error)
         })

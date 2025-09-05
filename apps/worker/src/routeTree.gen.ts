@@ -14,6 +14,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DebugPublicRouteImport } from './routes/debug-public'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as EntityEntityNameRouteImport } from './routes/entity.$entityName'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -92,6 +93,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const EntityEntityNameRoute = EntityEntityNameRouteImport.update({
+  id: '/entity/$entityName',
+  path: '/entity/$entityName',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
@@ -426,6 +432,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/entity/$entityName': typeof EntityEntityNameRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
@@ -480,6 +487,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/entity/$entityName': typeof EntityEntityNameRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
@@ -538,6 +546,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/entity/$entityName': typeof EntityEntityNameRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/_authenticated/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
@@ -596,6 +605,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/entity/$entityName'
     | '/'
     | '/debug/entity-routes-test'
     | '/debug/legend-state-test'
@@ -650,6 +660,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/entity/$entityName'
     | '/'
     | '/debug/entity-routes-test'
     | '/debug/legend-state-test'
@@ -707,6 +718,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/entity/$entityName'
     | '/_authenticated/'
     | '/_authenticated/debug/entity-routes-test'
     | '/_authenticated/debug/legend-state-test'
@@ -763,6 +775,7 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
+  EntityEntityNameRoute: typeof EntityEntityNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -787,6 +800,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/entity/$entityName': {
+      id: '/entity/$entityName'
+      path: '/entity/$entityName'
+      fullPath: '/entity/$entityName'
+      preLoaderRoute: typeof EntityEntityNameRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/(errors)/503': {
       id: '/(errors)/503'
@@ -1294,6 +1314,7 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
+  EntityEntityNameRoute: EntityEntityNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

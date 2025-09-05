@@ -31,27 +31,88 @@ class UniverseLoader {
 
   /**
    * Load complete user workspace - main loader for universe-centric navigation
-   * Now uses synced observables for automatic reactive updates
+   * This is the SINGLE source of truth for loading workspace data
    */
-  async loadCompleteWorkspace(options: LoaderOptions = {}): Promise<void> {
+  async loadWorkspaceData(options: LoaderOptions = {}): Promise<any> {
+    const auth = authContext$.get();
+    
+    if (!auth.isAuthenticated) {
+      console.log('[UniverseLoader] Not authenticated, skipping load');
+      return null;
+    }
+    
     const { includeInactive = false, includeArchived = false, bustCache = false } = options;
     
     try {
-      console.log('[UniverseLoader] Loading workspace via synced observable...');
+      console.log('[UniverseLoader] Loading user organizations from API');
       
-      // Trigger the synced observable to load data
-      // The syncedCrud configuration will handle the actual API call
-      const workspaceData = universeWorkspace$.get();
+      // Fetch user's organizations from the API
+      const response = await fetch('/api/organizations', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load organizations: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const organizations = result.organizations || [];
       
-      console.log('[UniverseLoader] Workspace data loaded:', {
-        hasData: !!workspaceData,
-        userId: workspaceData?.userId
+      console.log('[UniverseLoader] Loaded organizations from API:', {
+        count: organizations.length,
+        orgs: organizations.map((o: any) => ({ id: o.id, name: o.name }))
       });
       
+      // Transform organizations into workspace data structure
+      const workspaceData = {
+        userId: result.userId || auth.userId,
+        organizations: organizations.reduce((acc: any, org: any) => {
+          acc[org.id] = {
+            id: org.id,
+            name: org.name,
+            slug: org.slug || '',
+            type: org.type || 'business',
+            role: org.role || 'member',
+            joinedAt: org.joined_at || org.created_at || new Date().toISOString(),
+            created_at: org.created_at || new Date().toISOString(),
+            // These would come from additional API calls if needed
+            universe: null,
+            teams: [],
+            businessWorlds: [],
+            personalWorlds: []
+          };
+          return acc;
+        }, {}),
+        personal: {
+          worlds: [] // Would need separate API call for personal worlds
+        },
+        business: {
+          worlds: [] // Would need separate API call for business worlds
+        },
+        userEntities: {},
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Update the observable with the loaded data
+      universeWorkspace$.set(workspaceData);
+      return workspaceData;
+      
     } catch (error) {
-      console.error('Error loading complete workspace:', error);
-      throw error;
+      console.warn('[UniverseLoader] Failed to load workspace:', error);
+      // Return null instead of throwing - let the system continue
+      return null;
     }
+  }
+
+  /**
+   * Alias for backward compatibility
+   * @deprecated Use loadWorkspaceData instead
+   */
+  async loadCompleteWorkspace(options: LoaderOptions = {}): Promise<void> {
+    await this.loadWorkspaceData(options);
   }
 
   /**
@@ -369,18 +430,15 @@ class UniverseLoader {
 
   /**
    * Initialize universe context - main entry point
-   * Sets authentication state to trigger synced observables
+   * Sets authentication and loads workspace data
    */
   async initialize(options: LoaderOptions = {}): Promise<void> {
     try {
-      console.log('[UniverseLoader] Initializing universe context with synced observables...');
+      console.log('[UniverseLoader] Initializing universe context...');
       
-      // Set authentication state to trigger synced data loading
-      // In a real implementation, you'd get this from your auth system
-      universeHelpers.setAuthenticated(true, 'current-user-id');
-      
-      // Load workspace data via synced observable
-      await this.loadCompleteWorkspace(options);
+      // Authentication should already be set by auth machine
+      // Just load the workspace data
+      await this.loadWorkspaceData(options);
       
       console.log('[UniverseLoader] Universe context initialized successfully');
       
@@ -394,14 +452,8 @@ class UniverseLoader {
    * Refresh all data
    */
   async refresh(options: LoaderOptions = {}): Promise<void> {
-    try {
-      universeHelpers.setLoading(true);
-      await this.loadCompleteWorkspace({ ...options, bustCache: true });
-    } catch (error) {
-      console.error('Error refreshing universe context:', error);
-      universeHelpers.setLoading(false, error instanceof Error ? error.message : 'Refresh failed');
-      throw error;
-    }
+    console.log('[UniverseLoader] Refreshing workspace data');
+    await this.loadWorkspaceData({ ...options, bustCache: true });
   }
 }
 

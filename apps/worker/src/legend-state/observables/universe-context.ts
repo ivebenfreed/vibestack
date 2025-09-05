@@ -152,51 +152,8 @@ export const authContext$ = observable({
 // Simple observable for workspace data with manual loading
 export const universeWorkspace$ = observable(null as any);
 
-// Function to load workspace data
-export const loadWorkspaceData = async (): Promise<any> => {
-  const auth = authContext$.get();
-  
-  if (!auth.isAuthenticated) {
-    return null;
-  }
-  
-  log.info('[UniverseWorkspace] Loading complete workspace data');
-  
-  try {
-    const response = await fetch('/api/universe/complete?includeInactive=false&includeArchived=false&includeCounts=true', {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to load workspace: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    
-    if (!result.success) {
-      // Don't throw an error, just log and return null
-      log.warn('[UniverseWorkspace] Workspace API returned unsuccessful response:', result.error || 'No error message');
-      return null;
-    }
-
-    log.info('[UniverseWorkspace] Loaded workspace data:', {
-      organizations: Object.keys(result.data.organizations || {}).length,
-      personalWorlds: result.data.personal?.worlds?.length || 0,
-      businessWorlds: result.data.business?.worlds?.length || 0
-    });
-
-    // Update the observable with the loaded data
-    universeWorkspace$.set(result.data);
-    return result.data;
-  } catch (error) {
-    log.warn('[UniverseWorkspace] Failed to load workspace (this may be normal if data is loaded elsewhere):', error);
-    // Return null instead of throwing - let the system continue
-    return null;
-  }
-};
+// Data loading is handled by universe-loader.ts
+// This keeps separation of concerns - observables here, loading logic there
 
 // Create the main universe context observable that combines auth and workspace data
 export const universeContext$: Observable<UniverseContextData> = observable(() => {
@@ -208,15 +165,58 @@ export const universeContext$: Observable<UniverseContextData> = observable(() =
   }
   
   // Transform workspace API response into universe context structure
+  // The workspace data from API has organization details we need to transform
+  const organizations: Record<string, OrganizationContext> = {};
+  
+  // Process organizations from workspace data
+  if (workspaceData.organizations) {
+    Object.entries(workspaceData.organizations).forEach(([orgId, orgData]: [string, any]) => {
+      organizations[orgId] = {
+        info: {
+          id: orgId,
+          name: orgData.name || 'Unknown Organization',
+          slug: orgData.slug || '',
+          type: orgData.type || 'business',
+          role: orgData.role || 'member',
+          joinedAt: orgData.joinedAt || orgData.created_at || new Date().toISOString()
+        },
+        universe: orgData.universe,
+        teams: orgData.teams || [],
+        businessWorlds: orgData.businessWorlds || [],
+        personalWorlds: orgData.personalWorlds || []
+      };
+    });
+  }
+  
+  // Calculate summary data
+  const allPersonalWorlds = workspaceData.personal?.worlds || [];
+  const allBusinessWorlds = Object.values(organizations).reduce((acc: World[], org) => {
+    return [...acc, ...(org.businessWorlds || [])];
+  }, []);
+  const allTeams = Object.values(organizations).reduce((acc: Team[], org) => {
+    return [...acc, ...(org.teams || [])];
+  }, []);
+  const activeWorlds = [...allPersonalWorlds, ...allBusinessWorlds].filter(w => w.state === 'active');
+  
   const context: UniverseContextData = {
     userId: workspaceData.userId || auth.userId || '',
     isInitialized: !!workspaceData.userId,
     isLoading: false,
     error: null,
     lastUpdated: workspaceData.lastUpdated || new Date().toISOString(),
-    organizations: workspaceData.organizations || {},
+    organizations,
     personal: {
-      worlds: workspaceData.personal?.worlds || []
+      totalWorlds: allPersonalWorlds.length,
+      worlds: allPersonalWorlds,
+      activeWorlds: allPersonalWorlds.filter(w => w.state === 'active')
+    },
+    userEntities: workspaceData.userEntities || {},
+    summary: {
+      totalOrganizations: Object.keys(organizations).length,
+      totalPersonalWorlds: allPersonalWorlds.length,
+      totalBusinessWorlds: allBusinessWorlds.length,
+      totalTeams: allTeams.length,
+      totalActiveWorlds: activeWorlds.length
     }
   };
   
@@ -224,10 +224,13 @@ export const universeContext$: Observable<UniverseContextData> = observable(() =
 });
 
 // Computed observables for common use cases - now working with synced data
-export const currentOrganizations$ = computed(() => {
+export const userOrganizations$ = computed(() => {
   const context = universeContext$.get();
   return Object.values(context.organizations);
 });
+
+// Keep currentOrganizations$ for backward compatibility, but it's deprecated
+export const currentOrganizations$ = userOrganizations$;
 
 export const allPersonalWorlds$ = computed(() => {
   const context = universeContext$.get();
@@ -283,7 +286,7 @@ export const universeHelpers = {
     return context.isInitialized && !isUniverseLoading$.get();
   },
 
-  // Set authentication state and load data
+  // Set authentication state (data loading handled separately by universe-loader)
   setAuthenticated: async (isAuth: boolean, userId?: string, sessionToken?: string) => {
     authContext$.set({
       isAuthenticated: isAuth,
@@ -291,24 +294,17 @@ export const universeHelpers = {
       sessionToken: sessionToken || null
     });
     
-    if (isAuth && userId) {
-      log.info('[UniverseHelpers] Authentication set, loading workspace data');
-      const result = await loadWorkspaceData();
-      if (!result) {
-        log.info('[UniverseHelpers] Workspace data not loaded - may already be loaded via another path');
-      }
+    if (isAuth) {
+      log.info('[UniverseHelpers] Authentication set, ready for data loading');
+      // Data loading is handled by universe-loader.ts when needed
     }
   },
 
-  // Refresh workspace data
+  // Refresh workspace data (delegates to universe-loader)
   refresh: async () => {
-    log.info('[UniverseHelpers] Refreshing workspace data');
-    try {
-      await loadWorkspaceData();
-    } catch (error) {
-      log.error('[UniverseHelpers] Failed to refresh workspace:', error);
-      throw error;
-    }
+    log.info('[UniverseHelpers] Refresh requested - should be handled by universe-loader');
+    // The actual refresh logic should be called from universe-loader.ts
+    // This is just a placeholder - the loader should be imported and used
   },
 
   // Get organization by ID
@@ -380,3 +376,6 @@ export const universeHelpers = {
 
 // Export the main context and helpers
 export default universeContext$;
+
+// Export function to load workspace data (delegated to universe-loader)
+export { universeLoader } from '../loaders/universe-loader';

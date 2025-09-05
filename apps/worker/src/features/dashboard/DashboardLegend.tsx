@@ -391,12 +391,16 @@ const EntityCardWithData = observer(function EntityCardWithData({
     }
   }
   
+  // Get organization name from entity definition or current organization
+  const orgName = entityDef?._orgName || currentOrganization?.name
+  
   return (
     <EntityCard 
       entityName={entityName}
       entityDef={entityDef}
       count={displayCount}
       orgId={orgId}
+      orgName={isUniverseMode ? orgName : undefined} // Only show org name in universe mode
       isUniverseMode={isUniverseMode}
       onDelete={handleDelete}
     />

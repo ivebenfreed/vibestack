@@ -41,7 +41,6 @@ export {
 export {
   universeContext$,
   universeHelpers,
-  loadWorkspaceData,
   // Computed observables for universe context
   currentOrganizations$,
   allPersonalWorlds$,

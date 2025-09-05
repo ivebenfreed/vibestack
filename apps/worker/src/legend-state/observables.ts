@@ -109,12 +109,17 @@ export const universeSchema$ = observable(() => {
       // In universe mode, prefix entity names with orgId for uniqueness
       Object.entries(org.schema.entities).forEach(([entityName, entityDef]) => {
         const prefixedName = `${org.orgId}_${entityName}`
+        // Debug log to check org.name value
+        if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+          log.info(`[UniverseSchema] Adding entity ${entityName} from org ${org.orgId}, name: ${org.name}`)
+        }
         combinedEntities[prefixedName] = {
           ...entityDef,
           // Add metadata about which organization this entity belongs to
           _orgId: org.orgId,
-          _orgName: org.name,
-          _originalEntityName: entityName
+          _orgName: org.name || org.orgId, // Fallback to orgId if name is not available
+          _originalEntityName: entityName,
+          _originalName: entityName // Also add _originalName for compatibility
         }
       })
     }
@@ -647,13 +652,48 @@ function createEntityObservable(entityName: string, schema?: any) {
  * Load universe context - schemas from ALL user organizations
  * This should only be called by auth state machines, not components
  */
-export async function loadUniverseContext(userId: string, organizationIds: string[]) {
+export async function loadUniverseContext(userId: string, organizationIds: string[], organizationData?: Array<{ id: string; name: string }>) {
   log.info(`[Observable] Loading universe context for ${organizationIds.length} organizations`)
   
   // Update loading state
   universeContext$.loading.set(true)
   universeContext$.error.set(null)
   universeContext$.userId.set(userId)
+  
+  // Fetch organization details from API if not provided
+  const orgNameMap = new Map<string, string>()
+  
+  if (!organizationData || organizationData.length === 0) {
+    // Fetch organization data from API
+    try {
+      const response = await fetch('/api/organizations', {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        const organizations = result.organizations || []
+        
+        organizations.forEach((org: any) => {
+          if (org.id && org.name) {
+            orgNameMap.set(org.id, org.name)
+          }
+        })
+        
+        log.info(`[Observable] Fetched ${organizations.length} organizations from API with names`)
+      } else {
+        log.warn('[Observable] Failed to fetch organizations from API, using IDs as names')
+      }
+    } catch (error) {
+      log.error('[Observable] Error fetching organizations:', error)
+    }
+  } else {
+    // Use provided organization data
+    organizationData.forEach(org => {
+      orgNameMap.set(org.id, org.name)
+    })
+  }
   
   try {
     // Load schemas from all organizations in parallel
@@ -687,20 +727,25 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     // Process results and update universe context
     results.forEach(result => {
       if (result.success && result.schema) {
+        // Use the provided organization name or fall back to orgId
+        const orgName = orgNameMap.get(result.orgId) || result.orgId
+        
         universeContext$.organizations[result.orgId].assign({
           orgId: result.orgId,
-          name: result.schema.name || result.orgId,
+          name: orgName,
           schema: result.schema,
           loading: false,
           error: null
         })
         
         const entityCount = result.schema.entities ? Object.keys(result.schema.entities).length : 0
-        log.info(`[Observable] Loaded ${entityCount} entities from org ${result.orgId}`)
+        log.info(`[Observable] Loaded ${entityCount} entities from org ${result.orgId} (${orgName})`)
       } else {
+        const orgName = orgNameMap.get(result.orgId) || result.orgId
+        
         universeContext$.organizations[result.orgId].assign({
           orgId: result.orgId,
-          name: result.orgId,
+          name: orgName,
           schema: null,
           loading: false,
           error: result.error
