@@ -254,6 +254,39 @@ function getProjectColumns<T>(): Column<T>[] {
 }
 
 /**
+ * Normalize entity name to handle plural/singular and case variations
+ */
+function normalizeEntityName(entityName: string): string {
+  // Remove org prefix if present (e.g., "01920000-1000-7000-8000-000000000001_clients" -> "clients")
+  const cleanName = entityName.includes('_') && entityName.match(/^[0-9a-f-]+_(.+)$/i) 
+    ? entityName.split('_').slice(1).join('_') 
+    : entityName
+  
+  // Handle plural to singular mapping
+  const pluralToSingular: Record<string, string> = {
+    'clients': 'Client',
+    'tasks': 'Task', 
+    'projects': 'Project',
+    'meetings': 'Meeting',
+    'contracts': 'Contract',
+    'invoices': 'Invoice',
+    'expenses': 'Expense',
+    'files': 'File',
+    'discussions': 'Discussion',
+    'timesheets': 'Timesheet'
+  }
+  
+  // Check plural mapping first
+  const lowerName = cleanName.toLowerCase()
+  if (pluralToSingular[lowerName]) {
+    return pluralToSingular[lowerName]
+  }
+  
+  // Capitalize first letter for singular forms
+  return cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase()
+}
+
+/**
  * Column factory function - maps entity names to their column configurations
  */
 const entityColumnFactories: Record<string, <T>() => Column<T>[]> = {
@@ -270,8 +303,11 @@ export function getPrecomputedEntityColumns$<T = any>(entityName: string) {
   const cacheKey = entityName.toLowerCase()
   
   if (!entityColumnsCache.has(cacheKey)) {
+    // Normalize the entity name to handle plural/singular and case variations
+    const normalizedName = normalizeEntityName(entityName)
+    
     // Get the column factory for this entity
-    const columnFactory = entityColumnFactories[entityName] || entityColumnFactories.Client
+    const columnFactory = entityColumnFactories[normalizedName] || entityColumnFactories.Client
     
     // Create observable with precomputed columns
     const columns$ = observable(columnFactory<T>())
@@ -279,6 +315,8 @@ export function getPrecomputedEntityColumns$<T = any>(entityName: string) {
     entityColumnsCache.set(cacheKey, columns$)
     
     log.info(`[getPrecomputedEntityColumns$] Created cached observable for ${entityName}`, {
+      originalName: entityName,
+      normalizedName: normalizedName,
       columnCount: columnFactory<T>().length,
       referenceColumns: columnFactory<T>().filter(col => col.cellType?.startsWith('reference')).length
     })

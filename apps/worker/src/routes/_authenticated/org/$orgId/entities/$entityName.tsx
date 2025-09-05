@@ -59,15 +59,53 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   
   // ✅ ALWAYS call getEntity$ and use$ to maintain consistent hook order
   // Call this unconditionally even if we don't have schema yet
-  // Check if entityName is already prefixed with orgId to avoid double-prefixing
+  // Normalize entity name and check if entityName is already prefixed with orgId to avoid double-prefixing
   const actualEntityKey = React.useMemo(() => {
+    console.log('🔍 [actualEntityKey] Input:', { entityName, orgId })
+    
+    // Normalize entity name (handle plural/singular and case variations)
+    const normalizeEntityName = (name: string): string => {
+      // Handle plural to singular mapping
+      const pluralToSingular: Record<string, string> = {
+        'clients': 'Client',
+        'tasks': 'Task', 
+        'projects': 'Project',
+        'meetings': 'Meeting',
+        'contracts': 'Contract',
+        'invoices': 'Invoice',
+        'expenses': 'Expense',
+        'files': 'File',
+        'discussions': 'Discussion',
+        'timesheets': 'Timesheet'
+      }
+      
+      const lowerName = name.toLowerCase()
+      console.log('🔍 [normalizeEntityName] Processing:', { originalName: name, lowerName, mapped: pluralToSingular[lowerName] })
+      
+      if (pluralToSingular[lowerName]) {
+        return pluralToSingular[lowerName]
+      }
+      
+      // Capitalize first letter for singular forms
+      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+      console.log('🔍 [normalizeEntityName] Capitalized fallback:', { original: name, result: capitalized })
+      return capitalized
+    }
+    
     // Check if the entityName already contains the orgId prefix
     if (entityName.startsWith(`${orgId}_`)) {
-      // Already prefixed, use as-is
-      return entityName
+      // Already prefixed - normalize the entity part
+      const entityPart = entityName.substring(orgId.length + 1)
+      const normalizedEntityPart = normalizeEntityName(entityPart)
+      const result = `${orgId}_${normalizedEntityPart}`
+      console.log('🔍 [actualEntityKey] Already prefixed path:', { entityPart, normalizedEntityPart, result })
+      return result
     } else {
-      // Not prefixed, add the org prefix
-      return `${orgId}_${entityName}`
+      // Not prefixed, normalize and add the org prefix
+      const normalizedEntityName = normalizeEntityName(entityName)
+      const result = `${orgId}_${normalizedEntityName}`
+      console.log('🔍 [actualEntityKey] Not prefixed path:', { entityName, normalizedEntityName, result })
+      return result
     }
   }, [entityName, orgId])
   
@@ -138,12 +176,103 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     orgId
   })
   
-  // Get entity schema using the simplified key from display schema
+  // Get entity schema using the normalized entity name from display schema
   const entitySchema = React.useMemo(() => {
     if (!schema?.entities) return null
     
-    // Use the simplified entityName for schema lookup (display schema has "Task", not "orgId_Task")
-    return schema.entities[entityName] || null
+    // Normalize entity name for schema lookup (display schema has "Client", not "clients")
+    const normalizeEntityName = (name: string): string => {
+      // Handle plural to singular mapping
+      const pluralToSingular: Record<string, string> = {
+        'clients': 'Client',
+        'tasks': 'Task', 
+        'projects': 'Project',
+        'meetings': 'Meeting',
+        'contracts': 'Contract',
+        'invoices': 'Invoice',
+        'expenses': 'Expense',
+        'files': 'File',
+        'discussions': 'Discussion',
+        'timesheets': 'Timesheet'
+      }
+      
+      const lowerName = name.toLowerCase()
+      if (pluralToSingular[lowerName]) {
+        return pluralToSingular[lowerName]
+      }
+      
+      // Capitalize first letter for singular forms
+      return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+    }
+    
+    const normalizedEntityName = normalizeEntityName(entityName)
+    console.log('🔍 [EntitySchema] Schema lookup debug:', {
+      entityName,
+      normalizedEntityName,
+      schemaExists: !!schema,
+      schemaEntities: schema?.entities ? Object.keys(schema.entities) : null,
+      foundSchema: !!schema.entities?.[normalizedEntityName],
+      actualSchema: schema.entities?.[normalizedEntityName]
+    })
+    
+    // More detailed debugging before final result
+    const entityKeys = schema?.entities ? Object.keys(schema?.entities) : []
+    console.log('🔍 [EntitySchema] Detailed lookup:', {
+      schema: schema,
+      schemaExists: !!schema,
+      entities: schema?.entities,
+      entitiesExists: !!schema?.entities,
+      normalizedEntityName: normalizedEntityName,
+      directLookup: schema?.entities?.[normalizedEntityName],
+      allEntityKeys: entityKeys,
+      keyExists: schema?.entities ? Object.prototype.hasOwnProperty.call(schema.entities, normalizedEntityName) : false,
+      // Check if any keys contain our entity name
+      keysContainingEntity: entityKeys.filter(key => key.toLowerCase().includes(normalizedEntityName.toLowerCase()) || key.includes(normalizedEntityName)),
+      // Check for full entity keys (org-prefixed)
+      fullEntityKeyPattern: `${orgId}_${normalizedEntityName}`,
+      hasFullEntityKey: entityKeys.includes(`${orgId}_${normalizedEntityName}`)
+    })
+    
+    // Try multiple lookup strategies
+    let result = null
+    
+    if (schema?.entities) {
+      // Strategy 1: Direct normalized name lookup (e.g., "Client")
+      result = schema.entities[normalizedEntityName]
+      
+      // Strategy 2: Full entity key lookup (e.g., "01920000-1000-7000-8000-000000000001_Client")  
+      if (!result) {
+        const fullEntityKey = `${orgId}_${normalizedEntityName}`
+        result = schema.entities[fullEntityKey]
+      }
+      
+      // Strategy 3: Look for any key containing the normalized name
+      if (!result) {
+        const matchingKey = Object.keys(schema.entities).find(key => 
+          key.includes(`_${normalizedEntityName}`) || 
+          key.toLowerCase().includes(normalizedEntityName.toLowerCase())
+        )
+        if (matchingKey) {
+          result = schema.entities[matchingKey]
+        }
+      }
+    }
+    
+    console.log('🔍 [EntitySchema] Lookup strategies result:', {
+      normalizedEntityName,
+      fullEntityKey: `${orgId}_${normalizedEntityName}`,
+      strategy1: !!schema?.entities?.[normalizedEntityName],
+      strategy2: !!schema?.entities?.[`${orgId}_${normalizedEntityName}`],
+      foundViaStrategy3: result ? 'found' : 'not found',
+      finalResult: !!result
+    })
+    console.log('🔍 [EntitySchema] Return result:', {
+      result,
+      hasResult: !!result,
+      resultType: typeof result
+    })
+    
+    return result
   }, [schema, entityName])
   
   if (!orgId) {
@@ -183,11 +312,19 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
   
+  // Debug entitySchema value
+  console.log('🔍 [EntitySchema] Final entity schema check:', {
+    entityName,
+    entitySchema: entitySchema,
+    hasEntitySchema: !!entitySchema,
+    schemaType: typeof entitySchema
+  })
+  
   if (!entitySchema) {
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">
-          <h2 className="text-xl font-semibrand">Entity Not Found</h2>
+          <h2 className="text-xl font-semibold">Entity Not Found</h2>
           <p className="text-muted-foreground">
             The entity "{entityName}" was not found in organization {orgId}.
           </p>
