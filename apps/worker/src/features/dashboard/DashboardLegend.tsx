@@ -12,10 +12,11 @@ import { EntityCard } from './EntityCard'
 import { QuickEntityCreate } from './QuickEntityCreate'
 import { PlusCircle, Globe, Building } from 'lucide-react'
 import { 
-  orgContext$,
+  universeLoading$,
+  universeSchema$,
+  universeError$,
   getEntity$,
   removeEntityFromSchema,
-  loadOrgContext,
   loadUniverseContext
 } from '@/legend-state'
 import { orgSchemaClient } from '@/lib/schema-client'
@@ -76,61 +77,22 @@ const DashboardLegend = observer(function DashboardLegend() {
     currentOrgId 
   });
 
-  // Use Legend State observables - orgContext$ handles both universe and single org modes
-  const loading = use$(orgContext$.loading);
-  const schema = use$(orgContext$.schema);
-  const error = use$(orgContext$.error);
+  // NEW: Use universe-based observables for dashboard (supports universe mode)
+  const loading = use$(universeLoading$);
+  const schema = use$(universeSchema$);
+  const error = use$(universeError$);
   
   // Entity count will be calculated in DashboardContent after filtering
 
-  // Load appropriate context based on route parameters
-  useEffect(() => {
-    if (!userId) {
-      log.info('User not authenticated, skipping context load');
-      return;
-    }
-
-    const currentSchemaOrgId = schema?.orgId;
-    
-    // Only reload context if route requires different context than currently loaded
-    if (currentSchemaOrgId !== contextOrgId) {
-      log.info('Route requires different context, loading:', { 
-        currentSchemaOrgId, 
-        contextOrgId,
-        isUniverseMode 
-      });
-      
-      if (isUniverseMode) {
-        // Load universe context with ALL user organizations
-        // First fetch the user's complete organization list from the universe API
-        fetch('/api/universe/complete', { credentials: 'include' })
-          .then(response => response.json())
-          .then(universeData => {
-            if (universeData.success && universeData.data?.organizations) {
-              const orgIds = Object.keys(universeData.data.organizations);
-              log.info('Loading universe context with all organizations:', orgIds);
-              return loadUniverseContext(userId, orgIds);
-            } else {
-              throw new Error('Failed to get organization list from universe API');
-            }
-          })
-          .then(() => {
-            log.info('Universe context loaded for route with all organizations');
-          }).catch((error) => {
-            console.error('Failed to load universe context for route:', error);
-          });
-      } else {
-        // Load specific organization context - FIXED: orgId first, then userId
-        loadOrgContext(routeOrgId!, userId).then(() => {
-          log.info('Organization context loaded for route:', routeOrgId);
-        }).catch((error) => {
-          console.error('Failed to load organization context for route:', error);
-        });
-      }
-    } else {
-      log.info('Context already matches route requirements:', { currentSchemaOrgId, contextOrgId });
-    }
-  }, [userId, contextOrgId, isUniverseMode, routeOrgId, schema?.orgId, currentOrganization?.id]);
+  // UNIVERSE-ONLY CONTEXT: No context switching needed according to Session 17 plan
+  // Universe context is automatically loaded by auth system for all users
+  // Components filter entity display based on route parameters, not context switching
+  log.info('DashboardLegend using universe-only context - no manual loading needed', {
+    schemaLoaded: !!schema,
+    hasEntities: !!schema?.entities,
+    isUniverseMode,
+    routeOrgId
+  });
 
   // Track when schema is ready - don't wait for data loading
   useEffect(() => {

@@ -4,9 +4,10 @@ import { use$ } from '@legendapp/state/react'
 import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
 import { 
-  getOrgContext$,
   getUniverseEntity$,
-  loadOrgContext
+  universeLoading$,
+  universeError$,
+  universeSchema$
 } from '@/legend-state'
 import { useEffect } from 'react'
 import * as React from 'react'
@@ -51,11 +52,10 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   const userId = user?.id
   
   // ✅ ALWAYS call ALL hooks at the top - no conditionals before this point
-  // Use organization-specific Legend State observables - these must be called unconditionally
-  const orgContextObs = React.useMemo(() => getOrgContext$(orgId), [orgId])
-  const loading = use$(orgContextObs.loading)
-  const error = use$(orgContextObs.error)
-  const schema = use$(orgContextObs.schema)
+  // Use universe-based observables - schema-driven org parameters
+  const loading = use$(universeLoading$)
+  const error = use$(universeError$)  
+  const schema = use$(universeSchema$)
   
   // ✅ ALWAYS call getEntity$ and use$ to maintain consistent hook order
   // Call this unconditionally even if we don't have schema yet
@@ -77,7 +77,6 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   
   // ✅ All derived state calculations moved to useMemo with stable dependencies
   const derivedState = React.useMemo(() => {
-    const hasCorrectContext = !!schema && !!schema.entities
     const hasSchema = !!schema?.entities
     const schemaVersion = schema?.version || null
     const isEntityLoading = false // Simplified for now  
@@ -87,7 +86,6 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     let actualEntityName = actualEntityKey
     
     return {
-      hasCorrectContext,
       hasSchema,
       schemaVersion,
       isEntityLoading,
@@ -96,28 +94,8 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     }
   }, [schema, actualEntityKey, entityName])
   
-  // ✅ Load organization context based on URL parameters - useEffect hook
-  useEffect(() => {
-    if (!userId) {
-      console.log('User not authenticated, skipping org context load for entity page');
-      return;
-    }
-
-    const currentSchemaOrgId = schema?.orgId;
-    
-    // Only reload context if route requires different context than currently loaded
-    if (currentSchemaOrgId !== orgId) {
-      console.log('Entity page loading org context:', { currentSchemaOrgId, orgId });
-      
-      loadOrgContext(orgId, userId).then(() => {
-        console.log('Organization context loaded for entity page:', orgId);
-      }).catch((error) => {
-        console.error('Failed to load organization context for entity page:', error);
-      });
-    } else {
-      console.log('Entity page context already matches requirements:', { currentSchemaOrgId, orgId });
-    }
-  }, [userId, orgId, derivedState.schemaVersion, schema?.orgId])
+  // ✅ Universe-based approach - no context switching needed
+  // Schema is loaded automatically by auth system, org filtering happens at component level
   
   // ✅ Listen for WebSocket table change notifications
   useEffect(() => {
@@ -181,21 +159,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
   
-  if (!derivedState.hasCorrectContext) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">Switching Organization Context...</h2>
-          <p className="text-muted-foreground">
-            Loading {entityName} for organization {orgId.slice(0, 8)}...
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Current: {schema?.orgId || 'none'} → Target: {orgId}
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // Universe-based approach - no context switching needed, removed hasCorrectContext check
   
   if (error) {
     return (

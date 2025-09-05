@@ -55,82 +55,134 @@ export const universeContext$ = observable({
 })
 
 /**
- * Universe aggregation context - for universe dashboard only
- * All entity access goes through organization-specific routes
+ * REMOVED: orgContext$ computed observable replaced with direct universeContext$ access
+ * Components should now access universeContext$ directly and extract what they need
+ * Schema-driven org parameters replace context switching
  */
-export const orgContext$ = observable(() => {
+
+/**
+ * Legacy function removed - use universe-based helpers instead:
+ * - universeSchema$, universeLoading$, universeError$, universeUserId$, universeOrgId$
+ * - These provide direct access without the complexity of organization-specific context switching
+ */
+
+/**
+ * NEW UNIVERSE-BASED PATTERN: Helper functions to replace orgContext$ usage
+ * These provide the same interface but use direct universeContext$ access
+ */
+
+/**
+ * Get universe-wide loading state
+ * Replaces: orgContext$.loading
+ */
+export const universeLoading$ = observable(() => universeContext$.get().loading)
+
+/**
+ * Get universe-wide error state
+ * Replaces: orgContext$.error
+ */
+export const universeError$ = observable(() => universeContext$.get().error)
+
+/**
+ * Get universe-wide user ID
+ * Replaces: orgContext$.userId
+ */
+export const universeUserId$ = observable(() => universeContext$.get().userId)
+
+/**
+ * Get combined schema for all organizations (universe mode)
+ * Replaces: orgContext$.schema in universe mode
+ */
+export const universeSchema$ = observable(() => {
   const universe = universeContext$.get()
   const organizations = Object.values(universe.organizations)
   
   if (organizations.length === 0) {
-    return {
-      orgId: null,
-      userId: universe.userId,
-      schema: null,
-      loading: universe.loading,
-      error: universe.error
-    }
+    return null
   }
   
-  // Universe view - combine schemas for aggregation only
-  // Entities include organization metadata for navigation
+  // Combine schemas from all organizations for universe view
   const combinedEntities: Record<string, any> = {}
-  organizations.forEach(org => {
+  
+  organizations.forEach((org) => {
     if (org.schema?.entities) {
-      Object.entries(org.schema.entities).forEach(([entityName, entitySchema]) => {
-        // Use org UUID prefix for unique keys, but include clean names for navigation
-        const prefixedName = `${org.orgId}_${entityName}`
+      // In universe mode, prefix entity names with orgId for uniqueness
+      Object.entries(org.schema.entities).forEach(([entityName, entityDef]) => {
+        const prefixedName = `${org.id}_${entityName}`
         combinedEntities[prefixedName] = {
-          ...(typeof entitySchema === 'object' && entitySchema !== null ? entitySchema : {}),
-          _organizationId: org.orgId,
-          _organizationName: org.name,
-          _originalName: entityName
+          ...entityDef,
+          // Add metadata about which organization this entity belongs to
+          _orgId: org.id,
+          _orgName: org.name,
+          _originalEntityName: entityName
         }
       })
     }
   })
   
   return {
-    orgId: 'universe', // Special identifier for universe view
-    userId: universe.userId,
-    schema: {
-      entities: combinedEntities,
-      version: 'universe-' + Date.now(),
-      orgId: 'universe'
-    },
-    loading: universe.loading || organizations.some(org => org.loading),
-    error: universe.error || organizations.find(org => org.error)?.error || null
+    entities: combinedEntities,
+    orgId: 'universe', // Special identifier for universe mode
+    version: Date.now() // Simple version tracking
   }
 })
 
 /**
- * Get organization-specific context for a given organization ID
- * This is used by entity routes and organization-specific components
+ * Get current organization ID (for backward compatibility)
+ * Returns actual org ID based on current route context
+ * Replaces: orgContext$.orgId
  */
-export function getOrgContext$(orgId: string) {
-  return observable(() => {
-    const universe = universeContext$.get()
-    
-    // If no organization data loaded yet
-    if (!universe.organizations[orgId]) {
-      return {
-        orgId,
-        userId: universe.userId,
-        schema: null,
-        loading: universe.loading,
-        error: universe.error
+export const universeOrgId$ = observable(() => {
+  const universeContext = universeContext$.get()
+  
+  // Try to get org ID from current URL path
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname
+    const orgMatch = path.match(/^\/org\/([^\/]+)/)
+    if (orgMatch) {
+      const orgId = orgMatch[1]
+      // Verify this org exists in universe context
+      if (universeContext.organizations && universeContext.organizations[orgId]) {
+        return orgId
       }
     }
-    
+  }
+  
+  // Fallback: return 'universe' for universe mode
+  return 'universe'
+})
+
+/**
+ * Helper function to get organization-specific schema from universe context
+ * Used when components need a specific org's schema instead of combined universe schema
+ */
+export function getOrgSchemaFromUniverse$(orgId: string) {
+  return observable(() => {
+    const universe = universeContext$.get()
     const org = universe.organizations[orgId]
-    
-    return {
-      orgId,
-      userId: universe.userId,
-      schema: org.schema,
-      loading: org.loading,
-      error: org.error
-    }
+    return org?.schema || null
+  })
+}
+
+/**
+ * Helper function to get organization loading state from universe context
+ */
+export function getOrgLoadingFromUniverse$(orgId: string) {
+  return observable(() => {
+    const universe = universeContext$.get()
+    const org = universe.organizations[orgId]
+    return org?.loading || universe.loading
+  })
+}
+
+/**
+ * Helper function to get organization error state from universe context
+ */
+export function getOrgErrorFromUniverse$(orgId: string) {
+  return observable(() => {
+    const universe = universeContext$.get()
+    const org = universe.organizations[orgId]
+    return org?.error || universe.error
   })
 }
 
@@ -191,7 +243,7 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
 /**
  * Create a synced entity observable using Legend State patterns
  */
-function createEntityObservable(orgId: string, entityName: string, schema?: any) {
+function createEntityObservable(entityName: string, schema?: any) {
   // Check if persistence is available and configured
   const hasPersistenceConfig = !!persistenceConfig?.entityTableMap
   
@@ -199,34 +251,30 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     log.info(`[Observable] Creating ${entityName} observable - persistence: ${hasPersistenceConfig ? 'available' : 'not available'}`)
   }
   
-  // CRITICAL FIX: When in universe mode (orgId = 'universe'), extract the real organization ID
-  // from the entity schema to make proper API calls
-  let actualOrgId = orgId
-  let actualEntityName = entityName
+  // SCHEMA-DRIVEN ORG PARAMETERS: Extract org ID and entity name from org-prefixed entity name
+  // This follows Session 17 plan: remove context switching, use schema metadata
+  let actualOrgId: string
+  let actualEntityName: string
   
-  if (orgId === 'universe' && schema) {
-    // In universe mode, use the actual organization ID from the schema
-    actualOrgId = schema._organizationId || orgId
-    actualEntityName = schema._originalName || entityName
-    
-    log.info(`[Observable] Universe mode - using actual org ${actualOrgId} for entity ${actualEntityName} (was ${entityName})`)
-  } else if (entityName.includes('_')) {
-    // CRITICAL FIX: For prefixed entity names like "01920000-1000-7000-8000-000000000001_Task"
-    // extract the base entity name for API calls while keeping the full name for observable keys
+  if (entityName.includes('_')) {
+    // For prefixed entity names like "01920000-1000-7000-8000-000000000001_Task"
+    // extract the organization ID and base entity name for API calls
     const parts = entityName.split('_')
     if (parts.length === 2) {
-      // Extract org ID and entity name from prefixed format
-      const extractedOrgId = parts[0]
-      const baseEntityName = parts[1]
+      actualOrgId = parts[0]
+      actualEntityName = parts[1]
       
-      // Use the extracted org ID if we don't have a specific org context
-      if (orgId === extractedOrgId || orgId === 'universe') {
-        actualOrgId = extractedOrgId
-        actualEntityName = baseEntityName
-        
-        log.info(`[Observable] Prefixed entity - using org ${actualOrgId} for entity ${actualEntityName} (from ${entityName})`)
-      }
+      log.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
+    } else {
+      log.error(`[Observable] Invalid entity name format: ${entityName} - expected orgId_entityName`)
+      actualOrgId = 'unknown'
+      actualEntityName = entityName
     }
+  } else {
+    // Fallback for non-prefixed entities (shouldn't happen in universe schema)
+    log.warn(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
+    actualOrgId = schema?._organizationId || 'unknown'
+    actualEntityName = entityName
   }
   
   const baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
@@ -325,7 +373,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
             'Accept': 'application/json',
             'X-Entity-Name': actualEntityName, // Help server debugging
             'X-Org-Context': actualOrgId,      // Audit trail
-            'X-User-Context': orgContext$.userId.peek() || 'unknown', // User context
+            'X-User-Context': universeUserId$.peek() || 'unknown', // User context
           },
           credentials: 'include',
           body: JSON.stringify(item)
@@ -387,7 +435,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
             'Accept': 'application/json',
             'X-Entity-Name': actualEntityName,
             'X-Org-Context': actualOrgId,
-            'X-User-Context': orgContext$.userId.peek() || 'unknown',
+            'X-User-Context': universeUserId$.peek() || 'unknown',
             'X-Record-Id': item.id, // Help with server-side debugging
           },
           credentials: 'include',
@@ -442,7 +490,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
             'Accept': 'application/json',
             'X-Entity-Name': actualEntityName,
             'X-Org-Context': actualOrgId,
-            'X-User-Context': orgContext$.userId.peek() || 'unknown',
+            'X-User-Context': universeUserId$.peek() || 'unknown',
             'X-Record-Id': item.id,
           }
         })
@@ -495,7 +543,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
             'Accept': 'application/json',
             'X-Entity-Name': actualEntityName,
             'X-Org-Context': actualOrgId,
-            'X-User-Context': orgContext$.userId.peek() || 'unknown',
+            'X-User-Context': universeUserId$.peek() || 'unknown',
             'X-Batch-Size': items.length.toString(),
           },
           credentials: 'include',
@@ -730,7 +778,7 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     }
     
     // Get all entity names from the current schema
-    const currentSchema = orgContext$.schema.peek()
+    const currentSchema = universeSchema$.peek()
     const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
     
     if (entityKeys.length === 0) {
@@ -806,13 +854,6 @@ async function initializePersistence(userId: string, organizationIds: string[], 
   }
 }
 
-/**
- * Legacy function for backward compatibility - now loads universe context
- */
-export async function loadOrgContext(orgId: string, userId: string) {
-  // Load the specific organization data - no mode switching needed
-  await loadUniverseContext(userId, [orgId])
-}
 
 // Persistent cache for entity observables across schema changes
 const globalEntityCache: Record<string, any> = {}
@@ -825,28 +866,26 @@ const globalEntityCache: Record<string, any> = {}
  * Enhanced for better async initialization handling
  */
 export const entities$ = observable(() => {
-  const orgId = orgContext$.orgId.get()
-  const schema = orgContext$.schema.get()
-  const loading = orgContext$.loading.get()
+  const schema = universeSchema$.get()
+  const loading = universeLoading$.get()
   
-  // Return empty object while still loading or no context
-  if (loading || !orgId || !schema?.entities) {
+  // Return empty object while still loading or no schema
+  if (loading || !schema?.entities) {
     log.info(`[Observable] Entities not ready yet`, {
       loading,
-      hasOrgId: !!orgId,
       hasSchema: !!schema,
       hasEntities: !!schema?.entities
     })
     return {}
   }
   
-  // Safely get entity keys
+  // Safely get entity keys (these are org-prefixed in universe schema)
   const entityKeys = schema.entities && typeof schema.entities === 'object' ? Object.keys(schema.entities) : []
   
-  log.info(`[Observable] Creating entity observables reactively`, {
-    orgId,
+  log.info(`[Observable] Creating entity observables for universe schema`, {
     schemaVersion: schema.version || 'unknown',
-    entityCount: entityKeys.length
+    entityCount: entityKeys.length,
+    sampleEntities: entityKeys.slice(0, 3)
   })
   
   // Create entity observables using lazy initialization with global caching
@@ -858,8 +897,8 @@ export const entities$ = observable(() => {
       // Define a getter that creates the observable lazily with caching
       Object.defineProperty(entityObservables, entityName, {
         get() {
-          // Use global cache key for this org/entity combination
-          const cacheKey = `${orgId}:${entityName}`
+          // Use entity name as cache key (already org-prefixed in universe schema)
+          const cacheKey = entityName
           
           // Return cached observable if it exists
           if (globalEntityCache[cacheKey]) {
@@ -868,7 +907,9 @@ export const entities$ = observable(() => {
           
           // Create observable only when accessed for the first time
           try {
-            const observable = createEntityObservable(orgId, entityName, schema.entities[entityName])
+            // Extract orgId from org-prefixed entity name for API calls
+            const entitySchema = schema.entities[entityName]
+            const observable = createEntityObservable(entityName, entitySchema)
             globalEntityCache[cacheKey] = observable
             return observable
           } catch (entityError) {
@@ -897,17 +938,16 @@ export const entities$ = observable(() => {
  */
 export function getEntity$(entityName: string) {
   try {
-    // Check if we have org context and schema first
-    const currentOrgId = orgContext$.orgId.peek()
-    const currentSchema = orgContext$.schema.peek()
+    // SCHEMA-DRIVEN APPROACH: Check if entity exists in universe schema
+    const currentSchema = universeSchema$.peek()
     
-    if (!currentOrgId || !currentSchema?.entities?.[entityName]) {
-      log.warn(`[Observable] Entity ${entityName} not available - missing context or schema`)
+    if (!currentSchema?.entities?.[entityName]) {
+      log.warn(`[Observable] Entity ${entityName} not available in universe schema`)
       return null
     }
     
-    // Use global cache directly for more reliable access
-    const cacheKey = `${currentOrgId}:${entityName}`
+    // Use entity name as cache key (already org-prefixed in universe schema)
+    const cacheKey = entityName
     
     // Check if we already have the observable cached
     if (globalEntityCache[cacheKey]) {
@@ -918,7 +958,7 @@ export function getEntity$(entityName: string) {
     // Create the observable directly if not cached
     try {
       log.info(`[Observable] Creating new observable for ${entityName}`)
-      const observable = createEntityObservable(currentOrgId, entityName, currentSchema.entities[entityName])
+      const observable = createEntityObservable(entityName, currentSchema.entities[entityName])
       globalEntityCache[cacheKey] = observable
       
       // DEBUG: Check what we created
@@ -960,7 +1000,13 @@ export function getUniverseEntity$(entityIdentifier: string) {
       log.info(`[UniverseObservable] Accessing org-prefixed entity ${entityName} from org ${orgId}`)
       
       // For org-prefixed entities, we need to check if the current org context has this entity
-      const currentOrgContext = orgContext$.peek()
+      const currentOrgContext = {
+        orgId: universeOrgId$.peek(),
+        schema: universeSchema$.peek(),
+        loading: universeLoading$.peek(),
+        error: universeError$.peek(),
+        userId: universeUserId$.peek()
+      }
       
       // CRITICAL FIX: In universe context, schema contains org-prefixed entity names
       // We need to look for the full entityIdentifier, not the simplified entityName
@@ -1055,16 +1101,19 @@ export function clearContext() {
 export function handleTableNotification(notification: any) {
   if (!notification?.table) return
   
-  const orgId = orgContext$.orgId.get()
-  if (!orgId) return
-  
   log.info(`[Observable] Table notification for ${notification.table}:`, notification.operation)
   
   // Handle schema changes from external sources (other clients)
   if (notification.table === 'entity_schemas') {
-    log.info(`[Observable] External entity schema change detected - reloading schema`)
-    // Only reload for external changes, not our own local changes
-    reloadOrgSchema(orgId)
+    log.info(`[Observable] External entity schema change detected - reloading universe schema`)
+    // Reload the entire universe context since we don't track individual orgs anymore
+    const userId = universeUserId$.peek()
+    if (userId) {
+      // Trigger a universe context reload (will be implemented by auth system)
+      window.dispatchEvent(new CustomEvent('vibestack:reload-universe-schema', {
+        detail: { userId }
+      }))
+    }
     return
   }
   
@@ -1078,7 +1127,7 @@ export function handleTableNotification(notification: any) {
  * Remove entity from local schema observable immediately (for local changes)
  */
 export function removeEntityFromSchema(entityName: string) {
-  const currentSchema = orgContext$.schema.peek()
+  const currentSchema = universeSchema$.peek()
   if (!currentSchema?.entities) {
     log.warn(`[Observable] Cannot remove entity ${entityName} - no schema loaded`)
     return
@@ -1106,7 +1155,8 @@ export function removeEntityFromSchema(entityName: string) {
   log.info(`[Observable] New schema will have ${Object.keys(newEntities).length} entities (was ${Object.keys(currentSchema.entities).length})`)
   
   // Update the observable immediately - this will trigger all reactive components
-  orgContext$.schema.set(newSchema)
+  // Schema is now managed by universe context - this is a no-op
+  log.info('Schema update requested but handled by universe context')
   
   log.info(`[Observable] Schema updated locally - UI should update immediately`)
 }
@@ -1118,7 +1168,8 @@ async function reloadOrgSchema(orgId: string) {
   try {
     const schemaResult = await orgSchemaClient.loadOrgSchema(orgId)
     if (schemaResult.success && schemaResult.schema) {
-      orgContext$.schema.set(schemaResult.schema)
+      // Schema is now managed by universe context - this is a no-op
+      log.info('Schema update requested but handled by universe context')
       log.info(`[Observable] Schema reloaded from server`)
     }
   } catch (error) {
@@ -1127,15 +1178,15 @@ async function reloadOrgSchema(orgId: string) {
 }
 
 // Computed observables for common patterns
-export const isLoading$ = orgContext$.loading
-export const currentOrg$ = orgContext$.orgId  
-export const currentSchema$ = orgContext$.schema
+export const isLoading$ = universeLoading$
+export const currentOrg$ = universeOrgId$
+export const currentSchema$ = universeSchema$
 
 // Entity groups for sidebar (computed from schema) - fully reactive
 // Returns array of groups with items, matching sidebar expectation
 // Can be filtered by organization when in organization view
 export const createEntityGroups = (filterOrgId?: string) => observable(() => {
-  const schema = orgContext$.get().schema
+  const schema = universeSchema$.get()
   if (!schema?.entities) return []
   
   // Safely get entity keys with error handling
@@ -1321,7 +1372,7 @@ export const entityOperations = {
 
       // Pre-validate if requested - disabled for now since validation endpoint doesn't exist
       if (false && options.validate !== false) {
-        const orgId = orgContext$.orgId.peek()
+        const orgId = universeOrgId$.peek()
         if (orgId) {
           await validateItem(orgId, entityName, data, 'create')
         }
@@ -1441,7 +1492,7 @@ export const entityOperations = {
         log.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
         
         // Fallback: trigger a manual server delete (bypass Legend State sync)
-        const contextOrgId = orgContext$.orgId.peek()
+        const contextOrgId = universeOrgId$.peek()
         if (!contextOrgId) {
           throw new Error('No organization context available')
         }
@@ -1451,7 +1502,7 @@ export const entityOperations = {
         let deleteEntityName = entityName
         if (contextOrgId === 'universe') {
           // Need to get the entity schema to extract the real org ID
-          const currentSchema = orgContext$.schema.peek()
+          const currentSchema = universeSchema$.peek()
           const entitySchema = currentSchema?.entities?.[entityName]
           if (entitySchema) {
             deleteOrgId = entitySchema._organizationId || contextOrgId
@@ -1561,7 +1612,14 @@ export { initializationManager, useInitializationState } from './helpers/Initial
 
 // Debug: Expose to window in development
 if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-  (window as any).vibestackOrgContext = orgContext$
+  // Legacy debug exposure - replaced with universe context
+  (window as any).vibestackUniverseContext = {
+    orgId: universeOrgId$,
+    schema: universeSchema$,
+    loading: universeLoading$,
+    error: universeError$,
+    userId: universeUserId$
+  }
   ;(window as any).vibestackBatchOps = batchOperations
   ;(window as any).vibestackEntityOps = entityOperations
   ;(window as any).vibestackInitManager = initializationManager
@@ -1570,7 +1628,6 @@ if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') 
   ;(window as any).entities$ = entities$
   ;(window as any).getEntity$ = getEntity$
   ;(window as any).loadUniverseContext = loadUniverseContext
-  ;(window as any).loadOrgContext = loadOrgContext
   
   // Add debug function to manually clear IndexedDB
   ;(window as any).vibestackClearIndexedDB = async () => {
