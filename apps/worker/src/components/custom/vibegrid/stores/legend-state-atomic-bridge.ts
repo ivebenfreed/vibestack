@@ -67,10 +67,8 @@ export function createAtomicObservableBridge(
         }
       }
       
-      // Use the getUniverseEntity$ function which handles org-prefixed names correctly
-      const entityObservable = actualEntityName.includes('_') ? 
-        getUniverseEntity$(actualEntityName) : 
-        getEntity$(actualEntityName);
+      // Use getEntity$ for all entity lookups since entity names are already properly prefixed
+      const entityObservable = getEntity$(actualEntityName);
       
       if (!entityObservable) {
         log.info(`🔗 AtomicBridge: Entity observable ${actualEntityName} (original: ${entityTableName}) not available yet`);

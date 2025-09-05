@@ -4,7 +4,7 @@ import { use$ } from '@legendapp/state/react'
 import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
 import { 
-  getUniverseEntity$,
+  getEntity$,
   universeLoading$,
   universeError$,
   universeSchema$
@@ -71,7 +71,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     }
   }, [entityName, orgId])
   
-  const entityStore = React.useMemo(() => getUniverseEntity$(actualEntityKey), [actualEntityKey])
+  const entityStore = React.useMemo(() => getEntity$(actualEntityKey), [actualEntityKey])
   const entityData = use$(entityStore)
   
   // ✅ All derived state calculations moved to useMemo with stable dependencies
