@@ -59,18 +59,17 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   
   // ✅ ALWAYS call getEntity$ and use$ to maintain consistent hook order
   // Call this unconditionally even if we don't have schema yet
-  // CRITICAL FIX: In universe mode, entities are org-prefixed, so use the expected entity key
-  const expectedEntityKey = React.useMemo(() => `${orgId}_${entityName}`, [orgId, entityName])
-  
-  // CRITICAL FIX: React uses display schema (simplified keys) but Legend State needs org-prefixed keys
-  // Always use the expectedEntityKey (org-prefixed) for Legend State observables
+  // Check if entityName is already prefixed with orgId to avoid double-prefixing
   const actualEntityKey = React.useMemo(() => {
-    // Always return the expectedEntityKey (org-prefixed) because:
-    // 1. React components get a display schema with cleaned keys ("Task", "Project", etc.)  
-    // 2. Legend State observables use raw schema with org-prefixed keys ("orgId_Task", etc.)
-    // 3. VibeGrid expects org-prefixed entity types
-    return expectedEntityKey
-  }, [expectedEntityKey, entityName, orgId])
+    // Check if the entityName already contains the orgId prefix
+    if (entityName.startsWith(`${orgId}_`)) {
+      // Already prefixed, use as-is
+      return entityName
+    } else {
+      // Not prefixed, add the org prefix
+      return `${orgId}_${entityName}`
+    }
+  }, [entityName, orgId])
   
   const entityStore = React.useMemo(() => getUniverseEntity$(actualEntityKey), [actualEntityKey])
   const entityData = use$(entityStore)
@@ -92,7 +91,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
       hasEntityLoaded,
       actualEntityName
     }
-  }, [schema, actualEntityKey, entityName])
+  }, [schema, actualEntityKey])
   
   // ✅ Universe-based approach - no context switching needed
   // Schema is loaded automatically by auth system, org filtering happens at component level
