@@ -7,7 +7,7 @@
 
 import { use$ } from '@legendapp/state/react'
 import { observable } from '@legendapp/state'
-import { orgContext$, entities$ } from '../observables'
+import { universeSchema$, universeLoading$, entities$ } from '../observables'
 import { stateLog } from '@/logger';
 const log = stateLog('legend-state/hooks/use-entity.ts');
 
@@ -39,8 +39,8 @@ export interface UseEntityResult<T = any> {
  */
 export function useEntity$<T = any>(entityName: string): UseEntityResult<T> {
   // React to context and entities changes
-  const schema = use$(orgContext$.schema)
-  const loading = use$(orgContext$.loading)
+  const schema = use$(universeSchema$)
+  const loading = use$(universeLoading$)
   const allEntities = use$(entities$)
   
   // Create computed observable that returns entity when available

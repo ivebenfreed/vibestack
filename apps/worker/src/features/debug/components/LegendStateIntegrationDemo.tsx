@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
-import { entityOperations, getEntity$, getUniverseEntity$, universeContext$, orgContext$ } from '@/legend-state'
+import { entityOperations, getEntity$, getUniverseEntity$, universeContext$, universeSchema$, universeOrgId$ } from '@/legend-state'
 import { debugLog } from '@/logger'
 import { observer } from '@legendapp/state/react'
 
@@ -21,22 +21,31 @@ export const LegendStateIntegrationDemo = observer(() => {
   const [entityData, setEntityData] = useState<Record<string, any>>({})
   const [dataLoading, setDataLoading] = useState(false)
   
-  // Get universe and org contexts
+  // Get universe context and current schema
   const universeContext = universeContext$.get()
-  const currentOrgContext = orgContext$.get()
+  const currentSchema = universeSchema$.get()
+  const currentOrgId = universeOrgId$.get()
   
   // Extract available entities from all organizations in universe
   const availableEntities = React.useMemo(() => {
     const entities: Array<{value: string, label: string, orgName: string, recordCount: number}> = []
     
-    // Add entities from current org context if available
-    if (currentOrgContext?.schema?.entities) {
-      Object.keys(currentOrgContext.schema.entities).forEach(entityName => {
-        // Skip org-prefixed entities in regular org context
-        if (!entityName.includes('_')) {
+    // Add entities from current schema if available
+    if (currentSchema?.entities) {
+      Object.entries(currentSchema.entities).forEach(([entityKey, entitySchema]: [string, any]) => {
+        if (entityKey.includes('_') && entitySchema._orgName) {
+          // This is an org-prefixed entity from universe
           entities.push({
-            value: entityName,
-            label: `${entityName} (Current Org)`,
+            value: entityKey,
+            label: `${entitySchema._originalEntityName || entityKey.split('_')[1]} (${entitySchema._orgName})`,
+            orgName: entitySchema._orgName,
+            recordCount: 0 // We'll update this when we load data
+          })
+        } else if (!entityKey.includes('_')) {
+          // Regular entity (when not in universe mode)
+          entities.push({
+            value: entityKey,
+            label: `${entityKey} (Current Org)`,
             orgName: 'Current Organization',
             recordCount: 0
           })
@@ -44,23 +53,8 @@ export const LegendStateIntegrationDemo = observer(() => {
       })
     }
     
-    // Add entities from universe context (org-prefixed)
-    if (currentOrgContext?.schema?.entities) {
-      Object.entries(currentOrgContext.schema.entities).forEach(([entityKey, entitySchema]: [string, any]) => {
-        if (entityKey.includes('_') && entitySchema._organizationName) {
-          // This is an org-prefixed entity
-          entities.push({
-            value: entityKey,
-            label: `${entitySchema._originalName} (${entitySchema._organizationName})`,
-            orgName: entitySchema._organizationName,
-            recordCount: 0 // We'll update this when we load data
-          })
-        }
-      })
-    }
-    
     return entities
-  }, [universeContext, currentOrgContext])
+  }, [universeContext, currentSchema])
   
   // Set default selected entity if none selected
   React.useEffect(() => {
@@ -83,7 +77,7 @@ export const LegendStateIntegrationDemo = observer(() => {
     isLoading, 
     error,
     universeOrganizations: Object.keys(universeContext?.organizations || {}).length,
-    currentOrgId: currentOrgContext?.orgId,
+    currentOrgId: currentOrgId,
     dataLoading,
     entityDataCount: Object.keys(entityData).length
   })
@@ -229,9 +223,9 @@ export const LegendStateIntegrationDemo = observer(() => {
           <Badge variant="outline" className="text-xs">
             {columns.length} columns
           </Badge>
-          {currentOrgContext?.orgId && (
+          {currentOrgId && (
             <Badge variant="outline" className="text-xs">
-              {currentOrgContext.orgId === 'universe' ? 'Universe View' : `Org: ${currentOrgContext.orgId.slice(0, 8)}...`}
+              {currentOrgId === 'universe' ? 'Universe View' : `Org: ${currentOrgId.slice(0, 8)}...`}
             </Badge>
           )}
         </div>

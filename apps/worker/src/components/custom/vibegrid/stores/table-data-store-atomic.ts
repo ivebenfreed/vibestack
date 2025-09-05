@@ -1,6 +1,6 @@
 import { fromStore } from '@xstate/store';
 // NOTE: @repo/dataforge/dexie-schema was deprecated - using Legend State
-import { getEntity$, getUniverseEntity$, orgContext$, entities$ } from '@/legend-state/observables';
+import { getEntity$, getUniverseEntity$, entities$ } from '@/legend-state/observables';
 import { when } from '@legendapp/state';
 import { uiLog } from '@/logger';
 import { 

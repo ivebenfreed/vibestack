@@ -9,7 +9,6 @@ import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
-import { loadOrgContext } from '@/legend-state'
 import { authLog } from '@/logger'
 
 // Removed session tracking - components handle their own initialization state

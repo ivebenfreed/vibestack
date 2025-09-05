@@ -309,8 +309,8 @@ export const setupPersistenceActor = fromPromise(async ({ input }: {
     await loadUniverseContext(userId, organizationIds);
     
     // Get entity keys from the loaded universe context
-    const { orgContext$ } = await import('@/legend-state/observables');
-    const currentSchema = orgContext$.schema.peek();
+    const { universeSchema$ } = await import('@/legend-state/observables');
+    const currentSchema = universeSchema$.peek();
     const dynamicEntityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : [];
     
     log.info('[setupPersistenceActor] Found entity keys from schema', {

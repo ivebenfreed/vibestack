@@ -29,7 +29,7 @@ import {
 import { toast } from 'sonner';
 import { Plus, FolderOpen, CheckSquare, FileText, File, Zap, MessageCircle, Library, Save } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { getEntity$, orgContext$ } from '@/legend-state';
+import { getEntity$, universeSchema$ } from '@/legend-state';
 import { use$ } from '@legendapp/state/react';
 import { observer } from '@legendapp/state/react';
 import { WorldSelector } from '@/features/worlds/WorldSelector';
@@ -65,7 +65,7 @@ export const QuickEntityCreate = observer(function QuickEntityCreate() {
   });
   
   const { currentOrganization } = useAuth();
-  const schema = use$(orgContext$.schema);
+  const schema = use$(universeSchema$);
   
   // Get entities grouped by archetype
   const entitiesByArchetype = React.useMemo(() => {

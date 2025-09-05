@@ -1,6 +1,6 @@
 import { use$, useObserve } from '@legendapp/state/react';
 import { observe } from '@legendapp/state';
-import { entities$, orgContext$ } from '@/legend-state/observables';
+import { entities$, universeSchema$, universeLoading$, getEntity$ } from '@/legend-state/observables';
 import React, { useCallback, useRef } from 'react';
 import { uiLog } from '@/logger';
 const log = uiLog('components/custom/vibegrid/hooks/use-entity-row-changes.ts');
@@ -80,7 +80,8 @@ export function useEntityRowChanges({
 
   // Follow UltraTable pattern: get all entities reactively, then access specific entity
   const allEntities = use$(entities$);
-  const orgContext = use$(orgContext$);
+  const schema = use$(universeSchema$);
+  const loading = use$(universeLoading$);
   
   // Get the specific entity observable from allEntities
   const entityObservable = allEntities && allEntities[entityTableName] ? allEntities[entityTableName] : null;
@@ -90,7 +91,7 @@ export function useEntityRowChanges({
   
   // Process data with proper fallbacks (same as UltraTable)
   const rows = React.useMemo(() => {
-    if (!orgContext.schema || orgContext.loading || !rawEntityData) {
+    if (!schema || loading || !rawEntityData) {
       return [];
     }
     
@@ -107,7 +108,7 @@ export function useEntityRowChanges({
     }
     
     return currentRows;
-  }, [orgContext.schema, orgContext.loading, rawEntityData, handleChanges]);
+  }, [schema, loading, rawEntityData, handleChanges]);
 
   // OPTIMAL: Use Legend State observe() for atomic change detection
   // This replaces manual JSON.stringify comparison with Legend State's built-in reactivity

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Globe, Sparkles, User, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { orgContext$, getEntity$ } from '@/legend-state';
+import { getEntity$ } from '@/legend-state';
 import { uiLog } from '@/logger';
 
 const log = uiLog('features/universe/UniverseManager.tsx');

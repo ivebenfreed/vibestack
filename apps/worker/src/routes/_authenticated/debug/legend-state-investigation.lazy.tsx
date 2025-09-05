@@ -4,7 +4,7 @@ import { use$ } from '@legendapp/state/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect, useRef } from 'react'
-import { getEntity$, orgContext$ } from '@/legend-state/observables'
+import { getEntity$, universeSchema$, universeLoading$, universeError$ } from '@/legend-state/observables'
 
 const LegendStateInvestigation = observer(function LegendStateInvestigation() {
   const [logs, setLogs] = useState<string[]>([])
@@ -14,10 +14,10 @@ const LegendStateInvestigation = observer(function LegendStateInvestigation() {
   const entityRef = useRef<any>(null)
   const [observableId, setObservableId] = useState(0)
   
-  // Get org context observables
-  const schema = use$(orgContext$.schema)
-  const loading = use$(orgContext$.loading)
-  const error = use$(orgContext$.error)
+  // Get universe context observables
+  const schema = use$(universeSchema$)
+  const loading = use$(universeLoading$)
+  const error = use$(universeError$)
   
   // Track when we get the entity observable
   const entity$ = getEntity$(entityName)

@@ -1,5 +1,5 @@
 import { observable } from '@legendapp/state'
-import { orgContext$, getEntity$ } from '@/legend-state'
+import { universeSchema$, universeUserId$, getEntity$ } from '@/legend-state'
 import type { NavigationMode } from './navigation-mode'
 
 export interface SearchResult {
@@ -50,8 +50,8 @@ export async function searchEntities(query: string, mode: NavigationMode = 'all'
   entitySearch$.searching.set(true)
   
   try {
-    const schema = orgContext$.schema.peek()
-    const userId = orgContext$.userId.peek()
+    const schema = universeSchema$.peek()
+    const userId = universeUserId$.peek()
     if (!schema) return []
     
     const results: SearchResult[] = []

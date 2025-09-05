@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react'
 import { use$ } from '@legendapp/state/react'
-import { orgContext$ } from '../observables'
+import { universeSchema$ } from '../observables'
 import type { Column } from '@/components/custom/vibegrid/column-types'
 import { stateLog } from '@/logger';
 const log = stateLog('legend-state/hooks/use-entity-columns.ts');
@@ -228,7 +228,7 @@ export function useEntityColumns<T = any>(entityName: string): {
   error: string | null
 } {
   // Reactively get schema from Legend State
-  const schema = use$(orgContext$.schema)
+  const schema = use$(universeSchema$)
   
   // Memoized column generation
   const { columns, error } = useMemo(() => {

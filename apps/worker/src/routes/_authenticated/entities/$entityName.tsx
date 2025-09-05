@@ -4,7 +4,9 @@ import { use$ } from '@legendapp/state/react'
 import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
 import { 
-  orgContext$,
+  universeLoading$,
+  universeError$,
+  universeSchema$,
   getEntity$
 } from '@/legend-state'
 import { useEffect } from 'react'
@@ -16,9 +18,9 @@ export const Route = createFileRoute('/_authenticated/entities/$entityName')({
     
     // Preload entity schema and data
     try {
-      // Wait for org context to be ready
-      const orgContext = orgContext$.get()
-      if (!orgContext.schema) {
+      // Wait for universe context to be ready
+      const universeSchema = universeSchema$.get()
+      if (!universeSchema) {
         // Schema not ready yet, let component handle loading
         return { entityName, preloadedData: null }
       }
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/_authenticated/entities/$entityName')({
           entityName,
           preloadedData: {
             entities: entityData ? Object.values(entityData) : [],
-            schema: orgContext.schema?.entities?.[entityName] || null
+            schema: universeSchema?.entities?.[entityName] || null
           }
         }
       }
@@ -64,10 +66,10 @@ const EntityPageInner = observer(function EntityPageInner({
   const currentOrgId = currentOrganization?.id
   const userId = user?.id
   
-  // Use Legend State observables, but prefer preloaded data
-  const loading = use$(orgContext$.loading)
-  const error = use$(orgContext$.error)
-  const schema = preloadedData?.schema ? { entities: { [entityName]: preloadedData.schema } } : use$(orgContext$.schema)
+  // NEW: Use universe-based observables, but prefer preloaded data
+  const loading = use$(universeLoading$)
+  const error = use$(universeError$)
+  const schema = preloadedData?.schema ? { entities: { [entityName]: preloadedData.schema } } : use$(universeSchema$)
   
   // Components should only consume observables, not trigger loads
   // Loading is handled by auth state machines

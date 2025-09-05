@@ -15,7 +15,7 @@
  */
 
 import { setup, assign, fromPromise } from 'xstate'
-import { loadUniverseContext, loadOrgContext, orgContext$ } from '@/legend-state'
+import { loadUniverseContext, universeSchema$ } from '@/legend-state'
 import { syncLog } from '@/logger'
 
 const log = syncLog('state-machines/machines/legend-state-init-machine.ts')
@@ -25,7 +25,6 @@ export interface LegendStateInitContext {
   userId: string | null
   organizationIds: string[]
   currentOrgId: string | null
-  isUniverseMode: boolean
   
   // Progress tracking
   currentStep: string
@@ -70,35 +69,26 @@ const loadSchemasService = fromPromise(async ({
   input: { 
     userId: string
     organizationIds: string[]
-    isUniverseMode: boolean
     currentOrgId?: string
   } 
 }) => {
-  const { userId, organizationIds, isUniverseMode, currentOrgId } = input
+  const { userId, organizationIds, currentOrgId } = input
   
-  log.info('[LegendStateInit] Loading schemas:', {
+  log.info('[LegendStateInit] Loading universe schemas:', {
     userId,
     organizationIds,
-    isUniverseMode,
     currentOrgId
   })
   
   try {
-    if (isUniverseMode && organizationIds.length > 1) {
-      // Load universe context with all organizations
-      await loadUniverseContext(userId, organizationIds)
-    } else if (currentOrgId) {
-      // Load specific organization context
-      await loadOrgContext(currentOrgId, userId)
-    } else {
-      throw new Error('Invalid context parameters')
-    }
+    // Always load universe context with all organizations
+    await loadUniverseContext(userId, organizationIds)
     
     // Get the loaded schema to count entities
-    const schema = orgContext$.schema.peek()
+    const schema = universeSchema$.peek()
     const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0
     
-    log.info('[LegendStateInit] Schemas loaded successfully:', {
+    log.info('[LegendStateInit] Universe schemas loaded successfully:', {
       entityCount,
       orgId: schema?.orgId
     })
@@ -106,7 +96,7 @@ const loadSchemasService = fromPromise(async ({
     return { entityCount, schema }
     
   } catch (error) {
-    log.error('[LegendStateInit] Failed to load schemas:', error)
+    log.error('[LegendStateInit] Failed to load universe schemas:', error)
     throw error
   }
 })
@@ -264,8 +254,7 @@ export const legendStateInitMachine = setup({
           totalEntities: context.totalEntities,
           entitiesLoaded: context.entitiesLoaded,
           entitiesWithData: context.entitiesWithData,
-          organizationIds: context.organizationIds,
-          isUniverseMode: context.isUniverseMode
+          organizationIds: context.organizationIds
         }
       }))
     }
@@ -282,7 +271,6 @@ export const legendStateInitMachine = setup({
     userId: null,
     organizationIds: [],
     currentOrgId: null,
-    isUniverseMode: false,
     
     currentStep: 'idle',
     totalSteps: 4, // loadingSchemas, initializingPersistence, creatingObservables, triggeringInitialLoad
@@ -311,21 +299,17 @@ export const legendStateInitMachine = setup({
         () => log.info('[LegendStateInit] Machine ready, waiting for input'),
         // Automatically start based on input when the machine is created
         assign(({ input }) => {
-          const isUniverseMode = input.organizationIds.length > 1;
-          
           log.info('[LegendStateInit] Received input:', {
             userId: input.userId,
             organizationIds: input.organizationIds,
-            currentOrgId: input.currentOrgId,
-            isUniverseMode
+            currentOrgId: input.currentOrgId
           });
 
           return {
             userId: input.userId,
             organizationIds: input.organizationIds,
             currentOrgId: input.currentOrgId || null,
-            isUniverseMode,
-            currentStep: isUniverseMode ? 'Loading universe schemas' : 'Loading organization schema',
+            currentStep: 'Loading universe schemas',
             completedSteps: 0
           };
         }),
@@ -346,8 +330,7 @@ export const legendStateInitMachine = setup({
               userId: event.userId,
               organizationIds: event.organizationIds,
               currentOrgId: event.currentOrgId || null,
-              isUniverseMode: event.organizationIds.length > 1,
-              currentStep: 'Loading schemas',
+              currentStep: 'Loading universe schemas',
               completedSteps: 0
             })),
             'resetError',
@@ -362,24 +345,7 @@ export const legendStateInitMachine = setup({
               userId: event.userId,
               organizationIds: event.organizationIds,
               currentOrgId: null,
-              isUniverseMode: true,
               currentStep: 'Loading universe schemas',
-              completedSteps: 0
-            })),
-            'resetError',
-            'dispatchProgressEvent'
-          ]
-        },
-        
-        START_SINGLE_ORG: {
-          target: 'loadingSchemas',
-          actions: [
-            assign(({ event }) => ({
-              userId: event.userId,
-              organizationIds: [event.orgId],
-              currentOrgId: event.orgId,
-              isUniverseMode: false,
-              currentStep: 'Loading organization schema',
               completedSteps: 0
             })),
             'resetError',
@@ -397,7 +363,6 @@ export const legendStateInitMachine = setup({
         input: ({ context }) => ({
           userId: context.userId!,
           organizationIds: context.organizationIds,
-          isUniverseMode: context.isUniverseMode,
           currentOrgId: context.currentOrgId || undefined
         }),
         
@@ -457,7 +422,7 @@ export const legendStateInitMachine = setup({
         src: 'createObservables',
         input: ({ context }) => {
           // Get entity names from current schema
-          const schema = orgContext$.schema.peek()
+          const schema = universeSchema$.peek()
           const entityNames = schema?.entities ? Object.keys(schema.entities) : []
           return { entityNames }
         },
@@ -584,7 +549,6 @@ export const legendStateInitMachine = setup({
               userId: null,
               organizationIds: [],
               currentOrgId: null,
-              isUniverseMode: false,
               currentStep: 'idle',
               completedSteps: 0,
               schemasLoaded: false,

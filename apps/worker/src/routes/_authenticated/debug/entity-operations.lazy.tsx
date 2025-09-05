@@ -10,10 +10,11 @@ import { Separator } from '@/components/ui/separator'
 import { AlertCircle, Database, Plus, Trash2, Edit, RefreshCw, Search, Package, ArrowRight, ArrowUpDown, Edit3, CheckCircle, RotateCcw, Trash } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
-  orgContext$, 
+  universeLoading$,
+  universeSchema$,
+  universeOrgId$,
   getEntity$, 
   removeEntityFromSchema,
-  loadOrgContext,
   clearContext 
 } from '@/legend-state'
 import { orgSchemaClient } from '@/lib/schema-client'
@@ -27,9 +28,9 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
   const [isLoading, setIsLoading] = useState(false)
 
   // Use observables
-  const loading = use$(orgContext$.loading)
-  const schema = use$(orgContext$.schema)
-  const currentOrgId = use$(orgContext$.orgId)
+  const loading = use$(universeLoading$)
+  const schema = use$(universeSchema$)
+  const currentOrgId = use$(universeOrgId$)
 
   const addLog = (message: string, type: 'info' | 'error' | 'success' = 'info') => {
     const timestamp = new Date().toLocaleTimeString()
@@ -49,11 +50,12 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
 
     setIsLoading(true)
     try {
-      addLog(`Loading org context for ${currentOrganization.id}`)
-      await loadOrgContext(currentOrganization.id, user.id)
-      addLog('Org context loaded successfully', 'success')
+      addLog(`Organization context automatically loaded by auth system for ${currentOrganization.id}`)
+      // Organization context is now automatically loaded by the auth system
+      // No need to manually load org context here
+      addLog('Org context automatically handled by auth system', 'success')
     } catch (error) {
-      addLog(`Failed to load org context: ${error}`, 'error')
+      addLog(`Failed to handle org context: ${error}`, 'error')
     } finally {
       setIsLoading(false)
     }
@@ -123,8 +125,8 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
       
       if (data.success) {
         addLog(`Entity created: ${testEntityName}`, 'success')
-        // Reload context to pick up new entity
-        await loadOrgContext(currentOrganization.id, user!.id)
+        // Organization context is now automatically updated by the auth system
+        // No need to manually reload context
       } else {
         addLog(`Failed to create entity: ${data.error}`, 'error')
       }
@@ -963,9 +965,10 @@ const EntityOperationsDebug = observer(function EntityOperationsDebug() {
       
       // Method 2: Force re-sync by clearing and reloading
       if (currentOrganization?.id && user?.id) {
-        addLog(`Attempting context reload to force sync...`)
-        await loadOrgContext(currentOrganization.id, user.id)
-        addLog(`✅ Context reload completed`, 'success')
+        addLog(`Organization context automatically handled by auth system...`)
+        // Organization context is now automatically loaded by the auth system
+        // No need to manually reload context
+        addLog(`✅ Context automatically handled by auth system`, 'success')
       }
       
       // Method 3: Check if data is now available

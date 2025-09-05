@@ -4,7 +4,7 @@
  */
 
 import { observable, computed } from '@legendapp/state'
-import { orgContext$ } from '../observables'
+import { universeOrgId$, universeSchema$ } from '../observables'
 import { stateLog } from '@/logger';
 const log = stateLog('legend-state/reference-system/options-manager.ts');
 
@@ -123,7 +123,7 @@ async function loadSystemOptions(optionType: string, archetype: string, key: str
  * Get or create custom options observable for an organization option set
  */
 function getCustomOptionsObservable(optionSetName: string, organizationId?: string) {
-  const orgId = organizationId || orgContext$.currentOrganization.id.peek()
+  const orgId = organizationId || universeOrgId$.peek()
   const key = `${optionSetName}_${orgId}`
   
   if (!optionsStore$.customOptions[key].peek()) {
@@ -243,7 +243,7 @@ export const OptionsManager = {
    * Resolve a custom option value to its full option object
    */
   resolveCustomOption(optionSetName: string, value: string, organizationId?: string) {
-    const orgId = organizationId || orgContext$.currentOrganization.id.peek()
+    const orgId = organizationId || universeOrgId$.peek()
     const key = `custom:${optionSetName}_${orgId}`
     const resolvers = optionResolvers$.peek()
     const resolver = resolvers.get(key)
@@ -301,8 +301,8 @@ export const OptionsManager = {
 
 // Auto-preload on initialization
 if (typeof window !== 'undefined') {
-  // Wait for org context to be ready
-  orgContext$.schema.onChange((schema) => {
+  // Wait for universe schema to be ready
+  universeSchema$.onChange((schema) => {
     if (schema) {
       OptionsManager.preloadSystemOptions()
     }

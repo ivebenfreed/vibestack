@@ -49,40 +49,30 @@ else
     set +a
 fi
 
-# Export for Playwright config to use
-export WEB_PORT
-export SERVER_PORT
+# Export DEV_PORT for Playwright config to use (single unified port)
+export DEV_PORT
 export PR_NUMBER="$ISSUE_NUMBER"
 
 echo -e "${BLUE}🔧 Configuration:${NC}"
 echo "   Issue: ${ISSUE_NUMBER}"
-echo "   Web Port: ${WEB_PORT}"
-echo "   Server Port: ${SERVER_PORT}"
+echo "   Port: ${DEV_PORT}"
 echo "   Profile: ./.playwright/profiles/profile-${ISSUE_NUMBER}"
 echo ""
 
-# Check if servers are running
-echo -e "${BLUE}🔍 Checking if dev servers are running...${NC}"
+# Check if unified dev server is running
+echo -e "${BLUE}🔍 Checking if unified dev server is running...${NC}"
 
-# Check web server - make sure it's actually serving the app, not just responding
-WEB_RESPONSE=$(curl -s "http://localhost:${WEB_PORT}" 2>/dev/null || echo "")
+# Check unified server - web app and API on same port
+WEB_RESPONSE=$(curl -s "http://localhost:${DEV_PORT}" 2>/dev/null || echo "")
+API_RESPONSE=$(curl -s "http://localhost:${DEV_PORT}/health" 2>/dev/null || echo "")
+
 if [[ -n "$WEB_RESPONSE" ]] && [[ "$WEB_RESPONSE" == *"<div id=\"root\""* ]]; then
-    echo -e "${GREEN}✅ Web server is running on port ${WEB_PORT}${NC}"
+    echo -e "${GREEN}✅ Unified dev server is running on port ${DEV_PORT}${NC}"
 else
-    echo -e "${RED}❌ Web server not properly serving app on port ${WEB_PORT}${NC}"
-    echo -e "${YELLOW}   Make sure to run: ./scripts/dev-start.sh${NC}"
+    echo -e "${RED}❌ Unified dev server not properly serving app on port ${DEV_PORT}${NC}"
+    echo -e "${YELLOW}   Make sure to run: pnpm dev${NC}"
     echo ""
-fi
-
-# Check API server - THIS IS CRITICAL!
-if curl -s "http://localhost:${SERVER_PORT}/api/health" > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ API server is running on port ${SERVER_PORT}${NC}"
-else
-    echo -e "${RED}❌ API SERVER IS NOT RUNNING on port ${SERVER_PORT}${NC}"
-    echo -e "${RED}   The app WILL NOT WORK without the API server!${NC}"
-    echo -e "${YELLOW}   Start it with: ./scripts/tmux-bg.sh vibestack-dev-main \"pnpm dev:local\"${NC}"
-    echo ""
-    echo -e "${RED}ABORTING: Cannot run tests without API server${NC}"
+    echo -e "${RED}ABORTING: Cannot run tests without dev server${NC}"
     exit 1
 fi
 

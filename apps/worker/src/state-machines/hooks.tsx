@@ -292,15 +292,18 @@ export function useAppInit() {
   
   React.useEffect(() => {
     // Dynamic import to avoid circular dependencies
-    import('../legend-state').then(({ orgContext$ }) => {
-      // Subscribe to org context loading state
-      const unsubscribe = orgContext$.onChange(() => {
-        // Get the full context on each change - onChange only passes changed values
-        const fullContext = orgContext$.peek();
-        const hasOrgAndUser = !!(fullContext.orgId && fullContext.userId);
-        const hasSchema = !!(fullContext.schema && Object.keys(fullContext.schema.entities || {}).length > 0);
-        const isLoading = fullContext.loading;
-        const error = fullContext.error;
+    import('../legend-state').then(({ universeLoading$, universeError$, universeUserId$, universeOrgId$, universeSchema$ }) => {
+      // Subscribe to universe state using individual observables
+      const unsubscribe = universeSchema$.onChange(() => {
+        // Get the current universe state
+        const schema = universeSchema$.peek();
+        const userId = universeUserId$.peek();
+        const orgId = universeOrgId$.peek();
+        const isLoading = universeLoading$.peek();
+        const error = universeError$.peek();
+        
+        const hasOrgAndUser = !!(orgId && userId);
+        const hasSchema = !!(schema && Object.keys(schema.entities || {}).length > 0);
         
         // System is ready when we have org, user, and schema loaded
         setIsReady(hasOrgAndUser && hasSchema && !isLoading);

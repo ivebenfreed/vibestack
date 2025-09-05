@@ -7,9 +7,7 @@
 
 // Main observable exports - direct Legend State patterns
 export {
-  orgContext$,
-  getOrgContext$,
-  loadOrgContext,
+  // getOrgContext$ removed - use universe-based helpers instead
   loadUniverseContext,
   getEntity$,
   getUniverseEntity$,
@@ -18,7 +16,16 @@ export {
   removeEntityFromSchema,
   entityGroups$,
   createEntityGroups,
-  // Common computed observables
+  // NEW: Universe-based helper functions (replace orgContext$ usage)
+  universeLoading$,
+  universeError$,
+  universeUserId$,
+  universeSchema$,
+  universeOrgId$,
+  getOrgSchemaFromUniverse$,
+  getOrgLoadingFromUniverse$,
+  getOrgErrorFromUniverse$,
+  // Common computed observables (will be replaced)
   isLoading$,
   currentOrg$,
   currentSchema$,

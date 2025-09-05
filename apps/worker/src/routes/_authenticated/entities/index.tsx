@@ -50,7 +50,7 @@ import {
   Library,
   Save
 } from 'lucide-react';
-import { orgContext$, getEntity$ } from '@/legend-state';
+import { universeSchema$, universeOrgId$, getEntity$ } from '@/legend-state';
 import { useAuth } from '@/lib/auth';
 import { QuickEntityCreate } from '@/features/dashboard/QuickEntityCreate';
 import { Link } from '@tanstack/react-router';
@@ -78,8 +78,8 @@ const EntitiesListPage = observer(function EntitiesListPage() {
   const [selectedEntity, setSelectedEntity] = useState<string>('all');
   
   const { currentOrganization, user } = useAuth();
-  const schema = use$(orgContext$.schema);
-  const orgId = use$(orgContext$.orgId);
+  const schema = use$(universeSchema$);
+  const orgId = use$(universeOrgId$);
   
   // Components should only consume observables, not trigger loads
   // Loading is handled by auth state machines
@@ -87,7 +87,7 @@ const EntitiesListPage = observer(function EntitiesListPage() {
   // Create a computed observable that aggregates all entity data
   const entitiesData$ = useMemo(() => {
     return computed(() => {
-      const currentSchema = orgContext$.schema.get();
+      const currentSchema = universeSchema$.get();
       if (!currentSchema?.entities) return [];
       
       const allData: any[] = [];

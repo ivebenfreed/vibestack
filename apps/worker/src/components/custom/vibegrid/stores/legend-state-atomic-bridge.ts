@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { observe, when, batch } from '@legendapp/state';
-import { getEntity$, getUniverseEntity$, orgContext$ } from '@/legend-state/observables';
+import { getEntity$, getUniverseEntity$, universeSchema$, universeLoading$, universeError$, universeOrgId$ } from '@/legend-state/observables';
 import { fromStore } from '@xstate/store';
 import { uiLog } from '@/logger';
 
@@ -50,10 +50,11 @@ export function createAtomicObservableBridge(
       let actualEntityName = entityTableName;
       
       // Check if we're in universe mode and need to construct org-prefixed name
-      const orgContextData = orgContext$.get();
-      if (orgContextData.orgId === 'universe' && orgContextData.schema?.entities) {
+      const schema = universeSchema$.get();
+      const currentOrgId = universeOrgId$.get();
+      if (currentOrgId === 'universe' && schema?.entities) {
         // Find the org-prefixed version of this entity in the schema
-        const entityKeys = Object.keys(orgContextData.schema.entities);
+        const entityKeys = Object.keys(schema.entities);
         const orgPrefixedKey = entityKeys.find(key => {
           // Look for pattern: "{orgId}_{entityName}" where entityName matches our target
           const parts = key.split('_');
@@ -242,8 +243,10 @@ export function createAtomicObservableBridge(
   // Ensures we react when the schema becomes available
   const schemaReadinessDisposer = when(
     () => {
-      const context = orgContext$.get();
-      return context.schema && !context.loading && context.orgId;
+      const schema = universeSchema$.get();
+      const loading = universeLoading$.get();
+      const orgId = universeOrgId$.get();
+      return schema && !loading && orgId;
     },
     () => {
       log.info('🔗 AtomicBridge: Schema ready, triggering initial load');
@@ -253,12 +256,12 @@ export function createAtomicObservableBridge(
   
   // PATTERN 3: Error state observer
   const errorStateDisposer = observe(() => {
-    const context = orgContext$.get();
-    if (context.error) {
-      log.info('🔗 AtomicBridge: Error state detected', context.error);
+    const error = universeError$.get();
+    if (error) {
+      log.info('🔗 AtomicBridge: Error state detected', error);
       tableSend({
         type: 'STORE_ERROR',
-        error: context.error
+        error: error
       });
     }
   });
@@ -627,9 +630,9 @@ export function useAtomicEntityBridge(
     
     // Check if entity is ready
     isReady: React.useCallback(() => {
-      const context = orgContext$.peek();
+      const loading = universeLoading$.peek();
       const entityObservable = getEntity$(entityTableName);
-      return !context.loading && !!entityObservable;
+      return !loading && !!entityObservable;
     }, [entityTableName])
   };
 }

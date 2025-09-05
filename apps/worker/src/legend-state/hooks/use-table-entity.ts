@@ -10,7 +10,7 @@
 
 import { use$, useObservable } from '@legendapp/state/react'
 import { observable, ObservableObject, ObservableArray } from '@legendapp/state'
-import { getEntity$, orgContext$, entities$ } from '../observables'
+import { getEntity$, universeSchema$, universeLoading$, universeError$, entities$ } from '../observables'
 import { useMemo, useCallback } from 'react'
 import React from 'react'
 
@@ -125,9 +125,9 @@ export function useTableEntity$<T = any>(
   } = options
 
   // ALWAYS call these in exact same order every time
-  const schema = use$(orgContext$.schema) 
-  const loading = use$(orgContext$.loading)
-  const error = use$(orgContext$.error)
+  const schema = use$(universeSchema$) 
+  const loading = use$(universeLoading$)
+  const error = use$(universeError$)
   
   // ALWAYS create observables - never conditional
   const tableState$ = useObservable(() => ({

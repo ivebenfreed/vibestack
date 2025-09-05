@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { ChevronRight, Sparkles, Building2 } from 'lucide-react'
-import { orgContext$, getEntity$ } from '@/legend-state'
+import { universeSchema$, getEntity$ } from '@/legend-state'
 import { EntityGroupInWorld } from './EntityGroupInWorld'
 
 interface WorldData {
@@ -27,7 +27,7 @@ export const WorldFolder = observer(function WorldFolder({
   isPersonal: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const schema = use$(orgContext$.schema)
+  const schema = use$(universeSchema$)
   
   // Get ALL entities that belong to this world
   const worldEntities = useMemo(() => {

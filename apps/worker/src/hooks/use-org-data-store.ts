@@ -1,25 +1,35 @@
 import { useEffect, useMemo } from 'react'
 import { useObservable } from '@legendapp/state/react'
-import { orgContext$, loadOrgContext, getEntity$, clearContext } from '@/legend-state'
+import { universeSchema$, universeLoading$, universeError$, universeUserId$, universeOrgId$, getEntity$, clearContext } from '@/legend-state'
 import { useAuth } from '@/state-machines'
 import { stateLog } from '@/logger';
 const log = stateLog('hooks/use-org-data-store.ts');
 
 export function useOrgDataStore() {
   const { currentOrganization, user } = useAuth()
-  const context = useObservable(orgContext$)
+  const schema = useObservable(universeSchema$)
+  const loading = useObservable(universeLoading$)
+  const error = useObservable(universeError$)
+  const userId = useObservable(universeUserId$)
+  const orgId = useObservable(universeOrgId$)
   
   useEffect(() => {
     if (currentOrganization?.id && user?.id) {
-      loadOrgContext(currentOrganization.id, user.id).catch(error => {
-        log.error('[useOrgDataStore] Failed to load org context:', error)
-      })
+      // Universe context is now automatically loaded by the auth system
+      // No need to manually load org context here
     } else {
       clearContext()
     }
   }, [currentOrganization?.id, user?.id])
   
-  return context
+  // Return context object using universe-based observables
+  return {
+    schema,
+    loading,
+    error,
+    userId,
+    orgId
+  }
 }
 
 export function useEntityData(entityName: string) {

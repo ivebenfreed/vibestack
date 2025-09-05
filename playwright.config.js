@@ -31,25 +31,21 @@ function getIssueNumber() {
   return 'main';
 }
 
-// Get ports directly from environment variables
-function getPortsFromEnv() {
-  return {
-    webPort: parseInt(process.env.WEB_PORT) || 5173,
-    serverPort: parseInt(process.env.SERVER_PORT) || 8787
-  };
+// Get port from environment variable (single unified port)
+function getPortFromEnv() {
+  return parseInt(process.env.DEV_PORT) || 4000;
 }
 
 const issueNumber = getIssueNumber();
-const ports = getPortsFromEnv();
+const port = getPortFromEnv();
 const userDataDir = path.resolve(process.cwd(), '.playwright', 'profiles', `profile-${issueNumber}`);
 
 // Suppress logs for json/dot reporters to avoid EPIPE errors
 const suppressLogs = process.argv.some(arg => arg.includes('json') || arg.includes('dot'));
 if (!suppressLogs) {
-  console.log(`🎭 Playwright Config (Persistent Context):`);
+  console.log(`🎭 Playwright Config (Single Worker):`);
   console.log(`   Issue: ${issueNumber}`);
-  console.log(`   Web Port: ${ports.webPort}`);
-  console.log(`   Server Port: ${ports.serverPort}`);
+  console.log(`   Port: ${port}`);
   console.log(`   Profile Dir: ${userDataDir}`);
 }
 
@@ -75,7 +71,7 @@ export default defineConfig({
   ],
   
   use: {
-    baseURL: `http://localhost:${ports.webPort}`,
+    baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
