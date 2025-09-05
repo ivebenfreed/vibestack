@@ -16,9 +16,9 @@
 
 import { setup, assign, fromPromise } from 'xstate'
 import { loadUniverseContext, universeSchema$ } from '@/legend-state'
-import { syncLog } from '@/logger'
+import { stateLog } from '@/logger'
 
-const log = syncLog('state-machines/machines/legend-state-init-machine.ts')
+const log = stateLog('state-machines/machines/legend-state-init-machine.ts')
 
 export interface LegendStateInitContext {
   // User/org info from auth
@@ -167,7 +167,8 @@ const triggerInitialLoadsService = fromPromise(async ({
     try {
       const observable = getEntity$(entityName)
       if (observable) {
-        // Trigger initial load by accessing the observable
+        // Trigger initial load by accessing the observable multiple times
+        // This ensures Legend State's syncedCrud definitely triggers the list function
         const data = observable.get()
         const recordCount = data && typeof data === 'object' ? Object.keys(data).length : 0
         
@@ -175,6 +176,19 @@ const triggerInitialLoadsService = fromPromise(async ({
         results.loaded.push({ entityName, recordCount })
         
         log.info(`[LegendStateInit] ✅ Triggered load for ${entityName}: ${recordCount} records`)
+        
+        // For entities with no data, try again after a brief delay
+        if (recordCount === 0) {
+          setTimeout(() => {
+            try {
+              const retryData = observable.get()
+              const retryCount = retryData && typeof retryData === 'object' ? Object.keys(retryData).length : 0
+              log.info(`[LegendStateInit] 🔄 Retry trigger for ${entityName}: ${retryCount} records`)
+            } catch (retryError) {
+              log.warn(`[LegendStateInit] Retry failed for ${entityName}:`, retryError)
+            }
+          }, 100)
+        }
       }
     } catch (error) {
       log.error(`[LegendStateInit] ❌ Error triggering load for ${entityName}:`, error)
@@ -187,7 +201,11 @@ const triggerInitialLoadsService = fromPromise(async ({
 export const legendStateInitMachine = setup({
   types: {
     context: {} as LegendStateInitContext,
-    events: {} as LegendStateInitEvent
+    events: {} as LegendStateInitEvent,
+    input: {} as {
+      userId: string
+      organizationIds: string[]
+    }
   },
   
   actors: {
@@ -267,10 +285,10 @@ export const legendStateInitMachine = setup({
 }).createMachine({
   id: 'legendStateInit',
   
-  context: {
-    userId: null,
-    organizationIds: [],
-    currentOrgId: null,
+  context: ({ input }) => ({
+    userId: input?.userId || null,
+    organizationIds: input?.organizationIds || [],
+    currentOrgId: null, // Always null in universe mode
     
     currentStep: 'idle',
     totalSteps: 4, // loadingSchemas, initializingPersistence, creatingObservables, triggeringInitialLoad
@@ -289,29 +307,27 @@ export const legendStateInitMachine = setup({
     error: null,
     retryCount: 0,
     maxRetries: 3
-  },
+  }),
   
   initial: 'idle',
   
   states: {
     idle: {
       entry: [
-        () => log.info('[LegendStateInit] Machine ready, waiting for input'),
-        // Automatically start based on input when the machine is created
-        assign(({ input }) => {
-          log.info('[LegendStateInit] Received input:', {
-            userId: input.userId,
-            organizationIds: input.organizationIds,
-            currentOrgId: input.currentOrgId
-          });
-
-          return {
-            userId: input.userId,
-            organizationIds: input.organizationIds,
-            currentOrgId: input.currentOrgId || null,
-            currentStep: 'Loading universe schemas',
-            completedSteps: 0
-          };
+        ({ context }) => {
+          if (context.userId && context.organizationIds.length > 0) {
+            log.info('[LegendStateInit] Machine initialized with input:', {
+              userId: context.userId,
+              organizationIds: context.organizationIds,
+              universeMode: true
+            });
+          } else {
+            log.info('[LegendStateInit] Machine ready, waiting for START event');
+          }
+        },
+        assign({
+          currentStep: 'Loading universe schemas',
+          completedSteps: 0
         }),
         'resetError',
         'dispatchProgressEvent'
@@ -319,7 +335,8 @@ export const legendStateInitMachine = setup({
       
       // Automatically transition to loadingSchemas after setup
       always: {
-        target: 'loadingSchemas'
+        target: 'loadingSchemas',
+        guard: ({ context }) => !!context.userId && context.organizationIds.length > 0
       },
       
       on: {

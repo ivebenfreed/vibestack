@@ -311,9 +311,35 @@ const EntityCardWithData = observer(function EntityCardWithData({
   let hasLoaded = false
   
   if (entityStore) {
+    // CRITICAL FIX: In Legend State v3, we need to force the initial load
+    // by accessing the sync state and manually triggering if needed
+    React.useEffect(() => {
+      if (entityStore) {
+        try {
+          // Force initial load by accessing the observable
+          const currentData = entityStore.get()
+          log.info(`Manual trigger for ${entityName}:`, {
+            hasCurrentData: !!currentData,
+            dataKeys: currentData ? Object.keys(currentData).length : 0
+          })
+        } catch (error) {
+          log.warn(`Error during manual trigger for ${entityName}:`, error)
+        }
+      }
+    }, [entityStore, entityName])
+
     // Use use$ to make the component reactive to the observable
-    // This should trigger the syncedCrud fetch
     data = use$(entityStore)
+    
+    // CRITICAL DEBUG: Log exactly what data we're getting
+    log.info(`Data received for ${entityName}:`, {
+      data,
+      dataType: typeof data,
+      dataLength: data ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 'no data',
+      isUndefined: data === undefined,
+      isNull: data === null,
+      isEmpty: data && typeof data === 'object' ? Object.keys(data).length === 0 : 'not object'
+    })
     
     // Check loading state based on whether data exists
     isLoading = data === undefined

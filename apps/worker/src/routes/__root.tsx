@@ -72,6 +72,15 @@ if (!authMachineActor) {
     if (stored) {
       persistedSnapshot = JSON.parse(stored);
       log.info('Restored auth machine snapshot:', persistedSnapshot?.value);
+      
+      // CRITICAL: Reset Legend State flag to ensure it always initializes on app start
+      // This flag should NOT be persisted as Legend State needs to be initialized
+      // fresh on every page load/refresh
+      if (persistedSnapshot?.context) {
+        persistedSnapshot.context.legendStateSetupComplete = false;
+        persistedSnapshot.context.legendStateError = null;
+        log.info('[ROOT] Reset legendStateSetupComplete flag for fresh initialization');
+      }
     }
   } catch (error) {
     console.warn('[ROOT] Failed to restore auth machine snapshot:', error);
@@ -154,10 +163,9 @@ if (!authMachineActor) {
           universeHelpers.setAuthenticated(true, user.id).then(async () => {
             log.info('Universe context authenticated and workspace data loaded')
             
-            // Refresh workspace data (this loads organization data)
-            await universeHelpers.refresh()
+            // No need to refresh - Legend State init machine handles all loading
             
-            log.info('Universe helpers setup complete - persistence handled by auth machine')
+            log.info('Universe helpers setup complete - persistence handled by Legend State init machine')
           }).catch((error) => {
             console.error('[ROOT] Failed to initialize universe helpers:', error)
           })
@@ -176,20 +184,21 @@ if (!authMachineActor) {
   // Check initial state after setting up subscription (for restored snapshots)
   const initialSnapshot = authMachineActor.getSnapshot()
   if (initialSnapshot.matches('authenticated.ready')) {
-    const currentOrganization = initialSnapshot.context.currentOrganization
+    const userOrganizations = initialSnapshot.context.userOrganizations
     const user = initialSnapshot.context.user
     
-    if (currentOrganization?.id && user?.id) {
-      log.info('Initial auth already ready - loading Legend State org context:', currentOrganization.id)
+    if (userOrganizations?.length > 0 && user?.id) {
+      log.info('Initial auth already ready - loading Legend State universe context')
       
       // 🔄 SYNC: Connect sync machine for restored auth state (wait for actor to be ready)
+      // Use first organization for sync connection (universe mode still needs an org for WebSocket)
       const connectSync = () => {
         const syncActor = (window as any).simpleNotificationSyncMachineActor;
         if (syncActor) {
           log.info('✅ Triggering sync connection - restored auth ready');
           syncActor.send({ 
             type: 'CONNECT', 
-            organizationId: currentOrganization.id,
+            organizationId: userOrganizations[0].id,
             userId: user.id
           });
         } else {
@@ -206,10 +215,9 @@ if (!authMachineActor) {
         universeHelpers.setAuthenticated(true, user.id).then(async () => {
           log.info('Universe context authenticated and workspace data loaded (initial)')
           
-          // Refresh workspace data (this loads organization data)
-          await universeHelpers.refresh()
+          // No need to refresh - Legend State init machine handles all loading
           
-          log.info('Universe helpers setup complete (initial) - persistence handled by auth machine')
+          log.info('Universe helpers setup complete (initial) - persistence handled by Legend State init machine')
         }).catch((error) => {
           console.error('[ROOT] Failed to initialize universe helpers (initial):', error)
         })
@@ -254,8 +262,99 @@ if (!simpleNotificationSyncMachineActor) {
   log.info('SyncMachine 🔥 HMR: Using existing sync machine actor')
 }
 
-// App init machine removed - Legend State handles initialization directly
-// No separate init actor needed - auth machine calls loadOrgContext() directly
+// Create Legend State Init Machine actor (independent of auth machine)
+let legendStateInitActor = (window as any).legendStateInitActor
+
+if (!legendStateInitActor) {
+  log.info('Creating Legend State init machine actor - independent initialization')
+  
+  // Import the machine
+  import('../state-machines/machines/legend-state-init-machine').then(({ legendStateInitMachine }) => {
+    // Add inspection in test/dev mode
+    const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
+      ? { inspect: xstateTestInspector.inspect }
+      : {};
+    
+    // Check if auth machine has user and org data
+    const authSnapshot = authMachineActor?.getSnapshot()
+    const userId = authSnapshot?.context?.user?.id
+    const organizationIds = authSnapshot?.context?.userOrganizations?.map(org => org.id) || []
+    // Universe mode: don't pass currentOrgId - we load all orgs
+    
+    if (userId && organizationIds.length > 0) {
+      log.info('[ROOT] Creating Legend State machine with auth data:', {
+        userId,
+        organizationIds,
+        universeMode: true
+      })
+      
+      legendStateInitActor = createActor(legendStateInitMachine, {
+        ...inspectOptions,
+        id: 'legend-state-init-machine',
+        input: {
+          userId,
+          organizationIds
+          // No currentOrgId - universe mode loads all orgs
+        }
+      })
+      
+      legendStateInitActor.start()
+      
+      // Store globally
+      ;(window as any).legendStateInitActor = legendStateInitActor
+      
+      // Subscribe to state changes
+      legendStateInitActor.subscribe((snapshot) => {
+        log.info('[ROOT] Legend State machine state changed:', snapshot.value)
+        
+        // When Legend State is ready, dispatch event
+        if (snapshot.matches('ready')) {
+          window.dispatchEvent(new CustomEvent('legend-state:initialized'))
+        }
+      })
+    } else {
+      log.info('[ROOT] Deferring Legend State init - no auth data yet')
+      
+      // Listen for auth state changes to initialize Legend State
+      const handleAuthReady = (event: CustomEvent) => {
+        const authSnapshot = authMachineActor?.getSnapshot()
+        const userId = authSnapshot?.context?.user?.id
+        const organizationIds = authSnapshot?.context?.userOrganizations?.map(org => org.id) || []
+        const currentOrgId = authSnapshot?.context?.currentOrganization?.id
+        
+        if (userId && organizationIds.length > 0 && !legendStateInitActor) {
+          log.info('[ROOT] Auth ready, initializing Legend State machine now')
+          
+          legendStateInitActor = createActor(legendStateInitMachine, {
+            ...inspectOptions,
+            id: 'legend-state-init-machine',
+            input: {
+              userId,
+              organizationIds,
+              currentOrgId
+            }
+          })
+          
+          legendStateInitActor.start()
+          ;(window as any).legendStateInitActor = legendStateInitActor
+          
+          legendStateInitActor.subscribe((snapshot) => {
+            log.info('[ROOT] Legend State machine state changed:', snapshot.value)
+            if (snapshot.matches('ready')) {
+              window.dispatchEvent(new CustomEvent('legend-state:initialized'))
+            }
+          })
+        }
+      }
+      
+      window.addEventListener('auth:state-changed', handleAuthReady as EventListener)
+    }
+  }).catch((error) => {
+    console.error('[ROOT] Failed to import Legend State machine:', error)
+  })
+} else {
+  log.info('Legend State machine 🔥 HMR: Using existing Legend State actor')
+}
 
 // Dexie uses native IndexedDB, no special error handling needed
 

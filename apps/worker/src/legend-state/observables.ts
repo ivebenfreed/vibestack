@@ -108,11 +108,11 @@ export const universeSchema$ = observable(() => {
     if (org.schema?.entities) {
       // In universe mode, prefix entity names with orgId for uniqueness
       Object.entries(org.schema.entities).forEach(([entityName, entityDef]) => {
-        const prefixedName = `${org.id}_${entityName}`
+        const prefixedName = `${org.orgId}_${entityName}`
         combinedEntities[prefixedName] = {
           ...entityDef,
           // Add metadata about which organization this entity belongs to
-          _orgId: org.id,
+          _orgId: org.orgId,
           _orgName: org.name,
           _originalEntityName: entityName
         }
@@ -297,26 +297,15 @@ function createEntityObservable(entityName: string, schema?: any) {
     fieldUpdatedAt: 'updated_at',
     fieldDeleted: 'deleted',
     
-    // LIST - Proper implementation of changesSince: 'last-sync' pattern
-    list: async (params: { lastSync?: number } = {}) => {
+    // LIST - Simple function that returns array of records (Legend State v3 pattern)
+    list: async () => {
       try {
-        // DEBUG: Log what Legend State is passing us
-        log.info(`[Observable] List called for ${entityName}:`, {
-          lastSync: params?.lastSync,
-          lastSyncType: typeof params?.lastSync,
-          hasLastSync: !!params?.lastSync,
-          lastSyncDate: params?.lastSync ? new Date(params.lastSync).toISOString() : null
-        });
+        // DEBUG: Log that the function is being called - CRITICAL DEBUGGING
+        console.log(`🔥 [CRITICAL] List function called for ${entityName}!`);
         
-        // CORRECT: Use differential sync endpoint when lastSync exists, full load otherwise
-        // This is the proper changesSince: 'last-sync' pattern from Legend State docs
-        const url = params?.lastSync ? 
-          `${syncUrl}?changesSince=${encodeURIComponent(new Date(params.lastSync).toISOString())}&limit=1000` : 
-          baseUrl;
+        log.info(`[Observable] Loading ${entityName} from:`, baseUrl);
         
-        log.info(`[Observable] ${params?.lastSync ? 'Differential' : 'Initial full'} load for ${entityName}:`, url);
-        
-        const response = await fetch(url, {
+        const response = await fetch(baseUrl, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         })
@@ -339,12 +328,8 @@ function createEntityObservable(entityName: string, schema?: any) {
         const result = await response.json()
         const data = result.data || []
         
-        // Log sync results for debugging
-        if (params?.lastSync) {
-          log.info(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${new Date(params.lastSync).toISOString()}`)
-        } else {
-          log.info(`[Observable] Initial full load ${entityName}: ${data.length} total records`)
-        }
+        console.log(`🔥 [CRITICAL] List function returning ${data.length} records for ${entityName}`)
+        log.info(`[Observable] Loaded ${entityName}: ${data.length} records`)
         
         return data
       } catch (error) {
@@ -593,18 +578,10 @@ function createEntityObservable(entityName: string, schema?: any) {
     // Generate temporary IDs for optimistic updates
     generateId: () => `temp-${crypto.randomUUID()}`,
     
-    // Set initial to empty object to trigger the initial fetch
-    // syncedCrud needs this to know it should start loading data
-    initial: {},
-    
-    // PERSISTENCE: Each entity needs proper table name even with Legend State v3 configureSynced
-    // Extract the base entity name (e.g., 'Task' from '01920000-1000-7000-8000-000000000001_Task')
-    ...(persistenceConfig?.entityTableMap ? {
-      persist: {
-        name: persistenceConfig.entityTableMap[entityName.split('_').pop() || entityName] || `entity-${entityName}`,
-        retrySync: true
-      }
-    } : {}),
+    // CRITICAL FIX: Legend State v3 requires initial value to trigger list() function
+    // This is essential for syncedCrud to know it needs to fetch data
+    // Use empty array as in working example, even though we return object data
+    initial: [],
 
     // WebSocket subscription for real-time updates
     subscribe: ({ refresh }: { refresh: () => void }) => {
@@ -648,27 +625,20 @@ function createEntityObservable(entityName: string, schema?: any) {
   }
   
   
-  // Use persistence-enabled sync if available and configured, otherwise server-only
-  const syncedCrudFn = (persistenceConfig && syncedCrudWithPersistence) || syncedCrud
-  
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
     log.info(`[Observable] Creating syncedCrud for ${entityName}, hasPersistenceConfig: ${!!persistenceConfig?.entityTableMap}`)
   }
   
-  // CRITICAL FIX: syncedCrud must be wrapped in observable() to create proper observable with .get()/.set() methods
-  // The correct pattern is: observable(syncedCrud(config))
-  const syncedObservable = observable(syncedCrudFn(crudConfig))
+  // CRITICAL FIX: Use syncedCrud(config) directly like in working example
+  // Don't store the function separately - call it immediately with config
+  const syncedObservable = observable(syncedCrud(crudConfig))
   
-  // CRITICAL FIX: Force initial data load for syncedCrud with changesSince: 'last-sync'
-  // The issue was that syncedCrud with differential sync doesn't auto-trigger initial load
-  // We need to explicitly trigger the first load to populate the observable
-  setTimeout(() => {
-    if (typeof window !== 'undefined') {
-      log.info(`[Observable] Triggering initial load for ${entityName}`)
-      // Access the observable to trigger initial syncedCrud list() call
-      syncedObservable.get()
-    }
-  }, 0)
+  // Log available methods for debugging (should now have proper syncedCrud methods)
+  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+    setTimeout(() => {
+      log.info(`[Observable] ${entityName} observable created with methods:`, Object.getOwnPropertyNames(syncedObservable))
+    }, 10)
+  }
   
   return syncedObservable
 }

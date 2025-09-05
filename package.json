@@ -40,7 +40,7 @@
     "setup:worktree": "pnpm install && node scripts/setup-worktree-env.js && echo '✅ Worktree setup complete'",
     "log:focus": "./scripts/set-log-focus.sh",
     "log:sync": "./scripts/set-log-focus.sh sync",
-    "log:state": "./scripts/set-log-focus.sh state", 
+    "log:state": "./scripts/set-log-focus.sh state",
     "log:ui": "./scripts/set-log-focus.sh ui",
     "log:data": "./scripts/set-log-focus.sh data",
     "log:all": "./scripts/set-log-focus.sh all",
@@ -80,6 +80,7 @@
     }
   },
   "dependencies": {
+    "@hono/standard-validator": "^0.1.5",
     "@types/bcryptjs": "^3.0.0",
     "bcryptjs": "^3.0.2",
     "cloudflared": "^0.7.1",

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hfQ0n2QBLHmnywixPCRNCIa1WEhucgVuVKscxVEwlDBu8OhXtimzdhvImZuhxHu
+\restrict 7zCMVQPtWPg62gT6NO9a7oMfgKeW2nyDC6BJ0wzd5bhmCAPiNuCsxe9QYyjfhyw
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -12342,6 +12342,7 @@ fdfeb40c-e550-41e7-b9af-5633910bf8cb	01920000-1000-7000-8000-000000000001	0198b0
 a4203569-68b5-4acb-887d-39d16a6cad89	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-24 21:05:55.209	2025-09-03 01:59:34.325	Debug Test #9	Should show debug logs now	medium	active	\N	\N	\N	\N	\N	feature	\N	01920000-1000-7000-8000-000000000002	\N	\N
 e830942d-5d93-496a-b6f5-5662138f8750	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-24 21:01:01.815	2025-09-03 01:59:34.662	Live Sync Test #6	Should appear instantly with fixed table name matching	medium	active	\N	\N	\N	\N	\N	feature	\N	01920000-1000-7000-8000-000000000002	\N	\N
 510d78f0-d2ae-4f35-9a9b-ed2fb179586e	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-03 13:15:58.873	2025-09-03 13:16:06.152	API Schema Test Task - UPDATED	Testing full entity creation flow with proper schema	urgent	todo	\N	\N	\N	\N	\N	feature	\N	\N	\N	\N
+836b89a3-f5be-4924-ab2a-e36e2056558e	01920000-1000-7000-8000-000000000001	\N	2025-09-05 18:03:28.80289	2025-09-05 18:03:28.80289	Test Sync Task	Testing live sync between tabs	high	todo	\N	\N	\N	\N	\N	feature	\N	\N	\N	\N
 \.
 
 
@@ -12886,5 +12887,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hfQ0n2QBLHmnywixPCRNCIa1WEhucgVuVKscxVEwlDBu8OhXtimzdhvImZuhxHu
+\unrestrict 7zCMVQPtWPg62gT6NO9a7oMfgKeW2nyDC6BJ0wzd5bhmCAPiNuCsxe9QYyjfhyw
 

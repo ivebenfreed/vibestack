@@ -137,28 +137,19 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
     return `${displayName} records`
   }
 
-  // Always navigate to organization context - universe is aggregation only
+  // Navigate to universe view with entity filter
   const getEntityRoute = () => {
-    // Get organization ID from entity definition (universe mode) or route context
-    const targetOrgId = entityDef?._organizationId || orgId
-    const cleanEntityName = entityDef?._originalName || entityName
+    // In universe mode, extract org ID and original name from the prefixed entity name
+    const targetOrgId = entityDef?._orgId
+    const cleanEntityName = entityDef?._originalEntityName || entityName
     
-    if (!targetOrgId) {
-      console.warn('No organization ID available for entity navigation:', entityName)
-      // Fallback - shouldn't happen in normal usage
-      return {
-        to: "/universe" as const,
-        params: {}
-      }
-    }
-
-    // All entity access goes through organization context
+    // Always use universe route - org filtering is just a view parameter
+    // The entity name in universe mode includes the org prefix for uniqueness
     return {
-      to: "/org/$orgId/entities/$entityName" as const,
-      params: { 
-        orgId: targetOrgId, 
-        entityName: cleanEntityName 
-      }
+      to: "/universe" as const,
+      params: {},
+      // Could add search params for filtering in the future
+      // search: { entity: entityName, org: targetOrgId }
     }
   }
 

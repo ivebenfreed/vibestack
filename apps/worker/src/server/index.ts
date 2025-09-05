@@ -5,6 +5,7 @@
 
 // Import other dependencies
 import { Hono, Context } from 'hono';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { cors } from 'hono/cors'; // Re-add hono/cors import
 import api from './api';
 import { serverLogger } from './middleware/logger';
@@ -34,7 +35,7 @@ import { organizationActorRouter } from './routes/organization-actor';
  * Main API router for PUBLIC endpoints
  * Handles all HTTP routes under the /api path
  */
-const apiApp = new Hono<AppBindings>().basePath('/api');
+const apiApp = new OpenAPIHono<AppBindings>().basePath('/api');
 
 // Add Hono's CORS middleware FIRST
 apiApp.use('*', cors({
@@ -85,8 +86,10 @@ cloudflareSecurityStack.forEach(middleware => {
 });
 
 
-// Add public health endpoints BEFORE authMiddleware
-apiApp.get('/health', (c) => c.text('Server OK'));
+// Mount PUBLIC OpenAPI routes BEFORE authMiddleware (no authentication required)
+import publicOpenAPIRouter from './api/public-openapi';
+apiApp.route('/', publicOpenAPIRouter);
+
 
 // Test postgres.js directly
 apiApp.get('/db/postgres-test', async (c) => {
@@ -510,6 +513,7 @@ apiApp.use('*', authMiddleware);
 // Mount the auth router (which will be protected by authMiddleware)
 apiApp.route('/auth', authRouter);
 
+
 // Mount admin routes (platform orchestration)
 import { adminRouter } from './routes/admin.js';
 apiApp.route('/admin', adminRouter);
@@ -523,6 +527,10 @@ mountProtectedRoutes(apiApp);
 
 // Mount Organization Actor routes (for permissions caching, not schema caching)
 apiApp.route('/org-actor', organizationActorRouter);
+
+// Mount PROTECTED OpenAPI routes AFTER authMiddleware (authentication required)
+import protectedOpenAPIRouter from './api/protected-openapi';
+apiApp.route('/', protectedOpenAPIRouter);
 
 // Mount OTHER public API routes (which will also be protected by authMiddleware)
 apiApp.route('/', api);

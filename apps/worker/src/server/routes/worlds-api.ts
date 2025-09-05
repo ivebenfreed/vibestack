@@ -20,7 +20,9 @@ const worldsApi = new Hono();
 const CreateWorldSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  team_id: z.string().uuid().optional(), // NULL = org-wide, UUID = team-specific
+  team_id: z.string().uuid().openapi({
+    example: '01920000-3000-7000-8000-000000000001'
+  }).optional(), // NULL = org-wide, UUID = team-specific
   state: z.enum(['exploring', 'developing', 'active', 'paused', 'archived']).default('active'),
   world_type: z.enum(['personal', 'business', 'client', 'department', 'project_domain']).default('business'),
   priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium')
@@ -29,7 +31,9 @@ const CreateWorldSchema = z.object({
 const UpdateWorldSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  team_id: z.string().uuid().nullable().optional(),
+  team_id: z.string().uuid().openapi({
+    example: '01920000-3000-7000-8000-000000000001'
+  }).nullable().optional(),
   state: z.enum(['exploring', 'developing', 'active', 'paused', 'archived']).optional(),
   world_type: z.enum(['personal', 'business', 'client', 'department', 'project_domain']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional()
@@ -38,7 +42,9 @@ const UpdateWorldSchema = z.object({
 const WorldQuerySchema = z.object({
   includeInactive: z.boolean().default(false),
   includeArchived: z.boolean().default(false),
-  teamId: z.string().uuid().optional() // Filter by specific team
+  teamId: z.string().uuid().openapi({
+    example: '01920000-3000-7000-8000-000000000001'
+  }).optional() // Filter by specific team
 });
 
 // Apply organization security middleware to all routes

@@ -17,19 +17,25 @@ const teamsApi = new Hono();
 const CreateTeamSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  parent_team_id: z.string().uuid().optional(),
+  parent_team_id: z.string().uuid().openapi({
+    example: '01920000-1000-7000-8000-000000000001'
+  }).optional(),
   team_type: z.enum(['department', 'project', 'functional', 'cross_functional']).default('department')
 });
 
 const UpdateTeamSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  parent_team_id: z.string().uuid().nullable().optional(),
+  parent_team_id: z.string().uuid().openapi({
+    example: '01920000-1000-7000-8000-000000000001'
+  }).nullable().optional(),
   team_type: z.enum(['department', 'project', 'functional', 'cross_functional']).optional()
 });
 
 const AddMemberSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string().uuid().openapi({
+    example: '01920000-2000-7000-8000-000000000001'
+  }),
   role: z.enum(['member', 'lead', 'admin']).default('member')
 });
 

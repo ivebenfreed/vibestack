@@ -34,6 +34,7 @@
     "@electric-sql/pglite-react": "^0.2.17",
     "@electric-sql/pglite-repl": "^0.2.17",
     "@handsontable/react-wrapper": "^15.3.0",
+    "@hono/standard-validator": "^0.1.5",
     "@hono/zod-openapi": "^1.1.0",
     "@hono/zod-validator": "^0.1.11",
     "@hookform/resolvers": "^5.0.1",
@@ -90,6 +91,7 @@
     "framer-motion": "^12.7.4",
     "handsontable": "^15.3.0",
     "hono": "^4.7.7",
+    "hono-openapi": "^1.0.0",
     "immer": "^10.1.1",
     "indexeddb": "link:@legendapp/state/persist-plugins/indexeddb",
     "input-otp": "^1.4.2",
@@ -129,6 +131,7 @@
     "valibot": "^1.0.0",
     "xstate": "^5.19.4",
     "zod": "^4.0.17",
+    "zod-openapi": "^5.4.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

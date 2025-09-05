@@ -7,47 +7,24 @@ DATE_DIR="$CLAUDE_PROJECT_DIR/sessions/${DATE}"
 # Create date directory if it doesn't exist
 mkdir -p "$DATE_DIR"
 
-# Check if we should reuse an existing session
-REUSE_WINDOW=7200  # 2 hours in seconds
-CURRENT_TIME=$(date +%s)
+# Check for active session marker (survives autocompact)
+ACTIVE_SESSION_FILE="$CLAUDE_PROJECT_DIR/sessions/.active-session"
+if [ -f "$ACTIVE_SESSION_FILE" ]; then
+    ACTIVE_SESSION=$(cat "$ACTIVE_SESSION_FILE")
+    
+    # If active session directory exists, reuse it
+    if [ -d "$ACTIVE_SESSION" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION REUSE (active) - Directory: $ACTIVE_SESSION" >> "$CLAUDE_PROJECT_DIR/sessions/session.log"
+        echo "$ACTIVE_SESSION" > "$CLAUDE_PROJECT_DIR/sessions/current-session"
+        echo "Reusing active session: $ACTIVE_SESSION"
+        exit 0
+    fi
+fi
 
 # Find the most recent session for today
 LAST_SESSION=$(ls -d ${DATE_DIR}/session-* 2>/dev/null | sort -V | tail -1)
 
-if [ -n "$LAST_SESSION" ]; then
-    # Check if the session is recent enough to reuse
-    SESSION_TIME=$(stat -c %Y "$LAST_SESSION" 2>/dev/null || stat -f %m "$LAST_SESSION" 2>/dev/null)
-    if [ -n "$SESSION_TIME" ]; then
-        TIME_DIFF=$((CURRENT_TIME - SESSION_TIME))
-        
-        if [ $TIME_DIFF -lt $REUSE_WINDOW ]; then
-            # Check if there's been significant activity that warrants a new session
-            ACTIVITY_COUNT=0
-            if git rev-parse --git-dir > /dev/null 2>&1; then
-                # Count commits since last session
-                COMMIT_COUNT=$(git rev-list --count --since="@$SESSION_TIME" HEAD 2>/dev/null || echo 0)
-                # Count current modifications/staged files
-                MODIFIED_COUNT=$(git diff --name-only HEAD 2>/dev/null | wc -l || echo 0)
-                STAGED_COUNT=$(git diff --name-only --cached 2>/dev/null | wc -l || echo 0)
-                ACTIVITY_COUNT=$((COMMIT_COUNT + MODIFIED_COUNT + STAGED_COUNT))
-            fi
-            
-            # Create new session if significant activity (10+ changes) even within time window
-            if [ $ACTIVITY_COUNT -ge 10 ]; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION NEW - High activity ($ACTIVITY_COUNT changes) triggering new session" >> "$CLAUDE_PROJECT_DIR/sessions/session.log"
-                # Continue to create new session below
-            else
-                # Reuse existing session
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION REUSE - Directory: $LAST_SESSION" >> "$CLAUDE_PROJECT_DIR/sessions/session.log"
-                echo "$LAST_SESSION" > "$CLAUDE_PROJECT_DIR/sessions/current-session"
-                echo "Reusing existing session: $LAST_SESSION"
-                exit 0
-            fi
-        fi
-    fi
-fi
-
-# Create new session if none exists or last one is too old
+# Create new session
 SESSION_NUM=1
 if [ -n "$LAST_SESSION" ]; then
     # Extract the session number and increment
@@ -64,5 +41,8 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] SESSION START - Directory: $NEW_SESSION_DIR
 
 # Save current session info for other hooks to use
 echo "$NEW_SESSION_DIR" > "$CLAUDE_PROJECT_DIR/sessions/current-session"
+
+# Mark this as the active session (survives autocompact)
+echo "$NEW_SESSION_DIR" > "$ACTIVE_SESSION_FILE"
 
 echo "Created new session: $NEW_SESSION_DIR"

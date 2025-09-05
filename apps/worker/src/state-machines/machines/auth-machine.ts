@@ -1,4 +1,4 @@
-import { setup, assign } from 'xstate';
+import { setup, assign, fromPromise } from 'xstate';
 import { checkAuthActor, signInActor, signOutActor } from '../auth-actors';
 import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor, switchOrganizationActor } from '../organization-actors';
 import { legendStateInitMachine } from './legend-state-init-machine';
@@ -86,6 +86,22 @@ export const authMachine = setup({
     loadBilling: loadBillingActor,
     upgradeSubscription: upgradeSubscriptionActor,
     switchOrganization: switchOrganizationActor,
+    // Simple actor to create a default personal org if user has none
+    createDefaultPersonalOrg: fromPromise(async ({ input }: { input: { userId: string } }) => {
+      log.info('[AuthMachine] Creating default personal organization for user:', input.userId);
+      
+      // For now, just return a mock personal org
+      // In production, this would call the API to create the org
+      const personalOrg = {
+        id: `personal-${input.userId}`,
+        name: 'Personal Workspace',
+        slug: `personal-${input.userId}`,
+        type: 'personal' as const,
+        role: 'owner' as const
+      };
+      
+      return { organization: personalOrg };
+    }),
   },
   
   actions: {
@@ -583,6 +599,12 @@ export const authMachine = setup({
     
     authenticated: {
       entry: ({ context }) => {
+        log.info('[AuthMachine] 🎯 Entering AUTHENTICATED state', {
+          user: context.user?.email,
+          hasOrgs: context.userOrganizations?.length > 0,
+          currentOrg: context.currentOrganization?.id
+        });
+        
         // Always dispatch auth state change when entering authenticated state
         setTimeout(() => {
           const event = new CustomEvent('auth:state-changed', {
@@ -596,63 +618,223 @@ export const authMachine = setup({
         }, 0);
       },
 
-      // 🚀 OPTIMIZED: Use guards to determine initial state based on context
-      initial: 'checkingOrganizationState',
+      // NEW: Always go through postAuthSetup for fresh logins
+      // For restored sessions with everything already setup, check and skip to ready
+      initial: 'determineFlow',
       
       states: {
-        // 🚀 OPTIMIZED: Determine where to start based on existing context without redundant checks
-        checkingOrganizationState: {
+        // NEW: Determine whether to do full setup or skip to ready
+        determineFlow: {
+          entry: () => log.info('[AuthMachine] 🔀 Determining auth flow...'),
           always: [
             {
-              // If org is already setup AND we have userOrganizations loaded, go straight to ready
-              guard: ({ context }) => 
-                !!context.currentOrganization && context.organizationSetupComplete && context.userOrganizations.length > 0,
+              // ONLY skip to ready if EVERYTHING is truly complete from a restored session
+              guard: ({ context }) => {
+                const hasEverything = 
+                  !!context.currentOrganization &&
+                  context.organizationSetupComplete &&
+                  context.legendStateSetupComplete &&
+                  context.userOrganizations?.length > 0;
+                
+                if (hasEverything) {
+                  log.warn('[AuthMachine] ⚠️ Skipping setup - restored session has everything', {
+                    org: context.currentOrganization.id,
+                    legendState: context.legendStateSetupComplete
+                  });
+                }
+                return hasEverything;
+              },
               target: 'ready'
-              // No logging here - we already logged in determiningInitialState if this was from persistence
             },
             {
-              // If we have currentOrg but no userOrganizations list, load organizations first
-              guard: ({ context }) => 
-                !!context.currentOrganization && context.userOrganizations.length === 0,
-              target: 'loadingOrganizations',
-              actions: () => log.info('[AuthMachine] Have current org but missing organizations list - loading organizations')
-            },
-            {
-              // If we have orgs loaded but none selected, need selection
-              guard: ({ context }) => 
-                context.userOrganizations.length > 0 && !context.currentOrganization,
-              target: 'needsOrganizationSelection',
-              actions: () => log.info('[AuthMachine] Have organizations but none selected')
-            },
-            {
-              // Otherwise, need to load organizations (fresh login, no persisted orgs)
-              target: 'loadingOrganizations',
-              actions: () => log.info('[AuthMachine] Loading organizations for authenticated user')
+              // For fresh sign-ins or incomplete sessions, go through full setup
+              target: 'postAuthSetup',
+              actions: [  
+                // CRITICAL: Reset Legend State flag for fresh setup
+                assign({
+                  legendStateSetupComplete: false,
+                  legendStateError: null
+                }),
+                () => log.info('[AuthMachine] 🚀 Starting post-auth setup sequence')
+              ]
             }
           ]
         },
         
+        // NEW: Sequential post-auth setup that guarantees all steps happen in order
+        postAuthSetup: {
+          initial: 'step1_loadOrganizations',
+          
+          states: {
+            step1_loadOrganizations: {
+              entry: () => log.info('[AuthMachine] 📋 Step 1: Loading organizations'),
+              invoke: {
+                src: 'loadOrganizations',
+                onDone: {
+                  target: 'step2_setupOrganization',
+                  actions: [
+                    'setUserOrganizations',
+                    ({ context }) => log.info('[AuthMachine] ✅ Step 1 complete: Loaded', context.userOrganizations?.length || 0, 'organizations')
+                  ]
+                },
+                onError: {
+                  // Don't block on org loading failure - continue with defaults
+                  target: 'step2_setupOrganization',
+                  actions: [
+                    'setOrganizationError',
+                    () => log.error('[AuthMachine] ⚠️ Step 1 failed but continuing')
+                  ]
+                }
+              }
+            },
+            
+            step2_setupOrganization: {
+              entry: () => log.info('[AuthMachine] 📋 Step 2: Setting up organization'),
+              always: [
+                {
+                  // If we already have an org, continue
+                  guard: ({ context }) => !!context.currentOrganization,
+                  target: 'step3_initializeLegendState',
+                  actions: () => log.info('[AuthMachine] ✅ Step 2: Using existing organization')
+                },
+                {
+                  // Auto-select first org if available
+                  guard: ({ context }) => context.userOrganizations?.length > 0,
+                  target: 'step3_initializeLegendState',
+                  actions: [
+                    'autoSelectOrganization',
+                    ({ context }) => log.info('[AuthMachine] ✅ Step 2: Auto-selected organization', context.currentOrganization?.id)
+                  ]
+                },
+                {
+                  // No orgs available - create default personal org
+                  target: 'creatingDefaultOrg'
+                }
+              ]
+            },
+            
+            creatingDefaultOrg: {
+              entry: () => log.info('[AuthMachine] 📋 Step 2b: Creating default personal organization'),
+              invoke: {
+                src: 'createDefaultPersonalOrg',
+                input: ({ context }) => ({ userId: context.user?.id }),
+                onDone: {
+                  target: 'step3_initializeLegendState',
+                  actions: [
+                    assign({
+                      currentOrganization: ({ event }) => (event as any).output?.organization,
+                      userOrganizations: ({ event, context }) => [...(context.userOrganizations || []), (event as any).output?.organization].filter(Boolean)
+                    }),
+                    () => log.info('[AuthMachine] ✅ Step 2b: Created default organization')
+                  ]
+                },
+                onError: {
+                  // Continue even if org creation fails
+                  target: 'step3_initializeLegendState',
+                  actions: () => log.error('[AuthMachine] ⚠️ Step 2b failed but continuing')
+                }
+              }
+            },
+            
+            step3_initializeLegendState: {
+              entry: () => log.info('[AuthMachine] 📋 Step 3: Initializing Legend State'),
+              invoke: {
+                src: 'legendStateInit',
+                input: ({ context }) => {
+                  const organizationIds = context.userOrganizations?.map(org => org.id) || [];
+                  log.info('[AuthMachine] 🎯 Invoking Legend State machine with:', {
+                    userId: context.user?.id,
+                    organizationIds,
+                    currentOrgId: context.currentOrganization?.id
+                  });
+                  return {
+                    userId: context.user?.id || '',
+                    organizationIds,
+                    currentOrgId: context.currentOrganization?.id
+                  };
+                },
+                onDone: {
+                  target: 'step4_complete',
+                  actions: [
+                    'setLegendStateSuccess',
+                    () => log.info('[AuthMachine] ✅ Step 3 complete: Legend State initialized')
+                  ]
+                },
+                onError: {
+                  // Don't block on Legend State failure
+                  target: 'step4_complete',
+                  actions: [
+                    'setLegendStateError',
+                    ({ event }) => log.error('[AuthMachine] ⚠️ Step 3 failed:', event.error, 'but continuing')
+                  ]
+                }
+              }
+            },
+            
+            step4_complete: {
+              type: 'final' as const,
+              entry: () => log.info('[AuthMachine] 🎉 Post-auth setup sequence complete!')
+            }
+          },
+          
+          onDone: {
+            target: 'ready',
+            actions: () => log.info('[AuthMachine] ➡️ Transitioning to READY state')
+          }
+        },
+        
         loadingOrganizations: {
-          entry: 'setLoadingOrganizations',
+          entry: [
+            'setLoadingOrganizations',
+            ({ context }) => log.info('[AuthMachine] 📥 LOADING ORGANIZATIONS:', {
+              userId: context.user?.id,
+              currentLegendStateComplete: context.legendStateSetupComplete,
+              currentOrgId: context.currentOrganization?.id,
+              organizationSetupComplete: context.organizationSetupComplete
+            })
+          ],
           invoke: {
             src: 'loadOrganizations',
             onDone: [
               {
-                // If we already have current organization AND persistence is complete, go to ready
-                target: 'ready',
-                guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete && context.legendStateSetupComplete,
-                actions: ['setUserOrganizations', 'clearLoadingOrganizations']
-              },
-              {
                 // If we have current organization but no persistence, set up persistence
                 target: 'initializingLegendState',
                 guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete && !context.legendStateSetupComplete,
-                actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+                actions: [
+                  'setUserOrganizations', 
+                  'clearLoadingOrganizations',
+                  ({ context }) => log.info('[AuthMachine] ✅ From loadingOrganizations -> initializingLegendState (Legend State NOT complete)', {
+                    orgId: context.currentOrganization?.id,
+                    legendStateSetupComplete: context.legendStateSetupComplete
+                  })
+                ]
+              },
+              {
+                // If we already have current organization AND persistence is complete, go to ready
+                target: 'ready',
+                guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete && context.legendStateSetupComplete,
+                actions: [
+                  'setUserOrganizations', 
+                  'clearLoadingOrganizations',
+                  ({ context }) => log.error('[AuthMachine] ❌ BYPASSING Legend State init - going directly to ready!', {
+                    orgId: context.currentOrganization?.id,
+                    legendStateSetupComplete: context.legendStateSetupComplete,
+                    organizationSetupComplete: context.organizationSetupComplete,
+                    note: 'This is the problematic path - Legend State might not actually be initialized!'
+                  })
+                ]
               },
               {
                 // Otherwise, continue with the normal flow (billing then org selection)
                 target: 'loadingBilling',
-                actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+                actions: [
+                  'setUserOrganizations', 
+                  'clearLoadingOrganizations',
+                  ({ context }) => log.info('[AuthMachine] ➡️ From loadingOrganizations -> loadingBilling (normal flow)', {
+                    hasCurrentOrg: !!context.currentOrganization,
+                    legendStateSetupComplete: context.legendStateSetupComplete
+                  })
+                ]
               }
             ],
             onError: {
@@ -692,31 +874,53 @@ export const authMachine = setup({
         },
 
         checkingOrganizationSetup: {
+          entry: ({ context }) => {
+            log.info('[AuthMachine] 🔍 CHECKING ORGANIZATION SETUP:', {
+              hasOrganizations: !!context.userOrganizations?.length,
+              orgCount: context.userOrganizations?.length || 0,
+              hasCurrentOrg: !!context.currentOrganization,
+              currentOrgId: context.currentOrganization?.id,
+              legendStateSetupComplete: context.legendStateSetupComplete,
+              legendStateError: context.legendStateError
+            });
+          },
           always: [
             {
               target: 'needsOrganizationSetup',
-              guard: 'hasNoOrganizations'
+              guard: 'hasNoOrganizations',
+              actions: [() => log.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSetup - no organizations found')]
             },
             {
               target: 'needsOrganizationSelection',
-              guard: 'hasNoCurrentOrganization'
-            },
-            {
-              // If we have org and persistence is complete, go to ready
-              target: 'ready',
-              guard: ({ context }) => !!context.currentOrganization && context.legendStateSetupComplete,
-              actions: []
+              guard: 'hasNoCurrentOrganization',
+              actions: [() => log.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSelection - no current organization')]
             },
             {
               // If we have org but no persistence, set up persistence
               target: 'initializingLegendState',
               guard: ({ context }) => !!context.currentOrganization && !context.legendStateSetupComplete,
-              actions: []
+              actions: [({ context }) => log.info('[AuthMachine] ➡️ Transitioning to initializingLegendState - have org but Legend State not complete', {
+                orgId: context.currentOrganization?.id,
+                legendStateSetupComplete: context.legendStateSetupComplete
+              })]
+            },
+            {
+              // If we have org and persistence is complete, go to ready
+              target: 'ready',
+              guard: ({ context }) => !!context.currentOrganization && context.legendStateSetupComplete,
+              actions: [({ context }) => log.warn('[AuthMachine] ⚠️ SKIPPING Legend State init - already complete!', {
+                orgId: context.currentOrganization?.id,
+                legendStateSetupComplete: context.legendStateSetupComplete,
+                note: 'This might be stale state - Legend State may not actually be initialized'
+              })]
             },
             {
               // Auto-select organization and set up persistence - this is the normal path
               target: 'initializingLegendState',
-              actions: ['autoSelectOrganization']
+              actions: [
+                'autoSelectOrganization',
+                () => log.info('[AuthMachine] ➡️ Auto-selecting organization and transitioning to initializingLegendState')
+              ]
             }
           ]
         },
@@ -853,53 +1057,43 @@ export const authMachine = setup({
             ({ context }) => log.info(`[AuthMachine] 🎯 TRANSITION: Entering initializingLegendState for user: ${context.user?.email}, org: ${context.currentOrganization?.name}`)
           ],
           
-          // TEMPORARY: Skip Legend State initialization and go straight to ready
-          always: {
-            target: 'ready',
-            actions: [
-              'setLegendStateSuccess', 
-              'clearLoadingLegendState',
-              ({ context }) => log.info(`[AuthMachine] ✅ TRANSITION: BYPASSING Legend State - going directly to ready for user: ${context.user?.email}`)
-            ]
+          // RE-ENABLED: Legend State machine integration for universe context
+          invoke: {
+            src: 'legendStateInit',
+            input: ({ context }) => {
+              // Always pass ALL organizations for universe mode
+              const organizationIds = context.userOrganizations?.map(org => org.id) || [];
+              
+              log.info(`[AuthMachine] Passing to Legend State machine for universe mode:`, {
+                organizationIds,
+                userId: context.user?.id,
+                currentOrgId: context.currentOrganization?.id,
+                totalOrgs: organizationIds.length
+              });
+              
+              return {
+                userId: context.user?.id || '',
+                organizationIds,
+                // Pass current org for reference but Legend State will load all orgs
+                currentOrgId: context.currentOrganization?.id
+              };
+            },
+            
+            onDone: {
+              target: 'ready',
+              actions: [
+                'setLegendStateSuccess', 
+                'clearLoadingLegendState',
+                ({ context }) => log.info(`[AuthMachine] ✅ Legend State initialization completed for user: ${context.user?.email}`)
+              ]
+            },
+            
+            onError: {
+              // Don't block auth flow on Legend State failure - continue to ready with fallback
+              target: 'ready',
+              actions: ['setLegendStateError', 'clearLoadingLegendState']
+            }
           },
-          
-          // TODO: Re-enable Legend State machine integration after debugging
-          // invoke: {
-          //   src: 'legendStateInit',
-          //   input: ({ context }) => {
-          //     const organizationIds = context.userOrganizations?.map(org => org.id) || 
-          //                            (context.currentOrganization ? [context.currentOrganization.id] : []);
-          //     const isUniverseMode = organizationIds.length > 1;
-          //     
-          //     log.info(`[AuthMachine] Passing to Legend State machine:`, {
-          //       isUniverseMode,
-          //       organizationIds,
-          //       userId: context.user?.id,
-          //       currentOrgId: context.currentOrganization?.id
-          //     });
-          //     
-          //     return {
-          //       userId: context.user?.id || '',
-          //       organizationIds,
-          //       currentOrgId: isUniverseMode ? undefined : context.currentOrganization?.id
-          //     };
-          //   },
-          //   
-          //   onDone: {
-          //     target: 'ready',
-          //     actions: [
-          //       'setLegendStateSuccess', 
-          //       'clearLoadingLegendState',
-          //       ({ context }) => log.info(`[AuthMachine] ✅ Legend State initialization completed for user: ${context.user?.email}`)
-          //     ]
-          //   },
-          //   
-          //   onError: {
-          //     // Don't block auth flow on Legend State failure - continue to ready with fallback
-          //     target: 'ready',
-          //     actions: ['setLegendStateError', 'clearLoadingLegendState']
-          //   }
-          // },
           
           // Listen for progress events from the Legend State init machine
           on: {
@@ -1033,6 +1227,11 @@ export const authMachine = setup({
                 currentOrganization: ({ event }) => event.output.organization || null,
                 organizationSetupComplete: ({ event }) => !!event.output.organization,
                 needsOrganizationSetup: ({ event }) => !event.output.organization,
+              }),
+              assign({
+                // Reset Legend State on fresh sign-in to ensure it always initializes
+                legendStateSetupComplete: false,
+                legendStateError: null,
               }),
               { 
                 type: 'dispatchAuthStateChange',

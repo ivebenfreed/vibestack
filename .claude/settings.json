@@ -2,6 +2,16 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/session-start.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
         "hooks": [
           {
             "type": "command",

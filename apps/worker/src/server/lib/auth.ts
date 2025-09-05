@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { google, microsoft } from "better-auth/providers";
-import { admin, emailOTP, oneTimeToken, twoFactor, customSession } from "better-auth/plugins";
+import { admin, emailOTP, oneTimeToken, twoFactor, customSession, openAPI } from "better-auth/plugins";
 import { polar, checkout, portal, usage, webhooks } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
@@ -210,6 +210,11 @@ export const auth = betterAuth({
           length: 8,
           count: 10,
         },
+      }),
+      openAPI({
+        path: "/api/auth/reference", // Default path for OpenAPI reference
+        disableDefaultReference: false, // Keep Scalar UI enabled
+        theme: "default", // Use default theme
       }),
     ],
 });
@@ -706,6 +711,11 @@ export function initializeAuth(env: Env, request?: Request) {
           length: 8,
           count: 10,
         },
+      }),
+      openAPI({
+        path: "/api/auth/reference", // Default path for OpenAPI reference
+        disableDefaultReference: false, // Keep Scalar UI enabled
+        theme: "default", // Use default theme
       }),
     ],
     // Use Better Auth defaults - no custom field mappings needed
