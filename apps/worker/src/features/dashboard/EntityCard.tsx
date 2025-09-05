@@ -52,7 +52,6 @@ interface EntityCardProps {
   archetype?: string
   orgId?: string // Organization ID for routing context
   orgName?: string // Organization name for display
-  isUniverseMode?: boolean // Whether we're in universe view
   onDelete?: (entityName: string) => void
 }
 
@@ -68,7 +67,7 @@ const ARCHETYPE_CONFIG = {
   collection: { icon: Layers, color: 'bg-indigo-500/10 text-indigo-600', label: 'Collection' },
 }
 
-export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, orgId, orgName, isUniverseMode, onDelete }: EntityCardProps) {
+export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, orgId, orgName, onDelete }: EntityCardProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
   
@@ -157,34 +156,35 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
     return `${displayName} records`
   }
 
-  // Navigate to entity detail route
+  // Navigate to entity detail route - always use org-specific format
   const getEntityRoute = () => {
-    // In universe mode, entities have org-specific prefixes and need org context
-    if (isUniverseMode && entityDef?._orgId) {
-      // For universe entities, use the org-specific route
-      // The entityName already includes the org prefix for uniqueness
-      return {
-        to: "/org/$orgId/entities/$entityName" as const,
-        params: { 
-          orgId: entityDef._orgId,
-          entityName: entityName  // Use full prefixed name
-        },
+    // Extract org ID from entity name if it's org-prefixed
+    const orgIdToUse = entityDef?._orgId || orgId
+    
+    if (!orgIdToUse) {
+      console.warn('No org ID available for entity navigation:', entityName)
+      // Extract org ID from org-prefixed entity name as fallback
+      const orgPrefixMatch = entityName.match(/^([a-f0-9-]{36})_(.+)$/)
+      if (orgPrefixMatch) {
+        const [, extractedOrgId] = orgPrefixMatch
+        return {
+          to: "/org/$orgId/entities/$entityName" as const,
+          params: { 
+            orgId: extractedOrgId,
+            entityName: entityName
+          },
+        }
       }
-    } else if (orgId) {
-      // For org-specific context (non-universe mode)
-      return {
-        to: "/org/$orgId/entities/$entityName" as const,
-        params: { 
-          orgId: orgId,
-          entityName: entityName 
-        },
-      }
-    } else {
-      // Fallback to entity route without org context
-      return {
-        to: "/entities/$entityName" as const,
-        params: { entityName },
-      }
+      // Final fallback - should not happen in normal operation
+      throw new Error(`Cannot determine org ID for entity: ${entityName}`)
+    }
+    
+    return {
+      to: "/org/$orgId/entities/$entityName" as const,
+      params: { 
+        orgId: orgIdToUse,
+        entityName: entityName
+      },
     }
   }
 

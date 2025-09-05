@@ -1023,9 +1023,9 @@ export function getUniverseEntity$(entityIdentifier: string) {
         userId: universeUserId$.peek()
       }
       
-      // CRITICAL FIX: In universe context, schema contains org-prefixed entity names
-      // We need to look for the full entityIdentifier, not the simplified entityName
-      const schemaKey = currentOrgContext?.orgId === 'universe' ? entityIdentifier : entityName
+      // In the new unified universe context, schema always contains org-prefixed entity names
+      // Always use the full entityIdentifier for lookups
+      const schemaKey = entityIdentifier
       
       if (!currentOrgContext?.schema?.entities?.[schemaKey]) {
         log.warn(`[UniverseObservable] Entity ${schemaKey} not available in current universe schema`)
@@ -1033,8 +1033,8 @@ export function getUniverseEntity$(entityIdentifier: string) {
         return null
       }
       
-      // Use the org-specific cache key
-      const cacheKey = `${orgId}:${entityName}`
+      // Use the full entityIdentifier as cache key to match getEntity$ format
+      const cacheKey = entityIdentifier
       
       // Check cache first
       if (globalEntityCache[cacheKey]) {
@@ -1045,7 +1045,7 @@ export function getUniverseEntity$(entityIdentifier: string) {
       // Create observable for this specific organization's entity
       try {
         log.info(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
-        const observable = createEntityObservable(orgId, entityName, currentOrgContext.schema.entities[schemaKey])
+        const observable = createEntityObservable(entityIdentifier, currentOrgContext.schema.entities[schemaKey])
         globalEntityCache[cacheKey] = observable
         
         log.info(`[UniverseObservable] Created ${entityIdentifier} observable`, {

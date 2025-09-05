@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { observer } from '@legendapp/state/react'
 import { use$ } from '@legendapp/state/react'
@@ -20,9 +20,11 @@ import {
   Globe,
   Building
 } from 'lucide-react'
-import { getEntity$, universeSchema$ } from '@/legend-state'
+import { getEntity$, getUniverseEntity$, universeSchema$ } from '@/legend-state'
 import { useAuth } from '@/lib/auth'
 import { Link } from '@tanstack/react-router'
+import VibeGrid from '@/components/custom/vibegrid/VibeGrid'
+import type { Column } from '@/components/custom/vibegrid/types'
 
 const EntityDetailPage = observer(function EntityDetailPage() {
   const { entityName } = Route.useParams()
@@ -32,12 +34,70 @@ const EntityDetailPage = observer(function EntityDetailPage() {
   // Get entity definition from schema
   const entityDef = schema?.entities?.[entityName]
   
-  // Get entity data
-  const entityStore = getEntity$(entityName)
+  // Get entity data - use getUniverseEntity$ for org-prefixed entity names
+  const entityStore = getUniverseEntity$(entityName)
   const data = entityStore ? use$(entityStore) : null
   
   // Calculate counts and stats
   const recordCount = data ? Object.keys(data).length : 0
+  
+  // Generate columns from entity schema
+  const columns = useMemo<Column[]>(() => {
+    if (!entityDef?.properties) return []
+    
+    const cols: Column[] = []
+    
+    // Add ID column first if it exists
+    if (entityDef.properties.id) {
+      cols.push({
+        id: 'id',
+        field: 'id',
+        title: 'ID',
+        cellType: 'text' as const,
+        width: 100,
+        minWidth: 60,
+        maxWidth: 150,
+        pinned: 'left'
+      })
+    }
+    
+    // Add other columns
+    Object.entries(entityDef.properties).forEach(([key, prop]: [string, any]) => {
+      if (key === 'id') return // Already added
+      
+      // Determine cell type based on property type
+      let cellType: Column['cellType'] = 'text'
+      if (prop.type === 'boolean') {
+        cellType = 'checkbox'
+      } else if (prop.type === 'number' || prop.type === 'integer') {
+        cellType = 'number'
+      } else if (prop.format === 'date-time' || prop.format === 'date') {
+        cellType = 'date'
+      } else if (prop.enum) {
+        cellType = 'select'
+      }
+      
+      // Calculate reasonable default width
+      let width = 150
+      if (cellType === 'checkbox') width = 80
+      else if (cellType === 'date') width = 180
+      else if (key.toLowerCase().includes('description') || key.toLowerCase().includes('notes')) width = 250
+      else if (key.toLowerCase().includes('name') || key.toLowerCase().includes('title')) width = 200
+      
+      cols.push({
+        id: key,
+        field: key,
+        title: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(),
+        cellType,
+        width,
+        minWidth: Math.min(width * 0.6, 80),
+        maxWidth: Math.max(width * 2, 400),
+        options: prop.enum // For select columns
+      })
+    })
+    
+    return cols
+  }, [entityDef])
   
   // Extract clean display name from entity name (remove UUID prefix if present)
   const displayName = (() => {
@@ -118,7 +178,7 @@ const EntityDetailPage = observer(function EntityDetailPage() {
   
   return (
     <ContentContainer>
-      <TopNav items={topNav} />
+      <TopNav links={topNav} />
       
       {/* Header Section */}
       <div className="mb-6">
@@ -250,7 +310,7 @@ const EntityDetailPage = observer(function EntityDetailPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {recordCount === 0 ? (
                 <div className="text-center py-12">
                   <Database className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -264,9 +324,17 @@ const EntityDetailPage = observer(function EntityDetailPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="text-muted-foreground">
-                  <p>Table view with {recordCount} records will be displayed here.</p>
-                  <p className="text-sm mt-2">Integration with UltraTable component pending.</p>
+                <div className="h-[600px]">
+                  <VibeGrid
+                    tableId={`entity-table-${entityName}`}
+                    entityType={entityName}
+                    columns={columns}
+                    height="100%"
+                    className="h-full"
+                    enableVirtualScrolling={true}
+                    enableFiltering={true}
+                    enableSorting={true}
+                  />
                 </div>
               )}
             </CardContent>
