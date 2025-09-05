@@ -1211,8 +1211,19 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
     // Filter by organization if specified
     const filteredEntityKeys = filterOrgId 
       ? entityKeys.filter(entityName => {
+          // In universe mode, entities are prefixed with orgId_EntityName
+          // Extract org ID from the entity name if it's prefixed
+          if (entityName.includes('_')) {
+            const parts = entityName.split('_')
+            // Check if first part looks like a UUID (36 chars with dashes)
+            if (parts[0].length === 36 && parts[0].includes('-')) {
+              // This is an org-prefixed entity, check if it matches our filter
+              return parts[0] === filterOrgId
+            }
+          }
+          // Fallback to checking the schema property
           const entitySchema = schema.entities[entityName]
-          return entitySchema._organizationId === filterOrgId
+          return entitySchema._organizationId === filterOrgId || entitySchema._orgId === filterOrgId
         })
       : entityKeys
     
@@ -1231,12 +1242,21 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
       const displayName = entitySchema._originalName || entityName
       const orgName = entitySchema._organizationName
       
+      // Extract org ID from entity name if it's prefixed
+      let orgId = entitySchema._organizationId || entitySchema._orgId
+      if (!orgId && entityName.includes('_')) {
+        const parts = entityName.split('_')
+        if (parts[0].length === 36 && parts[0].includes('-')) {
+          orgId = parts[0]
+        }
+      }
+      
       entityGroups[archetype].push({
         title: displayName,
-        url: `/org/${entitySchema._organizationId}/entities/${displayName}`,
+        url: `/org/${orgId}/entities/${entityName}`,
         icon: getArchetypeIcon(archetype),
         organizationName: orgName,
-        organizationId: entitySchema._organizationId
+        organizationId: orgId
       })
     })
     
