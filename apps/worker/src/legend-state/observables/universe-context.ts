@@ -177,7 +177,9 @@ export const loadWorkspaceData = async (): Promise<any> => {
     const result = await response.json();
     
     if (!result.success) {
-      throw new Error(result.error || 'Failed to load workspace');
+      // Don't throw an error, just log and return null
+      log.warn('[UniverseWorkspace] Workspace API returned unsuccessful response:', result.error || 'No error message');
+      return null;
     }
 
     log.info('[UniverseWorkspace] Loaded workspace data:', {
@@ -190,8 +192,9 @@ export const loadWorkspaceData = async (): Promise<any> => {
     universeWorkspace$.set(result.data);
     return result.data;
   } catch (error) {
-    log.error('[UniverseWorkspace] Failed to load workspace:', error);
-    throw error;
+    log.warn('[UniverseWorkspace] Failed to load workspace (this may be normal if data is loaded elsewhere):', error);
+    // Return null instead of throwing - let the system continue
+    return null;
   }
 };
 
@@ -290,10 +293,9 @@ export const universeHelpers = {
     
     if (isAuth && userId) {
       log.info('[UniverseHelpers] Authentication set, loading workspace data');
-      try {
-        await loadWorkspaceData();
-      } catch (error) {
-        log.error('[UniverseHelpers] Failed to load workspace after auth:', error);
+      const result = await loadWorkspaceData();
+      if (!result) {
+        log.info('[UniverseHelpers] Workspace data not loaded - may already be loaded via another path');
       }
     }
   },
