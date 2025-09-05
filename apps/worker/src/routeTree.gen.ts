@@ -14,7 +14,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DebugPublicRouteImport } from './routes/debug-public'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as EntityEntityNameRouteImport } from './routes/entity.$entityName'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -48,7 +47,6 @@ import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
-import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugUltraTableTestRouteImport } from './routes/_authenticated/debug/ultra-table-test'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
@@ -93,11 +91,6 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const EntityEntityNameRoute = EntityEntityNameRouteImport.update({
-  id: '/entity/$entityName',
-  path: '/entity/$entityName',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
@@ -334,12 +327,6 @@ const AuthenticatedSettingsAccountRoute =
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-const AuthenticatedEntitiesEntityNameRoute =
-  AuthenticatedEntitiesEntityNameRouteImport.update({
-    id: '/entities/$entityName',
-    path: '/entities/$entityName',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedDebugVibegridLegendStateRoute =
   AuthenticatedDebugVibegridLegendStateRouteImport.update({
     id: '/vibegrid-legend-state',
@@ -432,7 +419,6 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
-  '/entity/$entityName': typeof EntityEntityNameRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
@@ -442,7 +428,6 @@ export interface FileRoutesByFullPath {
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
-  '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -487,7 +472,6 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
-  '/entity/$entityName': typeof EntityEntityNameRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
@@ -497,7 +481,6 @@ export interface FileRoutesByTo {
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
-  '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -546,7 +529,6 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
-  '/entity/$entityName': typeof EntityEntityNameRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/_authenticated/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
@@ -556,7 +538,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/_authenticated/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
-  '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -605,7 +586,6 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
-    | '/entity/$entityName'
     | '/'
     | '/debug/entity-routes-test'
     | '/debug/legend-state-test'
@@ -615,7 +595,6 @@ export interface FileRouteTypes {
     | '/debug/system-options'
     | '/debug/ultra-table-test'
     | '/debug/vibegrid-legend-state'
-    | '/entities/$entityName'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -660,7 +639,6 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
-    | '/entity/$entityName'
     | '/'
     | '/debug/entity-routes-test'
     | '/debug/legend-state-test'
@@ -670,7 +648,6 @@ export interface FileRouteTypes {
     | '/debug/system-options'
     | '/debug/ultra-table-test'
     | '/debug/vibegrid-legend-state'
-    | '/entities/$entityName'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -718,7 +695,6 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
-    | '/entity/$entityName'
     | '/_authenticated/'
     | '/_authenticated/debug/entity-routes-test'
     | '/_authenticated/debug/legend-state-test'
@@ -728,7 +704,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/system-options'
     | '/_authenticated/debug/ultra-table-test'
     | '/_authenticated/debug/vibegrid-legend-state'
-    | '/_authenticated/entities/$entityName'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
@@ -775,7 +750,6 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
-  EntityEntityNameRoute: typeof EntityEntityNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -800,13 +774,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/entity/$entityName': {
-      id: '/entity/$entityName'
-      path: '/entity/$entityName'
-      fullPath: '/entity/$entityName'
-      preLoaderRoute: typeof EntityEntityNameRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/(errors)/503': {
       id: '/(errors)/503'
@@ -1081,13 +1048,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/_authenticated/entities/$entityName': {
-      id: '/_authenticated/entities/$entityName'
-      path: '/entities/$entityName'
-      fullPath: '/entities/$entityName'
-      preLoaderRoute: typeof AuthenticatedEntitiesEntityNameRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/debug/vibegrid-legend-state': {
       id: '/_authenticated/debug/vibegrid-legend-state'
       path: '/vibegrid-legend-state'
@@ -1256,7 +1216,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDebugRouteRoute: typeof AuthenticatedDebugRouteRouteWithChildren
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedEntitiesEntityNameRoute: typeof AuthenticatedEntitiesEntityNameRoute
   AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
   AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
   AuthenticatedWorldsWorldIdRoute: typeof AuthenticatedWorldsWorldIdRoute
@@ -1276,7 +1235,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDebugRouteRoute: AuthenticatedDebugRouteRouteWithChildren,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedEntitiesEntityNameRoute: AuthenticatedEntitiesEntityNameRoute,
   AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
   AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
   AuthenticatedWorldsWorldIdRoute: AuthenticatedWorldsWorldIdRoute,
@@ -1314,7 +1272,6 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
-  EntityEntityNameRoute: EntityEntityNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

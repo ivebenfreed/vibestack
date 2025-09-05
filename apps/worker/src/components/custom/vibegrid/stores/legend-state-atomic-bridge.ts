@@ -87,7 +87,19 @@ export function createAtomicObservableBridge(
       }
       
       if (!currentEntityData || (typeof currentEntityData === 'object' && Object.keys(currentEntityData).length === 0)) {
-        log.info(`🔗 AtomicBridge: Entity data ${entityTableName} is empty or null`);
+        log.info(`🔗 AtomicBridge: Entity data ${entityTableName} is empty or null, but continuing to initialize bridge`);
+        
+        // Initialize with empty data to ensure bridge is ready
+        if (!isInitialized) {
+          tableSend({
+            type: 'STORE_DATA_UPDATED',
+            entities: [],
+            loading: false,
+            source: 'atomic_bridge_empty_initial'
+          });
+          isInitialized = true;
+          previousEntityData = {};
+        }
         return;
       }
       
@@ -238,7 +250,7 @@ export function createAtomicObservableBridge(
   });
   
   // PATTERN 2: Schema readiness observer
-  // Ensures we react when the schema becomes available
+  // Ensures we react when the schema becomes available and triggers data loading
   const schemaReadinessDisposer = when(
     () => {
       const schema = universeSchema$.get();
@@ -247,8 +259,23 @@ export function createAtomicObservableBridge(
       return schema && !loading && orgId;
     },
     () => {
-      log.info('🔗 AtomicBridge: Schema ready, triggering initial load');
-      // Schema is ready - the entity observer above will now have data
+      log.info('🔗 AtomicBridge: Schema ready, triggering initial data load');
+      
+      // Force a refresh of the entity observable to ensure data is loaded
+      const entityObservable = getEntity$(entityTableName);
+      if (entityObservable) {
+        try {
+          // Trigger a get to ensure the observable is active
+          const currentData = entityObservable.get();
+          log.info('🔗 AtomicBridge: Triggered entity observable refresh', {
+            entityTableName,
+            hasData: !!currentData,
+            dataKeys: currentData ? Object.keys(currentData).length : 0
+          });
+        } catch (error) {
+          log.warn('🔗 AtomicBridge: Error refreshing entity observable:', error);
+        }
+      }
     }
   );
   

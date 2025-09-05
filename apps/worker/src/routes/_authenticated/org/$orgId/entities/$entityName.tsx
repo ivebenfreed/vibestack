@@ -126,6 +126,18 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   // ✅ Compute derived values after all hooks
   const entityArray = (entityStore && entityData) ? Object.values(entityData) : []
   
+  // 🐛 DEBUG: Log the entity data loading state
+  console.log('🔍 [EntityRoute] Debug entity data:', {
+    actualEntityKey,
+    entityStore: !!entityStore,
+    entityData,
+    entityDataType: typeof entityData,
+    entityDataKeys: entityData ? Object.keys(entityData) : null,
+    entityArrayLength: entityArray.length,
+    entityName,
+    orgId
+  })
+  
   // Get entity schema using the simplified key from display schema
   const entitySchema = React.useMemo(() => {
     if (!schema?.entities) return null

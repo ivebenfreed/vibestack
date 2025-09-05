@@ -956,8 +956,15 @@ export function getEntity$(entityName: string) {
     // SCHEMA-DRIVEN APPROACH: Check if entity exists in universe schema
     const currentSchema = universeSchema$.peek()
     
+    // 🐛 DEBUG: Log what we're looking for and what's available
+    console.log('🔍 [getEntity$] Looking for entity:', entityName)
+    console.log('🔍 [getEntity$] Available entities in schema:', Object.keys(currentSchema?.entities || {}))
+    console.log('🔍 [getEntity$] Schema exists:', !!currentSchema)
+    console.log('🔍 [getEntity$] Entities object exists:', !!currentSchema?.entities)
+    
     if (!currentSchema?.entities?.[entityName]) {
       log.warn(`[Observable] Entity ${entityName} not available in universe schema`)
+      console.log('🔍 [getEntity$] Entity NOT FOUND:', entityName)
       return null
     }
     

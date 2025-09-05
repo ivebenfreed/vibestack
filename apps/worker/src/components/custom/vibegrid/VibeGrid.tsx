@@ -355,6 +355,37 @@ export function VibeGrid<T extends Record<string, any> = any>(
         
         log.info('Setting up atomic bridge', { entityType });
         
+        // Immediately try to load data if available
+        try {
+          const { getEntity$, universeLoading$, universeSchema$ } = await import('@/legend-state/observables');
+          const isLoading = universeLoading$.get();
+          const schema = universeSchema$.get();
+          
+          if (!isLoading && schema) {
+            const entityObservable = getEntity$(entityType);
+            if (entityObservable) {
+              const currentData = entityObservable.get();
+              log.info('🔗 VibeGrid: Attempting immediate data load', {
+                entityType,
+                hasData: !!currentData,
+                dataKeys: currentData ? Object.keys(currentData).length : 0
+              });
+              
+              if (currentData && Object.keys(currentData).length > 0) {
+                // Send immediate data update
+                tableSend({
+                  type: 'STORE_DATA_UPDATED',
+                  entities: Object.values(currentData),
+                  loading: false,
+                  source: 'immediate_load_from_bridge_setup'
+                });
+              }
+            }
+          }
+        } catch (error) {
+          log.warn('Failed to attempt immediate data load:', error);
+        }
+        
         // Create atomic observer with proper event handling
         const cleanup = bridge.createAtomicObservableBridge(entityType, (event) => {
           // Don't process events if cleanup is active
@@ -683,7 +714,10 @@ export function VibeGrid<T extends Record<string, any> = any>(
     });
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
-        Loading...
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading table structure...</p>
+        </div>
       </div>
     );
   }
