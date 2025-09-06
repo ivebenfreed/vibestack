@@ -109,72 +109,8 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     }
   }, [entityName, orgId])
   
-  const entityStore = React.useMemo(() => getEntity$(actualEntityKey), [actualEntityKey])
-  const entityData = use$(entityStore)
-  
-  // ✅ All derived state calculations moved to useMemo with stable dependencies
-  const derivedState = React.useMemo(() => {
-    const hasSchema = !!schema?.entities
-    const schemaVersion = schema?.version || null
-    const isEntityLoading = false // Simplified for now  
-    const hasEntityLoaded = true // Simplified for now
-    
-    // Get actual entity name based on schema - use the already computed actualEntityKey
-    let actualEntityName = actualEntityKey
-    
-    return {
-      hasSchema,
-      schemaVersion,
-      isEntityLoading,
-      hasEntityLoaded,
-      actualEntityName
-    }
-  }, [schema, actualEntityKey])
-  
-  // ✅ Universe-based approach - no context switching needed
-  // Schema is loaded automatically by auth system, org filtering happens at component level
-  
-  // ✅ Listen for WebSocket table change notifications
-  useEffect(() => {
-    if (!orgId || !entityName) return
-    
-    const handleTableChange = (event: CustomEvent) => {
-      const { table, organizationId } = event.detail
-      
-      // Check if this notification is for our organization and entity
-      if (organizationId === orgId) {
-        // Convert entity name to table name (e.g., "Project" -> "project")
-        const tableName = entityName.toLowerCase()
-        
-        if (table === tableName) {
-          console.log(`[${entityName}Page] Table change detected via WebSocket for org ${orgId}`)
-          // Legend State will handle the update via its subscription
-        }
-      }
-    }
-    
-    // Listen for table change notifications from WebSocket
-    window.addEventListener('vibestack:table-change-notification', handleTableChange as EventListener)
-    
-    return () => {
-      window.removeEventListener('vibestack:table-change-notification', handleTableChange as EventListener)
-    }
-  }, [orgId, entityName])
-  
-  // ✅ Compute derived values after all hooks
-  const entityArray = (entityStore && entityData) ? Object.values(entityData) : []
-  
-  // 🐛 DEBUG: Log the entity data loading state
-  console.log('🔍 [EntityRoute] Debug entity data:', {
-    actualEntityKey,
-    entityStore: !!entityStore,
-    entityData,
-    entityDataType: typeof entityData,
-    entityDataKeys: entityData ? Object.keys(entityData) : null,
-    entityArrayLength: entityArray.length,
-    entityName,
-    orgId
-  })
+  // ✅ SIMPLIFIED: Let the VibeGrid atomic bridge handle all data loading
+  // No need to manage entityStore or entityData here - that's the bridge's job
   
   // Get entity schema using the normalized entity name from display schema
   const entitySchema = React.useMemo(() => {
@@ -333,24 +269,11 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
   
-  // Show loading state if data hasn't been loaded yet
-  if (!derivedState.hasEntityLoaded && derivedState.isEntityLoading) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">Loading {entityName}...</h2>
-          <p className="text-muted-foreground">Fetching data from server...</p>
-        </div>
-      </div>
-    )
-  }
-  
-  // Render the universal entity page with Legend State data
+  // ✅ SIMPLIFIED: Just pass the essentials, let UniversalEntityPage and VibeGrid handle the rest
   return (
     <UniversalEntityPage
-      entityName={entityName}
+      entityName={actualEntityKey}
       schema={entitySchema}
-      data={entityArray}
       orgId={orgId}
     />
   )

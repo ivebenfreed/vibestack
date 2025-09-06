@@ -45,33 +45,11 @@ export function createAtomicObservableBridge(
     });
     
     try {
-      // CRITICAL FIX: Handle org-prefixed entity names in universe context
-      // When we're in org routes like /org/123/entities/Task, the entity is stored as "123_Task" in universe mode
-      let actualEntityName = entityTableName;
-      
-      // Check if we're in universe mode and need to construct org-prefixed name
-      const schema = universeSchema$.get();
-      const currentOrgId = universeOrgId$.get();
-      if (currentOrgId === 'universe' && schema?.entities) {
-        // Find the org-prefixed version of this entity in the schema
-        const entityKeys = Object.keys(schema.entities);
-        const orgPrefixedKey = entityKeys.find(key => {
-          // Look for pattern: "{orgId}_{entityName}" where entityName matches our target
-          const parts = key.split('_');
-          return parts.length === 2 && parts[1] === entityTableName;
-        });
-        
-        if (orgPrefixedKey) {
-          actualEntityName = orgPrefixedKey;
-          log.info(`🔗 AtomicBridge: Using org-prefixed entity name ${actualEntityName} instead of ${entityTableName}`);
-        }
-      }
-      
-      // Use getEntity$ for all entity lookups since entity names are already properly prefixed
-      const entityObservable = getEntity$(actualEntityName);
+      // ✅ SIMPLIFIED: Use the entity name directly as passed - let getEntity$ handle resolution
+      const entityObservable = getEntity$(entityTableName);
       
       if (!entityObservable) {
-        log.info(`🔗 AtomicBridge: Entity observable ${actualEntityName} (original: ${entityTableName}) not available yet`);
+        log.info(`🔗 AtomicBridge: Entity observable ${entityTableName} not available yet`);
         return;
       }
       

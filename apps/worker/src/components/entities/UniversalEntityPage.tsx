@@ -85,26 +85,15 @@ export function UniversalEntityPage({
   // Use precomputed column configuration hook
   const { columns, isLoading: columnsLoading, error: columnsError } = usePrecomputedEntityColumns(entityName)
   
-  // Handle both plain arrays and Legend State observables
-  const safeData = (() => {
-    if (Array.isArray(data)) {
-      return data
-    }
-    // If data is a Legend State observable (Proxy), it should already be the array value
-    // from useObservable, but let's be extra safe
-    if (data && typeof data === 'object' && data.length !== undefined) {
-      return Array.from(data)
-    }
-    return []
-  })()
-  const count = safeData.length
+  // ✅ SIMPLIFIED: Don't try to handle data here - let VibeGrid atomic bridge do it
+  // Just show a placeholder count, the real count will come from VibeGrid
+  const count = data ? (Array.isArray(data) ? data.length : 0) : '...'
   
   console.log('[UniversalEntityPage] Debug:', {
     entityName,
     data,
     dataType: typeof data,
     isArray: Array.isArray(data),
-    safeData,
     count,
     schema,
     schemaType: typeof schema,
@@ -119,10 +108,8 @@ export function UniversalEntityPage({
   // Safety check for orgId
   const safeOrgId = typeof orgId === 'string' ? orgId : String(orgId || '')
   
-  // Calculate last updated date
-  const lastUpdated = safeData[0]?.updatedAt 
-    ? new Date(safeData[0].updatedAt).toLocaleDateString() 
-    : 'No data'
+  // Calculate last updated date - simplified
+  const lastUpdated = 'Live'
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -203,7 +190,9 @@ export function UniversalEntityPage({
                   }
                   
                   // Determine the full entity name (with org prefix if needed)
-                  const fullEntityName = orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName
+                  // Check if entityName is already prefixed to avoid double-prefixing
+                  const isAlreadyPrefixed = orgId && entityName.startsWith(`${orgId}_`);
+                  const fullEntityName = (orgId && orgId !== 'universe' && !isAlreadyPrefixed) ? `${orgId}_${entityName}` : entityName
                   
                   console.log('🚀 Creating entity:', { entityName, fullEntityName, recordData })
                   
@@ -521,7 +510,9 @@ export function UniversalEntityPage({
           </div>
         ) : columns.length > 0 ? (
           (() => {
-            const fullEntityName = orgId && orgId !== 'universe' ? `${orgId}_${entityName}` : entityName;
+            // Check if entityName is already prefixed to avoid double-prefixing
+            const isAlreadyPrefixed = orgId && entityName.startsWith(`${orgId}_`);
+            const fullEntityName = (orgId && orgId !== 'universe' && !isAlreadyPrefixed) ? `${orgId}_${entityName}` : entityName;
             return (
               <VibeGrid
                 entityType={fullEntityName}
