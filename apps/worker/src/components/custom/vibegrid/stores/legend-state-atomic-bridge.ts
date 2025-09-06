@@ -84,18 +84,34 @@ export function createAtomicObservableBridge(
       // FIXED: Manual change detection with proper state tracking
       const isInitialLoad = !isInitialized || !previousEntityData;
       
+      // Detect bulk load: When we receive a large dataset after having no data or very little data
+      // This happens on fresh reload when the entire dataset comes in at once
+      const currentEntityCount = typeof currentEntityData === 'object' && !Array.isArray(currentEntityData) 
+        ? Object.keys(currentEntityData).length 
+        : 0;
+      const previousEntityCount = previousEntityData && typeof previousEntityData === 'object' && !Array.isArray(previousEntityData)
+        ? Object.keys(previousEntityData).length
+        : 0;
+      
+      // Detect bulk load scenarios:
+      // 1. Initial load (no previous data)
+      // 2. Fresh reload: Getting many entities when we had few or none before
+      // 3. Full sync: Getting a complete dataset (> 1000 entities) all at once
+      const isBulkLoad = isInitialLoad || 
+                        (currentEntityCount > 100 && previousEntityCount < 10) ||
+                        (currentEntityCount > 1000 && currentEntityCount - previousEntityCount > 500);
+      
       log.info(`🔗 AtomicBridge: Manual change detection analysis`, {
         entityTableName,
         isInitialLoad,
-        currentDataType: typeof currentEntityData,
-        currentKeys: currentEntityData && typeof currentEntityData === 'object' ? Object.keys(currentEntityData).length : 'not-object',
-        previousDataType: typeof previousEntityData,
-        previousKeys: previousEntityData && typeof previousEntityData === 'object' ? Object.keys(previousEntityData).length : 'not-object',
+        isBulkLoad,
+        currentEntityCount,
+        previousEntityCount,
         observerRunCount
       });
       
-      if (isInitialLoad) {
-        // Initial load - send all data and store current state as previous
+      if (isBulkLoad) {
+        // Bulk load - send all data at once
         let entities: any[];
         if (typeof currentEntityData === 'object' && !Array.isArray(currentEntityData)) {
           entities = Object.values(currentEntityData);
@@ -106,23 +122,24 @@ export function createAtomicObservableBridge(
           return;
         }
         
-        log.info('🚀 AtomicBridge: INITIAL LOAD - Sending all entities to table', {
+        log.info('🚀 AtomicBridge: BULK LOAD - Sending all entities to table at once', {
           entityTableName,
           entityCount: entities.length,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          reason: isInitialLoad ? 'initial_load' : 'fresh_reload_detected'
         });
         
         tableSend({
           type: 'STORE_DATA_UPDATED',
           entities,
           loading: false,
-          source: 'atomic_bridge_initial'
+          source: isBulkLoad && !isInitialLoad ? 'atomic_bridge_bulk_reload' : 'atomic_bridge_initial'
         });
         
         // Store current state for next comparison
         previousEntityData = JSON.parse(JSON.stringify(currentEntityData));
         isInitialized = true;
-        log.info(`✅ AtomicBridge: ${entityTableName} bridge initialized and working`);
+        log.info(`✅ AtomicBridge: ${entityTableName} bridge ${isInitialLoad ? 'initialized' : 'bulk reloaded'}`);
         return;
       }
       
@@ -170,31 +187,52 @@ export function createAtomicObservableBridge(
         }
       });
       
-      // Process changes
+      // Process changes - but if there are too many, treat as bulk reload
       if (changedEntities.length > 0) {
-        log.info('🚀 AtomicBridge: INCREMENTAL CHANGES DETECTED - Using atomic updates', {
-          entityTableName,
-          changedCount: changedEntities.length,
-          totalEntities: Object.keys(currentEntities).length,
-          timestamp: Date.now(),
-          changedEntityIds: changedEntities.map(e => e.id),
-          trigger: 'MANUAL_CHANGE_DETECTION'
-        });
-        
-        if (changedEntities.length === 1) {
-          // Single entity update - use atomic update
+        // If we have a huge number of changes (> 100), it's likely a bulk operation
+        // that should be handled as a full refresh rather than individual updates
+        if (changedEntities.length > 100) {
+          log.info('🚀 AtomicBridge: BULK CHANGES DETECTED - Sending full refresh instead of individual updates', {
+            entityTableName,
+            changedCount: changedEntities.length,
+            totalEntities: Object.keys(currentEntities).length,
+            timestamp: Date.now(),
+            reason: 'too_many_individual_changes'
+          });
+          
+          // Send all current data as a bulk update
+          const entities = Object.values(currentEntities);
           tableSend({
-            type: 'updateEntityAtomic',
-            entity: changedEntities[0],
-            source: 'atomic_bridge_incremental'
+            type: 'STORE_DATA_UPDATED',
+            entities,
+            loading: false,
+            source: 'atomic_bridge_bulk_changes'
           });
         } else {
-          // Multiple entities - use batch atomic update
-          tableSend({
-            type: 'batchUpdateEntitiesAtomic',
-            entities: changedEntities,
-            source: 'atomic_bridge_batch'
+          log.info('🚀 AtomicBridge: INCREMENTAL CHANGES DETECTED - Using atomic updates', {
+            entityTableName,
+            changedCount: changedEntities.length,
+            totalEntities: Object.keys(currentEntities).length,
+            timestamp: Date.now(),
+            changedEntityIds: changedEntities.map(e => e.id),
+            trigger: 'MANUAL_CHANGE_DETECTION'
           });
+          
+          if (changedEntities.length === 1) {
+            // Single entity update - use atomic update
+            tableSend({
+              type: 'updateEntityAtomic',
+              entity: changedEntities[0],
+              source: 'atomic_bridge_incremental'
+            });
+          } else {
+            // Multiple entities - use batch atomic update
+            tableSend({
+              type: 'batchUpdateEntitiesAtomic',
+              entities: changedEntities,
+              source: 'atomic_bridge_batch'
+            });
+          }
         }
       }
       

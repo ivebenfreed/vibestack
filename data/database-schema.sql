@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict 5ZVDjilxdK6xYdAlLVBjy4xdhtb1d2DNg4CpXG30X1Sl97dhLw9avPiy0mChooi
+\restrict T5NqcXDzerk7FsE3kjWb6Km1DAdtCbMlYiKao8O4qXJXIbNdctU0Vg4covmcaW3
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict 5ZVDjilxdK6xYdAlLVBjy4xdhtb1d2DNg4CpXG30X1Sl97dhLw9avPiy0mChooi
+\unrestrict T5NqcXDzerk7FsE3kjWb6Km1DAdtCbMlYiKao8O4qXJXIbNdctU0Vg4covmcaW3
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict VkUMJl1taAqfarJVZ3ctqIOM5kuSI7Fxl0NgJ8f0IpzansNO89N8NbelYT24Lzk
+\restrict BahYzUrkbm3fvrcK82M280caWWkKnFC0TRaetlMNx3Isxg4JaYbwvaZRDtbn5gK
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VkUMJl1taAqfarJVZ3ctqIOM5kuSI7Fxl0NgJ8f0IpzansNO89N8NbelYT24Lzk
+\unrestrict BahYzUrkbm3fvrcK82M280caWWkKnFC0TRaetlMNx3Isxg4JaYbwvaZRDtbn5gK
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict QTdaBbT8KxVoApB4tMBT7eGzxp9Tgh6U8T7Ghswy6FfckysjBRZPyvHkn9NKahj
+\restrict e3hci0cIQssb6llLjikNIT722YXyjWvxGOjKNaKtgyw06beoNsoer9pmsUOCP51
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QTdaBbT8KxVoApB4tMBT7eGzxp9Tgh6U8T7Ghswy6FfckysjBRZPyvHkn9NKahj
+\unrestrict e3hci0cIQssb6llLjikNIT722YXyjWvxGOjKNaKtgyw06beoNsoer9pmsUOCP51
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 373zDm0xaIK4OFFdWFnaHWAzAXJWnxR9XjlLKvFPqKESlGn6m3FVn5IFa38MZ1X
+\restrict uuhoZq3mEr9S3HaLQj98l5uRkG8obKYW2S3kkUeePmswJEouvKJs1A0qbSwgnd2
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict 373zDm0xaIK4OFFdWFnaHWAzAXJWnxR9XjlLKvFPqKESlGn6m3FVn5IFa38MZ1X
+\unrestrict uuhoZq3mEr9S3HaLQj98l5uRkG8obKYW2S3kkUeePmswJEouvKJs1A0qbSwgnd2
 \connect vibestack_dev
-\restrict 373zDm0xaIK4OFFdWFnaHWAzAXJWnxR9XjlLKvFPqKESlGn6m3FVn5IFa38MZ1X
+\restrict uuhoZq3mEr9S3HaLQj98l5uRkG8obKYW2S3kkUeePmswJEouvKJs1A0qbSwgnd2
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -4544,7 +4544,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 373zDm0xaIK4OFFdWFnaHWAzAXJWnxR9XjlLKvFPqKESlGn6m3FVn5IFa38MZ1X
+\unrestrict uuhoZq3mEr9S3HaLQj98l5uRkG8obKYW2S3kkUeePmswJEouvKJs1A0qbSwgnd2
 
 --
 -- PostgreSQL database cluster dump complete
