@@ -64,7 +64,10 @@ apps/worker/
 
 ```bash
 # RECOMMENDED: Use JSON file to avoid special character escaping issues
-echo '{"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}' > /tmp/login_payload.json
+# IMPORTANT: Use heredoc with single quotes to prevent shell expansion of special characters
+cat > /tmp/login_payload.json << 'EOF'
+{"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}
+EOF
 curl -X POST "http://localhost:4000/api/auth/sign-in/email" \
   -H "Content-Type: application/json" \
   -d @/tmp/login_payload.json \
@@ -135,8 +138,10 @@ pnpm dev
 curl -X GET http://localhost:4000/health
 psql postgres://postgres:postgres@localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
 
-# Test authentication (recommended approach using JSON file)
-echo '{"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}' > /tmp/login_payload.json
+# Test authentication (recommended approach using JSON file with heredoc)
+cat > /tmp/login_payload.json << 'EOF'
+{"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}
+EOF
 curl -X POST "http://localhost:4000/api/auth/sign-in/email" -H "Content-Type: application/json" -d @/tmp/login_payload.json -c cookies.txt
 
 # Test protected endpoints with cookies
@@ -630,10 +635,7 @@ rm -rf .playwright/profiles/profile-main/
 
 **IMPORTANT**: Use Wide Corp test users for all tests unless otherwise prompted.
 
-Complete test user credentials are documented in:
-📋 **[planning/active/testing-infrastructure/test-org-central/credentials/COMPLETE_ROLE_CREDENTIALS.md](planning/active/testing-infrastructure/test-org-central/credentials/COMPLETE_ROLE_CREDENTIALS.md)**
-
-### Quick Reference - Wide Corp Solutions
+### Wide Corp Solutions Test Credentials
 **Organization ID:** `01920000-1000-7000-8000-000000000001`
 
 | Role | Email | Password | Description |
@@ -648,4 +650,4 @@ For testing WebSocket connection and sync functionality:
 - Use **Alice CEO** (Owner role) for comprehensive access
 - Organization ID: `01920000-1000-7000-8000-000000000001` 
 - 12 business entity tables available for sync testing
-- Login at: `http://localhost:5175/sign-in` (or check current dev server port)
+- Login at: `http://localhost:4000/sign-in` (or check current dev server port with `pnpm dev`)

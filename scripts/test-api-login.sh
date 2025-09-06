@@ -52,9 +52,8 @@ login_user() {
     local login_payload="$TEMP_DIR/login_payload_$$.json"
     
     # Create JSON payload file to avoid bash escaping issues
-    cat > "$login_payload" << EOF
-{"email": "$email", "password": "$password"}
-EOF
+    # Use printf to avoid any shell expansion issues with special characters
+    printf '{"email": "%s", "password": "%s"}' "$email" "$password" > "$login_payload"
     
     echo -e "${BLUE}Logging in as $email...${NC}"
     

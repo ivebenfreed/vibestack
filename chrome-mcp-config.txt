@@ -1,0 +1,18 @@
+# Chrome MCP Configuration
+# Saved for potential future use
+# To enable, add this to the "mcpServers" object in ~/.claude.json
+
+"chrome-mcp-stdio": {
+  "type": "stdio",
+  "command": "node",
+  "args": [
+    "/home/benfreed/.config/nvm/versions/node/v22.18.0/lib/node_modules/mcp-chrome-bridge/dist/mcp/mcp-server-stdio.js"
+  ],
+  "env": {}
+}
+
+# Notes:
+# - Requires mcp-chrome-bridge npm package installed globally: npm install -g mcp-chrome-bridge
+# - Also requires Chrome extension from: https://github.com/hangwin/mcp-chrome/releases
+# - Extension must be loaded and configured to connect to MCP server
+# - Provides Chrome DevTools Protocol access for browser automation
