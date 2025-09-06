@@ -167,35 +167,22 @@ const triggerInitialLoadsService = fromPromise(async ({
   // Import getEntity$ here to avoid circular dependencies
   const { getEntity$ } = await import('@/legend-state')
   
+  // Don't trigger initial loads for ALL entities - let them load on-demand
+  // This significantly improves initial page load performance
+  // Each entity will load when first accessed via getEntity$().get()
+  
   for (const entityName of entityNames) {
     try {
       const observable = getEntity$(entityName)
       if (observable) {
-        // Trigger initial load by accessing the observable multiple times
-        // This ensures Legend State's syncedCrud definitely triggers the list function
-        const data = observable.get()
-        const recordCount = data && typeof data === 'object' ? Object.keys(data).length : 0
-        
+        // Just verify the observable exists, don't trigger data load
         results.triggered.push(entityName)
-        results.loaded.push({ entityName, recordCount })
+        results.loaded.push({ entityName, recordCount: 0 })
         
-        log.info(`[LegendStateInit] ✅ Triggered load for ${entityName}: ${recordCount} records`)
-        
-        // For entities with no data, try again after a brief delay
-        if (recordCount === 0) {
-          setTimeout(() => {
-            try {
-              const retryData = observable.get()
-              const retryCount = retryData && typeof retryData === 'object' ? Object.keys(retryData).length : 0
-              log.info(`[LegendStateInit] 🔄 Retry trigger for ${entityName}: ${retryCount} records`)
-            } catch (retryError) {
-              log.warn(`[LegendStateInit] Retry failed for ${entityName}:`, retryError)
-            }
-          }, 100)
-        }
+        log.info(`[LegendStateInit] ✅ Observable ready for ${entityName} (on-demand loading enabled)`)
       }
     } catch (error) {
-      log.error(`[LegendStateInit] ❌ Error triggering load for ${entityName}:`, error)
+      log.error(`[LegendStateInit] ❌ Error preparing observable for ${entityName}:`, error)
     }
   }
   

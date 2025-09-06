@@ -305,9 +305,6 @@ function createEntityObservable(entityName: string, schema?: any) {
     // LIST - Simple function that returns array of records (Legend State v3 pattern)
     list: async () => {
       try {
-        // DEBUG: Log that the function is being called - CRITICAL DEBUGGING
-        console.log(`🔥 [CRITICAL] List function called for ${entityName}!`);
-        
         log.info(`[Observable] Loading ${entityName} from:`, baseUrl);
         
         const response = await fetch(baseUrl, {
@@ -333,7 +330,6 @@ function createEntityObservable(entityName: string, schema?: any) {
         const result = await response.json()
         const data = result.data || []
         
-        console.log(`🔥 [CRITICAL] List function returning ${data.length} records for ${entityName}`)
         log.info(`[Observable] Loaded ${entityName}: ${data.length} records`)
         
         return data
