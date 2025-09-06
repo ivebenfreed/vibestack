@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dcLhBSqWQPEdCGA30uDcXQIbvTpMd6QUZ82cLYC1lDkF9IHD2zZX02AaNB8SrnP
+\restrict f3PHUFS4961d6OWqhiLCRs7ka2toImcUL6bEdaF5Q4RIdbNu9Fr3rh9yeFRhSd0
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -239,11 +239,11 @@ COPY public.org_01920000_1000_7000_8000_000000000001_cleantests (id, organizatio
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id, email, phone, industry, company_name, contact_person, new_test_field, another_new_field, score, category, notes, test_field, test_field_2, test_field_3, final_test_field, test_cache_refresh, priority) FROM stdin;
-1fdedf81-aaad-4fde-ab02-5717f9fce085	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:06.777+00	2025-09-06 07:31:22.175+00	Bob Industries		client	inactive	\N	\N	\N	bob@industries.com	\N	\N	\N	\N	\N	\N	42	standard	Not active status	\N	\N	\N	\N	\N	medium
 bb441964-dff2-4547-ab6d-d8feb4501338	01920000-1000-7000-8000-000000000001	\N	2025-08-23 13:47:00.87+00	2025-09-06 07:33:11.266+00	Updated Single Test Client		client	pending	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 3046cf56-1ef9-4bbc-bbc7-3845c29d0323	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:46.885+00	2025-08-24 16:14:46.885+00	Dynamic Tech Solutions	\N	customer	active	\N	\N	\N	support@dynamictec.mockdata.io	\N	\N	\N	\N	\N	\N	42	premium	Performance test record #457. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 d7cf20b3-a084-4889-b025-b4723f4a8486	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:47.81+00	2025-08-24 16:14:47.81+00	Edge Smart Co	\N	customer	pending	\N	\N	\N	admin@edgesmartc.mockdata.io	\N	\N	\N	\N	\N	\N	1	standard	Performance test record #8. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 4f0bc881-e486-4333-a6fe-483e522af4d8	01920000-1000-7000-8000-000000000001	\N	2025-08-23 13:45:23.226+00	2025-08-23 14:15:51.215+00	Test Client 1	\N	client	deleted	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
+1fdedf81-aaad-4fde-ab02-5717f9fce085	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:06.777+00	2025-09-06 16:44:01.092+00	Bob Industries		client	inactive	\N	\N	\N	bob@industries.com	\N	\N	\N	\N	\N	\N	42	standard	Updated after fixing replica identity	\N	\N	\N	\N	\N	medium
 719b7651-0265-467d-a2c5-7846881b3876	01920000-1000-7000-8000-000000000001	\N	2025-08-23 12:27:41.818+00	2025-08-23 14:15:51.215+00	Updated Client Name	\N	customer	active	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 2f3e6bfc-5fa3-46cf-8fb3-7ccbcdc45b74	01920000-1000-7000-8000-000000000001	\N	2025-08-23 12:27:42.059+00	2025-08-23 14:15:51.215+00	Updated Client Name	\N	prospect	active	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 27b50f0b-bfb7-4383-97e7-8289799a09ad	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:48.997+00	2025-08-24 16:14:48.997+00	Omega Edge Technologies	\N	prospect	inactive	\N	\N	\N	office@omegaedget.test.org	\N	\N	\N	\N	\N	\N	21	premium	Performance test record #460. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
@@ -13003,5 +13003,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dcLhBSqWQPEdCGA30uDcXQIbvTpMd6QUZ82cLYC1lDkF9IHD2zZX02AaNB8SrnP
+\unrestrict f3PHUFS4961d6OWqhiLCRs7ka2toImcUL6bEdaF5Q4RIdbNu9Fr3rh9yeFRhSd0
 

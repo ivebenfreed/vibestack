@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict ml5nIIho5bpHxkn3jDDe0eHwQMB8ugxQTlu1FoIemS7sCjQCWfkZs5fo0oxErA9
+\restrict qSBXvOky8bFKIh3aSPFKLqGzupGMaOUElxghIsP1zJHCnnNJ7WS9tb2dq2KSONH
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict ml5nIIho5bpHxkn3jDDe0eHwQMB8ugxQTlu1FoIemS7sCjQCWfkZs5fo0oxErA9
+\unrestrict qSBXvOky8bFKIh3aSPFKLqGzupGMaOUElxghIsP1zJHCnnNJ7WS9tb2dq2KSONH
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict CUK5irVc6O0dgkRqU4xu8od2nPlJVHX3z8Ob1RCttNJNaz69iv5YkEAOOBRqeBu
+\restrict xGBmm8Ak1PS04MFJY8xSGXhI4wlGtzpYYhZEuIBx3brwE1pzcSvA0hDQh5Yes3U
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CUK5irVc6O0dgkRqU4xu8od2nPlJVHX3z8Ob1RCttNJNaz69iv5YkEAOOBRqeBu
+\unrestrict xGBmm8Ak1PS04MFJY8xSGXhI4wlGtzpYYhZEuIBx3brwE1pzcSvA0hDQh5Yes3U
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 9NGYRAsZhvMpl2zvM8uMNiqt3KzDxFe4tHHZwrRhqcv2TSnaPhDE8GcJsGutUQp
+\restrict idmXOU4ULknN7y2GiHV2vshegLKATxQCoWzwcXCGl5HCKYy0o7CkXlCHIwTLJBp
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9NGYRAsZhvMpl2zvM8uMNiqt3KzDxFe4tHHZwrRhqcv2TSnaPhDE8GcJsGutUQp
+\unrestrict idmXOU4ULknN7y2GiHV2vshegLKATxQCoWzwcXCGl5HCKYy0o7CkXlCHIwTLJBp
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
+\restrict Bo93Z2dij9ofBFk2nJYtNrB0jfDTcMFd2kzbOoLYDTqCRSze3Oc1BtCoj7dcgEF
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
+\unrestrict Bo93Z2dij9ofBFk2nJYtNrB0jfDTcMFd2kzbOoLYDTqCRSze3Oc1BtCoj7dcgEF
 \connect vibestack_dev
-\restrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
+\restrict Bo93Z2dij9ofBFk2nJYtNrB0jfDTcMFd2kzbOoLYDTqCRSze3Oc1BtCoj7dcgEF
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2007,6 +2007,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_access_control_list
     owner_id text
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_access_control_list REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_access_control_list OWNER TO postgres;
 
@@ -2029,6 +2031,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_archetypetests (
     owner_id text,
     priority text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_archetypetests REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_archetypetests OWNER TO postgres;
@@ -2059,6 +2063,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cachetestentitys (
     story_points integer
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cachetestentitys REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cachetestentitys OWNER TO postgres;
 
@@ -2080,6 +2086,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_capitol_building (
     parent_record_id text,
     owner_id text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_capitol_building REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_capitol_building OWNER TO postgres;
@@ -2106,6 +2114,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantests (
     project_type text DEFAULT 'operational'::text,
     client text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cleantests REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantests OWNER TO postgres;
@@ -2145,6 +2155,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_client (
     priority character varying(20) DEFAULT 'medium'::character varying
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_client REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_client OWNER TO postgres;
 
@@ -2171,6 +2183,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contract (
     value numeric(10,2),
     contract_type character varying(255)
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_contract REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_contract OWNER TO postgres;
@@ -2202,6 +2216,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_customerorder (
     custom_fields jsonb DEFAULT '{}'::jsonb
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_customerorder REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_customerorder OWNER TO postgres;
 
@@ -2224,6 +2240,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_data_analytics_repo
     owner_id text
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_data_analytics_report REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_data_analytics_report OWNER TO postgres;
 
@@ -2244,6 +2262,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_discussion (
     author_id text,
     parent_discussion_id text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_discussion REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_discussion OWNER TO postgres;
@@ -2266,6 +2286,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_emergency_contact (
     parent_record_id text,
     owner_id text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_emergency_contact REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_emergency_contact OWNER TO postgres;
@@ -2292,6 +2314,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_expense (
     reimbursable boolean
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_expense REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_expense OWNER TO postgres;
 
@@ -2312,6 +2336,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_file (
     status text DEFAULT 'active'::text NOT NULL,
     uploaded_by text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_file REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_file OWNER TO postgres;
@@ -2336,6 +2362,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_inventoryitem (
     custom_fields jsonb DEFAULT '{}'::jsonb
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_inventoryitem REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_inventoryitem OWNER TO postgres;
 
@@ -2356,6 +2384,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoice (
     author_id text,
     parent_document_id text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoice OWNER TO postgres;
@@ -2381,6 +2411,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_meeting (
     attendees character varying(255),
     meeting_type character varying(255)
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meeting REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_meeting OWNER TO postgres;
@@ -2408,6 +2440,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts (
     project_type text DEFAULT 'operational'::text
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_morningworkouts REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts OWNER TO postgres;
 
@@ -2428,6 +2462,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_productcatalog (
     owner_id text,
     custom_fields jsonb DEFAULT '{}'::jsonb
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_productcatalog REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_productcatalog OWNER TO postgres;
@@ -2454,6 +2490,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_project (
     project_type character varying(100) DEFAULT 'operational'::character varying
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_project REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_project OWNER TO postgres;
 
@@ -2476,6 +2514,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_records (
     owner_id text,
     title text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_records REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_records OWNER TO postgres;
@@ -2550,6 +2590,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_schema_test_entity 
     test_field text NOT NULL
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_schema_test_entity REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_schema_test_entity OWNER TO postgres;
 
@@ -2571,6 +2613,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_security_badge (
     parent_record_id text,
     owner_id text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_security_badge REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_security_badge OWNER TO postgres;
@@ -2601,6 +2645,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_softdeletetests (
     story_points integer
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_softdeletetests REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_softdeletetests OWNER TO postgres;
 
@@ -2630,6 +2676,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_task (
     story_points integer
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
 
@@ -2649,6 +2697,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_temptests (
     status text,
     data jsonb
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_temptests REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_temptests OWNER TO postgres;
@@ -2674,6 +2724,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcompany2s (
     revenue numeric
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcompany2s REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcompany2s OWNER TO postgres;
 
@@ -2697,6 +2749,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcompanys (
     industry text,
     revenue numeric
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcompanys REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcompanys OWNER TO postgres;
@@ -2726,6 +2780,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes (
     sprint_id text,
     story_points integer
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdeletes REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes OWNER TO postgres;
@@ -2757,6 +2813,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testentity (
     custom_fields jsonb DEFAULT '{}'::jsonb
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testentity REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentity OWNER TO postgres;
 
@@ -2785,6 +2843,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys (
     sprint_id text,
     story_points integer
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testentitys REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys OWNER TO postgres;
@@ -2833,6 +2893,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testproducts (
     price numeric
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testproducts REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproducts OWNER TO postgres;
 
@@ -2858,6 +2920,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects (
     project_type text DEFAULT 'operational'::text
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testprojects REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects OWNER TO postgres;
 
@@ -2879,6 +2943,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_time_sheet (
     metadata jsonb
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_time_sheet REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_time_sheet OWNER TO postgres;
 
@@ -2896,6 +2962,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_universes (
     description text,
     owner_id text NOT NULL
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_universes REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_universes OWNER TO postgres;
@@ -2919,6 +2987,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_user_permission_gro
     owner_id text
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_user_permission_group REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_user_permission_group OWNER TO postgres;
 
@@ -2939,6 +3009,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_worlds (
     world_type text,
     priority text
 );
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_worlds REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_worlds OWNER TO postgres;
@@ -2961,6 +3033,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_worldss (
     priority text DEFAULT 'medium'::text NOT NULL
 );
 
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_worldss REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_worldss OWNER TO postgres;
 
@@ -2981,6 +3055,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_activity (
     deleted boolean DEFAULT false,
     deleted_at timestamp with time zone
 );
+
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_activity REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_activity OWNER TO postgres;
@@ -3005,6 +3081,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_attachment (
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_attachment REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_attachment OWNER TO postgres;
 
@@ -3026,6 +3104,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_comment (
     deleted boolean DEFAULT false,
     deleted_at timestamp with time zone
 );
+
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_comment REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_comment OWNER TO postgres;
@@ -3051,6 +3131,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_contact (
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_contact REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_contact OWNER TO postgres;
 
@@ -3073,6 +3155,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_custom_field_defini
     deleted boolean DEFAULT false,
     deleted_at timestamp with time zone
 );
+
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_custom_field_definitio REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_custom_field_definitio OWNER TO postgres;
@@ -3098,6 +3182,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_custom_field_value 
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_custom_field_value REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_custom_field_value OWNER TO postgres;
 
@@ -3122,6 +3208,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_deal (
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_deal REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_deal OWNER TO postgres;
 
@@ -3142,6 +3230,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_sync_configuration 
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_sync_configuration REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_sync_configuration OWNER TO postgres;
 
@@ -3161,6 +3251,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_tag (
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_tag REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_tag OWNER TO postgres;
 
@@ -3179,6 +3271,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_tagging (
     deleted boolean DEFAULT false,
     deleted_at timestamp with time zone
 );
+
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_tagging REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_tagging OWNER TO postgres;
@@ -3203,6 +3297,8 @@ CREATE TABLE public.org_01920000_2000_7000_8000_000000000002_ticket (
     deleted_at timestamp with time zone
 );
 
+ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_ticket REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_ticket OWNER TO postgres;
 
@@ -3218,6 +3314,8 @@ CREATE TABLE public.organization_members (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
+
+ALTER TABLE ONLY public.organization_members REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.organization_members OWNER TO postgres;
@@ -3239,6 +3337,8 @@ CREATE TABLE public.organizations (
     lore text,
     canon jsonb DEFAULT '[]'::jsonb
 );
+
+ALTER TABLE ONLY public.organizations REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.organizations OWNER TO postgres;
@@ -4855,7 +4955,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
+\unrestrict Bo93Z2dij9ofBFk2nJYtNrB0jfDTcMFd2kzbOoLYDTqCRSze3Oc1BtCoj7dcgEF
 
 --
 -- PostgreSQL database cluster dump complete
