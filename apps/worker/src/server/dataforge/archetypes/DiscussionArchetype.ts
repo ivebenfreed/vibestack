@@ -7,6 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
+import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface DiscussionFields {
   id: string;
@@ -39,14 +40,7 @@ export class DiscussionArchetype {
       syncable: true,
       serverOnly: false
     },
-    status: { 
-      type: 'status_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'open',
-      enum: ['open', 'closed', 'archived', 'resolved']
-    },
+    status: FieldSetManager.convertFieldToFieldSet('status', 'discussion'),
     discussion_type: { 
       type: 'discussion_type_option', 
       required: false, 

@@ -7,13 +7,13 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
+import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface ProjectFields {
   id: string;
   organization_id: string;
   name: string;
   description?: string;
-  world_id?: string; // Optional reference to containing world
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
   start_date?: Date;
@@ -21,7 +21,6 @@ export interface ProjectFields {
   owner_id?: string;
   budget?: number;
   progress_percentage?: number;
-  project_type?: 'software' | 'research' | 'marketing' | 'operational' | 'strategic';
   created_at: Date;
   updated_at: Date;
   created_by?: string;
@@ -44,28 +43,8 @@ export class ProjectArchetype {
       syncable: true,
       serverOnly: false
     },
-    world_id: { 
-      type: 'entity_reference', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
-    priority: { 
-      type: 'priority_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'medium',
-      enum: ['low', 'medium', 'high', 'critical']
-    },
-    status: { 
-      type: 'status_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'planning',
-      enum: ['planning', 'active', 'on_hold', 'completed', 'cancelled']
-    },
+    priority: FieldSetManager.convertFieldToFieldSet('priority', 'project'),
+    status: FieldSetManager.convertFieldToFieldSet('status', 'project'),
     start_date: { 
       type: 'date', 
       required: false, 
@@ -96,14 +75,6 @@ export class ProjectArchetype {
       syncable: true,
       serverOnly: false,
       defaultValue: 0
-    },
-    project_type: { 
-      type: 'category_option', 
-      required: false, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'operational',
-      enum: ['software', 'research', 'marketing', 'operational', 'strategic']
     }
   } as const;
 

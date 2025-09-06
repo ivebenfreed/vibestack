@@ -7,13 +7,13 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
+import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface DocumentFields {
   id: string;
   organization_id: string;
   title: string;
   content?: string; // Rich text content
-  world_id?: string; // Optional reference to containing world (for lore/canon)
   status: 'draft' | 'review' | 'published' | 'archived';
   category?: string;
   author_id?: string;
@@ -40,20 +40,7 @@ export class DocumentArchetype {
       syncable: true,
       serverOnly: false
     },
-    world_id: { 
-      type: 'entity_reference', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
-    status: { 
-      type: 'status_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'draft',
-      enum: ['draft', 'review', 'published', 'archived']
-    },
+    status: FieldSetManager.convertFieldToFieldSet('status', 'document'),
     category: { 
       type: 'category_option', 
       required: false, 

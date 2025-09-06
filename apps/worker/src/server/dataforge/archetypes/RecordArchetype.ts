@@ -7,13 +7,13 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
+import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface RecordFields {
   id: string;
   organization_id: string;
   name: string;
   description?: string;
-  record_type: string;
   status: 'active' | 'inactive' | 'archived' | 'draft';
   data?: any; // JSON data
   parent_record_id?: string;
@@ -40,20 +40,7 @@ export class RecordArchetype {
       syncable: true,
       serverOnly: false
     },
-    record_type: { 
-      type: 'text', 
-      required: true, 
-      syncable: true,
-      serverOnly: false
-    },
-    status: { 
-      type: 'status_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'active',
-      enum: ['active', 'inactive', 'archived', 'draft']
-    },
+    status: FieldSetManager.convertFieldToFieldSet('status', 'record'),
     data: { 
       type: 'json', 
       required: false, 

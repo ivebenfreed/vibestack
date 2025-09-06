@@ -7,6 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
+import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface TaskFields {
   id: string;
@@ -16,15 +17,9 @@ export interface TaskFields {
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'todo' | 'in_progress' | 'review' | 'blocked' | 'completed' | 'cancelled';
   assignee_id?: string;
-  reporter_id?: string;
   due_date?: Date;
-  estimated_hours?: number;
-  actual_hours?: number;
-  task_type?: 'bug' | 'feature' | 'improvement' | 'documentation' | 'maintenance';
   parent_task_id?: string;
   project_id?: string;
-  sprint_id?: string;
-  story_points?: number;
   created_at: Date;
   updated_at: Date;
   created_by?: string;
@@ -47,29 +42,9 @@ export class TaskArchetype {
       syncable: true,
       serverOnly: false
     },
-    priority: { 
-      type: 'priority_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'medium',
-      enum: ['low', 'medium', 'high', 'critical']
-    },
-    status: { 
-      type: 'status_option', 
-      required: true, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'todo',
-      enum: ['todo', 'in_progress', 'review', 'blocked', 'completed', 'cancelled']
-    },
+    priority: FieldSetManager.convertFieldToFieldSet('priority', 'task'),
+    status: FieldSetManager.convertFieldToFieldSet('status', 'task'),
     assignee_id: { 
-      type: 'user_reference', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
-    reporter_id: { 
       type: 'user_reference', 
       required: false, 
       syncable: true,
@@ -80,26 +55,6 @@ export class TaskArchetype {
       required: false, 
       syncable: true,
       serverOnly: false
-    },
-    estimated_hours: { 
-      type: 'decimal', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
-    actual_hours: { 
-      type: 'decimal', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
-    task_type: { 
-      type: 'category_option', 
-      required: false, 
-      syncable: true,
-      serverOnly: false,
-      defaultValue: 'feature',
-      enum: ['bug', 'feature', 'improvement', 'documentation', 'maintenance']
     },
     parent_task_id: { 
       type: 'entity_reference', 
@@ -113,18 +68,6 @@ export class TaskArchetype {
       syncable: true,
       serverOnly: false
     },
-    sprint_id: { 
-      type: 'entity_reference', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
-    story_points: { 
-      type: 'integer', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    }
   } as const;
 
   /**
