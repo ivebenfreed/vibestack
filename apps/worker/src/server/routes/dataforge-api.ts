@@ -1,5 +1,5 @@
 /**
- * DataForge API Routes (Refactored)
+ * DataForge API Routes
  * 
  * Thin route handlers that delegate to modular services.
  * Clean separation of HTTP concerns from business logic.

@@ -32,6 +32,14 @@ export class DDLGenerator {
   }
 
   /**
+   * Generate ALTER TABLE to set replica identity for replication/updates
+   * This is required for tables that need to support UPDATE operations with logical replication
+   */
+  static generateSetReplicaIdentityDDL(tableName: string): string {
+    return `ALTER TABLE ${tableName} REPLICA IDENTITY FULL`;
+  }
+
+  /**
    * Generate ADD COLUMN DDL for field additions
    */
   static generateAddColumnDDL(

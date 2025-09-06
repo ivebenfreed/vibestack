@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict O3ZZ1s0ylQKxkAqhcjX5WeNHHaAsH6g1hLfwzKOvvokSuFobEsCjQyFhNlS8vpk
+\restrict ml5nIIho5bpHxkn3jDDe0eHwQMB8ugxQTlu1FoIemS7sCjQCWfkZs5fo0oxErA9
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict O3ZZ1s0ylQKxkAqhcjX5WeNHHaAsH6g1hLfwzKOvvokSuFobEsCjQyFhNlS8vpk
+\unrestrict ml5nIIho5bpHxkn3jDDe0eHwQMB8ugxQTlu1FoIemS7sCjQCWfkZs5fo0oxErA9
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict 1DE5chKtYH8elLnE4AT99XZl6Xbg3f2j7kRlcSgKT220ujWBBl8i1tsGIeB3BCf
+\restrict CUK5irVc6O0dgkRqU4xu8od2nPlJVHX3z8Ob1RCttNJNaz69iv5YkEAOOBRqeBu
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1DE5chKtYH8elLnE4AT99XZl6Xbg3f2j7kRlcSgKT220ujWBBl8i1tsGIeB3BCf
+\unrestrict CUK5irVc6O0dgkRqU4xu8od2nPlJVHX3z8Ob1RCttNJNaz69iv5YkEAOOBRqeBu
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict So58VLTj7XQci5le0aqWf0XiUPYyXRHeRNYdbqYf4OVZJ2pmtRXHzTucBGhRWeY
+\restrict 9NGYRAsZhvMpl2zvM8uMNiqt3KzDxFe4tHHZwrRhqcv2TSnaPhDE8GcJsGutUQp
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict So58VLTj7XQci5le0aqWf0XiUPYyXRHeRNYdbqYf4OVZJ2pmtRXHzTucBGhRWeY
+\unrestrict 9NGYRAsZhvMpl2zvM8uMNiqt3KzDxFe4tHHZwrRhqcv2TSnaPhDE8GcJsGutUQp
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict ieKEydxSZJ3jf5Lcc0y5vLTMVKItveC0cf6Ox9URWn0ecT4UYG4f9oqax3Xkw6I
+\restrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict ieKEydxSZJ3jf5Lcc0y5vLTMVKItveC0cf6Ox9URWn0ecT4UYG4f9oqax3Xkw6I
+\unrestrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
 \connect vibestack_dev
-\restrict ieKEydxSZJ3jf5Lcc0y5vLTMVKItveC0cf6Ox9URWn0ecT4UYG4f9oqax3Xkw6I
+\restrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2481,6 +2481,56 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_records (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_records OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_replicatestentity17571; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_replicatestentity17571 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_replicatestentity17571 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_replicatestentity17571 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_reptest76123; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_reptest76123 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_reptest76123 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_reptest76123 OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_schema_test_entity; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2738,6 +2788,31 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys (
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testproductfixed; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testproductfixed (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testproductfixed REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproductfixed OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testproducts; Type: TABLE; Schema: public; Owner: postgres
@@ -4780,7 +4855,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ieKEydxSZJ3jf5Lcc0y5vLTMVKItveC0cf6Ox9URWn0ecT4UYG4f9oqax3Xkw6I
+\unrestrict 7niBcranmGF0XLpsUlRqzvnI86JPLyRWNo6g93CsVhgjWPzoDtp5sGOEptEcgfI
 
 --
 -- PostgreSQL database cluster dump complete

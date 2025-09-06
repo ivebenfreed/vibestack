@@ -7,7 +7,7 @@ import replication from './replication'
 import authRouter from './auth'
 import authOpenAPIRouter from './auth-openapi'
 import { phase1TestRouter } from './phase1-tests.js'
-import { dataforgeRouter } from '../routes/dataforge-api-refactored.js'
+import { dataforgeRouter } from '../routes/dataforge-api.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
 

@@ -309,7 +309,7 @@ const listDataForgeEntitiesRoute = createRoute({
   },
 });
 
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(listDataForgeEntitiesRoute, async (c) => {});
 
 const createDataForgeEntityRoute = createRoute({
@@ -367,7 +367,7 @@ const createDataForgeEntityRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(createDataForgeEntityRoute, async (c) => {});
 
 const getDataForgeEntityRoute = createRoute({
@@ -406,7 +406,7 @@ const getDataForgeEntityRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts  
+// REMOVED - Actual implementation is in dataforge-api.ts  
 // protectedOpenAPIRouter.openapi(getDataForgeEntityRoute, async (c) => {});
 
 const deleteDataForgeEntityRoute = createRoute({
@@ -438,7 +438,7 @@ const deleteDataForgeEntityRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(deleteDataForgeEntityRoute, async (c) => {});
 
 const getDataForgeArchetypesRoute = createRoute({
@@ -474,7 +474,7 @@ const getDataForgeArchetypesRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(getDataForgeArchetypesRoute, async (c) => {});
 
 const getDataForgeDataRoute = createRoute({
@@ -518,7 +518,7 @@ const getDataForgeDataRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(getDataForgeDataRoute, async (c) => {});
 
 const createDataForgeRecordRoute = createRoute({
@@ -560,7 +560,7 @@ const createDataForgeRecordRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(createDataForgeRecordRoute, async (c) => {});
 
 const updateDataForgeRecordRoute = createRoute({
@@ -602,7 +602,7 @@ const updateDataForgeRecordRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(updateDataForgeRecordRoute, async (c) => {});
 
 const deleteDataForgeRecordRoute = createRoute({
@@ -635,7 +635,7 @@ const deleteDataForgeRecordRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(deleteDataForgeRecordRoute, async (c) => {});
 
 // Schema management endpoint
@@ -674,7 +674,7 @@ const getDataForgeSchemaRoute = createRoute({
   },
 });
 
-// Removed - this was causing redirect loops. The actual implementation is in dataforge-api-refactored.ts
+// Removed - this was causing redirect loops. The actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(getDataForgeSchemaRoute, async (c) => {
 //   const orgId = c.req.param('orgId');
 //   return c.json({ 
@@ -725,7 +725,7 @@ const bulkCreateDataForgeRecordsRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(bulkCreateDataForgeRecordsRoute, async (c) => {});
 
 // Trash management endpoint
@@ -761,7 +761,7 @@ const getDataForgeTrashRoute = createRoute({
     },
   },
 });
-// REMOVED - Actual implementation is in dataforge-api-refactored.ts
+// REMOVED - Actual implementation is in dataforge-api.ts
 // protectedOpenAPIRouter.openapi(getDataForgeTrashRoute, async (c) => {});
 
 // =============================================================================
