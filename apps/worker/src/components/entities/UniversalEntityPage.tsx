@@ -82,12 +82,15 @@ export function UniversalEntityPage({
   const archetypeConfig = ARCHETYPE_CONFIG[archetype.toLowerCase() as keyof typeof ARCHETYPE_CONFIG] || ARCHETYPE_CONFIG.record
   const Icon = archetypeConfig.icon
   
-  // Use precomputed column configuration hook
-  const { columns, isLoading: columnsLoading, error: columnsError } = usePrecomputedEntityColumns(entityName)
+  // Use schema-based column configuration hook
+  const { columns, isLoading: columnsLoading, error: columnsError } = usePrecomputedEntityColumns(entityName, schema)
   
   // ✅ SIMPLIFIED: Don't try to handle data here - let VibeGrid atomic bridge do it
   // Just show a placeholder count, the real count will come from VibeGrid
   const count = data ? (Array.isArray(data) ? data.length : 0) : '...'
+  
+  // Get fields from either direct fields or businessMetadata.fields
+  const schemaFields = schema?.fields || schema?.businessMetadata?.fields
   
   console.log('[UniversalEntityPage] Debug:', {
     entityName,
@@ -97,9 +100,11 @@ export function UniversalEntityPage({
     count,
     schema,
     schemaType: typeof schema,
-    schemaFields: schema?.fields,
-    schemaHasFields: !!schema?.fields,
+    schemaFields: schemaFields,
+    schemaFieldNames: schemaFields ? Object.keys(schemaFields) : null,
+    schemaHasFields: !!schemaFields,
     schemaKeys: schema ? Object.keys(schema) : null,
+    businessMetadata: schema?.businessMetadata ? Object.keys(schema.businessMetadata) : null,
     archetype,
     orgId,
     orgIdType: typeof orgId
@@ -163,9 +168,15 @@ export function UniversalEntityPage({
                 setIsSubmitting(true)
                 
                 try {
-                  // Client-side validation
-                  if (!formData.name || !formData.name.trim()) {
-                    alert('Name is required')
+                  // Schema-aware validation - find the primary field for this entity
+                  const primaryField = schemaFields ? 
+                    Object.keys(schemaFields).find(field => 
+                      ['name', 'title', 'subject', 'summary'].includes(field.toLowerCase())
+                    ) : 'name'
+                  
+                  // Check if primary field is provided and not empty
+                  if (primaryField && (!formData[primaryField] || !formData[primaryField].trim())) {
+                    alert(`${primaryField.replace(/_/g, ' ')} is required`)
                     return
                   }
                   
@@ -177,16 +188,39 @@ export function UniversalEntityPage({
                   
                   // Prepare the data with required timestamps and system fields
                   const now = new Date().toISOString()
-                  const recordData = {
+                  const baseData = {
                     ...formData,
                     id: crypto.randomUUID(),
                     created_at: now,
                     updated_at: now,
-                    // Add commonly required fields with sensible defaults
-                    organization_id: orgId,
-                    record_type: entityName.toLowerCase(), // e.g., 'invoice', 'client', etc.
-                    status: formData.status || 'draft',
-                    priority: formData.priority || 'medium'
+                    organization_id: orgId
+                  }
+                  
+                  // Only add fields that exist in the schema to avoid database errors
+                  const recordData = { ...baseData }
+                  
+                  // Add record_type only if it exists in schema (typically for record archetype)
+                  const hasRecordType = schemaFields && Object.keys(schemaFields).some(field => field === 'record_type')
+                  console.log('[UniversalEntityPage] Schema check for record_type:', { 
+                    hasSchema: !!schema, 
+                    hasFields: !!schema?.fields,
+                    fieldNames: schema?.fields ? Object.keys(schema.fields) : null,
+                    hasRecordType,
+                    entityName
+                  })
+                  if (hasRecordType) {
+                    recordData.record_type = entityName.toLowerCase()
+                    console.log('[UniversalEntityPage] Added record_type:', recordData.record_type)
+                  }
+                  
+                  // Add status with default if not provided and field exists in schema
+                  if (schema?.fields && Object.keys(schema.fields).some(field => field === 'status')) {
+                    recordData.status = formData.status || 'draft'
+                  }
+                  
+                  // Add priority with default if not provided and field exists in schema
+                  if (schema?.fields && Object.keys(schema.fields).some(field => field === 'priority')) {
+                    recordData.priority = formData.priority || 'medium'
                   }
                   
                   // Determine the full entity name (with org prefix if needed)
@@ -213,8 +247,8 @@ export function UniversalEntityPage({
               }} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
                   {/* Use schema fields if available, otherwise provide fallback fields based on visible columns */}
-                  {schema?.fields ? (
-                    Object.entries(schema.fields).map(([fieldName, fieldDef]: [string, any]) => {
+                  {schemaFields ? (
+                    Object.entries(schemaFields).map(([fieldName, fieldDef]: [string, any]) => {
                       const safeFieldDef = fieldDef && typeof fieldDef === 'object' ? fieldDef : {}
                       const fieldType = String(safeFieldDef.type || 'text')
                       const fieldDescription = String(safeFieldDef.description || '')
@@ -302,109 +336,14 @@ export function UniversalEntityPage({
                       )
                     })
                   ) : (
-                    /* Fallback form fields based on commonly visible columns */
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="name" className="text-sm font-medium">
-                          Name <span className="text-red-500 ml-1">*</span>
-                        </Label>
-                        <Input
-                          id="name"
-                          type="text"
-                          placeholder="Enter name"
-                          value={formData.name || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium">
-                          Email
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="Enter email"
-                          value={formData.email || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-sm font-medium">
-                          Phone
-                        </Label>
-                        <Input
-                          id="phone"
-                          type="text"
-                          placeholder="Enter phone number"
-                          value={formData.phone || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="company" className="text-sm font-medium">
-                          Company
-                        </Label>
-                        <Input
-                          id="company"
-                          type="text"
-                          placeholder="Enter company name"
-                          value={formData.company || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="status" className="text-sm font-medium">
-                          Status
-                        </Label>
-                        <select
-                          id="status"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          value={formData.status || 'draft'}
-                          onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                        >
-                          <option value="draft">Draft</option>
-                          <option value="active">Active</option>
-                          <option value="pending">Pending</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="priority" className="text-sm font-medium">
-                          Priority
-                        </Label>
-                        <select
-                          id="priority"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          value={formData.priority || 'medium'}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                        >
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                          <option value="urgent">Urgent</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="notes" className="text-sm font-medium">
-                          Notes
-                        </Label>
-                        <Textarea
-                          id="notes"
-                          placeholder="Enter notes or description"
-                          value={formData.notes || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                          className="min-h-[80px]"
-                        />
-                      </div>
-                    </>
+                    <div className="p-8 text-center text-gray-500">
+                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg font-medium mb-2">Schema not available</p>
+                      <p className="text-sm">
+                        Cannot create new {displayName} records without schema information. 
+                        Please ensure the entity schema is properly loaded.
+                      </p>
+                    </div>
                   )}
                 </div>
                 

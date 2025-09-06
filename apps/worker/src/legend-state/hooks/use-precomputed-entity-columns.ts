@@ -12,9 +12,130 @@ const log = stateLog('legend-state/hooks/use-precomputed-entity-columns.ts');
 const entityColumnsCache = new Map<string, any>()
 
 /**
- * Client entity columns with reference cell types
+ * Get schema-based columns for any entity
+ * Dynamically generates columns based on entity schema fields
  */
-function getClientColumns<T>(): Column<T>[] {
+function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[] {
+  const columns: Column<T>[] = []
+  
+  // Support both schema.fields and schema.businessMetadata.fields
+  const schemaFields = schema?.fields || schema?.businessMetadata?.fields
+  
+  // If we have schema fields, use them to generate columns
+  if (schemaFields && Array.isArray(schemaFields)) {
+    // Add ID column first (always present but not in schema fields)
+    columns.push({
+      id: 'id',
+      field: 'id' as keyof T & string,
+      name: 'ID',
+      cellType: 'text' as const,
+      width: 200,
+      editable: false
+    })
+    
+    // Generate columns from schema fields
+    schemaFields.forEach((fieldDef: any) => {
+      const fieldName = fieldDef.name
+      
+      // Skip system fields that we handle separately
+      if (['id', 'organization_id', 'created_by'].includes(fieldName)) {
+        return
+      }
+      
+      // Determine cell type based on field type
+      let cellType: Column<T>['cellType'] = 'text'
+      let options: any[] | undefined
+      
+      if (fieldDef.cellType) {
+        cellType = fieldDef.cellType
+      } else if (fieldDef.type === 'select' || fieldDef.enumOptions) {
+        cellType = 'select'
+        options = fieldDef.enumOptions
+      } else if (fieldDef.type === 'boolean') {
+        cellType = 'checkbox'
+      } else if (fieldDef.type === 'integer' || fieldDef.type === 'number' || fieldDef.type === 'decimal') {
+        cellType = 'number'
+      } else if (fieldDef.type === 'date' || fieldDef.type === 'datetime') {
+        cellType = 'date'
+      } else if (fieldDef.type === 'email' || fieldName.includes('email')) {
+        cellType = 'text' // Could be enhanced to 'email' type
+      } else if (fieldDef.type === 'rich_text' || fieldDef.type === 'longtext') {
+        cellType = 'text' // Could be enhanced to support rich text
+      }
+      
+      // Add field-specific options for select fields
+      if (fieldName === 'status' && !options) {
+        options = [
+          { value: 'draft', label: 'Draft', color: '#6B7280' },
+          { value: 'active', label: 'Active', color: '#10B981' },
+          { value: 'pending', label: 'Pending', color: '#F59E0B' },
+          { value: 'inactive', label: 'Inactive', color: '#6B7280' },
+          { value: 'completed', label: 'Completed', color: '#10B981' },
+          { value: 'archived', label: 'Archived', color: '#6B7280' }
+        ]
+      } else if (fieldName === 'priority' && !options) {
+        options = [
+          { value: 'low', label: 'Low', color: '#10B981' },
+          { value: 'medium', label: 'Medium', color: '#F59E0B' },
+          { value: 'high', label: 'High', color: '#F97316' },
+          { value: 'critical', label: 'Critical', color: '#EF4444' }
+        ]
+      }
+      
+      // Calculate appropriate width based on field type
+      let width = 150
+      if (fieldName === 'name' || fieldName === 'title') width = 250
+      else if (fieldName.includes('email')) width = 250
+      else if (fieldName.includes('description') || fieldName.includes('notes') || fieldName.includes('content')) width = 300
+      else if (fieldName === 'status' || fieldName === 'priority') width = 140
+      else if (fieldName.includes('phone')) width = 150
+      else if (fieldName.includes('company')) width = 200
+      
+      columns.push({
+        id: fieldName,
+        field: fieldName as keyof T & string,
+        name: fieldName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        cellType,
+        width,
+        editable: !fieldDef.serverOnly && fieldName !== 'created_at' && fieldName !== 'updated_at',
+        options
+      })
+    })
+    
+    // Add timestamp columns at the end if not already added
+    if (!columns.find(col => col.id === 'created_at')) {
+      columns.push({
+        id: 'created_at',
+        field: 'created_at' as keyof T & string,
+        name: 'Created',
+        cellType: 'date' as const,
+        width: 150,
+        editable: false
+      })
+    }
+    
+    if (!columns.find(col => col.id === 'updated_at')) {
+      columns.push({
+        id: 'updated_at',
+        field: 'updated_at' as keyof T & string,
+        name: 'Updated',
+        cellType: 'date' as const,
+        width: 150,
+        editable: false
+      })
+    }
+    
+    return columns
+  }
+  
+  // Fallback to basic columns if no schema available
+  return getBasicColumns<T>()
+}
+
+/**
+ * Basic fallback columns when schema is not available
+ */
+function getBasicColumns<T>(): Column<T>[] {
   return [
     {
       id: 'id',
@@ -33,68 +154,6 @@ function getClientColumns<T>(): Column<T>[] {
       editable: true
     },
     {
-      id: 'email',
-      field: 'email' as keyof T & string,
-      name: 'Email',
-      cellType: 'text' as const,
-      width: 250,
-      editable: true
-    },
-    {
-      id: 'phone',
-      field: 'phone' as keyof T & string,
-      name: 'Phone',
-      cellType: 'text' as const,
-      width: 150,
-      editable: true
-    },
-    {
-      id: 'priority',
-      field: 'priority' as keyof T & string,
-      name: 'Priority',
-      cellType: 'select' as const,
-      width: 120,
-      editable: true,
-      options: [
-        { value: 'low', label: 'Low', color: '#10B981' },
-        { value: 'medium', label: 'Medium', color: '#F59E0B' },
-        { value: 'high', label: 'High', color: '#F97316' },
-        { value: 'critical', label: 'Critical', color: '#EF4444' }
-      ]
-    },
-    {
-      id: 'status',
-      field: 'status' as keyof T & string,
-      name: 'Status',
-      cellType: 'select' as const,
-      width: 140,
-      editable: true,
-      options: [
-        { value: 'active', label: 'Active', color: '#10B981' },
-        { value: 'inactive', label: 'Inactive', color: '#6B7280' },
-        { value: 'pending', label: 'Pending', color: '#F59E0B' },
-        { value: 'on_hold', label: 'On Hold', color: '#8B5CF6' },
-        { value: 'archived', label: 'Archived', color: '#6B7280' },
-        { value: 'deleted', label: 'Deleted', color: '#EF4444' }
-      ]
-    },
-    {
-      id: 'company',
-      field: 'company' as keyof T & string,
-      name: 'Company',
-      cellType: 'text' as const,
-      width: 200,
-      editable: true
-    },
-    {
-      id: 'notes',
-      field: 'notes' as keyof T & string,
-      name: 'Notes',
-      cellType: 'text' as const,
-      width: 300,
-      editable: true
-    },
-    {
       id: 'created_at',
       field: 'created_at' as keyof T & string,
       name: 'Created',
@@ -113,145 +172,8 @@ function getClientColumns<T>(): Column<T>[] {
   ]
 }
 
-/**
- * Task entity columns with reference cell types
- */
-function getTaskColumns<T>(): Column<T>[] {
-  return [
-    {
-      id: 'id',
-      field: 'id' as keyof T & string,
-      name: 'ID',
-      cellType: 'text' as const,
-      width: 200,
-      editable: false
-    },
-    {
-      id: 'title',
-      field: 'title' as keyof T & string,
-      name: 'Title',
-      cellType: 'text' as const,
-      width: 250,
-      editable: true
-    },
-    {
-      id: 'description',
-      field: 'description' as keyof T & string,
-      name: 'Description',
-      cellType: 'text' as const,
-      width: 300,
-      editable: true
-    },
-    {
-      id: 'priority_option',
-      field: 'priority_option' as keyof T & string,
-      name: 'Priority',
-      cellType: 'reference-select' as const,
-      referenceType: 'system',
-      systemOptionType: 'priority',
-      systemArchetype: 'task',
-      width: 120,
-      editable: true
-    },
-    {
-      id: 'status_option',
-      field: 'status_option' as keyof T & string,
-      name: 'Status',
-      cellType: 'reference-select' as const,
-      referenceType: 'system',
-      systemOptionType: 'status',
-      systemArchetype: 'task',
-      width: 140,
-      editable: true
-    },
-    {
-      id: 'created_at',
-      field: 'created_at' as keyof T & string,
-      name: 'Created',
-      cellType: 'date' as const,
-      width: 150,
-      editable: false
-    },
-    {
-      id: 'updated_at',
-      field: 'updated_at' as keyof T & string,
-      name: 'Updated',
-      cellType: 'date' as const,
-      width: 150,
-      editable: false
-    }
-  ]
-}
-
-/**
- * Project entity columns with reference cell types
- */
-function getProjectColumns<T>(): Column<T>[] {
-  return [
-    {
-      id: 'id',
-      field: 'id' as keyof T & string,
-      name: 'ID',
-      cellType: 'text' as const,
-      width: 200,
-      editable: false
-    },
-    {
-      id: 'title',
-      field: 'title' as keyof T & string,
-      name: 'Title',
-      cellType: 'text' as const,
-      width: 250,
-      editable: true
-    },
-    {
-      id: 'description',
-      field: 'description' as keyof T & string,
-      name: 'Description',
-      cellType: 'text' as const,
-      width: 300,
-      editable: true
-    },
-    {
-      id: 'priority_option',
-      field: 'priority_option' as keyof T & string,
-      name: 'Priority',
-      cellType: 'reference-select' as const,
-      referenceType: 'system',
-      systemOptionType: 'priority',
-      systemArchetype: 'project',
-      width: 120,
-      editable: true
-    },
-    {
-      id: 'status_option',
-      field: 'status_option' as keyof T & string,
-      name: 'Status',
-      cellType: 'reference-select' as const,
-      referenceType: 'system',
-      systemOptionType: 'status',
-      systemArchetype: 'project',
-      width: 140,
-      editable: true
-    },
-    {
-      id: 'created_at',
-      field: 'created_at' as keyof T & string,
-      name: 'Created',
-      cellType: 'date' as const,
-      width: 150,
-      editable: false
-    },
-    {
-      id: 'updated_at',
-      field: 'updated_at' as keyof T & string,
-      name: 'Updated',
-      cellType: 'date' as const,
-      width: 150,
-      editable: false
-    }
-  ]
-}
+// Removed hardcoded Task and Project column definitions
+// Now using schema-based column generation for all entities
 
 /**
  * Normalize entity name to handle plural/singular and case variations
@@ -287,58 +209,38 @@ function normalizeEntityName(entityName: string): string {
 }
 
 /**
- * Column factory function - maps entity names to their column configurations
- */
-const entityColumnFactories: Record<string, <T>() => Column<T>[]> = {
-  Client: getClientColumns,
-  Task: getTaskColumns,
-  Project: getProjectColumns
-}
-
-/**
  * Get precomputed columns observable for an entity
- * Uses cached observables to avoid regeneration on every table load
+ * No longer used - kept for backwards compatibility
+ * @deprecated Use usePrecomputedEntityColumns with schema instead
  */
 export function getPrecomputedEntityColumns$<T = any>(entityName: string) {
   const cacheKey = entityName.toLowerCase()
   
   if (!entityColumnsCache.has(cacheKey)) {
-    // Normalize the entity name to handle plural/singular and case variations
-    const normalizedName = normalizeEntityName(entityName)
-    
-    // Get the column factory for this entity
-    const columnFactory = entityColumnFactories[normalizedName] || entityColumnFactories.Client
-    
-    // Create observable with precomputed columns
-    const columns$ = observable(columnFactory<T>())
-    
+    // Create observable with basic columns as fallback
+    const columns$ = observable(getBasicColumns<T>())
     entityColumnsCache.set(cacheKey, columns$)
     
-    log.info(`[getPrecomputedEntityColumns$] Created cached observable for ${entityName}`, {
-      originalName: entityName,
-      normalizedName: normalizedName,
-      columnCount: columnFactory<T>().length,
-      referenceColumns: columnFactory<T>().filter(col => col.cellType?.startsWith('reference')).length
-    })
+    log.info(`[getPrecomputedEntityColumns$] Created basic columns fallback for ${entityName}`)
   }
   
   return entityColumnsCache.get(cacheKey)
 }
 
 /**
- * Hook that returns precomputed columns for an entity using Legend State observable
- * Much more efficient than dynamic generation - columns are cached and reused
+ * Hook that returns schema-based columns for an entity
+ * Dynamically generates columns based on entity schema
  */
-export function usePrecomputedEntityColumns<T = any>(entityName: string): {
+export function usePrecomputedEntityColumns<T = any>(entityName: string, schema?: any): {
   columns: Column<T>[]
   isLoading: boolean
   error: string | null
 } {
-  const columns$ = getPrecomputedEntityColumns$<T>(entityName)
+  // Generate columns based on schema if available
+  const columns = getSchemaBasedColumns<T>(entityName, schema)
   
-  // The observable contains precomputed columns, no loading state needed
   return {
-    columns: columns$.get(),
+    columns,
     isLoading: false,
     error: null
   }
