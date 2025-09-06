@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict 2hj3upfFgpeHwoqPf39bCur6L2CWiHuXrOaM3qA8at8ZZ9aqH2GkeKE0BCsAqmK
+\restrict vcQiyd4BJiTXFCPzkhW1cOporwkmKaWmcUetpeNV6Y092OetudLgTtlG2T87jfj
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict 2hj3upfFgpeHwoqPf39bCur6L2CWiHuXrOaM3qA8at8ZZ9aqH2GkeKE0BCsAqmK
+\unrestrict vcQiyd4BJiTXFCPzkhW1cOporwkmKaWmcUetpeNV6Y092OetudLgTtlG2T87jfj
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict fLWHqgmyGa9e8aNARbU9PcKJLRaxyUe1idaHrQRmhhnJwqXOwCkg4h1FongYKnd
+\restrict OCOFHl2jTHy3Of8Lc1E1ryg8GGer1ZEoufgeChUzuh8sWPYUsZgbJXIKdEvPI5m
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fLWHqgmyGa9e8aNARbU9PcKJLRaxyUe1idaHrQRmhhnJwqXOwCkg4h1FongYKnd
+\unrestrict OCOFHl2jTHy3Of8Lc1E1ryg8GGer1ZEoufgeChUzuh8sWPYUsZgbJXIKdEvPI5m
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict wbQMMvg8TNvbgGDoNd13H250lkYpHfIEeTxQml1pbQCHWnNwv65abIif4zxKFBH
+\restrict ZSrUT9AwL4QDLavr07RXyaXNMRFqmY4etWkG6mSb3eGYCYLPSApxkvF27sNFztU
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wbQMMvg8TNvbgGDoNd13H250lkYpHfIEeTxQml1pbQCHWnNwv65abIif4zxKFBH
+\unrestrict ZSrUT9AwL4QDLavr07RXyaXNMRFqmY4etWkG6mSb3eGYCYLPSApxkvF27sNFztU
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 6tBZE6zSuhpoukKQVGZIHuyTDn0CPLLUlnTDiyu662n9PuRUwlCgfMdUl3Zg8id
+\restrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict 6tBZE6zSuhpoukKQVGZIHuyTDn0CPLLUlnTDiyu662n9PuRUwlCgfMdUl3Zg8id
+\unrestrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
 \connect vibestack_dev
-\restrict 6tBZE6zSuhpoukKQVGZIHuyTDn0CPLLUlnTDiyu662n9PuRUwlCgfMdUl3Zg8id
+\restrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1989,6 +1989,28 @@ COMMENT ON TABLE public.custom_options IS 'Organization-specific option values w
 
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_access_control_list; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_access_control_list (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_access_control_list OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_archetypetests; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2041,6 +2063,28 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cachetestentitys (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cachetestentitys OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_capitol_building; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_capitol_building (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_capitol_building OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_cleantests; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2067,10 +2111,10 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantests (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantests OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_clients; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_client; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_clients (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_client (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
     created_by uuid,
@@ -2102,13 +2146,13 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_clients (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_clients OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_client OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_contracts; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_contract; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contracts (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contract (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
     created_by uuid,
@@ -2129,13 +2173,35 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contracts (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_contracts OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_contract OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_discussions; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_data_analytics_report; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_discussions (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_data_analytics_report (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_data_analytics_report OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_discussion; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_discussion (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
@@ -2150,13 +2216,35 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_discussions (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_discussions OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_discussion OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_expenses; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_emergency_contact; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_expenses (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_emergency_contact (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_emergency_contact OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_expense; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_expense (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
     created_by uuid,
@@ -2175,13 +2263,13 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_expenses (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_expenses OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_expense OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_files; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_file; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_files (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_file (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
@@ -2196,13 +2284,13 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_files (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_files OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_file OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_invoices; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoices (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoice (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
@@ -2217,13 +2305,13 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoices (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoices OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoice OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_meetings; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_meeting; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_meetings (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_meeting (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
     created_by uuid,
@@ -2242,7 +2330,7 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_meetings (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_meetings OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_meeting OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_morningworkouts; Type: TABLE; Schema: public; Owner: postgres
@@ -2271,10 +2359,10 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_projects; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_project; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projects (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_project (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
     created_by uuid,
@@ -2293,7 +2381,7 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projects (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projects OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_project OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_records; Type: TABLE; Schema: public; Owner: postgres
@@ -2319,10 +2407,10 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_records (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_records OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_schematestentitys; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_schema_test_entity; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_schematestentitys (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_schema_test_entity (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
@@ -2339,7 +2427,29 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_schematestentitys (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_schematestentitys OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_schema_test_entity OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_security_badge; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_security_badge (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_security_badge OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_softdeletetests; Type: TABLE; Schema: public; Owner: postgres
@@ -2371,10 +2481,10 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_softdeletetests (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_softdeletetests OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_tasks; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_task; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_tasks (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_task (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
@@ -2397,7 +2507,7 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_tasks (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_tasks OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_temptests; Type: TABLE; Schema: public; Owner: postgres
@@ -2573,10 +2683,10 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_timesheets; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_time_sheet; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_timesheets (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_time_sheet (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
@@ -2591,7 +2701,7 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_timesheets (
 );
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_timesheets OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_time_sheet OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_universes; Type: TABLE; Schema: public; Owner: postgres
@@ -2610,6 +2720,28 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_universes (
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_universes OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_user_permission_group; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_user_permission_group (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_user_permission_group OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_worlds; Type: TABLE; Schema: public; Owner: postgres
@@ -3331,42 +3463,42 @@ ALTER TABLE ONLY public.entity_schemas
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_clients org_01920000_1000_7000_8000_000000000001_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_client org_01920000_1000_7000_8000_000000000001_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_clients
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_client
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_clients_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_contracts org_01920000_1000_7000_8000_000000000001_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_contract org_01920000_1000_7000_8000_000000000001_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_contracts
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_contract
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_contracts_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_expenses org_01920000_1000_7000_8000_000000000001_expenses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_expense org_01920000_1000_7000_8000_000000000001_expenses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_expenses
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_expense
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_expenses_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_meetings org_01920000_1000_7000_8000_000000000001_meetings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_meeting org_01920000_1000_7000_8000_000000000001_meetings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meetings
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meeting
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_meetings_pkey PRIMARY KEY (id);
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_projects org_01920000_1000_7000_8000_000000000001_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_project org_01920000_1000_7000_8000_000000000001_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projects
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_project
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_projects_pkey PRIMARY KEY (id);
 
 
@@ -3579,10 +3711,10 @@ ALTER TABLE ONLY public.system_options
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_tasks tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_task tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_tasks
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task
     ADD CONSTRAINT tasks_pkey PRIMARY KEY (id);
 
 
@@ -3680,14 +3812,14 @@ CREATE INDEX idx_change_history_table_org ON public.change_history USING btree (
 -- Name: idx_client_priority; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_client_priority ON public.org_01920000_1000_7000_8000_000000000001_clients USING btree (priority);
+CREATE INDEX idx_client_priority ON public.org_01920000_1000_7000_8000_000000000001_client USING btree (priority);
 
 
 --
 -- Name: idx_client_status; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_client_status ON public.org_01920000_1000_7000_8000_000000000001_clients USING btree (status);
+CREATE INDEX idx_client_status ON public.org_01920000_1000_7000_8000_000000000001_client USING btree (status);
 
 
 --
@@ -3757,35 +3889,35 @@ CREATE INDEX idx_entity_schemas_table_name ON public.entity_schemas USING btree 
 -- Name: idx_org_01920000_1000_7000_8000_000000000001_clients_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_clients_created_at ON public.org_01920000_1000_7000_8000_000000000001_clients USING btree (created_at);
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_clients_created_at ON public.org_01920000_1000_7000_8000_000000000001_client USING btree (created_at);
 
 
 --
 -- Name: idx_org_01920000_1000_7000_8000_000000000001_contracts_created_; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_contracts_created_ ON public.org_01920000_1000_7000_8000_000000000001_contracts USING btree (created_at);
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_contracts_created_ ON public.org_01920000_1000_7000_8000_000000000001_contract USING btree (created_at);
 
 
 --
 -- Name: idx_org_01920000_1000_7000_8000_000000000001_expenses_created_a; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_expenses_created_a ON public.org_01920000_1000_7000_8000_000000000001_expenses USING btree (created_at);
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_expenses_created_a ON public.org_01920000_1000_7000_8000_000000000001_expense USING btree (created_at);
 
 
 --
 -- Name: idx_org_01920000_1000_7000_8000_000000000001_meetings_created_a; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_meetings_created_a ON public.org_01920000_1000_7000_8000_000000000001_meetings USING btree (created_at);
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_meetings_created_a ON public.org_01920000_1000_7000_8000_000000000001_meeting USING btree (created_at);
 
 
 --
 -- Name: idx_org_01920000_1000_7000_8000_000000000001_projects_created_a; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_projects_created_a ON public.org_01920000_1000_7000_8000_000000000001_projects USING btree (created_at);
+CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_projects_created_a ON public.org_01920000_1000_7000_8000_000000000001_project USING btree (created_at);
 
 
 --
@@ -4544,7 +4676,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6tBZE6zSuhpoukKQVGZIHuyTDn0CPLLUlnTDiyu662n9PuRUwlCgfMdUl3Zg8id
+\unrestrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
 
 --
 -- PostgreSQL database cluster dump complete

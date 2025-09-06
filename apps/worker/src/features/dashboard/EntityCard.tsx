@@ -98,23 +98,29 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
   // Get the clean display name for use in descriptions and icon detection
   // In universe mode, entityName might be prefixed with org UUID, so extract the actual entity name
   const displayName = (() => {
+    let cleanName = entityName;
+    
     // First try to use the original name from entity definition
     if (entityDef?._originalName) {
-      return entityDef._originalName;
+      cleanName = entityDef._originalName;
     }
-    
     // If entityName contains UUID prefix (universe mode), extract the clean name
-    if (entityName.includes('_')) {
+    else if (entityName.includes('_')) {
       const parts = entityName.split('_');
       // Check if first part looks like a UUID (36 chars with dashes)
       if (parts[0].length === 36 && parts[0].includes('-')) {
         // Return everything after the UUID prefix
-        return parts.slice(1).join('_');
+        cleanName = parts.slice(1).join('_');
       }
     }
     
-    // Otherwise return as-is
-    return entityName;
+    // Convert PascalCase to space-separated title case
+    // e.g., "EmergencyContact" -> "Emergency Contact"
+    // e.g., "AccessControlList" -> "Access Control List"
+    return cleanName
+      .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add space between lowercase and uppercase
+      .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')  // Handle consecutive capitals
+      .trim();
   })();
 
   // Override icon for specific entity names

@@ -68,55 +68,50 @@ export class EntityNameUtils {
   static toDisplayFormat(storageFormat: string): string {
     const { entityName } = this.extractOrgPrefix(storageFormat);
     
-    // First, try to restore word boundaries if the string has been improperly cased
-    // e.g., "Schematestentity" -> "Schema Test Entity"
+    // Convert PascalCase to space-separated title case
+    // This works even if the PascalCase has been flattened (like "Dataanalyticsreport")
     let displayName = entityName;
     
-    // Check if we have an improperly cased string (first letter capital, rest lowercase)
-    // This happens when SchemaTestEntity becomes Schematestentity
+    // If the string appears to be flattened PascalCase (first letter capital, rest lowercase)
+    // we need to try to restore word boundaries
     if (/^[A-Z][a-z]+$/.test(displayName)) {
-      // Try to restore word boundaries using common patterns
+      // Insert spaces before likely word boundaries based on common patterns
+      // This is a heuristic approach since we've lost the original casing
       displayName = displayName
-        .replace(/([a-z])(test|entity|data|info|config|manager|service|controller|helper|util|model|view)([a-z])/gi, 
-                (match, p1, p2, p3) => p1 + ' ' + p2.charAt(0).toUpperCase() + p2.slice(1) + ' ' + p3.toUpperCase())
-        .replace(/([a-z])(test|entity|data|info|config|manager|service|controller|helper|util|model|view)$/gi, 
-                (match, p1, p2) => p1 + ' ' + p2.charAt(0).toUpperCase() + p2.slice(1));
+        // Common word endings that likely indicate a new word starts after them
+        .replace(/([a-z])(data|time|user|access|control|emergency|security|capitol|schema|permission)/gi, 
+                '$1 $2')
+        // Common standalone words in entity names
+        .replace(/(test|entity|analytics|report|list|contact|badge|building|sheet|group)([a-z])/gi,
+                '$1 $2');
     }
     
-    // Convert PascalCase to space-separated title case
-    // Handle special cases like "SchemaTestEntity" -> "Schema Test Entity"
+    // Now convert to proper display format with spaces
+    // This handles both properly cased PascalCase and our restored version
     return displayName
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
-      .replace(/Test([A-Z])/g, 'Test $1') // Handle "Test" followed by capital letter
-      .trim();
+      .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add space between lowercase and uppercase
+      .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')  // Handle consecutive capitals
+      .trim()
+      // Capitalize first letter of each word for consistent display
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   /**
    * Convert entity name to URL-safe kebab-case format
    * @param entityName - Entity name in any format
-   * @returns URL-safe kebab-case string
+   * @returns URL-safe kebab-case string for clean URLs
    */
   static toUrlSafeFormat(entityName: string): string {
-    // First normalize the input to handle various formats
-    const normalized = this.normalizeInput(entityName);
-    
-    // Convert to kebab-case from the normalized format (which has spaces)
-    // Don't use toSingular here as it returns PascalCase without spaces
-    const kebabCase = normalized
-      .split(' ')
-      .join('-')
-      .toLowerCase();
-    
-    // Handle plurals if needed (but keep the kebab-case format)
-    // Check if we have a known plural and convert to singular
-    if (this.PLURAL_MAPPINGS[normalized]) {
-      // Get the singular form and convert it to kebab-case
-      const singularForm = this.PLURAL_MAPPINGS[normalized];
-      return singularForm
-        .replace(/([a-z])([A-Z])/g, '$1-$2')  // Add hyphen before capital letters
-        .toLowerCase();
-    }
+    // Convert to kebab-case for clean, user-friendly URLs
+    const kebabCase = entityName
+      .replace(/([a-z])([A-Z])/g, '$1-$2')  // camelCase to kebab-case
+      .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')  // Consecutive capitals
+      .replace(/[\s_]+/g, '-')  // Spaces and underscores to hyphens
+      .toLowerCase()
+      .replace(/-+/g, '-')  // Remove duplicate hyphens
+      .replace(/^-|-$/g, '');  // Trim hyphens from start/end
     
     return kebabCase;
   }
@@ -136,10 +131,12 @@ export class EntityNameUtils {
       return entityName;
     }
     
-    // Convert kebab-case directly to PascalCase
+    // Convert kebab-case to PascalCase
     // e.g., "schema-test-entity" -> "SchemaTestEntity"
+    // Also handle snake_case for backwards compatibility
+    const separator = urlName.includes('_') ? '_' : '-';
     return urlName
-      .split('-')
+      .split(separator)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join('');
   }

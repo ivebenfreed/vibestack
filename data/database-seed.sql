@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PoC3NdmSFUdrQFsJZEnZyl0NUDtdOfB0Q8udd5BEgfXRsWreGUGGoD3gQDHdcFw
+\restrict kPPRH28xUsdIPIS6NIYVMvyTM5afulwBuk2OA4jV7FssLrK6aWIU6JdSKqXvxy7
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -166,18 +166,32 @@ COPY public.custom_options (id, option_set_id, value, label, description, color,
 --
 
 COPY public.entity_schemas (org_id, entity_name, table_name, archetype, business_metadata, created_at, updated_at, deleted, deleted_at) FROM stdin;
-01920000-1000-7000-8000-000000000001	Invoice	org_01920000_1000_7000_8000_000000000001_invoices	document	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "content", "type": "rich_text", "required": false, "syncable": true, "serverOnly": false}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "draft"}, {"name": "category", "type": "category_option", "required": false, "syncable": true, "serverOnly": false}, {"name": "author_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_document_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Invoice document archetype"}	2025-08-23 19:15:53.701	2025-08-23 19:15:53.701	f	\N
-01920000-1000-7000-8000-000000000001	SchemaTestEntity	org_01920000_1000_7000_8000_000000000001_schematestentitys	record	{}	2025-09-03 13:16:24.733	2025-09-03 13:16:24.733	f	\N
-01920000-1000-7000-8000-000000000001	Timesheet	org_01920000_1000_7000_8000_000000000001_timesheets	activity	{"fields": [{"name": "activity_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_id", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "actor_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "metadata", "type": "json", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Timesheet activity archetype"}	2025-08-23 19:16:19.782	2025-08-23 19:16:19.782	f	\N
-01920000-1000-7000-8000-000000000001	Task	org_01920000_1000_7000_8000_000000000001_tasks	task	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "longtext", "required": false, "syncable": true, "serverOnly": false}, {"name": "priority", "type": "priority_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "medium"}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "todo"}, {"name": "assignee_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "reporter_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "due_date", "type": "datetime", "required": false, "syncable": true, "serverOnly": false}, {"name": "estimated_hours", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "actual_hours", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "task_type", "type": "category_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "feature"}, {"name": "parent_task_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "project_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "sprint_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "story_points", "type": "integer", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Task task archetype"}	2025-08-23 19:18:06.831	2025-08-23 19:18:06.831	f	\N
+01920000-1000-7000-8000-000000000001	CapitolBuilding	org_01920000_1000_7000_8000_000000000001_capitol_building	record	{}	2025-09-06 07:54:36.224	2025-09-06 07:54:36.224	f	\N
+01920000-1000-7000-8000-000000000001	Invoice	org_01920000_1000_7000_8000_000000000001_invoice	document	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "content", "type": "rich_text", "required": false, "syncable": true, "serverOnly": false}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "draft"}, {"name": "category", "type": "category_option", "required": false, "syncable": true, "serverOnly": false}, {"name": "author_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_document_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Invoice document archetype"}	2025-08-23 19:15:53.701	2025-08-23 19:15:53.701	f	\N
+01920000-1000-7000-8000-000000000001	SchemaTestEntity	org_01920000_1000_7000_8000_000000000001_schema_test_entity	record	{}	2025-09-03 13:16:24.733	2025-09-03 13:16:24.733	f	\N
+01920000-1000-7000-8000-000000000001	EmergencyContact	org_01920000_1000_7000_8000_000000000001_emergency_contact	record	{}	2025-09-06 07:55:23.797	2025-09-06 07:55:23.797	f	\N
+01920000-1000-7000-8000-000000000001	TimeSheet	org_01920000_1000_7000_8000_000000000001_time_sheet	activity	{"fields": [{"name": "activity_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_id", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "actor_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "metadata", "type": "json", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Timesheet activity archetype"}	2025-08-23 19:16:19.782	2025-08-23 19:16:19.782	f	\N
+01920000-1000-7000-8000-000000000001	SecurityBadge	org_01920000_1000_7000_8000_000000000001_security_badge	record	{}	2025-09-06 07:57:06.104	2025-09-06 07:57:06.104	f	\N
+01920000-1000-7000-8000-000000000001	Task	org_01920000_1000_7000_8000_000000000001_task	task	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "longtext", "required": false, "syncable": true, "serverOnly": false}, {"name": "priority", "type": "priority_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "medium"}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "todo"}, {"name": "assignee_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "reporter_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "due_date", "type": "datetime", "required": false, "syncable": true, "serverOnly": false}, {"name": "estimated_hours", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "actual_hours", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "task_type", "type": "category_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "feature"}, {"name": "parent_task_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "project_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "sprint_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "story_points", "type": "integer", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Task task archetype"}	2025-08-23 19:18:06.831	2025-08-23 19:18:06.831	f	\N
 56389312-ddb8-4143-8061-d8a357ebca0c	MorningWorkout	org_01920000_1000_7000_8000_000000000001_morningworkouts	project	{}	2025-08-31 13:50:47.733	2025-08-31 13:50:47.733	f	\N
-01920000-1000-7000-8000-000000000001	File	org_01920000_1000_7000_8000_000000000001_files	file	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "file_path", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "mime_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "size_bytes", "type": "integer", "required": true, "syncable": true, "serverOnly": false}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "active"}, {"name": "uploaded_by", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for File file archetype"}	2025-08-23 19:18:34.026	2025-08-23 19:18:34.026	f	\N
-01920000-1000-7000-8000-000000000001	Discussion	org_01920000_1000_7000_8000_000000000001_discussions	discussion	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "content", "type": "rich_text", "required": false, "syncable": true, "serverOnly": false}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "open"}, {"name": "discussion_type", "type": "discussion_type_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "general"}, {"name": "author_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_discussion_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Discussion discussion archetype"}	2025-08-23 19:18:47.371	2025-08-23 19:18:47.371	f	\N
-01920000-1000-7000-8000-000000000001	Project	org_01920000_1000_7000_8000_000000000001_projects	project	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "longtext", "required": false, "syncable": true, "serverOnly": false}, {"enum": ["low", "medium", "high", "critical"], "name": "priority", "type": "priority_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "medium"}, {"enum": ["planning", "active", "on_hold", "completed", "cancelled"], "name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "planning"}, {"name": "start_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "end_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "owner_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "budget", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "progress_percentage", "type": "integer", "required": false, "syncable": true, "serverOnly": false, "defaultValue": 0}, {"enum": ["software", "research", "marketing", "operational", "strategic"], "name": "project_type", "type": "category_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "operational"}], "syncable": true, "createdAt": "2025-08-23T11:31:03.441Z", "description": "Entity created via DataForge API"}	2025-08-23 11:31:03.67031	2025-08-23 11:31:03.67031	f	\N
-01920000-1000-7000-8000-000000000001	Contract	org_01920000_1000_7000_8000_000000000001_contracts	project	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "longtext", "required": false, "syncable": true, "serverOnly": false}, {"enum": ["low", "medium", "high", "critical"], "name": "priority", "type": "priority_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "medium"}, {"enum": ["planning", "active", "on_hold", "completed", "cancelled"], "name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "planning"}, {"name": "start_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "end_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "owner_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "budget", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "progress_percentage", "type": "integer", "required": false, "syncable": true, "serverOnly": false, "defaultValue": 0}, {"enum": ["software", "research", "marketing", "operational", "strategic"], "name": "project_type", "type": "category_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "operational"}, {"name": "value", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "contract_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "createdAt": "2025-08-23T11:31:54.141Z", "description": "Entity created via DataForge API"}	2025-08-23 11:31:54.366294	2025-08-23 11:31:54.366294	f	\N
-01920000-1000-7000-8000-000000000001	Expense	org_01920000_1000_7000_8000_000000000001_expenses	document	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "content", "type": "rich_text", "required": false, "syncable": true, "serverOnly": false}, {"enum": ["draft", "review", "published", "archived"], "name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "draft"}, {"name": "category", "type": "category_option", "required": false, "syncable": true, "serverOnly": false}, {"name": "author_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_document_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "amount", "type": "decimal", "required": true, "syncable": true, "serverOnly": false}, {"name": "expense_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "receipt_url", "type": "url", "required": false, "syncable": true, "serverOnly": false}, {"name": "reimbursable", "type": "boolean", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "createdAt": "2025-08-23T11:32:06.354Z", "description": "Entity created via DataForge API"}	2025-08-23 11:32:06.593347	2025-08-23 11:32:06.593347	f	\N
-01920000-1000-7000-8000-000000000001	Meeting	org_01920000_1000_7000_8000_000000000001_meetings	activity	{"fields": [{"name": "activity_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_id", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "actor_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "metadata", "type": "json", "required": false, "syncable": true, "serverOnly": false}, {"name": "duration", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "location", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "attendees", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "meeting_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "createdAt": "2025-08-23T11:32:18.343Z", "description": "Entity created via DataForge API"}	2025-08-23 11:32:18.572973	2025-08-23 11:32:18.572973	f	\N
-01920000-1000-7000-8000-000000000001	Client	org_01920000_1000_7000_8000_000000000001_clients	record	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "record_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "status", "type": "select", "cellType": "select", "required": true, "syncable": true, "serverOnly": false, "enumOptions": [{"color": "#10B981", "label": "Active", "value": "active"}, {"color": "#6B7280", "label": "Inactive", "value": "inactive"}, {"color": "#F59E0B", "label": "Pending", "value": "pending"}, {"color": "#8B5CF6", "label": "On Hold", "value": "on_hold"}, {"color": "#6B7280", "label": "Archived", "value": "archived"}, {"color": "#EF4444", "label": "Deleted", "value": "deleted"}], "defaultValue": "active"}, {"name": "data", "type": "json", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_record_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "owner_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "email", "type": "email", "required": false, "syncable": true, "serverOnly": false}, {"name": "phone", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "industry", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "company_name", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "contact_person", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "priority", "type": "select", "cellType": "select", "required": false, "syncable": true, "serverOnly": false, "enumOptions": [{"color": "#10B981", "label": "Low", "value": "low"}, {"color": "#F59E0B", "label": "Medium", "value": "medium"}, {"color": "#F97316", "label": "High", "value": "high"}, {"color": "#EF4444", "label": "Critical", "value": "critical"}], "defaultValue": "medium"}], "syncable": true, "createdAt": "2025-08-23T11:30:51.488Z", "description": "Entity created via DataForge API"}	2025-08-23 11:30:51.794527	2025-08-25 18:54:12.976342	f	\N
+01920000-1000-7000-8000-000000000001	AccessControlList	org_01920000_1000_7000_8000_000000000001_access_control_list	record	{}	2025-09-06 07:57:27.032	2025-09-06 07:57:27.032	f	\N
+01920000-1000-7000-8000-000000000001	File	org_01920000_1000_7000_8000_000000000001_file	file	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "file_path", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "mime_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "size_bytes", "type": "integer", "required": true, "syncable": true, "serverOnly": false}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "active"}, {"name": "uploaded_by", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for File file archetype"}	2025-08-23 19:18:34.026	2025-08-23 19:18:34.026	f	\N
+01920000-1000-7000-8000-000000000001	UserPermissionGroup	org_01920000_1000_7000_8000_000000000001_user_permission_group	record	{}	2025-09-06 07:58:53.311	2025-09-06 07:58:53.311	f	\N
+01920000-1000-7000-8000-000000000001	Discussion	org_01920000_1000_7000_8000_000000000001_discussion	discussion	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "content", "type": "rich_text", "required": false, "syncable": true, "serverOnly": false}, {"name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "open"}, {"name": "discussion_type", "type": "discussion_type_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "general"}, {"name": "author_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_discussion_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "description": "Entity metadata generated for Discussion discussion archetype"}	2025-08-23 19:18:47.371	2025-08-23 19:18:47.371	f	\N
+01920000-1000-7000-8000-000000000001	DataAnalyticsReport	org_01920000_1000_7000_8000_000000000001_data_analytics_report	record	{}	2025-09-06 07:59:03.304	2025-09-06 07:59:03.304	f	\N
+01920000-1000-7000-8000-000000000001	Contract	org_01920000_1000_7000_8000_000000000001_contract	project	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "longtext", "required": false, "syncable": true, "serverOnly": false}, {"enum": ["low", "medium", "high", "critical"], "name": "priority", "type": "priority_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "medium"}, {"enum": ["planning", "active", "on_hold", "completed", "cancelled"], "name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "planning"}, {"name": "start_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "end_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "owner_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "budget", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "progress_percentage", "type": "integer", "required": false, "syncable": true, "serverOnly": false, "defaultValue": 0}, {"enum": ["software", "research", "marketing", "operational", "strategic"], "name": "project_type", "type": "category_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "operational"}, {"name": "value", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "contract_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "createdAt": "2025-08-23T11:31:54.141Z", "description": "Entity created via DataForge API"}	2025-08-23 11:31:54.366294	2025-08-23 11:31:54.366294	f	\N
+01920000-1000-7000-8000-000000000001	Project	org_01920000_1000_7000_8000_000000000001_project	project	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "longtext", "required": false, "syncable": true, "serverOnly": false}, {"enum": ["low", "medium", "high", "critical"], "name": "priority", "type": "priority_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "medium"}, {"enum": ["planning", "active", "on_hold", "completed", "cancelled"], "name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "planning"}, {"name": "start_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "end_date", "type": "date", "required": false, "syncable": true, "serverOnly": false}, {"name": "owner_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "budget", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "progress_percentage", "type": "integer", "required": false, "syncable": true, "serverOnly": false, "defaultValue": 0}, {"enum": ["software", "research", "marketing", "operational", "strategic"], "name": "project_type", "type": "category_option", "required": false, "syncable": true, "serverOnly": false, "defaultValue": "operational"}], "syncable": true, "createdAt": "2025-08-23T11:31:03.441Z", "description": "Entity created via DataForge API"}	2025-08-23 11:31:03.67031	2025-08-23 11:31:03.67031	f	\N
+01920000-1000-7000-8000-000000000001	Client	org_01920000_1000_7000_8000_000000000001_client	record	{"fields": [{"name": "name", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "record_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "status", "type": "select", "cellType": "select", "required": true, "syncable": true, "serverOnly": false, "enumOptions": [{"color": "#10B981", "label": "Active", "value": "active"}, {"color": "#6B7280", "label": "Inactive", "value": "inactive"}, {"color": "#F59E0B", "label": "Pending", "value": "pending"}, {"color": "#8B5CF6", "label": "On Hold", "value": "on_hold"}, {"color": "#6B7280", "label": "Archived", "value": "archived"}, {"color": "#EF4444", "label": "Deleted", "value": "deleted"}], "defaultValue": "active"}, {"name": "data", "type": "json", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_record_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "owner_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "email", "type": "email", "required": false, "syncable": true, "serverOnly": false}, {"name": "phone", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "industry", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "company_name", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "contact_person", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "priority", "type": "select", "cellType": "select", "required": false, "syncable": true, "serverOnly": false, "enumOptions": [{"color": "#10B981", "label": "Low", "value": "low"}, {"color": "#F59E0B", "label": "Medium", "value": "medium"}, {"color": "#F97316", "label": "High", "value": "high"}, {"color": "#EF4444", "label": "Critical", "value": "critical"}], "defaultValue": "medium"}], "syncable": true, "createdAt": "2025-08-23T11:30:51.488Z", "description": "Entity created via DataForge API"}	2025-08-23 11:30:51.794527	2025-08-25 18:54:12.976342	f	\N
+01920000-1000-7000-8000-000000000001	Expense	org_01920000_1000_7000_8000_000000000001_expense	document	{"fields": [{"name": "title", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "content", "type": "rich_text", "required": false, "syncable": true, "serverOnly": false}, {"enum": ["draft", "review", "published", "archived"], "name": "status", "type": "status_option", "required": true, "syncable": true, "serverOnly": false, "defaultValue": "draft"}, {"name": "category", "type": "category_option", "required": false, "syncable": true, "serverOnly": false}, {"name": "author_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "parent_document_id", "type": "entity_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "amount", "type": "decimal", "required": true, "syncable": true, "serverOnly": false}, {"name": "expense_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "receipt_url", "type": "url", "required": false, "syncable": true, "serverOnly": false}, {"name": "reimbursable", "type": "boolean", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "createdAt": "2025-08-23T11:32:06.354Z", "description": "Entity created via DataForge API"}	2025-08-23 11:32:06.593347	2025-08-23 11:32:06.593347	f	\N
+01920000-1000-7000-8000-000000000001	Meeting	org_01920000_1000_7000_8000_000000000001_meeting	activity	{"fields": [{"name": "activity_type", "type": "text", "required": true, "syncable": true, "serverOnly": false}, {"name": "description", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "entity_id", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "actor_id", "type": "user_reference", "required": false, "syncable": true, "serverOnly": false}, {"name": "metadata", "type": "json", "required": false, "syncable": true, "serverOnly": false}, {"name": "duration", "type": "decimal", "required": false, "syncable": true, "serverOnly": false}, {"name": "location", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "attendees", "type": "text", "required": false, "syncable": true, "serverOnly": false}, {"name": "meeting_type", "type": "text", "required": false, "syncable": true, "serverOnly": false}], "syncable": true, "createdAt": "2025-08-23T11:32:18.343Z", "description": "Entity created via DataForge API"}	2025-08-23 11:32:18.572973	2025-08-23 11:32:18.572973	f	\N
+\.
+
+
+--
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_access_control_list; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_access_control_list (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id) FROM stdin;
 \.
 
 
@@ -198,6 +212,14 @@ COPY public.org_01920000_1000_7000_8000_000000000001_cachetestentitys (id, organ
 
 
 --
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_capitol_building; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_capitol_building (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id) FROM stdin;
+\.
+
+
+--
 -- Data for Name: org_01920000_1000_7000_8000_000000000001_cleantests; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -206,16 +228,15 @@ COPY public.org_01920000_1000_7000_8000_000000000001_cleantests (id, organizatio
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_clients; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_client; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_clients (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id, email, phone, industry, company_name, contact_person, new_test_field, another_new_field, score, category, notes, test_field, test_field_2, test_field_3, final_test_field, test_cache_refresh, priority) FROM stdin;
-e93c1317-471c-46db-9310-268db257e4bc	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:07.793+00	2025-08-23 14:15:11.307+00	Echo Enterprises	\N	client	active	\N	\N	\N	echo@enterprises.com	\N	\N	\N	\N	\N	\N	78	premium	Name starts with Echo	\N	\N	\N	\N	\N	medium
-1fdedf81-aaad-4fde-ab02-5717f9fce085	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:06.777+00	2025-08-23 14:15:30.746+00	Bob Industries	\N	client	inactive	\N	\N	\N	bob@industries.com	\N	\N	\N	\N	\N	\N	42	standard	Not active status	\N	\N	\N	\N	\N	medium
+COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id, email, phone, industry, company_name, contact_person, new_test_field, another_new_field, score, category, notes, test_field, test_field_2, test_field_3, final_test_field, test_cache_refresh, priority) FROM stdin;
+1fdedf81-aaad-4fde-ab02-5717f9fce085	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:06.777+00	2025-09-06 07:31:22.175+00	Bob Industries		client	inactive	\N	\N	\N	bob@industries.com	\N	\N	\N	\N	\N	\N	42	standard	Not active status	\N	\N	\N	\N	\N	medium
+bb441964-dff2-4547-ab6d-d8feb4501338	01920000-1000-7000-8000-000000000001	\N	2025-08-23 13:47:00.87+00	2025-09-06 07:33:11.266+00	Updated Single Test Client		client	pending	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 3046cf56-1ef9-4bbc-bbc7-3845c29d0323	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:46.885+00	2025-08-24 16:14:46.885+00	Dynamic Tech Solutions	\N	customer	active	\N	\N	\N	support@dynamictec.mockdata.io	\N	\N	\N	\N	\N	\N	42	premium	Performance test record #457. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 d7cf20b3-a084-4889-b025-b4723f4a8486	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:47.81+00	2025-08-24 16:14:47.81+00	Edge Smart Co	\N	customer	pending	\N	\N	\N	admin@edgesmartc.mockdata.io	\N	\N	\N	\N	\N	\N	1	standard	Performance test record #8. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 4f0bc881-e486-4333-a6fe-483e522af4d8	01920000-1000-7000-8000-000000000001	\N	2025-08-23 13:45:23.226+00	2025-08-23 14:15:51.215+00	Test Client 1	\N	client	deleted	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
-bb441964-dff2-4547-ab6d-d8feb4501338	01920000-1000-7000-8000-000000000001	\N	2025-08-23 13:47:00.87+00	2025-08-23 14:15:51.215+00	Updated Single Test Client	\N	client	pending	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 719b7651-0265-467d-a2c5-7846881b3876	01920000-1000-7000-8000-000000000001	\N	2025-08-23 12:27:41.818+00	2025-08-23 14:15:51.215+00	Updated Client Name	\N	customer	active	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 2f3e6bfc-5fa3-46cf-8fb3-7ccbcdc45b74	01920000-1000-7000-8000-000000000001	\N	2025-08-23 12:27:42.059+00	2025-08-23 14:15:51.215+00	Updated Client Name	\N	prospect	active	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	Category is null	\N	\N	\N	\N	\N	medium
 27b50f0b-bfb7-4383-97e7-8289799a09ad	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:48.997+00	2025-08-24 16:14:48.997+00	Omega Edge Technologies	\N	prospect	inactive	\N	\N	\N	office@omegaedget.test.org	\N	\N	\N	\N	\N	\N	21	premium	Performance test record #460. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
@@ -245,6 +266,7 @@ dbea2702-d005-4b96-a3e7-860e8e9ed29f	01920000-1000-7000-8000-000000000001	\N	202
 df3fdd5d-cb34-4437-94c0-c6ca085ca1e7	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:15:02.914+00	2025-08-24 16:15:02.914+00	Nova Pro Co	\N	client	pending	\N	\N	\N	contact@novaproco.test.org	\N	\N	\N	\N	\N	\N	19	premium	Performance test record #479. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 64b01ffd-fe29-4cac-92d8-7fab176ff0ef	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:15:03.529+00	2025-08-24 16:15:03.529+00	Tech Rapid Enterprises	\N	customer	inactive	\N	\N	\N	office@techrapide.example.com	\N	\N	\N	\N	\N	\N	9	basic	Performance test record #17. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 4cde548d-b23d-4402-b0de-b3eb377c6e9a	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:15:03.575+00	2025-08-24 16:15:03.575+00	Pro LLC	\N	client	active	\N	\N	\N	contact@prollc.mockdata.io	\N	\N	\N	\N	\N	\N	95	basic	Performance test record #480. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
+e93c1317-471c-46db-9310-268db257e4bc	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:07.793+00	2025-09-06 06:44:19.522+00	Echo Enterprises	Test description for Echo	client	active	\N	\N	\N	echo@enterprises.com	\N	\N	\N	\N	\N	\N	78	premium	Name starts with Echo	\N	\N	\N	\N	\N	medium
 c01e5d3a-6a3e-4210-8e33-d2003306afb5	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:45.992+00	2025-08-24 16:14:45.992+00	Edge Technologies	\N	client	pending	\N	\N	\N	admin@edgetechno.example.com	\N	\N	\N	\N	\N	\N	95	standard	Performance test record #456. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 cc0a58c6-2086-47dc-b682-0be645e22622	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:46.996+00	2025-08-24 16:14:46.996+00	Dynamic Enterprises	\N	prospect	active	\N	\N	\N	admin@dynamicent.test.org	\N	\N	\N	\N	\N	\N	70	basic	Performance test record #7. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 9d0d2d3f-775d-499f-8c82-e5f2af31461d	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:07.406+00	2025-08-23 14:15:30.746+00	Delta Systems	\N	client	pending	\N	\N	\N	delta@systems.com	\N	\N	\N	\N	\N	\N	67	standard	Not active status	\N	\N	\N	\N	\N	medium
@@ -12213,44 +12235,60 @@ a06b9bb6-dcb2-4c2b-be21-3b46ebbc5b3c	01920000-1000-7000-8000-000000000001	\N	202
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_contracts; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_contract; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_contracts (id, organization_id, created_by, created_at, updated_at, name, description, priority, status, start_date, end_date, owner_id, budget, progress_percentage, project_type, value, contract_type) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_contract (id, organization_id, created_by, created_at, updated_at, name, description, priority, status, start_date, end_date, owner_id, budget, progress_percentage, project_type, value, contract_type) FROM stdin;
 \.
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_discussions; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_data_analytics_report; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_discussions (id, organization_id, created_by, created_at, updated_at, title, content, status, discussion_type, author_id, parent_discussion_id) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_data_analytics_report (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_discussion; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_discussion (id, organization_id, created_by, created_at, updated_at, title, content, status, discussion_type, author_id, parent_discussion_id) FROM stdin;
 bc711997-bfdb-496c-a68b-8ca2fc8bed7e	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:18:53.972	2025-08-23 19:18:53.972	Test Discussion - Collaborative	Testing discussion archetype with org-wide collaborative permissions	open	general	0198b046-c453-72d9-b71a-092e1f75601a	\N
 \.
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_expenses; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_emergency_contact; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_expenses (id, organization_id, created_by, created_at, updated_at, title, content, status, category, author_id, parent_document_id, amount, expense_type, receipt_url, reimbursable) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_emergency_contact (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id) FROM stdin;
 \.
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_files; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_expense; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_files (id, organization_id, created_by, created_at, updated_at, name, file_path, mime_type, size_bytes, status, uploaded_by) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_expense (id, organization_id, created_by, created_at, updated_at, title, content, status, category, author_id, parent_document_id, amount, expense_type, receipt_url, reimbursable) FROM stdin;
+\.
+
+
+--
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_file; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_file (id, organization_id, created_by, created_at, updated_at, name, file_path, mime_type, size_bytes, status, uploaded_by) FROM stdin;
 a56405a4-077c-447c-9ae0-b39a278c5273	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:18:40.994	2025-08-23 19:18:40.994	test-document.pdf	/uploads/test-document.pdf	application/pdf	12345	active	0198b046-c453-72d9-b71a-092e1f75601a
 \.
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_invoices; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_invoices (id, organization_id, created_by, created_at, updated_at, title, content, status, category, author_id, parent_document_id) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_invoice (id, organization_id, created_by, created_at, updated_at, title, content, status, category, author_id, parent_document_id) FROM stdin;
 e8e01470-713c-44f8-aa3f-893fdb3c7780	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:16:00	2025-08-23 19:16:00	Test Invoice - CEO Document	Testing document archetype with owner-only permissions	draft	\N	\N	\N
 40bd1de7-f9a3-43ef-91b8-fa2d251d0d05	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:23:08.737	2025-08-23 19:23:08.737	Manager Invoice	Testing manager creating owner-only document	draft	\N	\N	\N
 f1057a76-f5db-4f5b-802a-0375e6b3c11e	01920000-1000-7000-8000-000000000001	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-08-23 19:24:55.871	2025-08-23 19:24:55.871	Manager Fixed Invoice v2	Testing manager document with fixed created_by field	draft	\N	\N	\N
@@ -12259,10 +12297,10 @@ f1057a76-f5db-4f5b-802a-0375e6b3c11e	01920000-1000-7000-8000-000000000001	0198b0
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_meetings; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_meeting; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_meetings (id, organization_id, created_by, created_at, updated_at, activity_type, description, entity_type, entity_id, actor_id, metadata, duration, location, attendees, meeting_type) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_meeting (id, organization_id, created_by, created_at, updated_at, activity_type, description, entity_type, entity_id, actor_id, metadata, duration, location, attendees, meeting_type) FROM stdin;
 \.
 
 
@@ -12275,10 +12313,10 @@ COPY public.org_01920000_1000_7000_8000_000000000001_morningworkouts (id, organi
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_projects; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_project; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_projects (id, organization_id, created_by, created_at, updated_at, name, description, priority, status, start_date, end_date, owner_id, budget, progress_percentage, project_type) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_project (id, organization_id, created_by, created_at, updated_at, name, description, priority, status, start_date, end_date, owner_id, budget, progress_percentage, project_type) FROM stdin;
 dea1e46d-dcc8-4501-94ea-611de57def0d	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:13:38.265+00	2025-08-23 19:13:38.265+00	Test Project - CEO Created	Testing project permissions with team-based model	medium	planning	\N	\N	\N	\N	0	operational
 f6258267-676c-4a02-a550-4bf25f109ec6	01920000-1000-7000-8000-000000000001	0198d86e-2544-71f8-8188-026e43f726c6	2025-08-23 19:38:12.12+00	2025-08-23 19:38:12.12+00	Member Test Project	Created by member role	medium	planning	\N	\N	\N	\N	0	operational
 cacc9a97-a921-4476-95dc-7e64e273f87d	01920000-1000-7000-8000-000000000001	0198b046-d127-769d-9bc2-8e5824b71b3a	2025-08-23 19:40:40.48+00	2025-08-23 19:40:40.48+00	Guest Access Project	Project for testing guest permissions	medium	planning	\N	\N	\N	\N	0	operational
@@ -12296,10 +12334,18 @@ ddc61642-c77e-42c0-8a25-fa12962cfd6d	01920000-1000-7000-8000-000000000001	\N	202
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_schematestentitys; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_schema_test_entity; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_schematestentitys (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id, test_field) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_schema_test_entity (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id, test_field) FROM stdin;
+\.
+
+
+--
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_security_badge; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_security_badge (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id) FROM stdin;
 \.
 
 
@@ -12312,10 +12358,10 @@ COPY public.org_01920000_1000_7000_8000_000000000001_softdeletetests (id, organi
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_tasks; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_task; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_tasks (id, organization_id, created_by, created_at, updated_at, title, description, priority, status, assignee_id, reporter_id, due_date, estimated_hours, actual_hours, task_type, parent_task_id, project_id, sprint_id, story_points) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_task (id, organization_id, created_by, created_at, updated_at, title, description, priority, status, assignee_id, reporter_id, due_date, estimated_hours, actual_hours, task_type, parent_task_id, project_id, sprint_id, story_points) FROM stdin;
 6f9458dd-0986-4abc-905c-0c3ac96de314	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:22:53.002	2025-08-23 19:22:53.002	Manager Created Task	Testing manager role creating assignment-based task	high	todo	0198b046-d931-7772-a1e8-b63c68c7f43d	\N	\N	\N	\N	feature	\N	\N	\N	\N
 82840242-591a-4115-b230-417f3b9644de	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-24 16:52:57.594	2025-08-24 16:52:57.594	Real-time Sync Test	Testing real-time sync after fix	high	in_progress	\N	\N	\N	\N	\N	bug	\N	\N	\N	\N
 7a6df292-01eb-40b3-852d-36599b59d86e	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-24 16:58:02.747	2025-08-24 16:58:02.747	Live Sync Demo Task #5	Testing real-time WebSocket sync - created via API	medium	active	\N	\N	\N	\N	\N	feature	\N	01920000-1000-7000-8000-000000000002	\N	\N
@@ -12406,10 +12452,10 @@ COPY public.org_01920000_1000_7000_8000_000000000001_testprojects (id, organizat
 
 
 --
--- Data for Name: org_01920000_1000_7000_8000_000000000001_timesheets; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_time_sheet; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.org_01920000_1000_7000_8000_000000000001_timesheets (id, organization_id, created_by, created_at, updated_at, activity_type, description, entity_type, entity_id, actor_id, metadata) FROM stdin;
+COPY public.org_01920000_1000_7000_8000_000000000001_time_sheet (id, organization_id, created_by, created_at, updated_at, activity_type, description, entity_type, entity_id, actor_id, metadata) FROM stdin;
 18e7e162-ee9b-401b-8cea-62e2e3b162a2	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:16:27.643	2025-08-23 19:16:27.643	work_session	Testing activity archetype with org-wide read-only permissions	project	dea1e46d-dcc8-4501-94ea-611de57def0d	\N	\N
 \.
 
@@ -12420,6 +12466,14 @@ COPY public.org_01920000_1000_7000_8000_000000000001_timesheets (id, organizatio
 
 COPY public.org_01920000_1000_7000_8000_000000000001_universes (id, organization_id, created_by, created_at, updated_at, name, description, owner_id) FROM stdin;
 85d2018c-c97f-4b81-b8dc-aefef3d86e0c	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-08-31 16:16:07.099	2025-08-31 16:16:07.099	Alice Universe	Alice CEO Personal Life Operating System	0198b046-c453-72d9-b71a-092e1f75601a
+\.
+
+
+--
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_user_permission_group; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_user_permission_group (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id) FROM stdin;
 \.
 
 
@@ -12890,5 +12944,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PoC3NdmSFUdrQFsJZEnZyl0NUDtdOfB0Q8udd5BEgfXRsWreGUGGoD3gQDHdcFw
+\unrestrict kPPRH28xUsdIPIS6NIYVMvyTM5afulwBuk2OA4jV7FssLrK6aWIU6JdSKqXvxy7
 

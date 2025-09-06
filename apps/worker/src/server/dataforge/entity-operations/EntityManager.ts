@@ -821,7 +821,46 @@ export class DataForgeEntityManager {
     customFields: Record<string, any> = {}
   ): Promise<any> {
     try {
-      console.log(`[DataForgeEntityManager] Creating entity: ${entityName} (${archetype}) for org: ${orgId}`);
+      // Import EntityNameUtils to ensure consistent naming
+      const { EntityNameUtils } = await import('@/lib/entity-name-utils');
+      
+      // Normalize entity name to proper PascalCase while preserving word boundaries
+      // Handle various input formats: "Access Control List", "access-control-list", "AccessControlList"
+      const normalizedEntityName = entityName
+        .replace(/[-_]/g, ' ')  // Convert kebab/snake to spaces
+        .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add space between camelCase words
+        .replace(/\s+/g, ' ')  // Normalize multiple spaces
+        .trim()
+        .split(' ')  // Split into words
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())  // Capitalize each word
+        .join('');  // Join without spaces for PascalCase
+      
+      // For table name, preserve original input to maintain word boundaries
+      // Convert to snake_case directly from original input
+      const tableBaseName = entityName
+        .replace(/([a-z])([A-Z])/g, '$1_$2')  // camelCase to snake_case
+        .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')  // Consecutive capitals
+        .replace(/[\s-]+/g, '_')  // Spaces and hyphens to underscores
+        .toLowerCase()
+        .replace(/_+/g, '_');  // Remove duplicate underscores
+      
+      console.log(`[DataForgeEntityManager] Creating entity: ${normalizedEntityName} (${archetype}) for org: ${orgId}`);
+      
+      // Check if entity with this name already exists (including soft-deleted)
+      const existingEntity = await this.config.kysely
+        .selectFrom('entity_schemas')
+        .select(['entity_name', 'deleted'])
+        .where('org_id', '=', orgId)
+        .where('entity_name', '=', normalizedEntityName)
+        .executeTakeFirst();
+      
+      if (existingEntity) {
+        const status = existingEntity.deleted ? 'soft-deleted' : 'active';
+        return {
+          success: false,
+          errors: [`Entity "${normalizedEntityName}" already exists (${status}). Please choose a different name or permanently delete the existing entity first.`]
+        };
+      }
       
       // Get archetype fields and merge with custom fields
       const archetypeFields = await this.getArchetypeFields(archetype);
@@ -839,8 +878,8 @@ export class DataForgeEntityManager {
       
       const allFields = { ...archetypeFields, ...customFieldDefs };
 
-      // Generate table name using DDLGenerator
-      const fullTableName = DDLGenerator.generateTableName(orgId, entityName);
+      // Generate table name using DDLGenerator with snake_case base name
+      const fullTableName = DDLGenerator.generateTableName(orgId, tableBaseName);
       
       // Validate table name
       const tableValidation = DDLGenerator.validateTableName(fullTableName);
@@ -865,7 +904,7 @@ export class DataForgeEntityManager {
         .insertInto('entity_schemas')
         .values({
           org_id: orgId,
-          entity_name: entityName,
+          entity_name: normalizedEntityName,  // Store normalized PascalCase name
           archetype,
           table_name: fullTableName,
           deleted: false,
@@ -878,7 +917,12 @@ export class DataForgeEntityManager {
       
       return {
         success: true,
-        tableName: fullTableName,
+        data: {
+          entityName: normalizedEntityName,  // Return normalized name
+          tableName: fullTableName,
+          archetype,
+          orgId
+        },
         immediate: true
       };
     } catch (error) {

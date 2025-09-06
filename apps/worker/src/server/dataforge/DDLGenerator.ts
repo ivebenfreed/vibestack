@@ -103,9 +103,13 @@ export class DDLGenerator {
 
   /**
    * Generate organization-specific table name
+   * Expects tableName to already be in snake_case format
+   * Uses consistent snake_case without pluralization for predictability
    */
-  static generateTableName(orgId: string, entityName: string): string {
-    return `org_${orgId.replace(/-/g, '_')}_${entityName.toLowerCase()}s`;
+  static generateTableName(orgId: string, tableName: string): string {
+    // Table name should already be in snake_case format by the caller
+    // Just combine with org prefix
+    return `org_${orgId.replace(/-/g, '_')}_${tableName}`;
   }
 
   /**
