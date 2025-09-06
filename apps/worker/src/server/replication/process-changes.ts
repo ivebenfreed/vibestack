@@ -8,7 +8,7 @@ import { transformWALChangesWithOrg } from './org-aware-process-changes';
 
 // Helper type for WAL change records
 type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
-import { sql, getDBClient } from '../lib/db';
+import { sql } from '../lib/db';
 import { StateManager } from './state-manager';
 
 import { DynamicTableDiscovery } from './dynamic-table-discovery';
@@ -32,8 +32,10 @@ let tableDiscovery: DynamicTableDiscovery | null = null;
 // Initialize dynamic table discovery
 async function getTableDiscovery(env: Env): Promise<DynamicTableDiscovery> {
   if (!tableDiscovery) {
-    const db = getDBClient(env);
-    tableDiscovery = new DynamicTableDiscovery(db, env);
+    // Initialize database connection
+    createDatabaseConnection(env);
+    const kysely = getKysely();
+    tableDiscovery = new DynamicTableDiscovery(kysely, env);
   }
   return tableDiscovery;
 }

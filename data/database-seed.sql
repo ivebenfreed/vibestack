@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fFOFnu30RW1ojEeL8EkU1y0XPy8tNMtswPEbxIVJyDxIWCgsB03cFnu6JlaPOGx
+\restrict BzzlNEQDXv6wzx8yCHBnbQ9xcMlavIGotaoMHZTamkotQQTRnUfKb41YctpAkH4
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -210,7 +210,6 @@ COPY public.org_01920000_1000_7000_8000_000000000001_cleantests (id, organizatio
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_clients (id, organization_id, created_by, created_at, updated_at, name, description, record_type, status, data, parent_record_id, owner_id, email, phone, industry, company_name, contact_person, new_test_field, another_new_field, score, category, notes, test_field, test_field_2, test_field_3, final_test_field, test_cache_refresh, priority) FROM stdin;
-a06b9bb6-dcb2-4c2b-be21-3b46ebbc5b3c	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:45.386+00	2025-08-24 16:14:45.386+00	Tech Co	\N	prospect	inactive	\N	\N	\N	office@techco.demo.net	\N	\N	\N	\N	\N	\N	68	basic	Performance test record #5. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 e93c1317-471c-46db-9310-268db257e4bc	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:07.793+00	2025-08-23 14:15:11.307+00	Echo Enterprises	\N	client	active	\N	\N	\N	echo@enterprises.com	\N	\N	\N	\N	\N	\N	78	premium	Name starts with Echo	\N	\N	\N	\N	\N	medium
 1fdedf81-aaad-4fde-ab02-5717f9fce085	01920000-1000-7000-8000-000000000001	\N	2025-08-23 14:13:06.777+00	2025-08-23 14:15:30.746+00	Bob Industries	\N	client	inactive	\N	\N	\N	bob@industries.com	\N	\N	\N	\N	\N	\N	42	standard	Not active status	\N	\N	\N	\N	\N	medium
 3046cf56-1ef9-4bbc-bbc7-3845c29d0323	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:46.885+00	2025-08-24 16:14:46.885+00	Dynamic Tech Solutions	\N	customer	active	\N	\N	\N	support@dynamictec.mockdata.io	\N	\N	\N	\N	\N	\N	42	premium	Performance test record #457. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
@@ -11920,6 +11919,7 @@ e769ef10-172c-44c1-8e3f-2a737f887e22	01920000-1000-7000-8000-000000000001	\N	202
 abb4506d-48e8-467d-bdfe-80f804139898	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:41:56.986+00	2025-08-24 16:41:56.986+00	TechCorp 4016	\N	client	pending	\N	\N	\N	user4016@techcorp.com	\N	\N	\N	\N	\N	\N	17	basic	Bulk record 4016 - high-performance test	\N	\N	\N	\N	\N	medium
 ef482b51-c2d6-4e58-9afe-46b17bba5373	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:41:57.873+00	2025-08-24 16:41:57.873+00	DataSystems 4017	\N	customer	active	\N	\N	\N	user4017@datasystems.com	\N	\N	\N	\N	\N	\N	18	premium	Bulk record 4017 - high-performance test	\N	\N	\N	\N	\N	medium
 531f6031-ea2b-4857-9d88-f72ac6c50be8	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:41:58.663+00	2025-08-24 16:41:58.663+00	CloudSolutions 4018	\N	prospect	inactive	\N	\N	\N	user4018@cloudsolutions.com	\N	\N	\N	\N	\N	\N	19	standard	Bulk record 4018 - high-performance test	\N	\N	\N	\N	\N	medium
+7604eaf4-b5b7-437d-aa3c-d2ed3db4187a	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-06 00:32:30.842+00	2025-09-06 00:32:30.843+00	Test Client API	\N	client	draft	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	medium
 48417d47-9980-4818-8326-9a9a6024797b	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:41:59.5+00	2025-08-24 16:41:59.5+00	DigitalWorks 4019	\N	lead	pending	\N	\N	\N	user4019@digitalworks.com	\N	\N	\N	\N	\N	\N	20	basic	Bulk record 4019 - high-performance test	\N	\N	\N	\N	\N	medium
 a2e4a8c7-5a12-4dc2-8d66-0a21b17641e6	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:42:00.338+00	2025-08-24 16:42:00.338+00	SmartTech 4020	\N	client	active	\N	\N	\N	user4020@smarttech.com	\N	\N	\N	\N	\N	\N	21	premium	Bulk record 4020 - high-performance test	\N	\N	\N	\N	\N	medium
 5911ff46-fab6-4482-b3c6-afd8cdf04624	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:42:01.277+00	2025-08-24 16:42:01.277+00	GlobalInc 4021	\N	customer	inactive	\N	\N	\N	user4021@globalinc.com	\N	\N	\N	\N	\N	\N	22	standard	Bulk record 4021 - high-performance test	\N	\N	\N	\N	\N	medium
@@ -11993,6 +11993,7 @@ b88af45e-c478-4ab1-ae25-b9685539054c	01920000-1000-7000-8000-000000000001	\N	202
 8f62f2b0-7b44-4390-a551-ba6be0c7fb85	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:43:16.198+00	2025-08-24 16:43:16.198+00	TechCorp 4088	\N	client	pending	\N	\N	\N	user4088@techcorp.com	\N	\N	\N	\N	\N	\N	89	basic	Bulk record 4088 - high-performance test	\N	\N	\N	\N	\N	medium
 04047b39-44d6-4f41-aed8-b879de0a6312	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:43:16.923+00	2025-08-24 16:43:16.923+00	DataSystems 4089	\N	customer	active	\N	\N	\N	user4089@datasystems.com	\N	\N	\N	\N	\N	\N	90	premium	Bulk record 4089 - high-performance test	\N	\N	\N	\N	\N	medium
 2e6ee792-171f-4451-944e-dc72ea1f6177	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:43:17.576+00	2025-08-24 16:43:17.576+00	CloudSolutions 4090	\N	prospect	inactive	\N	\N	\N	user4090@cloudsolutions.com	\N	\N	\N	\N	\N	\N	91	standard	Bulk record 4090 - high-performance test	\N	\N	\N	\N	\N	medium
+23eb78c6-dc42-42cf-992f-95925b429b5b	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-06 00:51:40.804+00	2025-09-06 00:51:40.804+00	Test Client	\N	client	active	\N	\N	\N	test@example.com	\N	\N	Test Company	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	medium
 5b408e23-be0c-4875-81a4-4e9c07362645	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:43:18.123+00	2025-08-24 16:43:18.123+00	DigitalWorks 4091	\N	lead	pending	\N	\N	\N	user4091@digitalworks.com	\N	\N	\N	\N	\N	\N	92	basic	Bulk record 4091 - high-performance test	\N	\N	\N	\N	\N	medium
 549fd2c0-f899-48d1-90d0-8b3f1391ed7a	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:43:18.779+00	2025-08-24 16:43:18.779+00	SmartTech 4092	\N	client	active	\N	\N	\N	user4092@smarttech.com	\N	\N	\N	\N	\N	\N	93	premium	Bulk record 4092 - high-performance test	\N	\N	\N	\N	\N	medium
 0645f070-15d4-4da9-ab3b-e91a63a6b388	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:43:19.304+00	2025-08-24 16:43:19.304+00	GlobalInc 4093	\N	customer	inactive	\N	\N	\N	user4093@globalinc.com	\N	\N	\N	\N	\N	\N	94	standard	Bulk record 4093 - high-performance test	\N	\N	\N	\N	\N	medium
@@ -12207,6 +12208,7 @@ c3f8b52f-822d-4c27-942f-258186eab189	01920000-1000-7000-8000-000000000001	\N	202
 134496e3-9ed6-4ebb-a46c-542cbdcd1fff	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:38:28.576+00	2025-09-03 02:13:04.114+00	TechCorp 3776	\N	client	pending	\N	\N	\N	user3776@techcorp.com	\N	\N	\N	\N	\N	\N	77	basic	Bulk record 3776 - high-performance test	\N	\N	\N	\N	\N	critical
 23ffd44c-dba4-48df-8873-f5ad2848d3d1	01920000-1000-7000-8000-000000000001	\N	2025-08-24 13:55:44.918+00	2025-09-03 22:47:58.92+00	Global Nova Co	\N	prospect	inactive	\N	\N	\N	info@globalnova.example.com	\N	\N	\N	\N	\N	\N	54	premium	Performance test record #30. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 000a4778-83b4-4b6e-8158-79933ac3e090	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:39:59.556+00	2025-09-03 22:59:16.534+00	FastCorp 11903 - SURGICAL TEST ON VISIBLE ROW	Bulk inserted record 11903 for performance testing	lead	pending	\N	\N	\N	contact11903@fastcorp.com	+1-555-12903	Manufacturing	TESTING FIELD MAPPING FIX	Contact Person 11903	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	medium
+a06b9bb6-dcb2-4c2b-be21-3b46ebbc5b3c	01920000-1000-7000-8000-000000000001	\N	2025-08-24 16:14:45.386+00	2025-09-06 00:22:22.106+00	4	\N	prospect	on_hold	\N	\N	\N	office@techco.demo.net	\N	\N	\N	\N	\N	\N	68	basic	Performance test record #5. Generated for UltraTable testing.	\N	\N	\N	\N	\N	medium
 \.
 
 
@@ -12887,5 +12889,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fFOFnu30RW1ojEeL8EkU1y0XPy8tNMtswPEbxIVJyDxIWCgsB03cFnu6JlaPOGx
+\unrestrict BzzlNEQDXv6wzx8yCHBnbQ9xcMlavIGotaoMHZTamkotQQTRnUfKb41YctpAkH4
 

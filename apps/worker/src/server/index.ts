@@ -40,21 +40,35 @@ const apiApp = new OpenAPIHono<AppBindings>().basePath('/api');
 // Add Hono's CORS middleware FIRST
 apiApp.use('*', cors({
   origin: (origin, c) => {
-    // Get dynamic web port from environment
-    const webPort = c.env.WEB_PORT || '5173';
-    console.log(`[CORS DEBUG] WEB_PORT from env: ${c.env.WEB_PORT}, using: ${webPort}, checking origin: ${origin}`);
+    // For unified worker architecture, the frontend and backend run on the same port
+    const isDev = c.env.ENVIRONMENT === 'development' || !c.env.ENVIRONMENT;
+    console.log(`[CORS DEBUG] Environment: ${c.env.ENVIRONMENT}, checking origin: ${origin}`);
     
-    // Build allowed origins dynamically
-    const allowedOrigins = [
-      `https://127.0.0.1:${webPort}`, 
-      `http://127.0.0.1:${webPort}`, 
-      `http://localhost:${webPort}`,
-      'https://dev.codevibesmatter.com',
-      'https://app.codevibesmatter.com'
-    ];
+    // Build allowed origins based on environment
+    const allowedOrigins = [];
+    
+    if (isDev) {
+      // In development, allow common localhost ports for unified worker architecture
+      allowedOrigins.push(
+        'http://localhost:4000',  // Default unified worker port
+        'http://localhost:5173',  // Legacy Vite dev server port
+        'http://localhost:5174',  // Alternative Vite port
+        'http://localhost:5175',  // Alternative Vite port
+        'http://127.0.0.1:4000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5175'
+      );
+    } else {
+      // Production origins
+      allowedOrigins.push(
+        'https://dev.codevibesmatter.com',
+        'https://app.codevibesmatter.com'
+      );
+    }
     
     if (!origin) {
-      // For requests without origin, we return null to avoid setting the header
+      // For same-origin requests (unified worker), allow null origin
       return null;
     }
     

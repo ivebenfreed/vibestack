@@ -1,7 +1,8 @@
 import type { DurableObjectState } from '../types/cloudflare';
 import type { MinimalContext } from '../types/hono';
 import { syncLogger } from '../middleware/logger';
-import { getDBClient, sql } from '../lib/db';
+import { sql } from '../lib/db';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 import type { InitialSyncState } from './types';
 import { compareLSN } from '../lib/sync-common';
 

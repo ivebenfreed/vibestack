@@ -32,7 +32,7 @@ import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
 import type { WebSocketHandler } from './types';
 import { compareLSN, deduplicateChanges } from '../lib/sync-common';
-import { getDBClient } from '../lib/db';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 const MODULE_NAME = 'SyncDO';
 
