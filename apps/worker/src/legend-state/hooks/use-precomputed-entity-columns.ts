@@ -18,11 +18,13 @@ const entityColumnsCache = new Map<string, any>()
 function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[] {
   const columns: Column<T>[] = []
   
-  // Support both schema.fields and schema.businessMetadata.fields
-  const schemaFields = schema?.fields || schema?.businessMetadata?.fields
+  // Support multiple schema field structures
+  // Priority: syncableFields (from schema client) > fields > businessMetadata.fields
+  const schemaFields = schema?.syncableFields || schema?.fields || schema?.businessMetadata?.fields
   
   // If we have schema fields, use them to generate columns
-  if (schemaFields && Array.isArray(schemaFields)) {
+  // Schema fields can be either an array or an object
+  if (schemaFields && (Array.isArray(schemaFields) || typeof schemaFields === 'object')) {
     // Add ID column first (always present but not in schema fields)
     columns.push({
       id: 'id',
@@ -33,8 +35,16 @@ function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[]
       editable: false
     })
     
+    // Convert to array format if it's an object
+    const fieldsArray = Array.isArray(schemaFields) 
+      ? schemaFields 
+      : Object.entries(schemaFields).map(([name, def]: [string, any]) => ({ 
+          name, 
+          ...(typeof def === 'object' ? def : { type: def })
+        }))
+    
     // Generate columns from schema fields
-    schemaFields.forEach((fieldDef: any) => {
+    fieldsArray.forEach((fieldDef: any) => {
       const fieldName = fieldDef.name
       
       // Skip system fields that we handle separately
