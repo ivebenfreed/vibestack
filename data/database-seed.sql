@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BzzlNEQDXv6wzx8yCHBnbQ9xcMlavIGotaoMHZTamkotQQTRnUfKb41YctpAkH4
+\restrict aWwObTjn0Po9EyFiPtTFsn9CnoVYTybwOdkfzFnhRCwbk9hhubmt5dUGCo6ir1i
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -12254,6 +12254,7 @@ COPY public.org_01920000_1000_7000_8000_000000000001_invoices (id, organization_
 e8e01470-713c-44f8-aa3f-893fdb3c7780	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:16:00	2025-08-23 19:16:00	Test Invoice - CEO Document	Testing document archetype with owner-only permissions	draft	\N	\N	\N
 40bd1de7-f9a3-43ef-91b8-fa2d251d0d05	01920000-1000-7000-8000-000000000001	\N	2025-08-23 19:23:08.737	2025-08-23 19:23:08.737	Manager Invoice	Testing manager creating owner-only document	draft	\N	\N	\N
 f1057a76-f5db-4f5b-802a-0375e6b3c11e	01920000-1000-7000-8000-000000000001	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-08-23 19:24:55.871	2025-08-23 19:24:55.871	Manager Fixed Invoice v2	Testing manager document with fixed created_by field	draft	\N	\N	\N
+1de0c7d6-b782-441c-9dc1-b9d1e198755b	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-06 01:00:10.724	2025-09-06 01:00:10.724	Test Invoice	Invoice content	draft	\N	\N	\N
 \.
 
 
@@ -12889,5 +12890,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BzzlNEQDXv6wzx8yCHBnbQ9xcMlavIGotaoMHZTamkotQQTRnUfKb41YctpAkH4
+\unrestrict aWwObTjn0Po9EyFiPtTFsn9CnoVYTybwOdkfzFnhRCwbk9hhubmt5dUGCo6ir1i
 

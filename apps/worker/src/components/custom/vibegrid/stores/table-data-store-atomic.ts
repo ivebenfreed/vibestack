@@ -972,15 +972,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     });
   }
   
-  // Debug test - let's see if getUniverseEntity$ exists
-  if (isOrgPrefixed) {
-    log.info('📊 TableStore: DEBUG - About to call getUniverseEntity$ with:', entityTableName);
-    if (typeof getUniverseEntity$ === 'function') {
-      log.info('📊 TableStore: DEBUG - getUniverseEntity$ is a function, calling it...');
-    } else {
-      log.error('📊 TableStore: DEBUG - getUniverseEntity$ is NOT a function!', typeof getUniverseEntity$);
-    }
-  }
+  // Check if getUniverseEntity$ is available (debug logging removed)
   
   const entity$ = getEntity$(entityTableName);
   
@@ -989,16 +981,23 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     
     // Wait for entity observable to be ready instead of returning empty data
     return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 50; // Max 5 seconds (50 * 100ms)
+      
       const checkReady = () => {
+        attempts++;
         const entity$ = getEntity$(entityTableName);
         
         if (entity$) {
-          log.info('📊 TableStore: Entity observable is now ready for', entityTableName);
-          // Recursively call loadInitialData now that entity is ready
+          // Entity observable is now ready
           loadInitialData(entityType, columns, page).then(resolve);
+        } else if (attempts >= maxAttempts) {
+          // Give up after max attempts
+          log.warn('📊 TableStore: Timeout waiting for entity observable:', entityTableName);
+          resolve({ entities: {}, relationships: {}, pagination: null });
         } else {
-          // Check again in next frame
-          requestAnimationFrame(checkReady);
+          // Check again after a delay (100ms instead of every frame)
+          setTimeout(checkReady, 100);
         }
       };
       checkReady();
@@ -1037,11 +1036,11 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
               loadInitialData(entityType, columns, page).then(resolve);
             } else {
               // Check again in next frame
-              requestAnimationFrame(checkDataReady);
+              setTimeout(checkDataReady, 100);
             }
           } catch (error) {
             // If there's an error, try again
-            requestAnimationFrame(checkDataReady);
+            setTimeout(checkDataReady, 100);
           }
         };
         // Give it a moment for initial load, then start checking
