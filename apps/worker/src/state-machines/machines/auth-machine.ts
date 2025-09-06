@@ -92,8 +92,9 @@ export const authMachine = setup({
       
       // For now, just return a mock personal org
       // In production, this would call the API to create the org
+      // Personal orgs use the user ID directly as the organization ID
       const personalOrg = {
-        id: `personal-${input.userId}`,
+        id: input.userId,
         name: 'Personal Workspace',
         slug: `personal-${input.userId}`,
         type: 'personal' as const,

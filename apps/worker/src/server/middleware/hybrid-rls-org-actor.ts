@@ -71,11 +71,17 @@ async function setPostgreSQLContext(
   env: any
 ): Promise<void> {
   try {
+    // Handle personal organization IDs by stripping the "personal-" prefix
+    // PostgreSQL expects a UUID, not a string with prefix
+    const cleanOrgId = organizationId.startsWith('personal-') 
+      ? organizationId.replace('personal-', '') 
+      : organizationId;
+    
     // Create fresh database connection for this request context to avoid I/O sharing
     await withKysely(async (database) => {
       // Set simplified RLS context (no role needed)
       // Use sql template with proper parameterized query
-      await sql`select set_simplified_rls_context(${organizationId}, ${userId}) as result limit 1`.execute(database);
+      await sql`select set_simplified_rls_context(${cleanOrgId}, ${userId}) as result limit 1`.execute(database);
     });
     
     syncLogger.debug('PostgreSQL RLS context set', {

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict oAEHuph5VMnLw0qoxPkcaHyKlrUAqfOb43n1AKzBF9ziP8htpmU6yNAK5ZViJ1s
+\restrict e6OpFk7h8M2YM2k9ygcyKZeLPvhK3sfvaFWFDzBatd0i5bikqfBGv7Yta63EHSa
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -50,8 +50,8 @@ COPY public."user" (id, name, email, "emailVerified", image, role, "createdAt", 
 0198b059-5fbf-7da1-aeda-3ad0c3c3eb0e	Support Agent	support@polytest.com	t	\N	user	2025-08-16 00:48:23.998+00	2025-08-16 00:48:23.998+00	\N	\N	\N	\N	01920000-2000-7000-8000-000000000002	fdb6bff8-e11e-4a98-a5f8-4a8531386701	2025-09-01 11:54:50.100666+00
 0198b059-64c9-7c4f-87be-5b1a3704f1c3	Read Only User	readonly@polytest.com	t	\N	user	2025-08-16 00:48:25.289+00	2025-08-16 00:48:25.289+00	\N	\N	\N	\N	01920000-2000-7000-8000-000000000002	8b525929-c8f5-4056-b343-1f85f70e34d2	2025-09-01 11:54:50.100666+00
 0198d86e-3ed0-7bf2-9317-674ef372c7db	Kate Viewer	viewer@widecorp.com	t	\N	user	2025-08-23 19:36:00.463+00	2025-08-23 19:36:00.463+00	\N	\N	\N	\N	01920000-1000-7000-8000-000000000001	75209771-bdad-4eda-96ab-fb14803668db	2025-09-01 11:54:50.100666+00
-0198b046-c453-72d9-b71a-092e1f75601a	Alice CEO	ceo@widecorp.com	t	\N	admin	2025-08-16 00:28:04.561+00	2025-08-17 12:55:09.020964+00	\N	\N	\N	$2b$12$RZX/uFINTrCFCSlAn33JDumVcEb2KdvsXwuB0flwHBwTo/lBx.2mC	01920000-2000-7000-8000-000000000002	56389312-ddb8-4143-8061-d8a357ebca0c	2025-09-01 11:54:50.100666+00
 0198b046-d127-769d-9bc2-8e5824b71b3a	Bob CTO	cto@widecorp.com	t	\N	admin	2025-08-16 00:28:07.847+00	2025-08-17 12:55:09.418718+00	\N	\N	\N	$2b$12$GDPdRpqlTyZolhv.m0jQIuRJgAPBYpKLVQnH2hP4F6Wh8aluRFOuC	01920000-1000-7000-8000-000000000001	81a82bbb-5544-4a9b-8215-5174887e224a	2025-09-01 11:54:50.100666+00
+0198b046-c453-72d9-b71a-092e1f75601a	Alice CEO	ceo@widecorp.com	t	\N	admin	2025-08-16 00:28:04.561+00	2025-08-17 12:55:09.020964+00	\N	\N	\N	$2b$12$RZX/uFINTrCFCSlAn33JDumVcEb2KdvsXwuB0flwHBwTo/lBx.2mC	01920000-2000-7000-8000-000000000002	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-06 18:29:00.5756+00
 \.
 
 
@@ -12703,8 +12703,8 @@ eeb713e6-e94a-435e-a66a-41443d8658bf	System Admin's Personal Workspace	personal-
 fdb6bff8-e11e-4a98-a5f8-4a8531386701	Support Agent's Personal Workspace	personal-0198b059-5fbf-7da1-aeda-3ad0c3c3eb0e	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198b059-5fbf-7da1-aeda-3ad0c3c3eb0e	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
 8b525929-c8f5-4056-b343-1f85f70e34d2	Read Only User's Personal Workspace	personal-0198b059-64c9-7c4f-87be-5b1a3704f1c3	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198b059-64c9-7c4f-87be-5b1a3704f1c3	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
 75209771-bdad-4eda-96ab-fb14803668db	Kate Viewer's Personal Workspace	personal-0198d86e-3ed0-7bf2-9317-674ef372c7db	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198d86e-3ed0-7bf2-9317-674ef372c7db	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
-56389312-ddb8-4143-8061-d8a357ebca0c	Alice CEO's Personal Workspace	personal-0198b046-c453-72d9-b71a-092e1f75601a	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198b046-c453-72d9-b71a-092e1f75601a	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
 81a82bbb-5544-4a9b-8215-5174887e224a	Bob CTO's Personal Workspace	personal-0198b046-d127-769d-9bc2-8e5824b71b3a	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198b046-d127-769d-9bc2-8e5824b71b3a	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
+0198b046-c453-72d9-b71a-092e1f75601a	Alice CEO's Personal Workspace	personal-alice-ceo	2025-09-06 18:28:51.609504+00	2025-09-06 18:28:51.609504+00	{}	personal	0198b046-c453-72d9-b71a-092e1f75601a	f	\N	[]
 \.
 
 
@@ -12750,8 +12750,8 @@ b7072742-93b0-4cb8-9ecb-4121e805330f	92d66d2b-726b-45f4-949e-25c29a0f8642	0198b0
 98753831-4083-4bdc-8991-782b0e2bf04d	fdb6bff8-e11e-4a98-a5f8-4a8531386701	0198b059-5fbf-7da1-aeda-3ad0c3c3eb0e	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
 feadfeb3-7da7-46d4-a8c2-d6205ce6fb95	8b525929-c8f5-4056-b343-1f85f70e34d2	0198b059-64c9-7c4f-87be-5b1a3704f1c3	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
 9e584ea0-4a53-436a-a2da-4ec9fbcb9f84	75209771-bdad-4eda-96ab-fb14803668db	0198d86e-3ed0-7bf2-9317-674ef372c7db	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
-818e59c9-763d-43e5-b842-00357f5406ca	56389312-ddb8-4143-8061-d8a357ebca0c	0198b046-c453-72d9-b71a-092e1f75601a	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
 8958d8e9-ce1b-4b9b-ab0c-84387cf17f65	81a82bbb-5544-4a9b-8215-5174887e224a	0198b046-d127-769d-9bc2-8e5824b71b3a	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
+4cab1c13-8405-4342-ae9e-7c37b1adf118	0198b046-c453-72d9-b71a-092e1f75601a	0198b046-c453-72d9-b71a-092e1f75601a	owner	2025-09-06 18:29:00.5756+00	2025-09-06 18:29:00.5756+00
 \.
 
 
@@ -12782,8 +12782,6 @@ COPY public.teams (id, organization_id, name, description, parent_team_id, team_
 COPY public.projects (id, organization_id, team_id, name, description, status, priority, project_type, start_date, target_completion_date, actual_completion_date, created_by, project_lead_id, created_at, updated_at) FROM stdin;
 01920000-1003-7003-8003-000000000003	01920000-1000-7000-8000-000000000001	01920000-1002-7002-8002-000000000001	Client Project Alpha	Web development project for Client A	active	high	internal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:07:11.514655	2025-09-01 01:07:11.514655
 01920000-1003-7003-8003-000000000004	01920000-1000-7000-8000-000000000001	01920000-1002-7002-8002-000000000002	Sales Pipeline Q4	Q4 sales targets and client outreach	active	critical	internal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:07:11.514655	2025-09-01 01:07:11.514655
-01920000-1003-7003-8003-000000000001	56389312-ddb8-4143-8061-d8a357ebca0c	\N	My Development Projects	Personal development projects and tools	active	high	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:07:11.514655	2025-09-01 01:07:11.514655
-01920000-1003-7003-8003-000000000002	56389312-ddb8-4143-8061-d8a357ebca0c	\N	Learning Resources	Technical books, courses, and tutorials	active	medium	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:07:11.514655	2025-09-01 01:07:11.514655
 01920000-1003-7003-8003-000000000020	01920000-1000-7000-8000-000000000001	01920000-1002-7002-8002-000000000013	Mobile App Development	iOS and Android app development for core platform	active	critical	internal	\N	\N	\N	01980000-2000-4000-8000-000000000017	\N	2025-09-01 01:28:53.301234	2025-09-01 01:28:53.301234
 01920000-1003-7003-8003-000000000021	01920000-1000-7000-8000-000000000001	01920000-1002-7002-8002-000000000014	API Infrastructure	Core API services, microservices architecture	active	critical	internal	\N	\N	\N	01980000-2000-4000-8000-000000000017	\N	2025-09-01 01:28:53.301234	2025-09-01 01:28:53.301234
 01920000-1003-7003-8003-000000000022	01920000-1000-7000-8000-000000000001	01920000-1002-7002-8002-000000000015	Cloud Infrastructure	AWS/Azure deployment, monitoring, and scaling	active	high	internal	\N	\N	\N	01980000-2000-4000-8000-000000000017	\N	2025-09-01 01:28:53.301234	2025-09-01 01:28:53.301234
@@ -12806,11 +12804,6 @@ COPY public.projects (id, organization_id, team_id, name, description, status, p
 01920000-1003-7003-8003-000000000071	01920000-1000-7000-8000-000000000001	01920000-1002-7002-8002-000000000017	Customer Success Metrics	NPS tracking, churn analysis, success playbooks	active	high	personal	\N	\N	\N	01980000-2000-4000-8000-000000000016	\N	2025-09-01 01:28:53.303557	2025-09-01 01:28:53.303557
 9490f5f8-a198-4f0a-8825-323ac7806d34	01920000-1000-7000-8000-000000000001	\N	Innovation Lab	Experimental projects and R&D initiatives	active	medium	internal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:36:22.254	2025-09-01 01:36:22.254
 5c4ae277-a876-4a1d-b778-e2a1aa05df20	01920000-1000-7000-8000-000000000001	\N	Client Onboarding Process	Streamlined client onboarding workflows and documentation	active	high	client_work	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:37:03.386	2025-09-01 01:37:03.386
-c02da654-a01f-4cbf-a7b2-2f43894fcc8d	56389312-ddb8-4143-8061-d8a357ebca0c	\N	Personal Fitness Journey	Track personal health and fitness goals	active	medium	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:18:51.258	2025-09-01 01:18:51.258
-01920000-1003-7003-8003-000000000050	56389312-ddb8-4143-8061-d8a357ebca0c	\N	Executive Leadership Development	CEO coaching, leadership books, strategic planning	active	high	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:28:53.303557	2025-09-01 01:28:53.303557
-01920000-1003-7003-8003-000000000051	56389312-ddb8-4143-8061-d8a357ebca0c	\N	Board Meeting Preparation	Quarterly board reports, investor relations, metrics	active	critical	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:28:53.303557	2025-09-01 01:28:53.303557
-01920000-1003-7003-8003-000000000052	56389312-ddb8-4143-8061-d8a357ebca0c	\N	Industry Research & Networking	Conference planning, competitor analysis, partnerships	active	medium	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:28:53.303557	2025-09-01 01:28:53.303557
-e68d0914-eb95-4437-878f-3b44e14175c0	56389312-ddb8-4143-8061-d8a357ebca0c	\N	CEO Strategic Planning	Long-term strategic planning and industry analysis	active	critical	personal	\N	\N	\N	0198b046-c453-72d9-b71a-092e1f75601a	\N	2025-09-01 01:36:31.133	2025-09-01 01:36:31.133
 \.
 
 
@@ -13003,5 +12996,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict oAEHuph5VMnLw0qoxPkcaHyKlrUAqfOb43n1AKzBF9ziP8htpmU6yNAK5ZViJ1s
+\unrestrict e6OpFk7h8M2YM2k9ygcyKZeLPvhK3sfvaFWFDzBatd0i5bikqfBGv7Yta63EHSa
 

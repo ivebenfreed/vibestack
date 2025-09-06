@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { observer } from '@legendapp/state/react'
-import { entityGroups$, createEntityGroups, currentOrganizations$, universeHelpers } from '@/legend-state'
+import { createEntityGroups } from '@/legend-state'
 import { use$ } from '@legendapp/state/react'
 import { 
   Home, 
@@ -215,8 +215,19 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
   isCollapsed: boolean
   onEnterOrg: (orgId: string) => void
 }) {
-  const organizations = use$(currentOrganizations$)
+  const { userOrganizations } = useAuth()
   const location = useLocation()
+
+  // Transform userOrganizations to match the expected format
+  const organizations = userOrganizations.map(org => ({
+    info: {
+      id: org.id,
+      name: org.name,
+      slug: org.slug || '',
+      type: org.type || 'business',
+      role: org.role || 'member'
+    }
+  }))
 
   const universeNavItems = [
     { id: 'universe-dashboard', label: 'Universe Dashboard', icon: Globe, href: '/universe' },
@@ -326,13 +337,13 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
   isCollapsed: boolean
   onBackToUniverse: () => void
 }) {
-  const allOrganizations = use$(currentOrganizations$)
+  const { userOrganizations } = useAuth()
   // Create organization-specific entity groups
   const orgEntityGroups$ = React.useMemo(() => createEntityGroups(orgId), [orgId])
   const entityNavGroups = use$(orgEntityGroups$)
   const location = useLocation()
 
-  const currentOrg = allOrganizations.find(org => org.info.id === orgId)
+  const currentOrg = userOrganizations.find(org => org.id === orgId)
   if (!currentOrg) {
     return <div className="p-4 text-sm text-muted-foreground">Organization not found</div>
   }
@@ -376,7 +387,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {currentOrg.info.name} Dashboard
+              {currentOrg.name} Dashboard
             </TooltipContent>
           </Tooltip>
         </div>
@@ -400,7 +411,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
           </Button>
           <ChevronRight className="h-3 w-3 text-muted-foreground" />
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium truncate">{currentOrg.info.name}</span>
+            <span className="text-sm font-medium truncate">{currentOrg.name}</span>
             <span className="text-xs text-muted-foreground truncate">Organization</span>
           </div>
         </div>
@@ -422,7 +433,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
           )}
         >
           <BarChart3 className="h-4 w-4" />
-          <span className="truncate">{currentOrg.info.name} Overview</span>
+          <span className="truncate">{currentOrg.name} Overview</span>
         </Link>
       </div>
 
