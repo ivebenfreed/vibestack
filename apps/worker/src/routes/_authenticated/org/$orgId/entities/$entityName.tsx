@@ -12,6 +12,7 @@ import {
 import { useEffect } from 'react'
 import * as React from 'react'
 import { z } from 'zod'
+import { EntityNameUtils } from '@/lib/entity-name-utils'
 
 const orgEntityRouteSchema = z.object({
   orgId: z.string(),
@@ -63,50 +64,17 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   const actualEntityKey = React.useMemo(() => {
     console.log('🔍 [actualEntityKey] Input:', { entityName, orgId })
     
-    // Normalize entity name (handle plural/singular and case variations)
-    const normalizeEntityName = (name: string): string => {
-      // Handle plural to singular mapping
-      const pluralToSingular: Record<string, string> = {
-        'clients': 'Client',
-        'tasks': 'Task', 
-        'projects': 'Project',
-        'meetings': 'Meeting',
-        'contracts': 'Contract',
-        'invoices': 'Invoice',
-        'expenses': 'Expense',
-        'files': 'File',
-        'discussions': 'Discussion',
-        'timesheets': 'Timesheet'
-      }
-      
-      const lowerName = name.toLowerCase()
-      console.log('🔍 [normalizeEntityName] Processing:', { originalName: name, lowerName, mapped: pluralToSingular[lowerName] })
-      
-      if (pluralToSingular[lowerName]) {
-        return pluralToSingular[lowerName]
-      }
-      
-      // Capitalize first letter for singular forms
-      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
-      console.log('🔍 [normalizeEntityName] Capitalized fallback:', { original: name, result: capitalized })
-      return capitalized
-    }
+    // Use centralized entity name utilities
+    const normalizedEntityName = EntityNameUtils.fromUrlFormat(entityName)
+    const result = EntityNameUtils.ensureOrgPrefix(normalizedEntityName, orgId)
     
-    // Check if the entityName already contains the orgId prefix
-    if (entityName.startsWith(`${orgId}_`)) {
-      // Already prefixed - normalize the entity part
-      const entityPart = entityName.substring(orgId.length + 1)
-      const normalizedEntityPart = normalizeEntityName(entityPart)
-      const result = `${orgId}_${normalizedEntityPart}`
-      console.log('🔍 [actualEntityKey] Already prefixed path:', { entityPart, normalizedEntityPart, result })
-      return result
-    } else {
-      // Not prefixed, normalize and add the org prefix
-      const normalizedEntityName = normalizeEntityName(entityName)
-      const result = `${orgId}_${normalizedEntityName}`
-      console.log('🔍 [actualEntityKey] Not prefixed path:', { entityName, normalizedEntityName, result })
-      return result
-    }
+    console.log('🔍 [actualEntityKey] Normalized:', { 
+      input: entityName, 
+      normalized: normalizedEntityName, 
+      result 
+    })
+    
+    return result
   }, [entityName, orgId])
   
   // ✅ SIMPLIFIED: Let the VibeGrid atomic bridge handle all data loading
@@ -116,32 +84,8 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   const entitySchema = React.useMemo(() => {
     if (!schema?.entities) return null
     
-    // Normalize entity name for schema lookup (display schema has "Client", not "clients")
-    const normalizeEntityName = (name: string): string => {
-      // Handle plural to singular mapping
-      const pluralToSingular: Record<string, string> = {
-        'clients': 'Client',
-        'tasks': 'Task', 
-        'projects': 'Project',
-        'meetings': 'Meeting',
-        'contracts': 'Contract',
-        'invoices': 'Invoice',
-        'expenses': 'Expense',
-        'files': 'File',
-        'discussions': 'Discussion',
-        'timesheets': 'Timesheet'
-      }
-      
-      const lowerName = name.toLowerCase()
-      if (pluralToSingular[lowerName]) {
-        return pluralToSingular[lowerName]
-      }
-      
-      // Capitalize first letter for singular forms
-      return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
-    }
-    
-    const normalizedEntityName = normalizeEntityName(entityName)
+    // Use centralized entity name utilities for consistent normalization
+    const normalizedEntityName = EntityNameUtils.fromUrlFormat(entityName)
     console.log('🔍 [EntitySchema] Schema lookup debug:', {
       entityName,
       normalizedEntityName,

@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { VibeGrid } from '@/components/custom/vibegrid'
 import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
 import { entityOperations } from '@/legend-state'
+import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { 
   Plus, 
   Settings, 
@@ -61,21 +62,8 @@ export function UniversalEntityPage({
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Extract clean display name from entity name (remove org prefix if present)
-  const displayName = (() => {
-    // If entityName contains org prefix (UUID format), extract the clean name
-    if (entityName.includes('_')) {
-      const parts = entityName.split('_');
-      // Check if first part looks like a UUID (36 chars with dashes)
-      if (parts[0].length === 36 && parts[0].includes('-')) {
-        // Return everything after the UUID prefix, capitalized
-        const cleanName = parts.slice(1).join('_');
-        return cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-      }
-    }
-    // Otherwise return as-is, capitalized
-    return entityName.charAt(0).toUpperCase() + entityName.slice(1);
-  })();
+  // Extract clean display name from entity name using centralized utility
+  const displayName = EntityNameUtils.toDisplayFormat(entityName);
   
   // Get archetype from props, schema, or default to 'record'
   const archetype = propArchetype || schema?.archetype || 'record'

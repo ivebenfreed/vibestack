@@ -12,6 +12,7 @@ import { configureSynced } from '@legendapp/state/sync'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
 import { initializationManager, ensureLegendStateReady, type PersistenceContext } from './helpers/InitializationManager'
+import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { stateLog } from '@/logger';
 const log = stateLog('legend-state/observables.ts');
 
@@ -1237,8 +1238,8 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
         entityGroups[archetype] = []
       }
       
-      // Use original entity name if available, otherwise use prefixed name
-      const displayName = entitySchema._originalName || entityName
+      // Use EntityNameUtils for proper display formatting with spaces
+      const displayName = EntityNameUtils.toDisplayFormat(entityName)
       const orgName = entitySchema._organizationName
       
       // Extract org ID from entity name if it's prefixed
@@ -1250,9 +1251,16 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
         }
       }
       
+      // Generate URL using the original entity name (without org prefix) in URL-safe format
+      // This ensures consistent URLs regardless of how the entity is stored
+      const cleanEntityName = entityName.includes('_') 
+        ? entityName.split('_').slice(1).join('_')  // Remove org prefix if present
+        : entityName;
+      const urlSafeEntityName = EntityNameUtils.toUrlSafeFormat(cleanEntityName);
+      
       entityGroups[archetype].push({
         title: displayName,
-        url: `/org/${orgId}/entities/${entityName}`,
+        url: `/org/${orgId}/entities/${urlSafeEntityName}`,
         icon: getArchetypeIcon(archetype),
         organizationName: orgName,
         organizationId: orgId

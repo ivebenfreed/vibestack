@@ -44,6 +44,7 @@ import {
   Trash2,
   Edit
 } from 'lucide-react'
+import { EntityNameUtils } from '@/lib/entity-name-utils'
 
 interface EntityCardProps {
   entityName: string
@@ -166,12 +167,14 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
       // Extract org ID from org-prefixed entity name as fallback
       const orgPrefixMatch = entityName.match(/^([a-f0-9-]{36})_(.+)$/)
       if (orgPrefixMatch) {
-        const [, extractedOrgId] = orgPrefixMatch
+        const [, extractedOrgId, cleanEntityName] = orgPrefixMatch
+        // Use EntityNameUtils to generate consistent kebab-case URL
+        const urlSafeEntityName = EntityNameUtils.toUrlSafeFormat(cleanEntityName)
         return {
           to: "/org/$orgId/entities/$entityName" as const,
           params: { 
             orgId: extractedOrgId,
-            entityName: entityName
+            entityName: urlSafeEntityName
           },
         }
       }
@@ -179,11 +182,17 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
       throw new Error(`Cannot determine org ID for entity: ${entityName}`)
     }
     
+    // Extract clean entity name and convert to URL-safe format
+    const cleanEntityName = entityName.includes('_') 
+      ? entityName.split('_').slice(1).join('_')  // Remove org prefix if present
+      : entityName;
+    const urlSafeEntityName = EntityNameUtils.toUrlSafeFormat(cleanEntityName)
+    
     return {
       to: "/org/$orgId/entities/$entityName" as const,
       params: { 
         orgId: orgIdToUse,
-        entityName: entityName
+        entityName: urlSafeEntityName
       },
     }
   }
