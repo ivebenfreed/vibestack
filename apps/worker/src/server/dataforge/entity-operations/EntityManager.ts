@@ -63,19 +63,25 @@ export class DataForgeEntityManager {
    */
   async getEntityConfig(orgId: string, entityName: string): Promise<any> {
     try {
-      console.log(`[DataForgeEntityManager] Getting entity config: ${entityName} for org: ${orgId}`);
+      // Import EntityNameUtils for consistent name normalization
+      const { EntityNameUtils } = await import('@/lib/entity-name-utils');
+      
+      // Normalize entity name to PascalCase for database lookup
+      const normalizedEntityName = EntityNameUtils.toPascalCase(entityName);
+      
+      console.log(`[DataForgeEntityManager] Getting entity config: ${normalizedEntityName} (original: ${entityName}) for org: ${orgId}`);
       
       // Get entity from entity_schemas table
       const entity = await this.config.kysely
         .selectFrom('entity_schemas')
         .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
         .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
+        .where('entity_name', '=', normalizedEntityName)
         .where('deleted', '!=', true)
         .executeTakeFirst();
 
       if (!entity) {
-        console.log(`[DataForgeEntityManager] Entity ${entityName} not found for org ${orgId}`);
+        console.log(`[DataForgeEntityManager] Entity ${normalizedEntityName} not found for org ${orgId}`);
         return null;
       }
 
@@ -102,15 +108,44 @@ export class DataForgeEntityManager {
         return { success: false, errors: [`Entity ${entityName} not found for org ${orgId}`] };
       }
 
-      // Add system fields and archetype defaults
+      // Get entity definition to understand custom fields
+      const { getEntityDefinition } = await import('./entity-storage');
+      const entityDef = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      
+      let baseData: any;
+      let customData: any = {};
+      
+      if (entityDef && entityDef.customFields && entityDef.customFields.length > 0) {
+        // Use FieldManager to separate base and custom fields
+        const { FieldManager } = await import('../services/FieldManager');
+        const fieldManager = new FieldManager();
+        
+        // Convert custom fields array to map
+        const customFieldsMap = new Map();
+        for (const field of entityDef.customFields) {
+          customFieldsMap.set(field.name, field);
+        }
+        
+        // Extract custom field data
+        const extracted = fieldManager.extractCustomFieldData(data, customFieldsMap);
+        baseData = extracted.baseData;
+        customData = extracted.customData;
+      } else {
+        // No custom fields defined, all data goes to base columns
+        baseData = { ...data };
+      }
+
+      // Add system fields and archetype defaults to base data
       const saveData = {
-        ...data,
+        ...baseData,
         id: crypto.randomUUID(),
         organization_id: orgId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         // Add creator/owner information if user is provided
-        ...(userId && { created_by: userId })
+        ...(userId && { created_by: userId }),
+        // Add custom fields as JSONB if any
+        ...(Object.keys(customData).length > 0 && { custom_fields: customData })
       };
 
       // Apply archetype-specific defaults
@@ -131,14 +166,21 @@ export class DataForgeEntityManager {
       const result = await this.config.kysely
         .insertInto(config.tableName as any)
         .values(saveData as any)
-        .returning(['id', 'created_at', 'updated_at'])
+        .returningAll()
         .executeTakeFirst();
 
       if (!result) {
         return { success: false, errors: ['Failed to create record'] };
       }
 
-      return { success: true, data: { ...saveData, ...result } };
+      // Merge custom fields back into the response
+      const responseData = { ...result };
+      if (result.custom_fields && typeof result.custom_fields === 'object') {
+        Object.assign(responseData, result.custom_fields);
+        delete responseData.custom_fields; // Remove the JSONB column from response
+      }
+
+      return { success: true, data: responseData };
     } catch (error) {
       return { 
         success: false, 
@@ -157,22 +199,78 @@ export class DataForgeEntityManager {
         return { success: false, errors: [`Entity ${entityName} not found for org ${orgId}`] };
       }
 
+      // Get entity definition to understand custom fields
+      const { getEntityDefinition } = await import('./entity-storage');
+      const entityDef = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      
+      let baseUpdates: any;
+      let customUpdates: any = {};
+      
+      if (entityDef && entityDef.customFields && entityDef.customFields.length > 0) {
+        // Use FieldManager to separate base and custom fields
+        const { FieldManager } = await import('../services/FieldManager');
+        const fieldManager = new FieldManager();
+        
+        // Convert custom fields array to map
+        const customFieldsMap = new Map();
+        for (const field of entityDef.customFields) {
+          customFieldsMap.set(field.name, field);
+        }
+        
+        // Extract custom field data
+        const extracted = fieldManager.extractCustomFieldData(updates, customFieldsMap);
+        baseUpdates = extracted.baseData;
+        customUpdates = extracted.customData;
+      } else {
+        // No custom fields defined, all data goes to base columns
+        baseUpdates = { ...updates };
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        ...baseUpdates,
+        updated_at: new Date().toISOString()
+      };
+
+      // If there are custom field updates, merge them with existing custom_fields
+      if (Object.keys(customUpdates).length > 0) {
+        // First get existing custom fields
+        const existing = await this.config.kysely
+          .selectFrom(config.tableName as any)
+          .select(['custom_fields'])
+          .where('id', '=', recordId)
+          .where('organization_id', '=', orgId)
+          .executeTakeFirst();
+        
+        const existingCustom = existing?.custom_fields || {};
+        updateData.custom_fields = { ...existingCustom, ...customUpdates };
+      }
+
+      // Remove system fields that shouldn't be updated
+      delete updateData.id;
+      delete updateData.organization_id;
+      delete updateData.created_at;
+
       const result = await this.config.kysely
         .updateTable(config.tableName as any)
-        .set({
-          ...updates,
-          updated_at: new Date().toISOString()
-        } as any)
+        .set(updateData as any)
         .where('id', '=', recordId)
         .where('organization_id', '=', orgId)
-        .returning(['id', 'updated_at'])
+        .returningAll()
         .executeTakeFirst();
 
       if (!result) {
         return { success: false, errors: ['Record not found or no changes made'] };
       }
 
-      return { success: true, data: result };
+      // Merge custom fields back into the response
+      const responseData = { ...result };
+      if (result.custom_fields && typeof result.custom_fields === 'object') {
+        Object.assign(responseData, result.custom_fields);
+        delete responseData.custom_fields; // Remove the JSONB column from response
+      }
+
+      return { success: true, data: responseData };
     } catch (error) {
       return { 
         success: false, 
@@ -249,7 +347,14 @@ export class DataForgeEntityManager {
         return { success: false, errors: ['Record not found'] };
       }
 
-      return { success: true, data: result };
+      // Merge custom fields into the record
+      let responseData = { ...result };
+      if (result.custom_fields && typeof result.custom_fields === 'object') {
+        Object.assign(responseData, result.custom_fields);
+        delete responseData.custom_fields; // Remove the JSONB column from response
+      }
+
+      return { success: true, data: responseData };
     } catch (error) {
       return { 
         success: false, 
@@ -294,10 +399,20 @@ export class DataForgeEntityManager {
 
       const results = await query.execute();
 
+      // Merge custom fields into each record
+      const mergedResults = results.map((record: any) => {
+        if (record.custom_fields && typeof record.custom_fields === 'object') {
+          const merged = { ...record, ...record.custom_fields };
+          delete merged.custom_fields; // Remove the JSONB column from response
+          return merged;
+        }
+        return record;
+      });
+
       // Resolve reference fields if requested
-      let resolvedResults = results;
+      let resolvedResults = mergedResults;
       if (options.resolveReferences !== false) {
-        resolvedResults = await this.resolveReferences(orgId, entityName, results);
+        resolvedResults = await this.resolveReferences(orgId, entityName, mergedResults);
       }
 
       return {
@@ -814,6 +929,9 @@ export class DataForgeEntityManager {
   /**
    * Create entity with archetype pattern and custom fields
    */
+  /**
+   * Create entity with archetype pattern and custom fields
+   */
   async createEntity(
     orgId: string,
     entityName: string,
@@ -821,32 +939,20 @@ export class DataForgeEntityManager {
     customFields: Record<string, any> = {}
   ): Promise<any> {
     try {
-      // Import EntityNameUtils to ensure consistent naming
+      // Import required modules
+      const { fieldManager } = await import('../services/FieldManager');
       const { EntityNameUtils } = await import('@/lib/entity-name-utils');
+      const { DDLGenerator } = await import('../DDLGenerator');
       
-      // Normalize entity name to proper PascalCase while preserving word boundaries
-      // Handle various input formats: "Access Control List", "access-control-list", "AccessControlList"
-      const normalizedEntityName = entityName
-        .replace(/[-_]/g, ' ')  // Convert kebab/snake to spaces
-        .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add space between camelCase words
-        .replace(/\s+/g, ' ')  // Normalize multiple spaces
-        .trim()
-        .split(' ')  // Split into words
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())  // Capitalize each word
-        .join('');  // Join without spaces for PascalCase
+      // Normalize entity name using EntityNameUtils
+      const normalizedEntityName = EntityNameUtils.toPascalCase(entityName);
       
-      // For table name, preserve original input to maintain word boundaries
-      // Convert to snake_case directly from original input
-      const tableBaseName = entityName
-        .replace(/([a-z])([A-Z])/g, '$1_$2')  // camelCase to snake_case
-        .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')  // Consecutive capitals
-        .replace(/[\s-]+/g, '_')  // Spaces and hyphens to underscores
-        .toLowerCase()
-        .replace(/_+/g, '_');  // Remove duplicate underscores
+      // For table name, convert to storage format (snake_case)
+      const tableBaseName = EntityNameUtils.toStorageFormat(entityName);
       
       console.log(`[DataForgeEntityManager] Creating entity: ${normalizedEntityName} (${archetype}) for org: ${orgId}`);
       
-      // Check if entity with this name already exists (including soft-deleted)
+      // Check if entity with this name already exists
       const existingEntity = await this.config.kysely
         .selectFrom('entity_schemas')
         .select(['entity_name', 'deleted'])
@@ -862,23 +968,67 @@ export class DataForgeEntityManager {
         };
       }
       
-      // Get archetype fields and merge with custom fields
-      const archetypeFields = await this.getArchetypeFields(archetype);
+      // Convert customFields to array format if needed
+      let customFieldsArray: any[] = [];
+      if (Array.isArray(customFields)) {
+        customFieldsArray = customFields;
+      } else if (customFields && typeof customFields === 'object') {
+        customFieldsArray = Object.entries(customFields).map(([name, config]) => ({
+          name,
+          ...(typeof config === 'object' ? config : { type: 'text', defaultValue: config })
+        }));
+      }
       
-      // Convert customFields object to field definitions
-      const customFieldDefs: Record<string, any> = {};
-      for (const [fieldName, fieldConfig] of Object.entries(customFields)) {
-        customFieldDefs[fieldName] = {
-          name: fieldName,
-          type: fieldConfig.type || 'text',
-          required: fieldConfig.required || false,
-          defaultValue: fieldConfig.defaultValue
+      // Validate custom fields against archetype
+      const validation = await fieldManager.validateCustomFields(customFieldsArray, archetype);
+      if (!validation.success) {
+        return {
+          success: false,
+          errors: validation.errors
         };
       }
       
-      const allFields = { ...archetypeFields, ...customFieldDefs };
-
-      // Generate table name using DDLGenerator with snake_case base name
+      // Merge fields with proper conflict resolution
+      const mergedFields = await fieldManager.mergeFieldDefinitions(
+        archetype,
+        customFieldsArray,
+        {
+          conflictStrategy: 'prefix',
+          customFieldPrefix: 'custom',
+          validateTypes: true,
+          preserveArchetypeDefaults: true
+        }
+      );
+      
+      // Get system fields that all tables need
+      const systemFields = await this.getArchetypeFields('base_system');
+      
+      // Get base fields for table creation - combine system fields with archetype fields
+      const baseFieldsForTable: Record<string, any> = {};
+      
+      // First add system fields
+      for (const [fieldName, fieldDef] of Object.entries(systemFields)) {
+        baseFieldsForTable[fieldName] = fieldDef;
+      }
+      
+      // Then add archetype-specific fields
+      for (const [name, field] of mergedFields.baseFields) {
+        baseFieldsForTable[name] = field;
+      }
+      
+      // Add custom_fields JSONB column for custom fields storage
+      baseFieldsForTable['custom_fields'] = {
+        name: 'custom_fields',
+        type: 'json',
+        required: false,
+        defaultValue: {}
+      };
+      
+      console.log('[DataForgeEntityManager] Creating table with base fields + custom_fields column');
+      console.log('[DataForgeEntityManager] Base fields count:', mergedFields.baseFields.size);
+      console.log('[DataForgeEntityManager] Custom fields count:', mergedFields.customFields.size);
+      
+      // Generate table name
       const fullTableName = DDLGenerator.generateTableName(orgId, tableBaseName);
       
       // Validate table name
@@ -889,39 +1039,52 @@ export class DataForgeEntityManager {
           errors: [`Invalid table name: ${tableValidation.error}`]
         };
       }
-
-      // Generate DDL using DDLGenerator
-      const ddl = DDLGenerator.generateCreateTableDDL(fullTableName, allFields);
-
+      
+      // Generate DDL using DDLGenerator with base fields only (custom fields go in JSONB)
+      const ddl = DDLGenerator.generateCreateTableDDL(fullTableName, baseFieldsForTable);
+      
+      console.log('[DataForgeEntityManager] Generated DDL:', ddl);
+      console.log('[DataForgeEntityManager] All fields:', JSON.stringify(baseFieldsForTable, null, 2));
+      
       // Execute DDL
-      await this.config.kysely.executeQuery({
-        sql: ddl,
-        parameters: []
-      });
-
-      // Register entity in entity_schemas table (direct insert)
-      await this.config.kysely
-        .insertInto('entity_schemas')
-        .values({
-          org_id: orgId,
-          entity_name: normalizedEntityName,  // Store normalized PascalCase name
-          archetype,
-          table_name: fullTableName,
-          deleted: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .execute();
-
+      try {
+        await this.config.kysely.executeQuery({
+          sql: ddl,
+          parameters: []
+        });
+      } catch (sqlError: any) {
+        console.error('[DataForgeEntityManager] SQL execution error:', sqlError);
+        console.error('[DataForgeEntityManager] Failed SQL:', ddl);
+        throw sqlError;
+      }
+      
+      // Store entity definition with separated fields
+      const entityDefinition = {
+        archetype,
+        baseFields: Array.from(mergedFields.baseFields.values()),
+        customFields: Array.from(mergedFields.customFields.values()),
+        allFields: Array.from(mergedFields.allFields.values()),
+        version: '2.0' // New field management version
+      };
+      
+      // Store in entity_schemas with complete field information
+      const { storeEntityDefinition } = await import('./entity-storage');
+      await storeEntityDefinition(this.config.kysely, orgId, normalizedEntityName, entityDefinition, fullTableName);
+      
       console.log(`[DataForgeEntityManager] Successfully created entity: ${fullTableName}`);
       
       return {
         success: true,
         data: {
-          entityName: normalizedEntityName,  // Return normalized name
+          entityName: normalizedEntityName,
           tableName: fullTableName,
           archetype,
-          orgId
+          orgId,
+          fields: {
+            base: entityDefinition.baseFields,
+            custom: entityDefinition.customFields,
+            total: entityDefinition.allFields.length
+          }
         },
         immediate: true
       };
@@ -946,6 +1109,11 @@ export class DataForgeEntityManager {
       created_at: { name: 'created_at', type: 'datetime', required: true },
       updated_at: { name: 'updated_at', type: 'datetime', required: true }
     };
+
+    // Special case for just getting system fields
+    if (archetype === 'base_system') {
+      return baseFields;
+    }
 
     // Import and use the appropriate archetype class
     try {

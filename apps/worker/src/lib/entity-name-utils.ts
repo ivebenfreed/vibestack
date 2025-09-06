@@ -147,6 +147,34 @@ export class EntityNameUtils {
    * @returns PascalCase string
    */
   static toPascalCase(name: string): string {
+    // Check if already in PascalCase format (starts with uppercase, may have internal capitals)
+    // Examples: CustomerOrder, ProductCatalog, User, APIKey
+    if (/^[A-Z][a-zA-Z]*$/.test(name) && !name.includes('_') && !name.includes('-') && !name.includes(' ')) {
+      // Check if it has mixed case (not all uppercase, not all lowercase after first char)
+      const hasInternalCapitals = /[a-z][A-Z]/.test(name);
+      const isNotAllUppercase = /[a-z]/.test(name.substring(1));
+      
+      if (hasInternalCapitals || (name.length <= 4 && isNotAllUppercase)) {
+        // It's likely already in PascalCase, preserve it
+        // But still check for pluralization
+        const lowerName = name.toLowerCase();
+        
+        // Check if it's plural and needs singularization
+        for (const [plural, singular] of Object.entries(this.PLURAL_MAPPINGS)) {
+          if (lowerName === plural || lowerName.endsWith(plural)) {
+            // It's plural, singularize while preserving case pattern
+            const singularLower = singular.toLowerCase();
+            // Reconstruct with original casing pattern
+            return name.substring(0, name.length - plural.length) + 
+                   singular.substring(singular.length - (name.length - (name.length - plural.length)));
+          }
+        }
+        
+        // Not plural or not in our mappings, return as-is
+        return name;
+      }
+    }
+    
     const normalized = this.normalizeInput(name);
     const singular = this.toSingular(normalized);
     

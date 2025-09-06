@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict vcQiyd4BJiTXFCPzkhW1cOporwkmKaWmcUetpeNV6Y092OetudLgTtlG2T87jfj
+\restrict xxXFh1891wFQdaLPOrgdQUjoRNWXl1VXdFrdiCXnzkYJnikaUpkWEexCyvaOWc6
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict vcQiyd4BJiTXFCPzkhW1cOporwkmKaWmcUetpeNV6Y092OetudLgTtlG2T87jfj
+\unrestrict xxXFh1891wFQdaLPOrgdQUjoRNWXl1VXdFrdiCXnzkYJnikaUpkWEexCyvaOWc6
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict OCOFHl2jTHy3Of8Lc1E1ryg8GGer1ZEoufgeChUzuh8sWPYUsZgbJXIKdEvPI5m
+\restrict 0oc0xJda1qAl3daLZODKjftjn6w6QPTvbWs66KJgO6hSG1BSZR98pWQ4HjsbMtp
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OCOFHl2jTHy3Of8Lc1E1ryg8GGer1ZEoufgeChUzuh8sWPYUsZgbJXIKdEvPI5m
+\unrestrict 0oc0xJda1qAl3daLZODKjftjn6w6QPTvbWs66KJgO6hSG1BSZR98pWQ4HjsbMtp
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict ZSrUT9AwL4QDLavr07RXyaXNMRFqmY4etWkG6mSb3eGYCYLPSApxkvF27sNFztU
+\restrict IaU8GSedKCoq8ocUhUAgsHAmgi8EHw9eb0BPwCH7K4HWylAwXJh0HhesEQqbCBH
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZSrUT9AwL4QDLavr07RXyaXNMRFqmY4etWkG6mSb3eGYCYLPSApxkvF27sNFztU
+\unrestrict IaU8GSedKCoq8ocUhUAgsHAmgi8EHw9eb0BPwCH7K4HWylAwXJh0HhesEQqbCBH
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
+\restrict nkNoJVZOOkTaEYm2CUhr0cgsRB7Of5IsmDyLxk5gqFYCIPS0Cdf0PDSNvEFGT8L
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
+\unrestrict nkNoJVZOOkTaEYm2CUhr0cgsRB7Of5IsmDyLxk5gqFYCIPS0Cdf0PDSNvEFGT8L
 \connect vibestack_dev
-\restrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
+\restrict nkNoJVZOOkTaEYm2CUhr0cgsRB7Of5IsmDyLxk5gqFYCIPS0Cdf0PDSNvEFGT8L
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2176,6 +2176,36 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_contract (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_contract OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_customerorder; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_customerorder (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
+    project_id text,
+    sprint_id text,
+    story_points integer,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_customerorder OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_data_analytics_report; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2287,6 +2317,29 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_file (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_file OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_inventoryitem; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_inventoryitem (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    record_type text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_inventoryitem OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2357,6 +2410,27 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts (
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_productcatalog; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_productcatalog (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    collection_type text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_productcatalog OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_project; Type: TABLE; Schema: public; Owner: postgres
@@ -2605,6 +2679,36 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes (
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    status text DEFAULT 'todo'::text NOT NULL,
+    assignee_id text,
+    reporter_id text,
+    due_date timestamp without time zone,
+    estimated_hours text,
+    actual_hours text,
+    task_type text DEFAULT 'feature'::text,
+    parent_task_id text,
+    project_id text,
+    sprint_id text,
+    story_points integer,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentity OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testentitys; Type: TABLE; Schema: public; Owner: postgres
@@ -4676,7 +4780,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KJQ5D9ipdtxa2FfnZNW7Gq39PQxQWeOg5JVeXF1jka2TJZscnxhkDRKuodq1fkh
+\unrestrict nkNoJVZOOkTaEYm2CUhr0cgsRB7Of5IsmDyLxk5gqFYCIPS0Cdf0PDSNvEFGT8L
 
 --
 -- PostgreSQL database cluster dump complete

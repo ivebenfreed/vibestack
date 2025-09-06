@@ -92,9 +92,32 @@ export class DDLGenerator {
     }
 
     if (field.defaultValue !== undefined) {
-      const defaultVal = typeof field.defaultValue === 'string' 
-        ? `'${field.defaultValue}'` 
-        : field.defaultValue;
+      let defaultVal;
+      if (typeof field.defaultValue === 'string') {
+        // Escape single quotes in string values
+        const escapedValue = field.defaultValue.replace(/'/g, "''");
+        defaultVal = `'${escapedValue}'`;
+      } else if (Array.isArray(field.defaultValue)) {
+        // Arrays need to be handled specially - convert to JSONB or array literal
+        if (field.type === 'json' || field.type === 'jsonb') {
+          defaultVal = `'${JSON.stringify(field.defaultValue)}'::jsonb`;
+        } else {
+          // For PostgreSQL array types, use ARRAY constructor
+          // This shouldn't normally happen with our field types, but handle it safely
+          defaultVal = `'{}'::text[]`;
+        }
+      } else if (typeof field.defaultValue === 'object' && field.defaultValue !== null) {
+        // For objects (JSONB fields), properly format the default value
+        defaultVal = `'${JSON.stringify(field.defaultValue)}'::jsonb`;
+      } else if (field.defaultValue === null) {
+        defaultVal = 'NULL';
+      } else if (typeof field.defaultValue === 'boolean') {
+        // Boolean values should be lowercase in SQL
+        defaultVal = field.defaultValue ? 'true' : 'false';
+      } else {
+        // Numbers and other primitives
+        defaultVal = field.defaultValue;
+      }
       constraints.push(`DEFAULT ${defaultVal}`);
     }
 
@@ -105,11 +128,12 @@ export class DDLGenerator {
    * Generate organization-specific table name
    * Expects tableName to already be in snake_case format
    * Uses consistent snake_case without pluralization for predictability
+   * Always returns lowercase to match PostgreSQL behavior
    */
   static generateTableName(orgId: string, tableName: string): string {
     // Table name should already be in snake_case format by the caller
-    // Just combine with org prefix
-    return `org_${orgId.replace(/-/g, '_')}_${tableName}`;
+    // Just combine with org prefix and ensure lowercase
+    return `org_${orgId.replace(/-/g, '_')}_${tableName}`.toLowerCase();
   }
 
   /**
