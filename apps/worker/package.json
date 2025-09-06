@@ -14,13 +14,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "log:focus": "../../scripts/set-log-focus.sh",
-    "log:vibegrid": "../../scripts/set-log-focus.sh vibegrid",
-    "log:sync": "../../scripts/set-log-focus.sh sync",
-    "log:quiet": "../../scripts/set-log-focus.sh quiet",
-    "log:quiet-except": "../../scripts/set-log-focus.sh quiet-except",
-    "log:clear": "../../scripts/set-log-focus.sh clear"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",

@@ -111,7 +111,7 @@ export class PersistenceManager {
    * Create IndexedDB configuration for all entity tables using Legend State v3 pattern
    */
   public async createIndexedDBConfig(entityNames: string[]) {
-    console.log(`[PersistenceManager] Creating IndexedDB config for entities:`, entityNames)
+    log.info(`Creating IndexedDB config for entities:`, entityNames)
     
     // Create table names for all entities plus metadata tables
     // For multi-org universe system, entityNames are in format: {orgId}_{EntityName}
@@ -126,7 +126,7 @@ export class PersistenceManager {
       'sync_state'
     ]
     
-    console.log(`[PersistenceManager] Created table names:`, tableNames)
+    log.debug(`Created table names:`, tableNames)
     
     // Generate dynamic version based on schema to trigger IndexedDB upgrades when needed
     const schemaVersion = this.generateSchemaVersion(entityNames)
@@ -135,11 +135,11 @@ export class PersistenceManager {
     log.info(`[PersistenceManager] Using schema version: ${schemaVersion}`)
     
     try {
-      console.log(`[PersistenceManager] Schema version: ${schemaVersion}, table names:`, tableNames)
+      log.debug(`Schema version: ${schemaVersion}, table names:`, tableNames)
       
       // Check if we need to clear database due to version downgrade
       const needsClear = this.checkForVersionDowngrade(schemaVersion)
-      console.log(`[PersistenceManager] Needs clear due to version downgrade:`, needsClear)
+      log.debug(`Needs clear due to version downgrade:`, needsClear)
       if (needsClear) {
         log.info(`[PersistenceManager] Clearing database due to version downgrade`)
         return await this.createConfigAfterClear(schemaVersion, tableNames, entityNames)
@@ -167,7 +167,7 @@ export class PersistenceManager {
       }
       
     } catch (error) {
-      console.error(`[PersistenceManager] ERROR - Failed to create IndexedDB plugin:`, error)
+      log.error(`Failed to create IndexedDB plugin:`, error)
       log.warn(`[PersistenceManager] Failed to create IndexedDB plugin:`, error)
       
       // Check if this is a version downgrade error
@@ -600,7 +600,7 @@ export class PersistenceManager {
       log.info(`[PersistenceManager] Persisted sync state for table: ${tableName}`)
       
     } catch (error) {
-      console.error(`[PersistenceManager] Failed to persist sync state for table: ${tableName}`, error)
+      log.error(`Failed to persist sync state for table: ${tableName}`, error)
     }
   }
   
@@ -623,7 +623,7 @@ export class PersistenceManager {
       return null
       
     } catch (error) {
-      console.error(`[PersistenceManager] Failed to load sync state for table: ${tableName}`, error)
+      log.error(`Failed to load sync state for table: ${tableName}`, error)
       return null
     }
   }
@@ -655,7 +655,7 @@ export class PersistenceManager {
       })
       
     } catch (error) {
-      console.error('[PersistenceManager] Failed to clear organization data', error)
+      log.error('Failed to clear organization data', error)
       throw error
     }
   }

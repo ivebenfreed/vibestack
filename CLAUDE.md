@@ -149,28 +149,48 @@ curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 - **StrictPort**: Enabled to prevent port confusion - server will fail if port is unavailable
 - **Environment**: Add `export DEV_PORT=4001` to your shell profile for persistent worktree ports
 
-## Contextual Logging System
+## Enhanced Contextual Logging System with File-Level Control
 
-**Control frontend logging to prevent console pollution and focus on specific areas during development.**
-
-**✅ Updated for unified worker architecture** - All logging scripts now target `/apps/worker/.env.local`.
+**Persistent logging configuration via dev scripts with file-level granularity.**
 
 ### Quick Commands
 ```bash
-pnpm dev:quiet      # Silent mode (errors only)
-pnpm dev:sync       # Focus on sync operations  
-pnpm dev:ui         # Focus on UI components only
-pnpm dev:debug      # Debug mode (sync, state, ui, data contexts)
-pnpm dev:all        # All contexts enabled
+pnpm dev:quiet                   # Silent mode (errors only)
+pnpm dev:sync                    # Focus on sync and state operations  
+pnpm dev:ui                      # UI components at debug level
+pnpm dev:ui:quiet-vibegrid       # Most UI quiet, VibeGrid at info level
+pnpm dev:ui:focus-vibegrid       # Most UI quiet, VibeGrid at debug level
+pnpm dev:debug                   # Multiple contexts at debug level
+pnpm dev:debug:quiet-vibegrid    # Debug mode with VibeGrid at warn level
+pnpm dev:all                     # All contexts enabled at debug level
+pnpm dev:focus                   # Focus on specific file (universe-loader)
+```
+
+### Custom Configuration
+```bash
+# Use wrapper script for custom configurations
+./scripts/dev-with-logging.sh custom \
+  --contexts=ui,sync \
+  --level=debug \
+  --file-levels=vibegrid:warn,universe-loader:info \
+  --muted=table-data-store
 ```
 
 ### Runtime Control (Browser Console)
 ```javascript
-logControl.focus('ui');           // Only UI logs
-logControl.focus('none');         // Silent mode
-logControl.only('ui', 'sync');    // Multiple contexts
-logControl.clear();               // Clear context filters
-logControl.status();              // Check current filters
+// Context controls (persistent)
+logControl.only('ui', 'sync');    // Only these contexts
+logControl.none();                 // Silent mode (errors only)
+logControl.status();               // Check current configuration
+
+// File-level controls (lost on HMR - use dev scripts for persistence)
+logControl.setFileLevel('components/MyComponent', 'debug');
+logControl.muteFile('components/VerboseComponent');
+logControl.setPatternLevel('vibegrid', 'warn');  // All VibeGrid files
+
+// Presets
+logControl.quietVibeGrid();       // UI with VibeGrid at warn
+logControl.focusFile('MyComponent'); // Only show logs from one file
 ```
 
 ### Usage in Code
@@ -179,11 +199,11 @@ import { uiLog, syncLog, dataLog } from '@/logger';
 
 const log = uiLog('components/MyComponent.tsx');
 log.debug('Component rendered', { props });
-log.error('Validation failed', error); // Always logs
+log.info('User action', { action });
+log.error('Validation failed', error); // Always shows (unless file muted)
 ```
 
 ### Available Contexts
-
 - `sync` - WebSocket, sync operations, state machines
 - `state` - State management, stores, Legend State
 - `ui` - Components, interactions, rendering  
@@ -194,14 +214,20 @@ log.error('Validation failed', error); // Always logs
 - `testing` - Test-related logging
 - `debug` - General debugging
 
+### File-Level Configuration
+- **Global Level**: Base log level for all files in context
+- **File Overrides**: Specific files can have different levels
+- **Pattern Support**: `vibegrid` matches all VibeGrid components
+- **Persistent**: Configuration survives HMR via dev scripts
+
 ### Troubleshooting Logger Issues
 
-If logging modes aren't changing or no logs appear:
+If logging configuration isn't working:
 
-1. **Clear cached context filters**: `logControl.clear()` in browser console
-2. **Check current status**: `logControl.status()` to see active filters  
-3. **Restart dev server**: Environment changes need server restart
-4. **Verify logger loaded**: Check `typeof window.logControl === 'object'`
+1. **Use dev scripts for persistence**: Runtime file controls are lost on HMR
+2. **Check configuration**: `logControl.status()` in browser console
+3. **Verify context enabled**: Ensure your logger type's context is active
+4. **File path normalization**: Paths auto-normalized (no src/, no extension)
 
 **📖 Complete documentation:** [`apps/worker/src/logger/README.md`](apps/worker/src/logger/README.md)
 

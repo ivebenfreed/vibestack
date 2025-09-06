@@ -1,8 +1,11 @@
-# Simple Contextual Logging System
+# Enhanced Contextual Logging System with File-Level Control
 
-**Single environment variable controls what logs show:**
+**Persistent logging configuration through dev scripts with file-level granularity:**
 - VITE_LOG_CONTEXTS: comma-separated list (sync,state,ui,data,auth,routing,performance,testing,debug)
-- VITE_LOG_LEVEL: debug|info|warn|error (default: info)
+- VITE_LOG_LEVEL: debug|info|warn|error (default: error)
+- VITE_LOG_FILE_LEVELS: file-specific levels (e.g., "vibegrid:info,universe-loader:debug")
+- VITE_LOG_MUTED_FILES: comma-separated list of files to mute
+- VITE_LOG_ONLY_FILES: comma-separated list of files to exclusively show
 
 ## Quick Start
 
@@ -10,35 +13,53 @@
 import { syncLog, stateLog, uiLog } from '@/logger';
 
 // In any component/file
-const log = syncLog('MyFile.ts');
-log.debug('WebSocket connected', { url });
-log.info('Sync completed', { changes: 5 });
-log.error('Connection failed', error); // Always shows
+const log = uiLog('components/MyComponent.tsx');
+log.debug('Component rendered', { props });
+log.info('User action', { action });
+log.error('Validation failed', error); // Always shows (unless file is muted)
 ```
 
-## Dev Scripts Control Logging
+## Dev Scripts with File-Level Control
 
-**Environment variables are set by dev scripts, not .env.local files:**
+**Logging configuration persists through HMR via wrapper script:**
 
 ```bash
 # Silent mode (errors only)
-pnpm dev:quiet      # VITE_LOG_CONTEXTS='' VITE_LOG_LEVEL='error'
+pnpm dev:quiet
 
-# Focus on sync operations  
-pnpm dev:sync       # VITE_LOG_CONTEXTS='sync,state' VITE_LOG_LEVEL='debug'
+# Focus on UI components  
+pnpm dev:ui                      # All UI at debug level
 
-# Focus on UI components
-pnpm dev:ui         # VITE_LOG_CONTEXTS='ui' VITE_LOG_LEVEL='debug'
+# UI with quiet VibeGrid (most UI quiet, VibeGrid at info)
+pnpm dev:ui:quiet-vibegrid       # UI at error level, VibeGrid at info level
 
-# Debug mode (multiple contexts)
-pnpm dev:debug      # VITE_LOG_CONTEXTS='sync,state,ui,data' VITE_LOG_LEVEL='debug'
+# Focus heavily on VibeGrid
+pnpm dev:ui:focus-vibegrid       # UI at error level, VibeGrid at debug level
 
-# All contexts enabled
-pnpm dev:all        # VITE_LOG_CONTEXTS='sync,state,ui,data,auth,routing,performance,testing,debug' VITE_LOG_LEVEL='debug'
+# Debug mode with quiet VibeGrid
+pnpm dev:debug:quiet-vibegrid    # Multiple contexts at debug, VibeGrid at warn
+
+# Focus on specific file
+pnpm dev:focus                   # Only shows logs from universe-loader
+```
+
+## Custom Configuration
+
+Use the wrapper script directly for custom configurations:
+
+```bash
+# Custom configuration example
+./scripts/dev-with-logging.sh custom \
+  --contexts=ui,sync \
+  --level=debug \
+  --file-levels=vibegrid:warn,universe-loader:info \
+  --muted=table-data-store \
+  --only=MyComponent
 ```
 
 ## Runtime Controls (Browser Console)
 
+### Context Controls
 ```javascript
 // Quick controls
 logControl.only('sync', 'state');  // Only these contexts
@@ -47,6 +68,23 @@ logControl.disable('data');         // Remove data logs
 logControl.all();                   // Enable everything
 logControl.none();                  // Only errors
 logControl.status();                // Show current config
+```
+
+### File-Level Controls (Lost on HMR)
+```javascript
+// File-specific controls (use dev scripts for persistence)
+logControl.setFileLevel('components/custom/vibegrid/VibeGrid', 'debug');
+logControl.muteFile('components/custom/vibegrid/stores/table-data-store');
+logControl.onlyFiles(['components/MyComponent', 'services/MyService']);
+logControl.clearFileFilters();
+
+// Pattern-based control
+logControl.setPatternLevel('vibegrid', 'warn');  // All VibeGrid files to warn
+
+// Presets
+logControl.quietVibeGrid();   // UI context with VibeGrid at warn
+logControl.debugVibeGrid();   // UI context with VibeGrid at debug
+logControl.focusFile('components/MyComponent');  // Only this file
 ```
 
 ## Available Contexts
@@ -61,57 +99,83 @@ logControl.status();                // Show current config
 - `testing` - Test-related logging
 - `debug` - General debugging
 
+## File-Level Configuration
+
+### How It Works
+1. **Global Level**: Set by `VITE_LOG_LEVEL` (default: error)
+2. **File Overrides**: Set by `VITE_LOG_FILE_LEVELS` 
+3. **Muted Files**: Set by `VITE_LOG_MUTED_FILES` (no logs at all)
+4. **Only Mode**: Set by `VITE_LOG_ONLY_FILES` (only these files log)
+
+### File Path Normalization
+File paths are normalized for matching:
+- Leading slashes removed
+- `src/` prefix removed  
+- File extensions removed
+- Example: `/src/components/MyComponent.tsx` → `components/MyComponent`
+
+### Pattern Support
+The `vibegrid` pattern automatically matches all VibeGrid component files:
+- `components/custom/vibegrid/VibeGrid`
+- `components/custom/vibegrid/stores/*`
+- `components/custom/vibegrid/actors/*`
+- `components/custom/vibegrid/systems/*`
+- etc.
+
 ## Benefits ✅
 
-- **Simple**: Environment variables set by dev scripts only
-- **No caching issues**: Dev scripts control everything directly
-- **Always errors**: Error logs always show regardless of settings
-- **Easy switching**: Change contexts without restart via console
-- **Clean output**: Contextual filtering prevents log pollution
-- **Instant quiet mode**: Runtime controls work immediately
+- **Persistent Configuration**: Survives HMR reloads via dev scripts
+- **File-Level Granularity**: Control verbosity per file or pattern
+- **No .env.local Issues**: Direct environment variable passing
+- **Always Errors**: Error logs always show (unless file is muted)
+- **Easy Switching**: Multiple presets for common scenarios
+- **Clean Output**: Precise control prevents log pollution
 
-## Key Features
+## Common Use Cases
 
-### Dev Script Control
-- Initial logging state set by `pnpm dev:*` commands
-- No `.env.local` file dependencies (prevents caching issues)
-- Restart server to change initial logging configuration
+### Debugging Specific Component
+```bash
+# Focus on one problematic component
+./scripts/dev-with-logging.sh focus-file MyComponent
+```
 
-### Runtime Controls (No Restart Required)
-- `logControl.none()` - Instant quiet mode
-- `logControl.only('sync')` - Focus on specific contexts
-- `logControl.status()` - Check current state
-- Perfect for quick debugging without server restarts
+### Quiet Verbose Components
+```bash
+# Keep chatty components quiet while debugging others
+pnpm dev:ui:quiet-vibegrid  # UI debugging with quiet VibeGrid
+```
 
-## Migration from Old System
+### Production-like Environment
+```bash
+# Minimal logging for performance testing
+pnpm dev:quiet  # Only errors show
+```
 
-The new system automatically works with existing `syncLog()` and `stateLog()` calls. No code changes needed.
-
-**Old complex env vars removed:**
-- ~~`VITE_LOG_PATTERNS`~~ 
-- ~~`VITE_LOG_DISABLED_PATTERNS`~~
-- ~~`VITE_LOG_FOCUS_MODE`~~
-- ~~`.env.local` logging configuration~~
-
-**New simple approach:**
-- Dev scripts control initial state via environment variables
-- Runtime controls for instant switching without restarts
+### Full Debug Mode
+```bash
+# Everything at maximum verbosity
+pnpm dev:all  # All contexts at debug level
+```
 
 ## Troubleshooting
 
 **Logs not showing?**
-1. Check contexts: `logControl.status()` in browser console
-2. Use dev script: `pnpm dev:debug` for debug mode
-3. Runtime enable: `logControl.all()` to see everything
+1. Check configuration: `logControl.status()` in browser console
+2. Verify context is enabled for your logger type
+3. Check if file is muted or filtered
+4. Use `pnpm dev:debug` for debug mode
 
 **Too many logs?**
-1. Use dev scripts: `pnpm dev:quiet` for silent mode
-2. Runtime control: `logControl.none()` for instant quiet
+1. Use `pnpm dev:quiet` for silent mode
+2. Set specific files to higher levels (warn/error)
+3. Mute verbose files with `--muted=filename`
 
-**Need to switch contexts quickly?**
-1. Use runtime controls (no restart): `logControl.only('sync', 'state')`
-2. For permanent change: restart with different dev script
+**File-level settings not persisting?**
+1. Use dev scripts, not runtime controls for persistence
+2. Runtime file-level controls are lost on HMR
+3. Add custom presets to `scripts/dev-with-logging.sh`
 
 **Logger not working?**
-1. Verify logger loaded: `typeof window.logControl === 'object'`
-2. Clear any cached filters: `logControl.clear()`
+1. Verify logger loaded: Check for startup log message
+2. Ensure using correct import (`uiLog`, `syncLog`, etc.)
+3. Check file path is correctly passed to logger factory

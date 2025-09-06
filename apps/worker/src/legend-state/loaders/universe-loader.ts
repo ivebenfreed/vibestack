@@ -14,6 +14,9 @@ import {
   type Team, 
   type OrganizationContext 
 } from '../observables/universe-context';
+import { stateLog } from '@/logger';
+
+const log = stateLog('legend-state/loaders/universe-loader.ts');
 
 interface LoaderOptions {
   includeInactive?: boolean;
@@ -37,14 +40,14 @@ class UniverseLoader {
     const auth = authContext$.get();
     
     if (!auth.isAuthenticated) {
-      console.log('[UniverseLoader] Not authenticated, skipping load');
+      log.debug('Not authenticated, skipping load');
       return null;
     }
     
     const { includeInactive = false, includeArchived = false, bustCache = false } = options;
     
     try {
-      console.log('[UniverseLoader] Loading user organizations from API');
+      log.info('Loading user organizations from API');
       
       // Fetch user's organizations from the API
       const response = await fetch('/api/organizations', {
@@ -61,7 +64,7 @@ class UniverseLoader {
       const result = await response.json();
       const organizations = result.organizations || [];
       
-      console.log('[UniverseLoader] Loaded organizations from API:', {
+      log.info('Loaded organizations from API:', {
         count: organizations.length,
         orgs: organizations.map((o: any) => ({ id: o.id, name: o.name }))
       });
@@ -101,7 +104,7 @@ class UniverseLoader {
       return workspaceData;
       
     } catch (error) {
-      console.warn('[UniverseLoader] Failed to load workspace:', error);
+      log.warn('Failed to load workspace:', error);
       // Return null instead of throwing - let the system continue
       return null;
     }
@@ -155,7 +158,7 @@ class UniverseLoader {
       }
 
     } catch (error) {
-      console.error('Error loading personal context:', error);
+      log.error('Error loading personal context:', error);
       throw error;
     }
   }
@@ -211,7 +214,7 @@ class UniverseLoader {
       universeHelpers.setOrganizationContext(orgId, updatedOrgContext);
 
     } catch (error) {
-      console.error(`Error loading organization context for ${orgId}:`, error);
+      log.error(`Error loading organization context for ${orgId}:`, error);
       throw error;
     }
   }
@@ -233,7 +236,7 @@ class UniverseLoader {
       await this.loadOrganizationContext(existingWorld.organization_id);
 
     } catch (error) {
-      console.error(`Error refreshing world ${worldId}:`, error);
+      log.error(`Error refreshing world ${worldId}:`, error);
       throw error;
     }
   }
@@ -295,7 +298,7 @@ class UniverseLoader {
       return newWorld;
 
     } catch (error) {
-      console.error('Error creating world:', error);
+      log.error('Error creating world:', error);
       throw error;
     }
   }
@@ -346,7 +349,7 @@ class UniverseLoader {
       return updatedWorld;
 
     } catch (error) {
-      console.error(`Error updating world ${worldId}:`, error);
+      log.error(`Error updating world ${worldId}:`, error);
       throw error;
     }
   }
@@ -375,7 +378,7 @@ class UniverseLoader {
       universeHelpers.removeWorld(worldId);
 
     } catch (error) {
-      console.error(`Error deleting world ${worldId}:`, error);
+      log.error(`Error deleting world ${worldId}:`, error);
       throw error;
     }
   }
@@ -423,7 +426,7 @@ class UniverseLoader {
       return newTeam;
 
     } catch (error) {
-      console.error('Error creating team:', error);
+      log.error('Error creating team:', error);
       throw error;
     }
   }
@@ -434,16 +437,16 @@ class UniverseLoader {
    */
   async initialize(options: LoaderOptions = {}): Promise<void> {
     try {
-      console.log('[UniverseLoader] Initializing universe context...');
+      log.info('Initializing universe context...');
       
       // Authentication should already be set by auth machine
       // Just load the workspace data
       await this.loadWorkspaceData(options);
       
-      console.log('[UniverseLoader] Universe context initialized successfully');
+      log.info('Universe context initialized successfully');
       
     } catch (error) {
-      console.error('Error initializing universe context:', error);
+      log.error('Error initializing universe context:', error);
       // Don't throw to allow partial functionality
     }
   }
@@ -452,7 +455,7 @@ class UniverseLoader {
    * Refresh all data
    */
   async refresh(options: LoaderOptions = {}): Promise<void> {
-    console.log('[UniverseLoader] Refreshing workspace data');
+    log.info('Refreshing workspace data');
     await this.loadWorkspaceData({ ...options, bustCache: true });
   }
 }

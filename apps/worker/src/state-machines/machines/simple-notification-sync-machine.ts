@@ -95,11 +95,9 @@ export const simpleNotificationSyncMachine = setup({
   
   actions: {
     setupWebSocketListeners: ({ context, self }) => {
-      console.log('🔧 DIRECT CONSOLE LOG: Setting up WebSocket listeners')
-      log.info('🔧 [SimpleNotificationSync] Setting up WebSocket listeners')
+      log.info('🔧 Setting up WebSocket listeners')
       if (!context.webSocket) {
-        console.log('❌ DIRECT CONSOLE LOG: No WebSocket to set up listeners on')
-        log.info('❌ [SimpleNotificationSync] No WebSocket to set up listeners on')
+        log.warn('❌ No WebSocket to set up listeners on')
         return
       }
       
