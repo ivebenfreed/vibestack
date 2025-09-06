@@ -179,28 +179,24 @@ export class CoordinateSystem {
     };
   }
 
-  // Convert cell indices to viewport coordinates
+  // Convert cell indices to absolute coordinates
   cellToViewport(row: number, column: number, viewport: ViewportInfo): CellPosition {
     // Get column ID from index
     const columnId = this.indexToColumnId.get(column);
     if (!columnId) {
       // Fallback to old calculation if column not found  
-      const x = column * this.config.cellWidth - (viewport.scrollLeft || 0);
-      
-      // Canvas is transformed by scrollTop, so shapes need to be positioned
-      // relative to the current viewport, not absolute document position
-      const y = row * this.config.cellHeight - viewport.scrollTop;
-      
+      const x = column * this.config.cellWidth;
+      const y = row * this.config.cellHeight;
       
       return { x, y, row, column };
     }
     
-    // Get column position and adjust for horizontal scroll
-    const x = this.getColumnOffset(columnId) - (viewport.scrollLeft || 0);
+    // Get absolute column position (no scroll adjustment)
+    const x = this.getColumnOffset(columnId);
     
-    // Canvas is transformed by scrollTop, so we need to position shapes
-    // relative to the current viewport, not absolute document position
-    const y = row * this.config.cellHeight - viewport.scrollTop;
+    // Calculate absolute row position (no scroll adjustment)
+    // Canvas container handles scroll positioning via CSS transforms
+    const y = row * this.config.cellHeight;
 
     return { x, y, row, column };
   }
@@ -246,19 +242,22 @@ export class CoordinateSystem {
   isCellVisible(row: number, column: number, viewport: ViewportInfo): boolean {
     const position = this.cellToViewport(row, column, viewport);
     
-    // Since position.y is now relative to viewport (0 = top of viewport),
-    // we check if it's within the viewport height
-    const isVisible = position.y >= -this.config.cellHeight && 
-           position.y <= viewport.height + this.config.cellHeight &&
-           position.x >= 0 &&
-           position.x <= viewport.width;
+    // Position is now absolute, so we need to check against scrolled viewport bounds
+    const viewportTop = viewport.scrollTop || 0;
+    const viewportBottom = viewportTop + viewport.height;
+    const viewportLeft = viewport.scrollLeft || 0;
+    const viewportRight = viewportLeft + viewport.width;
+    
+    const isVisible = position.y >= viewportTop - this.config.cellHeight && 
+           position.y <= viewportBottom + this.config.cellHeight &&
+           position.x >= viewportLeft &&
+           position.x <= viewportRight;
            
-    log.info('CoordinateSystem.isCellVisible:', {
+    log.info('CoordinateSystem.isCellVisible (absolute coordinates):', {
       row,
       column,
       position,
-      viewportHeight: viewport.height,
-      viewportWidth: viewport.width,
+      viewportBounds: { top: viewportTop, bottom: viewportBottom, left: viewportLeft, right: viewportRight },
       isVisible
     });
     

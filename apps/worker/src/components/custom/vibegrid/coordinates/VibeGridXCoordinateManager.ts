@@ -267,20 +267,21 @@ export class VibeGridXCoordinateManager {
       };
     }
     
-    // Calculate viewport-relative position
-    // Since the canvas is transformed with the scroll offset, we should NOT adjust by viewport.start
-    // The canvas moves with scrollTop, so shapes should be positioned at their absolute Y
+    // Return absolute position (no scroll compensation)
+    // Canvas container handles scroll positioning via CSS transforms
+    // Overlays must use absolute coordinates to align properly with DOM cells
     const viewportY = absolutePos.y;
     const viewportX = absolutePos.x;
     
-    log.info('getCellPositionWithViewport: Calculating position', {
+    log.info('getCellPositionWithViewport: Using absolute coordinates', {
       rowId,
       absoluteRowIndex,
       absoluteY: absolutePos.y,
+      absoluteX: absolutePos.x,
       viewportStart: viewport.start,
       viewportEnd: viewport.end,
       scrollTop: viewport.scrollTop,
-      calculatedViewportY: viewportY
+      note: 'Absolute positioning - canvas transform handles scroll'
     });
     
     return {

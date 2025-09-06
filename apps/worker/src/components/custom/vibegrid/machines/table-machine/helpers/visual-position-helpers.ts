@@ -81,30 +81,28 @@ export const calculateVisualPositions = (
       isInViewport: absoluteRowIndex >= viewport.start && absoluteRowIndex <= viewport.end
     });
     
-    // Calculate position compensated for canvas scroll transform
-    // Canvas moves down with scroll, so selection position must move up to stay aligned
+    // Calculate absolute position WITHOUT scroll compensation
+    // The canvas container handles scroll positioning via CSS transforms
+    // Overlays must use absolute coordinates to align properly with DOM cells
     const baseY = absoluteRowIndex * rowHeight;
     const baseX = colData.offset;
     
-    // Subtract scroll offset to compensate for canvas movement
-    const scrollCompensatedY = baseY - (viewport.scrollTop || 0);
-    const scrollCompensatedX = baseX - (viewport.scrollLeft || 0);
-    
-    log.info('calculateVisualPositions: Cell position calculation', {
+    log.info('calculateVisualPositions: Cell position calculation (absolute positioning)', {
       cellKey,
       absoluteRowIndex,
-      baseY,
-      baseX,
-      scrollCompensatedY,
-      scrollCompensatedX,
+      baseY: baseY,
+      baseX: baseX,
+      rowHeight,
+      columnWidth: colData.width,
       viewportScrollTop: viewport.scrollTop,
-      viewportScrollLeft: viewport.scrollLeft
+      viewportScrollLeft: viewport.scrollLeft,
+      note: 'Using absolute coordinates - canvas transform handles scroll positioning'
     });
     
     visualPositions.push({
       cellKey,
-      x: scrollCompensatedX,
-      y: scrollCompensatedY,
+      x: baseX,
+      y: baseY,
       width: colData.width,
       height: rowHeight
     });

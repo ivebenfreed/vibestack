@@ -119,7 +119,8 @@ export class EditingOverlay {
     // Position the portal
     this.portal.style.display = 'block';
     
-    console.log('🔧 EditingOverlay: Portal positioned', {
+    console.log('🔧 EditingOverlay: Portal positioned with absolute coordinates', {
+      position,
       portalDisplay: this.portal.style.display,
       portalVisible: this.portal.offsetWidth > 0 && this.portal.offsetHeight > 0,
       portalBounds: this.portal.getBoundingClientRect(),
@@ -127,7 +128,8 @@ export class EditingOverlay {
       portalParent: this.portal.parentElement,
       containerInDOM: document.contains(this.container),
       containerVisible: this.container.offsetWidth > 0 && this.container.offsetHeight > 0,
-      containerBounds: this.container.getBoundingClientRect()
+      containerBounds: this.container.getBoundingClientRect(),
+      note: 'Position should now match cell coordinates exactly - no scroll compensation applied'
     });
     
     // Check editor type to determine positioning strategy
