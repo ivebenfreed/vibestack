@@ -977,31 +977,9 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   const entity$ = getEntity$(entityTableName);
   
   if (!entity$) {
-    log.warn('📊 TableStore: Entity observable not ready for', entityTableName, '- waiting...');
-    
-    // Wait for entity observable to be ready instead of returning empty data
-    return new Promise((resolve) => {
-      let attempts = 0;
-      const maxAttempts = 50; // Max 5 seconds (50 * 100ms)
-      
-      const checkReady = () => {
-        attempts++;
-        const entity$ = getEntity$(entityTableName);
-        
-        if (entity$) {
-          // Entity observable is now ready
-          loadInitialData(entityType, columns, page).then(resolve);
-        } else if (attempts >= maxAttempts) {
-          // Give up after max attempts
-          log.warn('📊 TableStore: Timeout waiting for entity observable:', entityTableName);
-          resolve({ entities: {}, relationships: {}, pagination: null });
-        } else {
-          // Check again after a delay (100ms instead of every frame)
-          setTimeout(checkReady, 100);
-        }
-      };
-      checkReady();
-    });
+    // Entity observable not ready - this shouldn't happen since the bridge handles this
+    log.warn('📊 TableStore: Entity observable not ready for', entityTableName);
+    return { entities: {}, relationships: {}, pagination: null };
   }
   
   // Get entities from Legend State observable - wait for data to be loaded
@@ -1024,28 +1002,9 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     
     // Check if data is actually loaded (not undefined or empty on first load)
     if (!entityData) {
-      log.info('📊 TableStore: Data not yet loaded for', entityTableName, '- waiting for sync...');
-      // Wait a bit for the initial sync to complete
-      return new Promise((resolve) => {
-        const checkDataReady = () => {
-          try {
-            const data = entity$.get();
-            if (data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
-              log.info('📊 TableStore: Data is now ready for', entityTableName);
-              // Recursively call loadInitialData now that data is ready
-              loadInitialData(entityType, columns, page).then(resolve);
-            } else {
-              // Check again in next frame
-              setTimeout(checkDataReady, 100);
-            }
-          } catch (error) {
-            // If there's an error, try again
-            setTimeout(checkDataReady, 100);
-          }
-        };
-        // Give it a moment for initial load, then start checking
-        setTimeout(checkDataReady, 100);
-      });
+      // Data not yet loaded - this is normal during initial sync
+      log.info('📊 TableStore: Data not yet loaded for', entityTableName);
+      return { entities: {}, relationships: {}, pagination: null };
     }
     
     entities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});

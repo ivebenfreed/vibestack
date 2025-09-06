@@ -62,7 +62,7 @@ import { dragActor } from '../../actors/drag-actor';
 // No overlay actor needed - canvas subscribes directly to table machine context
 
 // Import atomic store setup utilities  
-import { createTableStoreLogic, loadInitialData, setupGranularSubscriptions } from '../../stores/table-data-store-atomic';
+import { createTableStoreLogic } from '../../stores/table-data-store-atomic';
 import { createActor } from 'xstate';
 import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
 import { uiLog } from '@/logger';
@@ -473,53 +473,15 @@ export const tableBaseMachine = setup({
             
             log.info('TableMachine: Store subscription created', { hasSubscription: !!subscription });
             
-            // Load initial data with Promise.all then setup granular subscriptions
-            loadInitialData(context.entityType, context.columns)
-              .then(({ entities, relationships, pagination }) => {
-                log.info('TableMachine: Promise.all initial load complete', {
-                  entityCount: Object.keys(entities).length,
-                  relationshipTables: Object.keys(relationships),
-                  paginationEnabled: !!pagination
-                });
-                
-                // Set initial data atomically using event
-                storeActor.send({ type: 'setInitialData', entities, relationships });
-                
-                // Set pagination if needed
-                if (pagination) {
-                  storeActor.send({ type: 'setPagination', pagination });
-                }
-                
-                // SYNCHRONOUS: Send data directly to table machine (bypass subscription timing)
-                log.info('🚀 TableMachine: Sending data SYNCHRONOUSLY to avoid timing issues');
-                self.send({
-                  type: 'STORE_DATA_UPDATED',
-                  entities: Object.values(entities),
-                  loading: false,
-                  source: 'synchronous_initial_load'
-                });
-                
-                // Setup granular subscriptions for live updates
-                // Only enable if not in pagination mode (for now)
-                if (!pagination) {
-                  const cleanup = setupGranularSubscriptions(storeActor, context.entityType, context.columns);
-                  
-                  // Store cleanup in global registry
-                  (window as any).__vibegrid_store_cleanup = () => {
-                    if (cleanup && typeof cleanup === 'function') {
-                      cleanup();
-                    }
-                    storeActor.stop();
-                    delete (window as any).__vibegrid_store_actor;
-                  };
-                } else {
-                  log.info('📊 TableMachine: Pagination mode - live queries disabled for performance');
-                }
-              })
-              .catch(error => {
-                log.error('TableMachine: Initial data load failed', error);
-                storeActor.send({ type: 'setError', error: error.message });
-              });
+            // The Legend State bridge (created in VibeGrid.tsx) will handle loading data reactively
+            // No need to call loadInitialData here - it would cause unnecessary polling
+            log.info('TableMachine: Store actor created, waiting for data from Legend State bridge');
+            
+            // Store cleanup in global registry (bridge cleanup is handled separately)
+            (window as any).__vibegrid_store_cleanup = () => {
+              storeActor.stop();
+              delete (window as any).__vibegrid_store_actor;
+            };
             
             return storeActor;
           }
