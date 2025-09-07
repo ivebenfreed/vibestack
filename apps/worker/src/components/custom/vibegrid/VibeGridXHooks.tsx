@@ -3,6 +3,9 @@ import { useSelector } from '@xstate/react';
 import type { TableRow, RenderState, CellRef, OptimisticOperation, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
+import { uiLog } from '@/logger';
+
+const log = uiLog('components/custom/vibegrid/VibeGridXHooks.tsx');
 
 // ====================================
 // STATE EXTRACTION HOOKS
@@ -159,18 +162,28 @@ export const useVibeGridXApi = (
 ) => {
   // Safe send that checks if actor is still alive
   const safeSend = useCallback((event: any) => {
+    log.debug('🔍 DEBUG: safeSend called with event:', event);
+    
     if (!tableActor) {
-      console.warn('Table actor not available');
+      log.warn('Table actor not available');
       return;
     }
     
     const snapshot = tableActor.getSnapshot();
     if (snapshot?.status === 'done' || snapshot?.status === 'error') {
-      console.warn(`Cannot send event to ${snapshot.status} actor:`, event.type);
+      log.warn(`Cannot send event to ${snapshot.status} actor:`, event.type);
       return;
     }
     
+    log.debug('🔍 DEBUG: Calling tableSend with event:', { 
+      eventType: event.type, 
+      columnId: event.columnId,
+      currentState: snapshot?.value,
+      machineStatus: snapshot?.status,
+      canProcessEvent: snapshot?.can?.(event)
+    });
     tableSend(event);
+    log.debug('🔍 DEBUG: tableSend completed');
   }, [tableSend, tableActor]);
   
   return useMemo(() => ({

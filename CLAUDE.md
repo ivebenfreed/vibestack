@@ -221,8 +221,9 @@ log.error('Validation failed', error); // Always shows (unless file muted)
 
 ### File-Level Configuration
 - **Global Level**: Base log level for all files in context
-- **File Overrides**: Specific files can have different levels
-- **Pattern Support**: `vibegrid` matches all VibeGrid components
+- **File Overrides**: Specific files can have different levels (e.g., `vibegrid:warn`)
+- **Pattern Support**: `vibegrid` matches all VibeGrid components automatically
+- **Silent Setup**: File configurations load without startup noise
 - **Persistent**: Configuration survives HMR via dev scripts
 
 ### Troubleshooting Logger Issues

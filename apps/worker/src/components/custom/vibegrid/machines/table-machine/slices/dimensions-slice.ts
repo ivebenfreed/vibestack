@@ -35,11 +35,14 @@ export interface RowCoordinate {
   originalIndex: number;
   sortedIndex: number;
   offset: number;
+  height?: number; // Variable height support for mixed row types
+  type?: 'data' | 'group' | 'summary'; // Row type for mixed rendering
 }
 
 export interface CoordinateMapping {
   rows: RowCoordinate[];
   columns: ColumnCoordinate[];
+  totalHeight?: number; // Total content height for virtual scrolling with variable heights
   version: number;
 }
 
@@ -102,15 +105,43 @@ const buildColumnCoordinates = (
 };
 
 /**
- * Build row coordinates
+ * Build row coordinates for uniform height rows
  */
 const buildRowCoordinates = (rowCount: number, rowHeight: number): RowCoordinate[] => {
   return Array.from({ length: rowCount }, (_, index) => ({
     rowId: `row-${index}`,
     originalIndex: index,
     sortedIndex: index,
-    offset: index * rowHeight
+    offset: index * rowHeight,
+    height: rowHeight,
+    type: 'data' as const
   }));
+};
+
+/**
+ * Build row coordinates from virtual rows (supports variable heights)
+ */
+const buildRowCoordinatesFromVirtualRows = (virtualRows: any[]): { coordinates: RowCoordinate[], totalHeight: number } => {
+  const coordinates: RowCoordinate[] = [];
+  let currentOffset = 0;
+  
+  virtualRows.forEach((virtualRow, index) => {
+    coordinates.push({
+      rowId: virtualRow.id,
+      originalIndex: index,
+      sortedIndex: index,
+      offset: currentOffset,
+      height: virtualRow.height,
+      type: virtualRow.type
+    });
+    
+    currentOffset += virtualRow.height;
+  });
+  
+  return {
+    coordinates,
+    totalHeight: currentOffset
+  };
 };
 
 // ====================================
@@ -255,6 +286,46 @@ export const dimensionActions = {
         version: context.coordinateMapping.version + 1
       };
     }
+  }),
+
+  /**
+   * Update coordinate mapping from virtual rows (for grouped rendering)
+   */
+  updateFromVirtualRows: assign({
+    coordinateMapping: ({ context }, event) => {
+      // Handle undefined event
+      if (!event) {
+        log.warn('🔄 updateFromVirtualRows called without event');
+        return context.coordinateMapping;
+      }
+      
+      // Type the event properly and handle undefined
+      const typedEvent = event as { virtualRows?: any[] };
+      
+      if (!typedEvent.virtualRows) {
+        log.warn('🔄 updateFromVirtualRows called without virtualRows', { event: typedEvent });
+        return context.coordinateMapping;
+      }
+      
+      const { coordinates, totalHeight } = buildRowCoordinatesFromVirtualRows(typedEvent.virtualRows);
+      
+      log.info('🔄 Updated coordinate mapping from virtual rows', {
+        virtualRowCount: typedEvent.virtualRows.length,
+        coordinateCount: coordinates.length,
+        totalHeight,
+        rowTypes: coordinates.map(c => c.type).reduce((acc, type) => {
+          acc[type] = (acc[type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      });
+      
+      return {
+        ...context.coordinateMapping,
+        rows: coordinates,
+        totalHeight,
+        version: context.coordinateMapping.version + 1
+      };
+    }
   })
 };
 
@@ -315,8 +386,20 @@ export const dimensionSelectors = {
   },
   
   getRowAtPosition: (context: DimensionsState, y: number): RowCoordinate | undefined => {
+    // Handle variable height rows
+    const rows = context.coordinateMapping.rows;
+    
+    // If rows have variable heights, find by offset ranges
+    if (rows.some(row => row.height !== undefined)) {
+      return rows.find(row => {
+        const height = row.height || context.rowHeight;
+        return y >= row.offset && y < row.offset + height;
+      });
+    }
+    
+    // Fallback to uniform height calculation
     const rowIndex = Math.floor(y / context.rowHeight);
-    return context.coordinateMapping.rows[rowIndex];
+    return rows[rowIndex];
   },
   
   // Aggregate queries
@@ -328,6 +411,11 @@ export const dimensionSelectors = {
   },
   
   getTotalHeight: (context: DimensionsState): number => {
+    // Use explicit totalHeight if available (for variable height rows)
+    if (context.coordinateMapping.totalHeight !== undefined) {
+      return context.coordinateMapping.totalHeight;
+    }
+    // Fallback to uniform height calculation
     return context.totalRows * context.rowHeight;
   },
   

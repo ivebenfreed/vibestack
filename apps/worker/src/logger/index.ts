@@ -53,11 +53,11 @@ class SimpleLogger {
     
     this.logLevel = level as LogLevel;
     
-    if (contexts === undefined) {
-      // No env var specified, default to quiet mode
+    if (contexts === undefined || contexts === '') {
+      // No env var specified or empty string, default to quiet mode
       this.enabledContexts = new Set();
-    } else if (contexts === '') {
-      // Empty string explicitly set, disable all contexts (quiet mode)
+    } else if (contexts === 'none') {
+      // Explicitly set to none
       this.enabledContexts = new Set();
     } else {
       // Specific contexts set via dev script
@@ -73,10 +73,16 @@ class SimpleLogger {
         const [pattern, fileLevel] = config.split(':');
         if (pattern && fileLevel) {
           // Handle patterns (e.g., "vibegrid/*" or specific files)
-          if (pattern.includes('vibegrid')) {
-            this.setPatternLevel('vibegrid', fileLevel as LogLevel);
+          const lowerPattern = pattern.toLowerCase();
+          if (lowerPattern.includes('vibegrid')) {
+            this.setPatternLevel('vibegrid', fileLevel as LogLevel, true);
+          } else if (lowerPattern === 'groupconfig' || lowerPattern === 'groupheaderrow') {
+            // Handle specific VibeGrid component names
+            this.setFileLevel(`components/custom/vibegrid/components/${pattern}`, fileLevel as LogLevel, true);
+          } else if (lowerPattern === 'vibegridxheader') {
+            this.setFileLevel('components/custom/vibegrid/components/VibeGridXHeader', fileLevel as LogLevel, true);
           } else {
-            this.setFileLevel(pattern, fileLevel as LogLevel);
+            this.setFileLevel(pattern, fileLevel as LogLevel, true);
           }
         }
       });
@@ -87,7 +93,7 @@ class SimpleLogger {
     const mutedFiles = import.meta.env.VITE_LOG_MUTED_FILES;
     if (mutedFiles) {
       mutedFiles.split(',').forEach((file: string) => {
-        if (file) this.muteFile(file);
+        if (file) this.muteFile(file, true);
       });
     }
     
@@ -224,20 +230,20 @@ class SimpleLogger {
   }
 
   // File-level control methods
-  setFileLevel(filePath: string, level: LogLevel): void {
+  setFileLevel(filePath: string, level: LogLevel, silent = false): void {
     const key = this.getFileKey(filePath);
     const config = this.fileConfigs.get(key) || {};
     config.level = level;
     this.fileConfigs.set(key, config);
-    console.info(`📄 Set ${key} to ${level} level`);
+    if (!silent) console.info(`📄 Set ${key} to ${level} level`);
   }
 
-  muteFile(filePath: string): void {
+  muteFile(filePath: string, silent = false): void {
     const key = this.getFileKey(filePath);
     const config = this.fileConfigs.get(key) || {};
     config.muted = true;
     this.fileConfigs.set(key, config);
-    console.info(`🔇 Muted ${key}`);
+    if (!silent) console.info(`🔇 Muted ${key}`);
   }
 
   unmuteFile(filePath: string): void {
@@ -264,7 +270,7 @@ class SimpleLogger {
   }
 
   // Set level for multiple files matching a pattern
-  setPatternLevel(pattern: string, level: LogLevel): void {
+  setPatternLevel(pattern: string, level: LogLevel, silent = false): void {
     // Store pattern-based rules for evaluation
     // For simplicity, we'll handle common patterns
     if (pattern.includes('vibegrid')) {
@@ -284,10 +290,12 @@ class SimpleLogger {
         'components/custom/vibegrid/VibeGridXHooks',
         'components/custom/vibegrid/components/ContextMenuRenderer',
         'components/custom/vibegrid/components/VibeGridXColumnVisibility',
-        'components/custom/vibegrid/components/VibeGridXHeader'
+        'components/custom/vibegrid/components/VibeGridXHeader',
+        'components/custom/vibegrid/components/GroupHeaderRow',
+        'components/custom/vibegrid/components/GroupConfig'
       ];
-      vibegridFiles.forEach(file => this.setFileLevel(file, level));
-      console.info(`🎯 Set all VibeGrid files to ${level} level`);
+      vibegridFiles.forEach(file => this.setFileLevel(file, level, silent));
+      if (!silent) console.info(`🎯 Set all VibeGrid files to ${level} level`);
     }
   }
 

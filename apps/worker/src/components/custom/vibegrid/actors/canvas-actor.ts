@@ -213,6 +213,12 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             return;
           }
           
+          // Check if mapping is null (can happen when columns are toggled before coordinate recalculation)
+          if (!event.mapping) {
+            log.warn('CanvasActor: UPDATE_COORDINATES received with null mapping, skipping update');
+            return;
+          }
+          
           log.info('CanvasActor: Updating coordinates:', {
             mappingVersion: event.mapping.version,
             rowCount: event.mapping.rows?.length || 0,

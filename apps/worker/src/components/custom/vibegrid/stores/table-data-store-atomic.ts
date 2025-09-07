@@ -692,24 +692,41 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
         hiddenColumnCount: (context, event) => {
           const visibility = event.columnVisibility;
           return Object.values(visibility).filter(v => !v).length;
-        }
+        },
+        // IMPORTANT: Preserve data during column visibility changes
+        processedRows: (context) => context.processedRows || [],
+        originalRows: (context) => context.originalRows || [],
+        entities: (context) => context.entities || {}
       },
       
       toggleColumnVisibility: {
         columnVisibility: (context, event: { columnId: string }) => {
+          // If column is not in visibility map or is true, it's visible -> hide it (set to false)
+          // If column is false, it's hidden -> show it (set to true or remove from map)
+          const currentVisibility = context.columnVisibility[event.columnId];
+          const isCurrentlyVisible = currentVisibility !== false;
+          
           const newVisibility = {
             ...context.columnVisibility,
-            [event.columnId]: !context.columnVisibility[event.columnId]
+            [event.columnId]: !isCurrentlyVisible  // Toggle: visible->false, hidden->true
           };
           return newVisibility;
         },
         hiddenColumnCount: (context, event) => {
+          // Same logic for calculating new visibility
+          const currentVisibility = context.columnVisibility[event.columnId];
+          const isCurrentlyVisible = currentVisibility !== false;
+          
           const newVisibility = {
             ...context.columnVisibility,
-            [event.columnId]: !context.columnVisibility[event.columnId]
+            [event.columnId]: !isCurrentlyVisible
           };
-          return Object.values(newVisibility).filter(v => !v).length;
-        }
+          return Object.values(newVisibility).filter(v => v === false).length;
+        },
+        // IMPORTANT: Preserve data during column visibility changes
+        processedRows: (context) => context.processedRows || [],
+        originalRows: (context) => context.originalRows || [],
+        entities: (context) => context.entities || {}
       },
       
       showAllColumns: {
@@ -727,7 +744,11 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           });
           return allVisible;
         },
-        hiddenColumnCount: 0
+        hiddenColumnCount: 0,
+        // IMPORTANT: Preserve data during column visibility changes
+        processedRows: (context) => context.processedRows || [],
+        originalRows: (context) => context.originalRows || [],
+        entities: (context) => context.entities || {}
       },
       
       hideAllColumns: {
@@ -751,11 +772,19 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             count = columns.filter(col => col.id !== '__selection').length;
           }
           return count;
-        }
+        },
+        // IMPORTANT: Preserve data during column visibility changes
+        processedRows: (context) => context.processedRows || [],
+        originalRows: (context) => context.originalRows || [],
+        entities: (context) => context.entities || {}
       },
       
       setColumnOrder: {
-        columnOrder: (context, event: { columnOrder: string[] }) => event.columnOrder
+        columnOrder: (context, event: { columnOrder: string[] }) => event.columnOrder,
+        // IMPORTANT: Preserve data during column order changes
+        processedRows: (context) => context.processedRows || [],
+        originalRows: (context) => context.originalRows || [],
+        entities: (context) => context.entities || {}
       },
       
       reorderColumns: {
@@ -766,6 +795,9 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             currentColumns: context.columns.map(c => c.id),
             visibility: context.columnVisibility
           });
+          
+          // Check if we have a selection column
+          const selectionColumn = context.columns.find((col: any) => col.id === '__selection');
           
           // Get visible columns only (excluding selection column)
           const visibleColumns = context.columns.filter((col: any) => 
@@ -790,9 +822,15 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           const newColumns: any[] = [];
           const addedColumns = new Set<string>();
           
+          // Always add selection column first if it exists
+          if (selectionColumn) {
+            newColumns.push(selectionColumn);
+            addedColumns.add(selectionColumn.id);
+          }
+          
           // Process each column in the original order
           for (const column of context.columns) {
-            // Special handling for selection column - skip it
+            // Skip selection column as we already added it
             if (column.id === '__selection') {
               continue;
             }
@@ -842,7 +880,19 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
         columnOrder: (context, event: { fromIndex: number; toIndex: number }) => {
           // This will be computed from the new columns array
           return context.columns.map(c => c.id);
-        }
+        },
+        // IMPORTANT: Preserve processedRows during column reordering
+        processedRows: (context) => {
+          log.info('🔄 Store: Preserving processedRows during reorder', {
+            rowCount: context.processedRows?.length || 0,
+            hasRows: !!context.processedRows
+          });
+          return context.processedRows || [];
+        },
+        // Also preserve originalRows
+        originalRows: (context) => context.originalRows || [],
+        // Preserve entities as well
+        entities: (context) => context.entities || {}
       },
       
       setColumnWidths: {

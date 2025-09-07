@@ -39,6 +39,7 @@ pnpm dev:ui:focus-vibegrid       # UI at error level, VibeGrid at debug level
 # Debug mode with quiet VibeGrid
 pnpm dev:debug:quiet-vibegrid    # Multiple contexts at debug, VibeGrid at warn
 
+
 # Focus on specific file
 pnpm dev:focus                   # Only shows logs from universe-loader
 ```
@@ -48,13 +49,12 @@ pnpm dev:focus                   # Only shows logs from universe-loader
 Use the wrapper script directly for custom configurations:
 
 ```bash
-# Custom configuration example
+# Custom configuration example with file-level overrides
 ./scripts/dev-with-logging.sh custom \
   --contexts=ui,sync \
   --level=debug \
   --file-levels=vibegrid:warn,universe-loader:info \
-  --muted=table-data-store \
-  --only=MyComponent
+  --muted=table-data-store
 ```
 
 ## Runtime Controls (Browser Console)
@@ -119,8 +119,10 @@ The `vibegrid` pattern automatically matches all VibeGrid component files:
 - `components/custom/vibegrid/VibeGrid`
 - `components/custom/vibegrid/stores/*`
 - `components/custom/vibegrid/actors/*`
-- `components/custom/vibegrid/systems/*`
-- etc.
+- `components/custom/vibegrid/components/*`
+- All VibeGridX core files and utilities
+
+This makes it simple to control verbosity: `vibegrid:warn` quiets all VibeGrid files.
 
 ## Benefits ✅
 

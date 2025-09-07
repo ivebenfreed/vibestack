@@ -11,6 +11,7 @@ import { createInitialSelectionState, selectionActions } from './slices/selectio
 import { createInitialEditState, editActions } from './slices/edit-slice';
 import { createInitialDragState, dragActions } from './slices/drag-slice';
 import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
+import { createInitialGroupState, groupActions } from './slices/group-slice';
 
 // Import event handlers
 import { selectionHandlers } from './event-handlers/selection-handlers';
@@ -21,6 +22,7 @@ import { dragHandlers } from './event-handlers/drag-handlers';
 import { fillHandlers } from './event-handlers/fill-handlers';
 import { clipboardHandlers } from './event-handlers/clipboard-handlers';
 import { contextMenuHandlers } from './event-handlers/contextmenu-handlers';
+import { groupHandlers } from './event-handlers/group-handlers';
 
 // Import helpers
 import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
@@ -65,8 +67,10 @@ import { dragActor } from '../../actors/drag-actor';
 import { createTableStoreLogic } from '../../stores/table-data-store-atomic';
 import { createActor } from 'xstate';
 import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/machines/table-machine/index.ts');
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+const LOG_LEVEL: LogLevel = 'info';  // DEBUG: Group toggle debugging
+const log = createLogger('table-machine', LOG_LEVEL);
 
 
 // ====================================
@@ -115,6 +119,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   
   // Create overlay state
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
+  
+  // Create group state
+  const groupState = createInitialGroupState();
   
   // Add relationship providers to columns - they'll use the store actor from context
   const columnsWithProviders = addRelationshipProvidersToColumns(
@@ -166,6 +173,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Spread overlay state
     ...overlayState,
+    
+    // Spread group state
+    ...groupState,
     
     // Context menu state
     contextMenu: {
@@ -271,6 +281,9 @@ export const tableBaseMachine = setup({
     
     // Overlay actions
     ...overlayActions,
+    
+    // Group actions
+    ...groupActions,
     
     // Additional actions
     logError: ({ event, context }) => {
@@ -591,7 +604,36 @@ export const tableBaseMachine = setup({
       
       states: {
         idle: {
-          entry: [],
+          entry: [
+            // DEBUG: Log when entering idle state
+            ({ context, self }) => {
+              log.info('🟢 TableMachine: Entering IDLE state', {
+                hasStoreActor: !!context.storeActor,
+                hasRendererActor: !!context.actors?.rendererActor,
+                hasCanvasActor: !!context.actors?.canvasActor
+              });
+            }
+          ],
+          
+          // DEBUG: Add universal event logger to see ALL events received by idle state
+          always: [
+            {
+              actions: ({ event, context, self }) => {
+                // Only log view.columns.toggle events to avoid spam
+                if (event.type === 'view.columns.toggle') {
+                  const snapshot = self.getSnapshot();
+                  log.error('🚨 IDLE STATE: Received view.columns.toggle event!', {
+                    eventType: event.type,
+                    columnId: event.columnId,
+                    currentState: snapshot?.value,
+                    stateCanHandle: snapshot?.can?.(event),
+                    handlersIncluded: 'viewHandlers should be in on object below',
+                    timestamp: Date.now()
+                  });
+                }
+              }
+            }
+          ],
           
           on: {
             
@@ -830,7 +872,8 @@ export const tableBaseMachine = setup({
             ...dragHandlers,
             ...fillHandlers,
             ...clipboardHandlers,
-            ...contextMenuHandlers
+            ...contextMenuHandlers,
+            ...groupHandlers
           }
         }
       },
@@ -840,10 +883,28 @@ export const tableBaseMachine = setup({
       // Handle store snapshot updates - simplified flow
       STORE_SNAPSHOT_RECEIVED: {
         actions: [
+          // Debug log the snapshot
+          ({ event }) => {
+            log.info('🔍 TableMachine: STORE_SNAPSHOT_RECEIVED - Snapshot details', {
+              hasSnapshot: !!event.snapshot,
+              hasContext: !!event.snapshot?.context,
+              processedRowsCount: event.snapshot?.context?.processedRows?.length || 0,
+              columnsCount: event.snapshot?.context?.columns?.length || 0,
+              hasProcessedRows: !!event.snapshot?.context?.processedRows,
+              processedRowsType: Array.isArray(event.snapshot?.context?.processedRows) ? 'array' : typeof event.snapshot?.context?.processedRows
+            });
+          },
           // Update context with processed data from store
           assign({
             entities: ({ event }) => event.snapshot?.context?.entities ? Object.values(event.snapshot.context.entities) : [],
-            rows: ({ event }) => event.snapshot?.context?.processedRows || [],
+            rows: ({ event }) => {
+              const rows = event.snapshot?.context?.processedRows || [];
+              log.info('🔍 TableMachine: Updating rows from store snapshot', {
+                rowCount: rows.length,
+                hasRows: !!event.snapshot?.context?.processedRows
+              });
+              return rows;
+            },
             visibleRowIds: ({ event }) => event.snapshot?.context?.processedRows?.map((r: any) => r.id) || [],
             sortBy: ({ event }) => event.snapshot?.context?.sortBy || [],
             filters: ({ event }) => event.snapshot?.context?.filters || [],
@@ -856,6 +917,20 @@ export const tableBaseMachine = setup({
           
           // Recalculate coordinate mapping with the new columns from store
           dimensionActions.recalculateCoordinateMapping,
+          
+          // Send updated coordinates to canvas after recalculation
+          ({ context, self }) => {
+            if (context.actors?.canvasActor && context.coordinateMapping) {
+              log.info('TableMachine: Sending updated coordinates to canvas after store update', {
+                version: context.coordinateMapping.version,
+                columnCount: context.coordinateMapping.columns.length
+              });
+              context.actors.canvasActor.send({
+                type: 'UPDATE_COORDINATES',
+                mapping: context.coordinateMapping
+              });
+            }
+          },
           
           // Always render when store emits new data - store decides what changed
           ({ context, self, event }) => {
@@ -992,6 +1067,25 @@ export const tableBaseMachine = setup({
         ]
       },
       
+      // Handle group toggle events from renderer
+      GROUP_TOGGLE: {
+        actions: [
+          ({ event, self }) => {
+            log.info('TableMachine: GROUP_TOGGLE received from renderer', { 
+              event,
+              eventKeys: Object.keys(event || {}),
+              groupId: event?.groupId,
+              eventType: typeof event 
+            });
+            // Forward to group.toggle event
+            self.send({
+              type: 'group.toggle',
+              groupId: event.groupId
+            });
+          }
+        ]
+      },
+      
       // Canvas actor is now pre-created, these actions are no longer needed
       SPAWN_CANVAS_ACTOR: {
         actions: [
@@ -1109,6 +1203,16 @@ export const tableBaseMachine = setup({
       
       // Context menu events
       ...contextMenuHandlers,
+      
+      // Group events
+      ...groupHandlers,
+      
+      // Handle coordinate mapping update from virtual rows
+      'UPDATE_COORDINATE_MAPPING_FROM_VIRTUAL_ROWS': {
+        actions: [
+          dimensionActions.updateFromVirtualRows
+        ]
+      },
       
       // Legacy edit events (now handled by edit slice)
       'edit.legacy.*': {

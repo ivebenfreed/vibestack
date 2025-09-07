@@ -187,7 +187,11 @@ export const viewActions = {
       return willBeHidden
         ? context.hiddenColumnCount + 1
         : context.hiddenColumnCount - 1;
-    }
+    },
+    // CRITICAL FIX: Preserve data during column visibility changes
+    rows: ({ context }) => context.rows,
+    entities: ({ context }) => context.entities,
+    visibleRowIds: ({ context }) => context.visibleRowIds
   }),
   
   setColumnVisibility: assign({

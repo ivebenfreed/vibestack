@@ -14,8 +14,11 @@ import type {
   SortConfig 
 } from '../../types';
 import { CellPipeline } from './CellPipeline';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/renderers/core/CleanTableRenderer.ts');
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+// File-level log control
+const LOG_LEVEL: LogLevel | undefined = undefined;  // Use global (quiet)
+const log = createLogger('CleanTableRenderer', LOG_LEVEL);
 
 // ====================================
 // TYPES

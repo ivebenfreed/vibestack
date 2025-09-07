@@ -232,11 +232,62 @@ export interface GroupNode {
   id: string;
   field: string;
   value: any;
+  displayValue: string; // Human-readable display text
   level: number;
+  parentId?: string; // For hierarchical grouping
   rowCount: number;
+  totalCount?: number; // Recursive count for nested groups
   children: GroupNode[] | TableRow[];
   isCollapsed?: boolean;
   summary?: Record<string, any>;
+  aggregations?: GroupAggregation[]; // Calculated aggregations
+  sortOrder?: number; // Custom group ordering
+}
+
+// ====================================
+// VIRTUAL ROW TYPES (for Mixed Rendering)
+// ====================================
+
+export type VirtualRowType = 'data' | 'group' | 'summary';
+
+export interface VirtualRow {
+  type: VirtualRowType;
+  id: string;
+  index: number; // Position in the flattened virtual array
+  height: number; // Row height (may vary by type)
+  data: TableRow | GroupNode; // The actual data
+  level?: number; // Nesting level for groups
+  isExpandable?: boolean; // Can be expanded/collapsed
+  parentGroupId?: string; // Parent group for data rows
+}
+
+// Group aggregation configuration and results
+export interface GroupAggregation {
+  field: string;
+  function: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'unique';
+  value: number | string;
+  displayValue: string;
+}
+
+// Group configuration for multi-level grouping
+export interface GroupConfig {
+  fields: GroupField[]; // Multiple grouping fields
+  sortBy: 'name' | 'count' | 'custom';
+  sortDirection: 'asc' | 'desc';
+  aggregations: AggregationConfig[];
+  expandedGroups: Set<string>; // Which groups are expanded
+  colorScheme?: 'auto' | 'none' | 'custom';
+}
+
+export interface GroupField {
+  field: string; // Column field name
+  displayName: string; // Human-readable name
+}
+
+export interface AggregationConfig {
+  field: string; // Field to aggregate
+  function: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'unique';
+  displayName?: string; // Custom display name
 }
 
 // ====================================
@@ -472,7 +523,21 @@ export type TableEvents =
   | { type: 'contextmenu.insert.column' }
   | { type: 'contextmenu.delete.column' }
   
-  // View events
+  // Group events (enhanced)
+  | { type: 'group.config.set'; config: GroupConfig }
+  | { type: 'group.field.add'; field: GroupField }
+  | { type: 'group.field.remove'; field: string }
+  | { type: 'group.field.reorder'; fromIndex: number; toIndex: number }
+  | { type: 'group.toggle'; groupId: string }
+  | { type: 'group.expand.all' }
+  | { type: 'group.collapse.all' }
+  | { type: 'group.aggregation.add'; config: AggregationConfig }
+  | { type: 'group.aggregation.remove'; field: string }
+  | { type: 'group.aggregation.update'; field: string; config: AggregationConfig }
+  | { type: 'group.sort.set'; sortBy: 'name' | 'count' | 'custom'; direction: 'asc' | 'desc' }
+  | { type: 'group.move.item'; itemId: string; fromGroupId: string; toGroupId: string; newValue: any }
+  
+  // Legacy group events (deprecated - use enhanced events above)
   | { type: 'view.group.set'; groupBy: string[] }
   | { type: 'view.group.toggle'; groupId: string }
   | { type: 'view.sort.set'; sortBy: SortConfig[] }
@@ -619,23 +684,27 @@ export interface RendererOptions {
 
 export interface RenderState {
   rows: TableRow[]; // All rows in the table (renamed from visibleRows for clarity)
+  virtualRows?: VirtualRow[]; // Mixed row types for grouped rendering (optional - fallback to rows)
   columns?: Column<any>[];
   selectedCells: Set<string>;
   editingCell: CellRef | null;
   groupedData: GroupNode[];
+  groupConfig?: GroupConfig; // Current group configuration
   optimisticOperations: Map<string, OptimisticOperation>;
   version: number;
   sortBy?: SortConfig[]; // Current sort configuration
   columnVisibility?: Record<string, boolean>; // Column visibility state
   columnOrder?: string[]; // Column order array
   
-  // AUTHORITATIVE coordinate mapping from state machine
+  // AUTHORITATIVE coordinate mapping from state machine (updated for variable heights)
   coordinateMapping?: {
     rows: Array<{
       rowId: string;
       originalIndex: number;
       sortedIndex: number;
       offset: number;
+      height?: number; // Variable height support
+      type?: VirtualRowType; // Row type for mixed rendering
     }>;
     columns: Array<{
       columnId: string;
@@ -643,6 +712,7 @@ export interface RenderState {
       offset: number;
       width: number;
     }>;
+    totalHeight?: number; // Total content height for virtual scrolling
     version: number;
   };
 }
