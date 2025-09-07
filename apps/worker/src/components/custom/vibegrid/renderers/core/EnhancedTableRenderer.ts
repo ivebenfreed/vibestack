@@ -70,6 +70,15 @@ export class EnhancedTableRenderer extends CleanTableRenderer {
       version: state.version
     });
     
+    // CRITICAL DEBUG: Log the exact state before processing
+    log.error('🚨 ENHANCED: State received with rows', {
+      rowsLength: state.rows?.length || 0,
+      rowsType: Array.isArray(state.rows) ? 'array' : typeof state.rows,
+      firstRow: state.rows?.[0],
+      hasRows: !!state.rows,
+      stateKeys: Object.keys(state)
+    });
+    
     // Update group state
     this.groupConfig = state.groupConfig || null;
     if (state.groupConfig) {
@@ -80,6 +89,13 @@ export class EnhancedTableRenderer extends CleanTableRenderer {
     if (state.virtualRows && state.virtualRows.length > 0) {
       this.renderGrouped(state);
     } else {
+      // CRITICAL DEBUG: Log state before passing to parent
+      log.error('🚨 ENHANCED: About to call super.render() with state', {
+        rowsLength: state.rows?.length || 0,
+        hasRows: !!state.rows,
+        aboutToCallSuper: true
+      });
+      
       // Fallback to parent's standard rendering
       super.render(state);
     }

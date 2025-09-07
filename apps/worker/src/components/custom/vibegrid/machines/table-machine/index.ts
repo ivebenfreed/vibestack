@@ -604,7 +604,36 @@ export const tableBaseMachine = setup({
       
       states: {
         idle: {
-          entry: [],
+          entry: [
+            // DEBUG: Log when entering idle state
+            ({ context, self }) => {
+              log.info('🟢 TableMachine: Entering IDLE state', {
+                hasStoreActor: !!context.storeActor,
+                hasRendererActor: !!context.actors?.rendererActor,
+                hasCanvasActor: !!context.actors?.canvasActor
+              });
+            }
+          ],
+          
+          // DEBUG: Add universal event logger to see ALL events received by idle state
+          always: [
+            {
+              actions: ({ event, context, self }) => {
+                // Only log view.columns.toggle events to avoid spam
+                if (event.type === 'view.columns.toggle') {
+                  const snapshot = self.getSnapshot();
+                  log.error('🚨 IDLE STATE: Received view.columns.toggle event!', {
+                    eventType: event.type,
+                    columnId: event.columnId,
+                    currentState: snapshot?.value,
+                    stateCanHandle: snapshot?.can?.(event),
+                    handlersIncluded: 'viewHandlers should be in on object below',
+                    timestamp: Date.now()
+                  });
+                }
+              }
+            }
+          ],
           
           on: {
             
@@ -854,10 +883,28 @@ export const tableBaseMachine = setup({
       // Handle store snapshot updates - simplified flow
       STORE_SNAPSHOT_RECEIVED: {
         actions: [
+          // Debug log the snapshot
+          ({ event }) => {
+            log.info('🔍 TableMachine: STORE_SNAPSHOT_RECEIVED - Snapshot details', {
+              hasSnapshot: !!event.snapshot,
+              hasContext: !!event.snapshot?.context,
+              processedRowsCount: event.snapshot?.context?.processedRows?.length || 0,
+              columnsCount: event.snapshot?.context?.columns?.length || 0,
+              hasProcessedRows: !!event.snapshot?.context?.processedRows,
+              processedRowsType: Array.isArray(event.snapshot?.context?.processedRows) ? 'array' : typeof event.snapshot?.context?.processedRows
+            });
+          },
           // Update context with processed data from store
           assign({
             entities: ({ event }) => event.snapshot?.context?.entities ? Object.values(event.snapshot.context.entities) : [],
-            rows: ({ event }) => event.snapshot?.context?.processedRows || [],
+            rows: ({ event }) => {
+              const rows = event.snapshot?.context?.processedRows || [];
+              log.info('🔍 TableMachine: Updating rows from store snapshot', {
+                rowCount: rows.length,
+                hasRows: !!event.snapshot?.context?.processedRows
+              });
+              return rows;
+            },
             visibleRowIds: ({ event }) => event.snapshot?.context?.processedRows?.map((r: any) => r.id) || [],
             sortBy: ({ event }) => event.snapshot?.context?.sortBy || [],
             filters: ({ event }) => event.snapshot?.context?.filters || [],

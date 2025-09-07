@@ -143,12 +143,46 @@ export const viewHandlers = {
   
   'view.columns.toggle': {
     actions: [
+      // CRITICAL DEBUG: First action to prove handler executes
+      ({ context, event, self }) => {
+        const snapshot = self.getSnapshot();
+        log.error('🚨 CRITICAL: view.columns.toggle handler EXECUTING!', {
+          columnId: event.columnId,
+          currentState: snapshot?.value,
+          stateCanProcess: snapshot?.can?.(event),
+          hasStoreActor: !!context.storeActor,
+          storeActorStatus: context.storeActor?.getSnapshot?.()?.status,
+          machineStatus: snapshot?.status,
+          timestamp: Date.now()
+        });
+      },
+      
       // Just forward to store
       ({ context, event }) => {
+        log.info('🔍 DEBUG: view.columns.toggle handler', {
+          columnId: event.columnId,
+          hasStoreActor: !!context.storeActor,
+          storeActorType: context.storeActor ? typeof context.storeActor : 'null',
+          storeActorState: context.storeActor?.getSnapshot?.()?.value,
+          contextKeys: Object.keys(context),
+          hasActors: !!context.actors,
+          actorsKeys: context.actors ? Object.keys(context.actors) : []
+        });
+        
         if (context.storeActor) {
+          log.info('🔍 DEBUG: Sending toggleColumnVisibility to store actor', {
+            columnId: event.columnId,
+            eventType: 'toggleColumnVisibility'
+          });
           context.storeActor.send({
             type: 'toggleColumnVisibility',
             columnId: event.columnId
+          });
+        } else {
+          log.error('🔍 DEBUG: NO STORE ACTOR FOUND when trying to toggle column visibility!', {
+            columnId: event.columnId,
+            contextStoreActor: context.storeActor,
+            contextKeys: Object.keys(context)
           });
         }
       },

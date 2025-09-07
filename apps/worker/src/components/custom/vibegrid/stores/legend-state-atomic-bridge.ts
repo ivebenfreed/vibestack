@@ -65,10 +65,28 @@ export function createAtomicObservableBridge(
       }
       
       if (!currentEntityData || (typeof currentEntityData === 'object' && Object.keys(currentEntityData).length === 0)) {
-        log.info(`🔗 AtomicBridge: Entity data ${entityTableName} is empty or null, but continuing to initialize bridge`);
+        log.warn(`🔗 AtomicBridge: Entity data ${entityTableName} appears empty - investigating why data read failed`, {
+          isInitialized,
+          hasPreviousData: !!previousEntityData,
+          entityDataType: typeof currentEntityData,
+          entityDataKeys: currentEntityData && typeof currentEntityData === 'object' ? Object.keys(currentEntityData).length : 'N/A'
+        });
         
-        // Initialize with empty data to ensure bridge is ready
-        if (!isInitialized) {
+        // INVESTIGATION: Log the actual observable state to understand what's happening
+        try {
+          const rawObservableData = entityObservable.peek();
+          log.warn(`🔗 AtomicBridge: Raw observable data check for ${entityTableName}:`, {
+            rawDataType: typeof rawObservableData,
+            rawDataKeys: rawObservableData && typeof rawObservableData === 'object' ? Object.keys(rawObservableData).length : 'N/A',
+            rawDataSample: rawObservableData && typeof rawObservableData === 'object' ? Object.keys(rawObservableData).slice(0, 3) : 'N/A'
+          });
+        } catch (peekError) {
+          log.warn(`🔗 AtomicBridge: Could not peek observable data:`, peekError);
+        }
+        
+        // Initialize with empty data to ensure bridge is ready, but only if we never had data before
+        // This prevents clearing existing data during temporary empty states (e.g., during system options loading)
+        if (!isInitialized && !previousEntityData) {
           tableSend({
             type: 'STORE_DATA_UPDATED',
             entities: [],
@@ -77,6 +95,12 @@ export function createAtomicObservableBridge(
           });
           isInitialized = true;
           previousEntityData = {};
+        } else if (previousEntityData && (typeof previousEntityData === 'object' && Object.keys(previousEntityData).length > 0)) {
+          // We had data before - don't clear it during temporary empty states
+          log.warn(`🔗 AtomicBridge: Preserving previous data during temporary empty state for ${entityTableName}`, {
+            previousEntityCount: Object.keys(previousEntityData).length,
+            reason: 'preventing_data_loss_during_temporary_empty_read'
+          });
         }
         return;
       }
