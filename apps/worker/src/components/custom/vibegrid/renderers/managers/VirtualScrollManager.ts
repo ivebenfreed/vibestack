@@ -1,4 +1,9 @@
 import type { ViewportInfo } from '../../types';
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+// File-level log control
+const LOG_LEVEL: LogLevel | undefined = undefined;  // Use global (quiet)
+const log = createLogger('VirtualScrollManager', LOG_LEVEL);
 
 // ====================================
 // VIRTUAL GRID MANAGER

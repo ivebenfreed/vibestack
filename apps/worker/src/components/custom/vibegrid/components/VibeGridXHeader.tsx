@@ -1,6 +1,7 @@
 import React from 'react';
 import { VibeGridXColumnVisibility } from './VibeGridXColumnVisibility';
-import type { Column } from '../types';
+import { GroupConfigDropdown } from './GroupConfigDropdown';
+import type { Column, GroupConfig } from '../types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from '../machines/table-machine';
 
@@ -10,6 +11,10 @@ interface VibeGridXHeaderProps {
   onToggleColumn: (columnId: string) => void;
   onShowAll: () => void;
   onHideAll: () => void;
+  // Group by functionality (optional)
+  enableGrouping?: boolean;
+  groupConfig?: GroupConfig | null;
+  onGroupConfigChange?: (config: GroupConfig | null) => void;
   className?: string;
 }
 
@@ -19,6 +24,9 @@ export function VibeGridXHeader({
   onToggleColumn,
   onShowAll,
   onHideAll,
+  enableGrouping = false,
+  groupConfig = null,
+  onGroupConfigChange,
   className = ''
 }: VibeGridXHeaderProps) {
   // Subscribe to column visibility state changes
@@ -67,6 +75,13 @@ export function VibeGridXHeader({
       </div>
       
       <div className="flex items-center gap-2">
+        {enableGrouping && onGroupConfigChange && (
+          <GroupConfigDropdown
+            columns={columns}
+            groupConfig={groupConfig}
+            onGroupConfigChange={onGroupConfigChange}
+          />
+        )}
         <VibeGridXColumnVisibility
           columns={columns}
           columnVisibility={columnVisibility}

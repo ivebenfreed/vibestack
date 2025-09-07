@@ -157,7 +157,20 @@ export class CoordinateSystem {
     // We need to convert back to absolute positions
     const absoluteY = y + viewport.scrollTop;
     const absoluteX = x + (viewport.scrollLeft || 0);
-    const row = Math.floor(absoluteY / this.config.cellHeight);
+    
+    // Find row index (supports variable heights)
+    let row: number;
+    if (this.coordinateMapping && this.coordinateMapping.rows.some(r => r.height !== undefined)) {
+      // Variable height rows - find by offset ranges
+      const foundRow = this.coordinateMapping.rows.find((r, index) => {
+        const height = r.height || this.config.cellHeight;
+        return absoluteY >= r.offset && absoluteY < r.offset + height;
+      });
+      row = foundRow ? this.coordinateMapping.rows.indexOf(foundRow) : -1;
+    } else {
+      // Uniform height rows
+      row = Math.floor(absoluteY / this.config.cellHeight);
+    }
     
     // Find column by absolute x position using actual column widths
     const columnInfo = this.getColumnByX(absoluteX);
@@ -194,9 +207,15 @@ export class CoordinateSystem {
     // Get absolute column position (no scroll adjustment)
     const x = this.getColumnOffset(columnId);
     
-    // Calculate absolute row position (no scroll adjustment)
-    // Canvas container handles scroll positioning via CSS transforms
-    const y = row * this.config.cellHeight;
+    // Calculate row position (supports variable heights)
+    let y: number;
+    if (this.coordinateMapping && this.coordinateMapping.rows[row]) {
+      // Use offset from coordinate mapping for variable height support
+      y = this.coordinateMapping.rows[row].offset;
+    } else {
+      // Fallback to uniform height calculation
+      y = row * this.config.cellHeight;
+    }
 
     return { x, y, row, column };
   }

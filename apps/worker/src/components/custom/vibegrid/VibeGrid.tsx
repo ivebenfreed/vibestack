@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useActorRef, useSelector } from '@xstate/react';
-import { uiLog } from '@/logger';
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
 
-const log = uiLog('components/custom/vibegrid/VibeGrid.tsx');
+// File-level log control - explicit override
+// Set to undefined to use global, or a specific level to override
+const LOG_LEVEL: LogLevel | undefined = 'info';  // OVERRIDE: Only important events
+const log = createLogger('VibeGrid', LOG_LEVEL);
 // useLiveQuery removed - handled by XState store
 import { tableBaseMachine } from './machines/table-machine';
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector';
@@ -17,12 +20,13 @@ type InitializationRefs = {
 // Legacy event handlers removed - using unified EventDelegationManager only
 import { EventDelegationManager, type EventDelegationConfig } from './systems/EventDelegationManager';
 import { ContextMenuRenderer } from './components/ContextMenuRenderer';
+import { GroupConfigPanel } from './components/GroupConfigPanel';
 import {
   useChangeDetection,
   useRenderStateExtractor,
   useVibeGridXApi
 } from './VibeGridXHooks';
-import type { RenderState, TableRow, CellRef, Column, RelationshipOptionsProviders } from './types';
+import type { RenderState, TableRow, CellRef, Column, RelationshipOptionsProviders, GroupConfig } from './types';
 // TableRenderer removed - using CleanTableRenderer via actor
 // CanvasOverlay removed - using DOM overlays via CanvasOverlayDOM
 // Deprecated coordinate manager removed - using dimensions-slice coordinate mapping
@@ -686,6 +690,22 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // Create public API (only for non-Legend State mode)
   const vibeGridXApi = tableActor ? useVibeGridXApi(tableSend, null, tableActor, null) : null;
   
+  // Group configuration state and handlers
+  const groupConfig = useSelector(tableActor, (snapshot) => snapshot.context.groupConfig as GroupConfig | null);
+  
+  const handleGroupConfigChange = useCallback((config: GroupConfig | null) => {
+    if (config) {
+      tableSend({
+        type: 'group.config.set',
+        config
+      });
+    } else {
+      tableSend({
+        type: 'CLEAR_GROUPING_RENDER'
+      });
+    }
+  }, [tableSend]);
+  
   // Column visibility handlers
   const handleToggleColumn = useCallback((columnId: string) => {
     vibeGridXApi.toggleColumnVisibility(columnId);
@@ -740,26 +760,34 @@ export function VibeGrid<T extends Record<string, any> = any>(
         width, 
         height, 
         position: 'relative',
-        outline: 'none' // Remove focus outline that can cause scroll
+        outline: 'none', // Remove focus outline that can cause scroll
+        display: 'flex',
+        flexDirection: 'column'
       }}
       // tabIndex removed - EventDelegationManager handles focus on renderer container
     >
-      {/* Header with Column Visibility Controls */}
+      {/* Header with Column Visibility and Group By Controls */}
       <VibeGridXHeader
         columns={columns}
         tableActor={tableActor}
         onToggleColumn={handleToggleColumn}
         onShowAll={handleShowAllColumns}
         onHideAll={handleHideAllColumns}
+        enableGrouping={enableGrouping}
+        groupConfig={groupConfig}
+        onGroupConfigChange={handleGroupConfigChange}
       />
       
-      {/* Atomic Renderer Container */}
-      <div
-        ref={containerRefCallback}
-        className="vibegridx-renderer"
-        data-testid={`vibegridx-renderer-${tableId}`}
-        style={{ width: '100%', height: 'calc(100% - 48px)' }} // Subtract header height
-      />
+      {/* Main content area with table */}
+      <div className="flex-1" style={{ minHeight: 0 }}>
+        {/* Atomic Renderer Container */}
+        <div
+          ref={containerRefCallback}
+          className="vibegridx-renderer h-full"
+          data-testid={`vibegridx-renderer-${tableId}`}
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
       
       {/* Canvas overlay handled by embedded approach in TableRenderer */}
       

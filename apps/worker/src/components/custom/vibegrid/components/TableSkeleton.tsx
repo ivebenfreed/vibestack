@@ -1,4 +1,8 @@
 import React from 'react';
+import { createLogger } from '@/logger/simple-logger';
+
+// Use global log level - no override
+const log = createLogger('TableSkeleton');
 
 // ====================================
 // TABLE SKELETON COMPONENT

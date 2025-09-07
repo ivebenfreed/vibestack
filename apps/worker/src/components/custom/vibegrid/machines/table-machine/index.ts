@@ -11,6 +11,7 @@ import { createInitialSelectionState, selectionActions } from './slices/selectio
 import { createInitialEditState, editActions } from './slices/edit-slice';
 import { createInitialDragState, dragActions } from './slices/drag-slice';
 import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
+import { createInitialGroupState, groupActions } from './slices/group-slice';
 
 // Import event handlers
 import { selectionHandlers } from './event-handlers/selection-handlers';
@@ -21,6 +22,7 @@ import { dragHandlers } from './event-handlers/drag-handlers';
 import { fillHandlers } from './event-handlers/fill-handlers';
 import { clipboardHandlers } from './event-handlers/clipboard-handlers';
 import { contextMenuHandlers } from './event-handlers/contextmenu-handlers';
+import { groupHandlers } from './event-handlers/group-handlers';
 
 // Import helpers
 import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
@@ -65,8 +67,10 @@ import { dragActor } from '../../actors/drag-actor';
 import { createTableStoreLogic } from '../../stores/table-data-store-atomic';
 import { createActor } from 'xstate';
 import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/machines/table-machine/index.ts');
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+const LOG_LEVEL: LogLevel = 'info';  // DEBUG: Group toggle debugging
+const log = createLogger('table-machine', LOG_LEVEL);
 
 
 // ====================================
@@ -115,6 +119,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   
   // Create overlay state
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
+  
+  // Create group state
+  const groupState = createInitialGroupState();
   
   // Add relationship providers to columns - they'll use the store actor from context
   const columnsWithProviders = addRelationshipProvidersToColumns(
@@ -166,6 +173,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Spread overlay state
     ...overlayState,
+    
+    // Spread group state
+    ...groupState,
     
     // Context menu state
     contextMenu: {
@@ -271,6 +281,9 @@ export const tableBaseMachine = setup({
     
     // Overlay actions
     ...overlayActions,
+    
+    // Group actions
+    ...groupActions,
     
     // Additional actions
     logError: ({ event, context }) => {
@@ -830,7 +843,8 @@ export const tableBaseMachine = setup({
             ...dragHandlers,
             ...fillHandlers,
             ...clipboardHandlers,
-            ...contextMenuHandlers
+            ...contextMenuHandlers,
+            ...groupHandlers
           }
         }
       },
@@ -992,6 +1006,25 @@ export const tableBaseMachine = setup({
         ]
       },
       
+      // Handle group toggle events from renderer
+      GROUP_TOGGLE: {
+        actions: [
+          ({ event, self }) => {
+            log.info('TableMachine: GROUP_TOGGLE received from renderer', { 
+              event,
+              eventKeys: Object.keys(event || {}),
+              groupId: event?.groupId,
+              eventType: typeof event 
+            });
+            // Forward to group.toggle event
+            self.send({
+              type: 'group.toggle',
+              groupId: event.groupId
+            });
+          }
+        ]
+      },
+      
       // Canvas actor is now pre-created, these actions are no longer needed
       SPAWN_CANVAS_ACTOR: {
         actions: [
@@ -1109,6 +1142,16 @@ export const tableBaseMachine = setup({
       
       // Context menu events
       ...contextMenuHandlers,
+      
+      // Group events
+      ...groupHandlers,
+      
+      // Handle coordinate mapping update from virtual rows
+      'UPDATE_COORDINATE_MAPPING_FROM_VIRTUAL_ROWS': {
+        actions: [
+          dimensionActions.updateFromVirtualRows
+        ]
+      },
       
       // Legacy edit events (now handled by edit slice)
       'edit.legacy.*': {

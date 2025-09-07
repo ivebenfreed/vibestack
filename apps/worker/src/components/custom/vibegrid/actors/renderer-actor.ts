@@ -12,10 +12,13 @@
 // ====================================
 
 import { fromCallback } from 'xstate';
-import type { CleanTableRenderer } from '../renderers/core/CleanTableRenderer';
+import type { EnhancedTableRenderer } from '../renderers/core/EnhancedTableRenderer';
 import type { RenderState, RendererOptions, ViewportInfo, Column } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/actors/renderer-actor.ts');
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+// File-level log control
+const LOG_LEVEL: LogLevel | undefined = undefined;  // Use global (quiet)
+const log = createLogger('RendererActor', LOG_LEVEL);
 
 // ====================================
 // EVENT TYPES
@@ -45,6 +48,7 @@ export type RendererActorResponse =
   | { type: 'COORDINATES_UPDATED' }
   | { type: 'COORDINATES_CALCULATED'; mapping: any; version: number; deferredEvent?: any }
   | { type: 'SELECTED_ROWS_UPDATED' }
+  | { type: 'GROUP_TOGGLE'; groupId: string }
   | { type: 'RENDERER_ERROR'; error: string };
 
 // ====================================
@@ -111,7 +115,7 @@ function calculateCoordinateMapping(
 // ====================================
 
 export const rendererActor = fromCallback<RendererActorEvent, RendererActorResponse>(({ sendBack, receive }) => {
-  let renderer: CleanTableRenderer | null = null;
+  let renderer: EnhancedTableRenderer | null = null;
   let renderState: RenderState | null = null;
   let isInitializing = false;
   let isInitialized = false;
@@ -141,8 +145,8 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           isInitializing = true;
           
-          // Import CleanTableRenderer dynamically to avoid circular imports
-          import('../renderers/core/CleanTableRenderer').then(({ CleanTableRenderer }) => {
+          // Import EnhancedTableRenderer dynamically to avoid circular imports
+          import('../renderers/core/EnhancedTableRenderer').then(({ EnhancedTableRenderer }) => {
             // Merge stored options from window with event options
             const storedOptions = (window as any).__vibegridx_renderer_options || {};
             const mergedOptions = {
@@ -183,6 +187,15 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                     }
                     renderer.initializeCanvasPostRender();
                   }
+                }
+                
+                // Handle group toggle event
+                if (state.type === 'group.toggle') {
+                  log.info('RendererActor: Group toggle requested', { groupId: state.groupId });
+                  sendBack({
+                    type: 'GROUP_TOGGLE',
+                    groupId: state.groupId
+                  });
                 }
                 
                 // Forward other state changes if there was an original handler
@@ -242,7 +255,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                     // Continue with renderer creation using the valid container
                     const finalOptions = { ...mergedOptions, container: retryContainer };
                     
-                    renderer = new CleanTableRenderer(finalOptions);
+                    renderer = new EnhancedTableRenderer(finalOptions);
                     isInitializing = false;
                     isInitialized = true;
                     
@@ -304,7 +317,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               } : null
             });
             
-            renderer = new CleanTableRenderer(finalOptions);
+            renderer = new EnhancedTableRenderer(finalOptions);
             isInitializing = false;
             isInitialized = true;
             

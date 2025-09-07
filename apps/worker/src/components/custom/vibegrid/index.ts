@@ -50,7 +50,7 @@ export { tableBaseMachine, createTableEvent, measurePerformance } from './machin
 // HYBRID RENDERING
 // ====================================
 
-export { CleanTableRenderer as TableRenderer } from './renderers';
+export { EnhancedTableRenderer as TableRenderer } from './renderers';
 
 // Entity integration removed - table machine now subscribes directly to atoms
 

@@ -2,6 +2,11 @@ import React from 'react';
 import { ChevronRight, ChevronDown, Users, Folder, Calendar, Tag } from 'lucide-react';
 import type { GroupNode } from '../types';
 import { cn } from '@/lib/utils';
+import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+// File-level log control - explicit override
+const LOG_LEVEL: LogLevel | undefined = 'debug';  // OVERRIDE: Force debug for group headers
+const log = createLogger('GroupHeaderRow', LOG_LEVEL);
 
 interface GroupHeaderRowProps {
   groupNode: GroupNode;
@@ -36,6 +41,14 @@ export function GroupHeaderRow({
   // Calculate indentation
   const indentPx = depth * 24;
   
+  // Example logging usage
+  log.debug('Rendering group header', { 
+    field: groupNode.field, 
+    value: groupNode.displayValue,
+    rowCount: groupNode.rowCount,
+    isCollapsed 
+  });
+  
   return (
     <div 
       className={cn(
@@ -68,7 +81,7 @@ export function GroupHeaderRow({
       
       {/* Group Name */}
       <span className="font-medium text-sm flex-1">
-        {groupNode.relationshipName || 'Unnamed Group'}
+        {groupNode.displayValue || 'Unnamed Group'}
       </span>
       
       {/* Item Count Badge */}
@@ -142,7 +155,7 @@ export function renderGroupHeaderCanvas(
   ctx.font = '500 14px Inter, system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.fillText(
-    groupNode.relationshipName || 'Unnamed Group',
+    groupNode.displayValue || 'Unnamed Group',
     x + indentPx + 36,
     y + height / 2
   );
