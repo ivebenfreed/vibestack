@@ -2,6 +2,7 @@
 // CORE RENDERER EXPORTS
 // ====================================
 
-export { CleanTableRenderer } from './CleanTableRenderer';
+export { UnifiedTableRenderer } from './UnifiedTableRenderer';
 export { CellPipeline } from './CellPipeline';
-// TableRenderer and RenderPipeline removed - using CleanTableRenderer only
+export { RenderPipeline } from './RenderPipeline';
+// Legacy renderers removed - using UnifiedTableRenderer only
