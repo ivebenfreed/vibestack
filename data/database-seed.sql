@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict f0WrnGgjmMjTl1Uf1cVM5ZRPwRwvPP0JUnT8ffNzZOwJDUkqcXNmixGHBkevo0t
+\restrict 1X4tl1tNbmtlEDaYkehQvHHVy2z5NKFdytaY4oC9Yk7emFH8Ee1rOUdTjyLYr3R
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -311,7 +311,7 @@ COPY public.organizations (id, name, slug, created_at, updated_at, settings, typ
 108b0ac2-487f-4951-b295-b1924288daad	TechFlow Solutions	techflow-solutions	2025-08-15 21:35:08.904915+00	2025-09-02 19:45:40.83641+00	{}	business	\N	f	Creating value and impact through collaborative work and meaningful relationships	["Respect and inclusion", "Collaborative decision making", "Quality deliverables", "Open communication"]	trial	active	monthly	\N	\N	{}
 01920000-2000-7000-8000-000000000002	Polymorphic Test CRM	polymorphic-test	2025-08-16 00:48:20.207914+00	2025-09-02 19:45:40.83641+00	{"industry": "SaaS", "timezone": "America/Los_Angeles", "company_size": "51-200", "sync_options": {"enable_polymorphic": true, "enable_system_options": true, "enable_custom_filtering": true}}	business	\N	f	Creating value and impact through collaborative work and meaningful relationships	["Respect and inclusion", "Collaborative decision making", "Quality deliverables", "Open communication"]	trial	active	monthly	\N	\N	{}
 1c3ef67a-2051-46b4-b54a-dd0f2c0b6db4	Playwright Test Organization	playwright-test-organization	2025-08-16 13:05:46.993884+00	2025-09-02 19:45:40.83641+00	{"country": null, "industry": null, "logo_url": null, "timezone": "UTC", "description": null, "website_url": null, "company_size": null, "billing_email": null, "trial_ends_at": "2025-08-30T13:05:46.730Z", "allowed_domains": ["playwright-test.com"], "trial_started_at": "2025-08-16T13:05:46.730Z", "subscription_tier": "trial"}	business	\N	f	Creating value and impact through collaborative work and meaningful relationships	["Respect and inclusion", "Collaborative decision making", "Quality deliverables", "Open communication"]	trial	active	monthly	\N	\N	{}
-01920000-1000-7000-8000-000000000001	Wide Corp Solutions	wide-corp	2025-08-16 00:28:03.818317+00	2025-09-07 20:15:13.998407+00	{"industry": "Software Consulting", "timezone": "America/New_York", "company_size": "11-50"}	business	\N	f	Building innovative solutions for enterprise clients while maintaining work-life balance and continuous learning	["Quality over speed", "Customer success first", "Transparent communication", "Continuous learning"]	trial	trial	monthly	\N	2025-09-14 20:15:13.998407+00	{}
+01920000-1000-7000-8000-000000000001	Wide Corp Solutions	wide-corp	2025-08-16 00:28:03.818317+00	2025-09-07 21:32:24.728857+00	{"industry": "Software Consulting", "timezone": "America/New_York", "company_size": "11-50"}	business	\N	f	Building innovative solutions for enterprise clients while maintaining work-life balance and continuous learning	["Quality over speed", "Customer success first", "Transparent communication", "Continuous learning"]	trial	trial	monthly	\N	2025-09-06 21:32:24.728857+00	{}
 0a1eaf20-5386-43e8-ad36-73fafefeb500	Playwright Test Organization 1755349777432	playwright-test-organization-1755349777432	2025-08-16 13:09:39.369872+00	2025-09-02 19:45:40.83641+00	{"country": null, "industry": null, "logo_url": null, "timezone": "UTC", "description": null, "website_url": null, "company_size": null, "billing_email": null, "trial_ends_at": "2025-08-30T13:09:38.932Z", "allowed_domains": ["playwright-test-1755349777432.com"], "trial_started_at": "2025-08-16T13:09:38.932Z", "subscription_tier": "trial"}	business	\N	f	Creating value and impact through collaborative work and meaningful relationships	["Respect and inclusion", "Collaborative decision making", "Quality deliverables", "Open communication"]	trial	active	monthly	\N	\N	{}
 72622cf0-b4c6-4f15-890f-e0b9f695fcdb	Test Member's Personal Workspace	personal-0198d836-58b6-7590-b715-8974f2033b0a	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198d836-58b6-7590-b715-8974f2033b0a	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]	trial	active	monthly	\N	\N	{}
 665049a7-dfed-4f01-8180-41202efaba3a	Gary Guest's Personal Workspace	personal-0198d872-3eda-781e-910f-e8d109fbb967	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198d872-3eda-781e-910f-e8d109fbb967	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]	trial	active	monthly	\N	\N	{}
@@ -340,7 +340,7 @@ fdb6bff8-e11e-4a98-a5f8-4a8531386701	Support Agent's Personal Workspace	personal
 0199258f-5dde-7dc0-bef9-4e11c293c8cd	Newest Test User 1757271767298's Personal Workspace	newest-test-user-1757271767298-1757271776734	2025-09-07 19:02:56.734+00	2025-09-07 19:02:56.734+00	{}	personal	\N	f	\N	[]	trial	active	monthly	\N	\N	{}
 0199258f-5ef3-7d3f-9436-f506791cad07	Newest Test Org 1757271767298	newest-test-org-1757271767298	2025-09-07 19:02:57.011+00	2025-09-07 19:02:57.011+00	{}	business	\N	f	\N	[]	trial	trial	monthly	newest.1757271767298@gmail.com	2025-09-21 19:02:57.011+00	{}
 01992590-a56f-760d-a90f-01f9750a7ab6	E2E Test User Final's Personal Workspace	e2e-test-user-final-1757271860591	2025-09-07 19:04:20.591+00	2025-09-07 19:04:20.591+00	{}	personal	\N	f	\N	[]	trial	active	monthly	\N	\N	{}
-01992590-a6a2-7888-86e6-d4bf191ac1cf	E2E Final Test Organization	e2e-final-test-organization	2025-09-07 19:04:20.898+00	2025-09-07 19:04:20.898+00	{}	business	\N	f	\N	[]	trial	trial	monthly	e2efinal.test@gmail.com	2025-09-21 19:04:20.898+00	{}
+01992590-a6a2-7888-86e6-d4bf191ac1cf	E2E Final Test Organization	e2e-final-test-organization	2025-09-07 19:04:20.898+00	2025-09-07 21:32:39.420292+00	{}	business	\N	f	\N	[]	trial	trial	monthly	e2efinal.test@gmail.com	2025-09-06 21:32:39.420292+00	{}
 \.
 
 
@@ -367,6 +367,22 @@ COPY public.import_errors (id, file_import_id, row_number, column_name, error_ty
 --
 
 COPY public.import_field_mappings (id, file_import_id, source_column, target_field, field_type, transformation_function, transformation_params, default_value, is_required, validation_rules, values_processed, values_transformed, validation_errors, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: integration_connections; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.integration_connections (id, org_id, provider, access_token, refresh_token, expires_at, metadata, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: import_mappings; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.import_mappings (id, org_id, connection_id, source_type, source_id, source_name, target_entity, field_mappings, transformation_rules, sync_enabled, sync_direction, last_sync_at, sync_status, sync_error, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -1449,5 +1465,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict f0WrnGgjmMjTl1Uf1cVM5ZRPwRwvPP0JUnT8ffNzZOwJDUkqcXNmixGHBkevo0t
+\unrestrict 1X4tl1tNbmtlEDaYkehQvHHVy2z5NKFdytaY4oC9Yk7emFH8Ee1rOUdTjyLYr3R
 

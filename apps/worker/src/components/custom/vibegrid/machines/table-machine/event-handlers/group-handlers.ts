@@ -298,6 +298,35 @@ export const groupHandlers = {
       // Update group state
       groupActions.completeGroupProcessing,
       
+      // Update UI store with group configuration
+      ({ context }) => {
+        const groupConfig = (context as any).groupConfig;
+        const storeActor = (context as any).actors?.storeActor;
+        
+        log.info('🔄 GroupHandlers: UI store bridge debug', {
+          hasGroupConfig: !!groupConfig,
+          hasStoreActor: !!storeActor,
+          actorsKeys: (context as any).actors ? Object.keys((context as any).actors) : [],
+          fieldCount: groupConfig?.fields?.length || 0
+        });
+        
+        if (groupConfig && storeActor) {
+          log.info('🔄 GroupHandlers: Updating UI store with group configuration', {
+            hasGroupConfig: !!groupConfig,
+            fieldCount: groupConfig.fields?.length || 0
+          });
+          storeActor.send({
+            type: 'setGroupConfig',
+            groupConfig: groupConfig
+          });
+        } else {
+          log.warn('🔄 GroupHandlers: Cannot update UI store - missing requirements', {
+            hasGroupConfig: !!groupConfig,
+            hasStoreActor: !!storeActor
+          });
+        }
+      },
+      
       // Update coordinate mapping for variable heights
       ({ event, self }) => {
         log.info('🔄 GroupHandlers: Updating coordinate mapping with virtual rows', {

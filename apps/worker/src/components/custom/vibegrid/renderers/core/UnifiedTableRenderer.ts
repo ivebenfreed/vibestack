@@ -301,6 +301,14 @@ export class UnifiedTableRenderer {
     const entityRecords = Object.values(rawData);
     const groupConfig = uiState.context.groupConfig;
     
+    // Debug grouping state
+    log.info('🔗 UnifiedTableRenderer: Grouping state debug', {
+      hasGroupConfig: !!groupConfig,
+      groupConfig: groupConfig,
+      contextKeys: Object.keys(uiState.context || {}),
+      uiStateKeys: Object.keys(uiState || {})
+    });
+    
     // Check if grouping is enabled
     if (groupConfig && groupConfig.fields && groupConfig.fields.length > 0) {
       // GROUPED RENDERING: Create group headers + data rows
@@ -374,34 +382,51 @@ export class UnifiedTableRenderer {
       }
     });
     
+    // Auto-expand groups if no groups are currently expanded (UX improvement)
+    const hasExpandedGroups = groupConfig.expandedGroups && groupConfig.expandedGroups.size > 0;
+    const shouldAutoExpand = !hasExpandedGroups;
+    
+    if (shouldAutoExpand) {
+      log.info('🔗 UnifiedTableRenderer: Auto-expanding all groups (no groups currently expanded)', {
+        totalGroups: groupMap.size,
+        expandedGroupsBefore: groupConfig.expandedGroups?.size || 0
+      });
+    }
+    
     // Create unified rows with group headers + data rows
     let rowIndex = 0;
     for (const [groupValue, groupEntities] of groupMap) {
+      const groupId = `group_${groupField}_${groupValue}`;
+      
+      // Determine if this group should be expanded
+      const isConfigExpanded = groupConfig.expandedGroups?.has(groupId) || false;
+      const isExpanded = shouldAutoExpand || isConfigExpanded;
+      
       // Create group header row
       const groupHeaderRow: UnifiedTableRow = {
-        id: `group_${groupField}_${groupValue}`,
+        id: groupId,
         type: 'group',
         data: {
-          id: `group_${groupField}_${groupValue}`,
+          id: groupId,
           field: groupField,
           displayValue: groupValue,
           value: groupValue,
           rowCount: groupEntities.length,
           aggregations: [],
-          isExpanded: groupConfig.expandedGroups?.has(`group_${groupField}_${groupValue}`) || false
+          isExpanded: isExpanded
         },
         height: ROW_HEIGHT,
         level: 0,
-        isExpanded: groupConfig.expandedGroups?.has(`group_${groupField}_${groupValue}`) || false,
-        groupId: `group_${groupField}_${groupValue}`,
+        isExpanded: isExpanded,
+        groupId: groupId,
         originalData: null
       };
       
       this.unifiedRows.push(groupHeaderRow);
       rowIndex++;
       
-      // Add data rows for this group (only if expanded)
-      if (groupHeaderRow.isExpanded) {
+      // Add data rows for this group (if expanded)
+      if (isExpanded) {
         groupEntities.forEach(entity => {
           const dataRow: UnifiedTableRow = {
             id: entity.id,
@@ -409,7 +434,7 @@ export class UnifiedTableRenderer {
             data: entity,
             height: ROW_HEIGHT,
             level: 1, // Indented under group header
-            groupId: `group_${groupField}_${groupValue}`,
+            groupId: groupId,
             originalData: {
               id: entity.id,
               data: entity,
@@ -433,7 +458,8 @@ export class UnifiedTableRenderer {
       totalUnifiedRows: this.unifiedRows.length,
       groupHeaders: this.unifiedRows.filter(r => r.type === 'group').length,
       dataRows: this.unifiedRows.filter(r => r.type === 'data').length,
-      expandedGroups: this.unifiedRows.filter(r => r.type === 'group' && r.isExpanded).length
+      expandedGroups: this.unifiedRows.filter(r => r.type === 'group' && r.isExpanded).length,
+      autoExpandApplied: shouldAutoExpand
     });
   }
 
