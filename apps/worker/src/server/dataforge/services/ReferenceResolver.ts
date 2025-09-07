@@ -145,7 +145,15 @@ export class ReferenceResolver {
           case 'custom_option_reference':
             lookupMaps[fieldName] = await this.getCustomOptionLookup(orgId, fieldName);
             break;
-          // TODO: Implement user_reference and entity_reference resolution
+          case 'user_reference':
+            lookupMaps[fieldName] = await this.getUserLookup(orgId);
+            break;
+          case 'entity_reference':
+            const targetEntity = this.inferTargetEntity(fieldName, fieldInfo.archetype);
+            if (targetEntity) {
+              lookupMaps[fieldName] = await this.getEntityLookup(orgId, targetEntity);
+            }
+            break;
         }
       } catch (error) {
         console.warn(`[ReferenceResolver] Failed to build lookup map for ${fieldName}:`, error);
@@ -235,5 +243,118 @@ export class ReferenceResolver {
       console.error(`[ReferenceResolver] Error getting custom option lookup for ${fieldName}:`, error);
       return {};
     }
+  }
+
+  /**
+   * Get user lookup map for user references
+   */
+  private async getUserLookup(orgId: string): Promise<Record<string, any>> {
+    try {
+      // Get all users in the organization
+      const users = await this.config.kysely
+        .selectFrom('"user"')
+        .innerJoin('organization_members', 'user.id', 'organization_members.user_id')
+        .select([
+          '"user".id',
+          '"user".name',
+          '"user".email',
+          '"user".image',
+          'organization_members.role'
+        ])
+        .where('organization_members.organization_id', '=', orgId)
+        .execute();
+
+      const lookup: Record<string, any> = {};
+      for (const user of users) {
+        lookup[user.id] = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          role: user.role,
+          displayName: user.name || user.email
+        };
+      }
+
+      return lookup;
+    } catch (error) {
+      console.error(`[ReferenceResolver] Error getting user lookup:`, error);
+      return {};
+    }
+  }
+
+  /**
+   * Get entity lookup map for entity references
+   */
+  private async getEntityLookup(orgId: string, targetEntityName: string): Promise<Record<string, any>> {
+    try {
+      // Find the target entity table
+      const targetEntity = await this.config.kysely
+        .selectFrom('entity_schemas')
+        .select(['table_name', 'archetype'])
+        .where('org_id', '=', orgId)
+        .where('entity_name', '=', targetEntityName)
+        .where('deleted', '!=', true)
+        .executeTakeFirst();
+        
+      if (!targetEntity) {
+        console.warn(`[ReferenceResolver] Target entity not found: ${targetEntityName}`);
+        return {};
+      }
+
+      // Query records from the target entity table
+      // Use common fields that most entities should have
+      const records = await this.config.kysely
+        .selectFrom(targetEntity.table_name as any)
+        .select(['id', 'name', 'title', 'status', 'created_at', 'updated_at'])
+        .limit(1000) // Reasonable limit for lookup maps
+        .execute();
+
+      const lookup: Record<string, any> = {};
+      for (const record of records) {
+        lookup[record.id] = {
+          id: record.id,
+          name: record.name || record.title || `${targetEntity.archetype} ${record.id.slice(0, 8)}`,
+          status: record.status,
+          archetype: targetEntity.archetype,
+          created_at: record.created_at,
+          updated_at: record.updated_at
+        };
+      }
+
+      return lookup;
+    } catch (error) {
+      console.error(`[ReferenceResolver] Error getting entity lookup for ${targetEntityName}:`, error);
+      return {};
+    }
+  }
+
+  /**
+   * Infer target entity from field name using naming conventions
+   */
+  private inferTargetEntity(fieldName: string, archetype?: string): string | null {
+    // Handle self-references first (parent relationships)
+    if (fieldName.startsWith('parent_') && archetype) {
+      // parent_task_id in task entity -> Task
+      return archetype.charAt(0).toUpperCase() + archetype.slice(1);
+    }
+    
+    // Handle specific patterns
+    if (fieldName === 'project_id') return 'Project';
+    if (fieldName === 'task_id') return 'Task';
+    if (fieldName === 'document_id') return 'Document';
+    if (fieldName === 'file_id') return 'File';
+    if (fieldName === 'discussion_id') return 'Discussion';
+    if (fieldName === 'collection_id') return 'Collection';
+    if (fieldName === 'record_id') return 'Record';
+    if (fieldName === 'activity_id') return 'Activity';
+    
+    // Generic pattern: remove _id suffix and capitalize
+    if (fieldName.endsWith('_id')) {
+      const baseName = fieldName.replace(/_id$/, '');
+      return baseName.charAt(0).toUpperCase() + baseName.slice(1);
+    }
+    
+    return null;
   }
 }

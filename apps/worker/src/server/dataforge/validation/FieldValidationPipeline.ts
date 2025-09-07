@@ -395,21 +395,26 @@ export class ReferenceValidator implements IFieldValidator {
           errors.push({
             field: fieldName,
             code: 'INVALID_USER_REF',
-            message: `Field '${fieldName}' references non-existent user`,
+            message: `Field '${fieldName}' references non-existent user: ${value}`,
             value
           });
         }
       }
 
       if (fieldDef.type === 'entity_reference' && this.validateEntityRef) {
-        // Extract entity type from field name convention (e.g., project_id -> project)
-        const entityType = fieldName.replace(/_id$/, '');
-        const isValid = await this.validateEntityRef(value, entityType, context.organizationId);
-        if (!isValid) {
-          warnings.push({
+        // Enhanced entity reference validation with better resolution
+        const referenceResult = await this.validateEntityReferenceEnhanced(
+          fieldName, 
+          value, 
+          context.organizationId
+        );
+        
+        if (!referenceResult.isValid) {
+          // Make this an error instead of warning for better data integrity
+          errors.push({
             field: fieldName,
             code: 'INVALID_ENTITY_REF',
-            message: `Field '${fieldName}' references non-existent ${entityType}`,
+            message: referenceResult.message,
             value
           });
         }
@@ -421,6 +426,107 @@ export class ReferenceValidator implements IFieldValidator {
       errors,
       warnings: warnings.length > 0 ? warnings : undefined
     };
+  }
+
+  /**
+   * Enhanced entity reference validation with proper entity resolution
+   */
+  private async validateEntityReferenceEnhanced(
+    fieldName: string, 
+    value: string, 
+    organizationId: string
+  ): Promise<{isValid: boolean; message: string}> {
+    try {
+      // Import ForeignKeyManager for entity resolution logic
+      const { ForeignKeyManager } = await import('../services/ForeignKeyManager');
+      const fkManager = new ForeignKeyManager({ kysely: this.kysely });
+      
+      // Use the same entity resolution logic as ForeignKeyManager
+      const targetEntityName = this.inferTargetEntityFromFieldName(fieldName);
+      if (!targetEntityName) {
+        return {
+          isValid: false,
+          message: `Cannot determine target entity type for field '${fieldName}'. Expected naming pattern: 'entity_id' or 'parent_entity_id'`
+        };
+      }
+      
+      // Find the target entity schema
+      const targetEntity = await this.kysely
+        .selectFrom('entity_schemas')
+        .select(['entity_name', 'table_name'])
+        .where('org_id', '=', organizationId)
+        .where('entity_name', '=', targetEntityName)
+        .where('deleted', '!=', true)
+        .executeTakeFirst();
+        
+      if (!targetEntity) {
+        return {
+          isValid: false,
+          message: `Target entity '${targetEntityName}' does not exist for field '${fieldName}'`
+        };
+      }
+      
+      // Check if the referenced record exists
+      const recordExists = await this.kysely
+        .selectFrom(targetEntity.table_name as any)
+        .select('id')
+        .where('id', '=', value)
+        .executeTakeFirst();
+        
+      if (!recordExists) {
+        return {
+          isValid: false,
+          message: `Field '${fieldName}' references non-existent ${targetEntityName} record: ${value}`
+        };
+      }
+      
+      return { isValid: true, message: 'Valid reference' };
+      
+    } catch (error) {
+      console.error(`[FieldValidationPipeline] Error validating entity reference:`, error);
+      return {
+        isValid: false,
+        message: `Reference validation error for field '${fieldName}': ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Infer target entity type from field naming conventions
+   */
+  private inferTargetEntityFromFieldName(fieldName: string): string | null {
+    // Handle self-references (parent relationships)
+    if (fieldName.startsWith('parent_')) {
+      // parent_task_id -> Task, parent_project_id -> Project, etc.
+      const baseName = fieldName.replace(/^parent_/, '').replace(/_id$/, '');
+      return baseName.charAt(0).toUpperCase() + baseName.slice(1);
+    }
+    
+    // Handle direct references
+    if (fieldName.endsWith('_id')) {
+      const baseName = fieldName.replace(/_id$/, '');
+      
+      // Map common patterns
+      const entityMap: Record<string, string> = {
+        'project': 'Project',
+        'task': 'Task',
+        'document': 'Document',
+        'file': 'File',
+        'discussion': 'Discussion',
+        'collection': 'Collection',
+        'record': 'Record',
+        'activity': 'Activity'
+      };
+      
+      if (entityMap[baseName]) {
+        return entityMap[baseName];
+      }
+      
+      // Generic capitalization
+      return baseName.charAt(0).toUpperCase() + baseName.slice(1);
+    }
+    
+    return null;
   }
 }
 

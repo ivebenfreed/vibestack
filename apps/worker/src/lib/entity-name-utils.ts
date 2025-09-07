@@ -148,8 +148,8 @@ export class EntityNameUtils {
    */
   static toPascalCase(name: string): string {
     // Check if already in PascalCase format (starts with uppercase, may have internal capitals)
-    // Examples: CustomerOrder, ProductCatalog, User, APIKey
-    if (/^[A-Z][a-zA-Z]*$/.test(name) && !name.includes('_') && !name.includes('-') && !name.includes(' ')) {
+    // Examples: CustomerOrder, ProductCatalog, User, APIKey, TestProject1757185632812
+    if (/^[A-Z][a-zA-Z0-9]*$/.test(name) && !name.includes('_') && !name.includes('-') && !name.includes(' ')) {
       // Check if it has mixed case (not all uppercase, not all lowercase after first char)
       const hasInternalCapitals = /[a-z][A-Z]/.test(name);
       const isNotAllUppercase = /[a-z]/.test(name.substring(1));

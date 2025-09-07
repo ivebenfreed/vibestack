@@ -8,6 +8,7 @@ import authRouter from './auth'
 import authOpenAPIRouter from './auth-openapi'
 import { phase1TestRouter } from './phase1-tests.js'
 import { dataforgeRouter } from '../routes/dataforge-api.js'
+import { dataforgeMigrationRouter } from '../routes/dataforge-migration-api.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
 
@@ -37,6 +38,7 @@ api.route('/', publicOpenAPIRouter) // Public routes (health, etc.)
 // api.route('/', organizationsOpenAPIRouter) // Organization management routes - DISABLED due to UUID validation issue
 api.route('/', protectedOpenAPIRouter) // Protected routes
 api.route('/dataforge', dataforgeRouter) // DataForge API (already OpenAPI)
+api.route('/dataforge-migration', dataforgeMigrationRouter) // DataForge Migration API
 
 // Mount non-OpenAPI routes (these won't appear in unified docs)
 api.route('/sync', syncV2Router)
