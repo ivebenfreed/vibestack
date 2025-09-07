@@ -75,10 +75,9 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
     context: {
       entityType,
       columns: initialColumns, // Full column objects in order
-      entities: {} as Record<string, any>, // Raw resolved entities
-      relationships: {} as Record<string, Record<string, any>>, // Lookup tables
-      processedRows: [] as any[], // Table-ready rows for renderer
-      originalRows: [] as any[], // Original unsorted order for restoration
+      // REMOVED DATA DUPLICATION: No entities, processedRows, originalRows
+      // All data comes directly from Legend State via getEntity$()
+      relationships: {} as Record<string, Record<string, any>>, // Keep for relationship lookups only
       sortBy: persistedState?.sortBy || [] as Array<{ field: string; direction: 'asc' | 'desc' }>,
       filters: persistedState?.filters || [] as Array<{ field: string; operator: string; value: any }>,
       columnVisibility: persistedState?.columnVisibility || {} as Record<string, boolean>,
@@ -101,128 +100,20 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
     
     on: {
       // Event-based mutations for XState compatibility
-      setInitialData: {
-        entities: (context, event: { entities: Record<string, any>, relationships: Record<string, Record<string, any>> }) => {
-          if (process.env.NODE_ENV === 'development') {
-            log.info('📊 TableStore: Setting entities', {
-              entityCount: Object.keys(event.entities).length
-            });
-          }
-          return event.entities;
-        },
-        relationships: (context, event) => event.relationships,
-        processedRows: (context, event) => {
-          // Convert entities to table rows
-          const entityValues = Object.values(event.entities);
-          let processedRows = entityValues.map((entity: any) => ({
-            id: entity.id,
-            data: entity, // This should contain fully resolved relationship data
-            metadata: {
-              isSelected: false,
-              isDirty: false,
-              isGroup: false,
-              level: 0
-            }
-          }));
-          
-          // Apply persisted sort if it exists
-          if (context.sortBy.length > 0) {
-            processedRows = [...processedRows].sort((a, b) => {
-              for (const sort of context.sortBy) {
-                const aValue = a.data[sort.field];
-                const bValue = b.data[sort.field];
-                
-                // Handle null/undefined
-                if (aValue == null && bValue == null) continue;
-                if (aValue == null) return sort.direction === 'asc' ? 1 : -1;
-                if (bValue == null) return sort.direction === 'asc' ? -1 : 1;
-                
-                // Compare values normally
-                let comparison = 0;
-                if (typeof aValue === 'number' && typeof bValue === 'number') {
-                  comparison = aValue - bValue;
-                } else if (aValue instanceof Date && bValue instanceof Date) {
-                  comparison = aValue.getTime() - bValue.getTime();
-                } else {
-                  const aStr = String(aValue).toLowerCase();
-                  const bStr = String(bValue).toLowerCase();
-                  comparison = aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
-                }
-                
-                if (comparison !== 0) {
-                  const result = sort.direction === 'desc' ? -comparison : comparison;
-                  
-                  // Debug logging for initial sort
-                  if (process.env.NODE_ENV === 'development' && sort.field === 'title') {
-                    log.info('📊 TableStore: Initial sort application', {
-                      field: sort.field,
-                      direction: sort.direction,
-                      aValue: String(aValue).substring(0, 20),
-                      bValue: String(bValue).substring(0, 20),
-                      comparison,
-                      result,
-                      shouldABeFirst: result < 0
-                    });
-                  }
-                  
-                  return result;
-                }
-              }
-              return 0;
-            });
-            
-            if (process.env.NODE_ENV === 'development' && context.sortBy[0]?.field === 'title') {
-              log.info('📊 TableStore: Initial data sorted with persisted state', {
-                sortBy: context.sortBy,
-                firstThree: processedRows.slice(0, 3).map(row => ({
-                  id: row.id,
-                  title: row.data.title
-                }))
-              });
-            }
-          }
-          
-          // Debug: Show sample resolved entity to verify relationship resolution
-          if (process.env.NODE_ENV === 'development' && entityValues.length > 0) {
-            const sampleEntity = entityValues[0];
-            log.info('📊 TableStore: Sample resolved entity:', {
-              id: sampleEntity.id,
-              title: sampleEntity.title,
-              projectId: sampleEntity.projectId,
-              projectName: sampleEntity.projectName || sampleEntity.__resolved_projectId,
-              assigneeId: sampleEntity.assigneeId,
-              assigneeName: sampleEntity.assigneeName || sampleEntity.__resolved_assigneeId,
-              hasResolvedFields: Object.keys(sampleEntity).filter(k => k.includes('resolved') || k.includes('Name')).length > 0
-            });
-          }
-          
-          return processedRows;
-        },
-        originalRows: (context, event) => {
-          // Store the original unsorted order for restoration when sort is cleared
-          const entityValues = Object.values(event.entities);
-          return entityValues.map((entity: any) => ({
-            id: entity.id,
-            data: entity,
-            metadata: {
-              isSelected: false,
-              isDirty: false,
-              isGroup: false,
-              level: 0
-            }
-          }));
-        },
+      // Initialize UI state only - no data duplication
+      initializeUIState: {
+        relationships: (context, event: { relationships: Record<string, Record<string, any>> }) => event.relationships,
         loading: false,
         error: null,
         lastProcessedAt: Date.now(),
-        // Initialize column visibility/order from columns if not already set
-        columnVisibility: (context, event) => {
+        // Initialize column visibility from columns if not set
+        columnVisibility: (context) => {
           if (columns && Object.keys(context.columnVisibility).length === 0) {
             return Object.fromEntries(columns.map(col => [col.id, true]));
           }
           return context.columnVisibility;
         },
-        columnOrder: (context, event) => {
+        columnOrder: (context) => {
           if (columns && context.columnOrder.length === 0) {
             return columns.map(col => col.id);
           }
@@ -233,162 +124,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
         }
       },
       
-      updateEntity: {
-        entities: (context, event: { entity: any }) => {
-          if (process.env.NODE_ENV === 'development') {
-            log.info('📊 TableStore: Updating single entity atomically', {
-              entityId: event.entity.id,
-              entityType: context.entityType,
-              hasTagsField: 'tags' in event.entity,
-              tagsValue: event.entity.tags,
-              entityKeys: Object.keys(event.entity).sort()
-            });
-          }
-          
-          // Resolve entity with current relationships
-          const relationshipConfigs = discoverRelationships(columns || []);
-          const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
-          
-          if (process.env.NODE_ENV === 'development' && event.entity.tags) {
-            log.info('📊 TableStore: Entity resolution result', {
-              entityId: event.entity.id,
-              originalTags: event.entity.tags,
-              resolvedTags: resolvedEntity.__resolved_tags,
-              hasRelationshipData: !!context.relationships.tags,
-              tagCount: context.relationships.tags ? Object.keys(context.relationships.tags).length : 0
-            });
-          }
-          
-          return {
-            ...context.entities,
-            [event.entity.id]: resolvedEntity
-          };
-        },
-        processedRows: (context, event) => {
-          // Resolve entity with current relationships
-          const relationshipConfigs = discoverRelationships(columns || []);
-          const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
-          
-          // Update corresponding row in processedRows
-          const rowIndex = context.processedRows.findIndex(row => row.id === event.entity.id);
-          let updatedRows: any[];
-          
-          if (rowIndex !== -1) {
-            updatedRows = [...context.processedRows];
-            updatedRows[rowIndex] = {
-              ...updatedRows[rowIndex],
-              data: resolvedEntity
-            };
-          } else {
-            // New entity - add to processed rows
-            updatedRows = [...context.processedRows, {
-              id: event.entity.id,
-              data: resolvedEntity,
-              metadata: {
-                isSelected: false,
-                isDirty: false,
-                isGroup: false,
-                level: 0
-              }
-            }];
-          }
-          
-          // Check if we need to re-sort
-          if (context.sortBy.length > 0) {
-            // Check if any sorted field was updated or if sorting by updatedAt
-            const needsResort = context.sortBy.some(sort => {
-              // Always re-sort if sorting by updatedAt since it likely changed
-              if (sort.field === 'updatedAt') return true;
-              
-              // Check if the sorted field value changed
-              if (rowIndex !== -1) {
-                const oldValue = context.processedRows[rowIndex].data[sort.field];
-                const newValue = resolvedEntity[sort.field];
-                return oldValue !== newValue;
-              }
-              
-              return false; // New entity, no need to re-sort existing
-            });
-            
-            if (needsResort) {
-              if (process.env.NODE_ENV === 'development') {
-                log.info('📊 TableStore: Re-sorting after entity update', {
-                  entityId: event.entity.id,
-                  sortBy: context.sortBy,
-                  reason: context.sortBy.some(s => s.field === 'updatedAt') ? 'updatedAt field' : 'sorted field changed'
-                });
-              }
-              
-              // Re-apply sort
-              updatedRows = [...updatedRows].sort((a, b) => {
-                for (const sort of context.sortBy) {
-                  const aValue = a.data[sort.field];
-                  const bValue = b.data[sort.field];
-                  
-                  // Handle null/undefined
-                  if (aValue == null && bValue == null) continue;
-                  if (aValue == null) return sort.direction === 'asc' ? 1 : -1;
-                  if (bValue == null) return sort.direction === 'asc' ? -1 : 1;
-                  
-                  let comparison = 0;
-                  
-                  // Date comparison
-                  if (aValue instanceof Date || (typeof aValue === 'string' && !isNaN(Date.parse(aValue)))) {
-                    const aDate = aValue instanceof Date ? aValue : new Date(aValue);
-                    const bDate = bValue instanceof Date ? bValue : new Date(bValue);
-                    comparison = aDate.getTime() - bDate.getTime();
-                  }
-                  // Number comparison
-                  else if (typeof aValue === 'number' && typeof bValue === 'number') {
-                    comparison = aValue - bValue;
-                  }
-                  // String comparison (case-insensitive)
-                  else {
-                    const aStr = String(aValue).toLowerCase();
-                    const bStr = String(bValue).toLowerCase();
-                    comparison = aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
-                  }
-                  
-                  if (comparison !== 0) {
-                    return sort.direction === 'desc' ? -comparison : comparison;
-                  }
-                }
-                return 0;
-              });
-            }
-          }
-          
-          return updatedRows;
-        },
-        originalRows: (context, event) => {
-          // Also update originalRows to maintain unsorted order consistency
-          const relationshipConfigs = discoverRelationships(columns || []);
-          const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
-          
-          const rowIndex = context.originalRows.findIndex(row => row.id === event.entity.id);
-          if (rowIndex !== -1) {
-            const updatedRows = [...context.originalRows];
-            updatedRows[rowIndex] = {
-              ...updatedRows[rowIndex],
-              data: resolvedEntity
-            };
-            return updatedRows;
-          } else {
-            // New entity - add to original rows (append to maintain insertion order)
-            return [...context.originalRows, {
-              id: event.entity.id,
-              data: resolvedEntity,
-              metadata: {
-                isSelected: false,
-                isDirty: false,
-                isGroup: false,
-                level: 0
-              }
-            }];
-          }
-        },
-        lastProcessedAt: Date.now()
-      },
+      // REMOVED updateEntity - data updates handled by Legend State directly
       
       updateRelationshipTable: {
         relationships: (context, event: { table: string, data: any[] }) => {
@@ -701,19 +437,6 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       
       toggleColumnVisibility: {
         columnVisibility: (context, event: { columnId: string }) => {
-          // If column is not in visibility map or is true, it's visible -> hide it (set to false)
-          // If column is false, it's hidden -> show it (set to true or remove from map)
-          const currentVisibility = context.columnVisibility[event.columnId];
-          const isCurrentlyVisible = currentVisibility !== false;
-          
-          const newVisibility = {
-            ...context.columnVisibility,
-            [event.columnId]: !isCurrentlyVisible  // Toggle: visible->false, hidden->true
-          };
-          return newVisibility;
-        },
-        hiddenColumnCount: (context, event) => {
-          // Same logic for calculating new visibility
           const currentVisibility = context.columnVisibility[event.columnId];
           const isCurrentlyVisible = currentVisibility !== false;
           
@@ -721,12 +444,24 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             ...context.columnVisibility,
             [event.columnId]: !isCurrentlyVisible
           };
-          return Object.values(newVisibility).filter(v => v === false).length;
+          
+          log.info('📊 TableStore: toggleColumnVisibility (UI state only)', {
+            columnId: event.columnId,
+            wasVisible: isCurrentlyVisible,
+            nowVisible: !isCurrentlyVisible
+          });
+          
+          return newVisibility;
         },
-        // IMPORTANT: Preserve data during column visibility changes
-        processedRows: (context) => context.processedRows || [],
-        originalRows: (context) => context.originalRows || [],
-        entities: (context) => context.entities || {}
+        hiddenColumnCount: (context, event: { columnId: string }) => {
+          const currentVisibility = context.columnVisibility[event.columnId];
+          const isCurrentlyVisible = currentVisibility !== false;
+          const newVisibility = {
+            ...context.columnVisibility,
+            [event.columnId]: !isCurrentlyVisible
+          };
+          return Object.values(newVisibility).filter(v => v === false).length;
+        }
       },
       
       showAllColumns: {

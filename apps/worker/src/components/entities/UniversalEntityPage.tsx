@@ -211,10 +211,8 @@ export function UniversalEntityPage({
                     recordData.priority = formData.priority || 'medium'
                   }
                   
-                  // Determine the full entity name (with org prefix if needed)
-                  // Check if entityName is already prefixed to avoid double-prefixing
-                  const isAlreadyPrefixed = orgId && entityName.startsWith(`${orgId}_`);
-                  const fullEntityName = (orgId && orgId !== 'universe' && !isAlreadyPrefixed) ? `${orgId}_${entityName}` : entityName
+                  // Use EntityNameUtils to ensure proper prefixing without duplication
+                  const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '')
                   
                   console.log('🚀 Creating entity:', { entityName, fullEntityName, recordData })
                   
@@ -437,9 +435,8 @@ export function UniversalEntityPage({
           </div>
         ) : columns.length > 0 ? (
           (() => {
-            // Check if entityName is already prefixed to avoid double-prefixing
-            const isAlreadyPrefixed = orgId && entityName.startsWith(`${orgId}_`);
-            const fullEntityName = (orgId && orgId !== 'universe' && !isAlreadyPrefixed) ? `${orgId}_${entityName}` : entityName;
+            // Use EntityNameUtils to ensure proper prefixing without duplication
+            const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '');
             return (
               <VibeGrid
                 entityType={fullEntityName}

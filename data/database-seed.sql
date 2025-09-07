@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2AZvcYh9z8gk5fnfVFLb7JRX3lGFeOeIRfH2R76vSc3nCCdQSfNBHGm4WPwObrf
+\restrict byfiFYyZo5mkBeIF4Za4CSU5OPbVIGvvLbXWn6voa86ryeg0lyEhGoc0UHHrE5g
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -35,7 +35,9 @@ COPY public."user" (id, name, email, "emailVerified", image, role, "createdAt", 
 0198d836-58b6-7590-b715-8974f2033b0a	Test Member	test-member@widecorp.com	t	\N	user	2025-08-23 18:34:57.077+00	2025-08-23 18:34:57.077+00	\N	\N	\N	\N	01920000-1000-7000-8000-000000000001	72622cf0-b4c6-4f15-890f-e0b9f695fcdb	2025-09-01 11:54:50.100666+00
 0198d872-3eda-781e-910f-e8d109fbb967	Gary Guest	guest@widecorp.com	t	\N	user	2025-08-23 19:40:22.618+00	2025-08-23 19:40:22.618+00	\N	\N	\N	\N	01920000-1000-7000-8000-000000000001	665049a7-dfed-4f01-8180-41202efaba3a	2025-09-01 11:54:50.100666+00
 0198f65b-d657-7440-a635-5b59be41b835	New Test User	newuser@widecorp.com	f	\N	admin	2025-08-29 15:04:30.55+00	2025-08-29 15:05:04.291+00	f	\N	\N	\N	4dd6b20a-aa87-4e43-a52d-7c42856d725e	4dd6b20a-aa87-4e43-a52d-7c42856d725e	2025-09-01 11:54:50.100666+00
+01992531-7bed-7ceb-bbb1-4a35f77d8ba5	Test User E2E	test.e2e.registration@example.com	f	\N	user	2025-09-07 17:20:24.044+00	2025-09-07 17:20:24.044+00	\N	\N	\N	\N	\N	\N	\N
 0199053c-c896-7c9d-bbc5-1da987af005d	Personal Test User	testpersonal@example.com	f	\N	user	2025-09-01 12:24:53.653+00	2025-09-01 12:24:53.653+00	\N	\N	\N	\N	\N	\N	\N
+01992556-5e1c-7c5e-aaf9-9493f425d57a	Trial Test User	trial.test.user@gmail.com	f	\N	user	2025-09-07 18:00:41.244+00	2025-09-07 18:00:41.244+00	\N	\N	\N	\N	01992556-60c6-7a48-a54f-5348ded91e7e	01992556-60c6-7a48-a54f-5348ded91e7e	2025-09-07 18:00:41.932175+00
 0198aed6-cc0b-783b-b414-c5fb8a81f227	TechFlow Admin	admin@techflow.solutions	t	\N	user	2025-08-15 17:46:09.288+00	2025-08-17 12:41:50.512685+00	\N	\N	\N	$2b$12$UkgwO6dP5ESpW4LcTIneguT5qCkwGzl4vPEuLxlhJsym0cUL6Jfza	108b0ac2-487f-4951-b295-b1924288daad	0031029c-9915-4de2-9179-ffbb159057f1	2025-09-01 11:54:50.100666+00
 0198d86e-2544-71f8-8188-026e43f726c6	Jim Member	member@widecorp.com	t	\N	user	2025-08-23 19:35:53.924+00	2025-08-23 19:35:53.924+00	\N	\N	\N	\N	01920000-1000-7000-8000-000000000001	bddd93de-7a65-444a-88e1-0ea0334d012a	2025-09-01 11:54:50.100666+00
 0198b046-d931-7772-a1e8-b63c68c7f43d	Carol PM	pm1@widecorp.com	t	\N	user	2025-08-16 00:28:09.905+00	2025-08-17 12:55:09.824229+00	\N	\N	\N	$2b$12$ciyrZyDuwZ9ZAl4rENG.ZOpvabqyRgGxVPxoeO/gCBTq0N1n.qi6i	01920000-1000-7000-8000-000000000001	ef1f96f1-cfab-478b-96e1-159fcdc02bb7	2025-09-01 11:54:50.100666+00
@@ -62,6 +64,7 @@ COPY public."user" (id, name, email, "emailVerified", image, role, "createdAt", 
 COPY public.account (id, "accountId", "providerId", "userId", "accessToken", "refreshToken", "idToken", "accessTokenExpiresAt", "refreshTokenExpiresAt", scope, password, "createdAt", "updatedAt") FROM stdin;
 0198d836-5c3e-7f6a-9566-93c327d87859	0198d836-58b6-7590-b715-8974f2033b0a	credential	0198d836-58b6-7590-b715-8974f2033b0a	\N	\N	\N	\N	\N	\N	ef1c6982b8bd05731241f8b86bf0ece6:bdf88fd23b7f3e995c2e7ec35821a98b266423cf73df7cceeb4a06558c6ef86ca2171a4bbcd5f02ae08fd0f4a6f33bafa3489a451f363084c6760e4800c7f9f6	2025-08-23 14:34:57.981	2025-08-23 14:34:57.981
 0198f65b-dcb8-7ae4-8d60-2cc340b6566d	0198f65b-d657-7440-a635-5b59be41b835	credential	0198f65b-d657-7440-a635-5b59be41b835	\N	\N	\N	\N	\N	\N	53f9a70d5ddba4aab4253ba0fd2db003:48d0d7c24f66e6e946d01567d5551cebb7b4e930616a952c5b4f5b38c32b28223544c715fb315dae99519ff066e164c6fd7a6230b1b50a3df9aa54e2a2e8e38a	2025-08-29 15:04:32.183	2025-08-29 15:04:32.183
+01992556-60d3-724a-ae65-2bc59a820b0e	01992556-5e1c-7c5e-aaf9-9493f425d57a	credential	01992556-5e1c-7c5e-aaf9-9493f425d57a	\N	\N	\N	\N	\N	\N	b3a56e0ed2ab90fa51c63f11f7f77ab8:8c621b49e42e1780cdaef4447177b2710fc37e219a039e2232ce6e28af227671bb62191aa98840526e65bf8050b5addd8f5405b46420e973478c0202d15f2606	2025-09-07 18:00:41.939	2025-09-07 18:00:41.939
 0198d86e-2997-7f91-8872-b0bc741552ec	0198d86e-2544-71f8-8188-026e43f726c6	credential	0198d86e-2544-71f8-8188-026e43f726c6	\N	\N	\N	\N	\N	\N	fd10f0dac2a4e74279378191d3adcd7f:ae0b54388f0be124bae90c74ec8374e46f3d088aba8288a2213c1db7f57fab099ea5b929e79f63457212ea7e46548da072200c8168217f3e4daf63a49810a76f	2025-08-23 15:35:55.03	2025-08-23 15:35:55.03
 0198d86e-40cd-7236-a370-cfbe751a8e5f	0198d86e-3ed0-7bf2-9317-674ef372c7db	credential	0198d86e-3ed0-7bf2-9317-674ef372c7db	\N	\N	\N	\N	\N	\N	917ce45cb974911b17805884fa6442a7:3832c0072cde54d32f6324184b8fc208d6f06dfbaa02b2855ec7fa3ae72f3a1659b943d8709c888774e65c4fd639aa404e421dbda3aae4f9a4b8eed5d017b1b3	2025-08-23 15:36:00.941	2025-08-23 15:36:00.941
 0198d872-41e9-71cf-b1cf-38aa0f2a97e9	0198d872-3eda-781e-910f-e8d109fbb967	credential	0198d872-3eda-781e-910f-e8d109fbb967	\N	\N	\N	\N	\N	\N	215d130f146109fb40ee14c2b35e0a94:b4fb9c3632cd3066798e82f3e69dc451cf720aed311e24794604a58175e902b15c7b8833322ff69994b74e169c60e2edb47694a4791e17b7231ac178ccdfb859	2025-08-23 15:40:23.4	2025-08-23 15:40:23.4
@@ -321,6 +324,7 @@ fdb6bff8-e11e-4a98-a5f8-4a8531386701	Support Agent's Personal Workspace	personal
 75209771-bdad-4eda-96ab-fb14803668db	Kate Viewer's Personal Workspace	personal-0198d86e-3ed0-7bf2-9317-674ef372c7db	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198d86e-3ed0-7bf2-9317-674ef372c7db	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
 81a82bbb-5544-4a9b-8215-5174887e224a	Bob CTO's Personal Workspace	personal-0198b046-d127-769d-9bc2-8e5824b71b3a	2025-09-01 11:54:37.693785+00	2025-09-02 19:45:40.83641+00	{}	personal	0198b046-d127-769d-9bc2-8e5824b71b3a	t	Managing personal life areas with intentionality, balance, and alignment with core values	["Family time is sacred", "Health is non-negotiable", "Growth mindset always", "Be present and intentional"]
 0198b046-c453-72d9-b71a-092e1f75601a	Alice CEO's Personal Workspace	personal-alice-ceo	2025-09-06 18:28:51.609504+00	2025-09-06 18:28:51.609504+00	{}	personal	0198b046-c453-72d9-b71a-092e1f75601a	f	\N	[]
+01992556-60c6-7a48-a54f-5348ded91e7e	Trial Test User's Personal Workspace	trial-test-user-1757268041926	2025-09-07 18:00:41.926+00	2025-09-07 18:00:41.926+00	{}	personal	\N	f	\N	[]
 \.
 
 
@@ -501,6 +505,9 @@ COPY public.org_01920000_1000_7000_8000_000000000001_morningworkouts (id, organi
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_project (id, organization_id, created_by, created_at, updated_at, name, description, priority, status, start_date, end_date, owner_id, budget, progress_percentage, project_type) FROM stdin;
+f95d1f22-1a38-4cf9-b76c-ba8414a8d278	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:09.621968+00	2025-09-07 16:51:09.621968+00	Website Redesign	Complete redesign of corporate website	high	active	2024-01-01	2024-06-30	12480000-0000-4000-8000-000000000001	50000.00	65	development
+91b53611-befb-46b1-8e3f-6e23f561f82f	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:09.621968+00	2025-09-07 16:51:09.621968+00	Mobile App Development	Build iOS and Android apps	high	active	2024-02-01	2024-08-31	12480000-0000-4000-8000-000000000001	120000.00	40	development
+a35ab90f-fbcc-4cd7-8b88-43067c2c4244	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:09.621968+00	2025-09-07 16:51:09.621968+00	Cloud Migration	Migrate infrastructure to AWS	medium	planning	2024-03-01	2024-09-30	12480000-0000-4000-8000-000000000001	80000.00	10	infrastructure
 \.
 
 
@@ -592,6 +599,12 @@ COPY public.org_01920000_1000_7000_8000_000000000001_softdeletetests (id, organi
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_task (id, organization_id, created_by, created_at, updated_at, title, description, priority, status, assignee_id, reporter_id, due_date, estimated_hours, actual_hours, task_type, parent_task_id, project_id, sprint_id, story_points) FROM stdin;
+21851e6e-2c44-45d6-802f-b813a70ff89e	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Setup development environment	Configure local dev setup	high	completed	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	setup	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+e1a00686-898b-4b89-ac6a-283a09d373f4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Design mockups	Create UI/UX mockups	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	design	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+62e20872-53e7-4fb5-aad7-2e69bbf7bb19	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	API integration	Integrate with backend APIs	medium	todo	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	feature	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+7ce84b7e-4d57-45db-9dd5-9ab7690c166f	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Testing and QA	Complete testing suite	medium	todo	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	testing	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+41521a77-42eb-4f8c-9bfc-a72f5f0fbe8d	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Database schema design	Design and implement database schema	high	completed	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	design	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+160e57e6-4eef-4e32-9afe-e4d052e9bde4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Authentication system	Implement user authentication	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	feature	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 \.
 
 
@@ -1166,6 +1179,7 @@ feadfeb3-7da7-46d4-a8c2-d6205ce6fb95	8b525929-c8f5-4056-b343-1f85f70e34d2	0198b0
 9e584ea0-4a53-436a-a2da-4ec9fbcb9f84	75209771-bdad-4eda-96ab-fb14803668db	0198d86e-3ed0-7bf2-9317-674ef372c7db	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
 8958d8e9-ce1b-4b9b-ab0c-84387cf17f65	81a82bbb-5544-4a9b-8215-5174887e224a	0198b046-d127-769d-9bc2-8e5824b71b3a	owner	2025-09-01 11:54:50.100666+00	2025-09-01 11:54:50.100666+00
 4cab1c13-8405-4342-ae9e-7c37b1adf118	0198b046-c453-72d9-b71a-092e1f75601a	0198b046-c453-72d9-b71a-092e1f75601a	owner	2025-09-06 18:29:00.5756+00	2025-09-06 18:29:00.5756+00
+01992556-60cb-7b0b-a499-bf67a907b49d	01992556-60c6-7a48-a54f-5348ded91e7e	01992556-5e1c-7c5e-aaf9-9493f425d57a	owner	2025-09-07 18:00:41.931+00	2025-09-07 18:00:41.931+00
 \.
 
 
@@ -1411,5 +1425,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2AZvcYh9z8gk5fnfVFLb7JRX3lGFeOeIRfH2R76vSc3nCCdQSfNBHGm4WPwObrf
+\unrestrict byfiFYyZo5mkBeIF4Za4CSU5OPbVIGvvLbXWn6voa86ryeg0lyEhGoc0UHHrE5g
 

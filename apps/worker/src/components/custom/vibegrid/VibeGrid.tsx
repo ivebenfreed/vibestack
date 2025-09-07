@@ -355,18 +355,20 @@ export function VibeGrid<T extends Record<string, any> = any>(
     // Dynamically import and setup new atomic bridge
     const setupAtomicBridge = async () => {
       try {
-        const bridge = await import('./stores/legend-state-atomic-bridge');
+        const bridge = await import('./stores/legend-state-ui-bridge');
         
         log.info('Setting up atomic bridge', { entityType });
         
-        // Immediately try to load data if available
+        // Get Legend State observable first
+        let entityObservable = null;
         try {
           const { getEntity$, universeLoading$, universeSchema$ } = await import('@/legend-state/observables');
           const isLoading = universeLoading$.get();
           const schema = universeSchema$.get();
           
           if (!isLoading && schema) {
-            const entityObservable = getEntity$(entityType);
+            entityObservable = getEntity$(entityType);
+            
             if (entityObservable) {
               const currentData = entityObservable.get();
               log.info('🔗 VibeGrid: Attempting immediate data load', {
@@ -390,25 +392,32 @@ export function VibeGrid<T extends Record<string, any> = any>(
           log.warn('Failed to attempt immediate data load:', error);
         }
         
-        // Create atomic observer with proper event handling
-        const cleanup = bridge.createAtomicObservableBridge(entityType, (event) => {
-          // Don't process events if cleanup is active
-          if ((window as any).__vibegrid_cleanup_active) {
-            log.debug('Ignoring atomic event during cleanup', { entityType, eventType: event.type });
-            return;
-          }
+        // Create unified UI bridge with Legend State integration
+        const cleanup = (() => {
+          // Get the renderer and UI store from the table machine
+          const tableSnapshot = tableActor.getSnapshot();
+          const rendererActor = tableSnapshot.context?.actors?.rendererActor;
+          const uiStore = tableSnapshot.context?.storeActor;
           
-          log.debug('Atomic change detected via bridge', {
+          // Get the actual renderer instance from window (set by renderer actor)
+          const rendererInstance = (window as any).__vibegridx_renderer_instance;
+          
+          log.debug('Setting up unified bridge', {
             entityType,
-            eventType: event.type,
-            entityCount: event.entities?.length || 0,
-            source: event.source,
-            timestamp: Date.now()
+            hasRendererActor: !!rendererActor,
+            hasRendererInstance: !!rendererInstance,
+            hasUIStore: !!uiStore,
+            hasLegendState: !!entityObservable
           });
           
-          // Send atomic updates to table machine
-          tableSend(event);
-        });
+          // Use the new unified bridge with actual renderer instance
+          return bridge.createLegendStateUIBridge(
+            entityType, 
+            uiStore,           // UI store from table machine
+            rendererInstance,  // Actual renderer instance from window
+            entityObservable   // Legend State observable
+          );
+        })();
         
         // Store cleanup function in ref
         atomicBridge.current = cleanup;
@@ -691,7 +700,13 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const vibeGridXApi = tableActor ? useVibeGridXApi(tableSend, null, tableActor, null) : null;
   
   // Group configuration state and handlers
-  const groupConfig = useSelector(tableActor, (snapshot) => snapshot.context.groupConfig as GroupConfig | null);
+  const groupConfig = useSelector(tableActor, (snapshot) => {
+    if (!snapshot?.context?.storeActor) {
+      return null;
+    }
+    const storeSnapshot = snapshot.context.storeActor?.getSnapshot();
+    return storeSnapshot?.context?.groupConfig as GroupConfig | null;
+  });
   
   const handleGroupConfigChange = useCallback((config: GroupConfig | null) => {
     if (config) {

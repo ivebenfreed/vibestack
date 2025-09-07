@@ -12,7 +12,7 @@
 // ====================================
 
 import { fromCallback } from 'xstate';
-import type { EnhancedTableRenderer } from '../renderers/core/EnhancedTableRenderer';
+import type { UnifiedTableRenderer } from '../renderers/core/UnifiedTableRenderer';
 import type { RenderState, RendererOptions, ViewportInfo, Column } from '../types';
 import { createLogger, type LogLevel } from '@/logger/simple-logger';
 
@@ -115,7 +115,7 @@ function calculateCoordinateMapping(
 // ====================================
 
 export const rendererActor = fromCallback<RendererActorEvent, RendererActorResponse>(({ sendBack, receive }) => {
-  let renderer: EnhancedTableRenderer | null = null;
+  let renderer: UnifiedTableRenderer | null = null;
   let renderState: RenderState | null = null;
   let isInitializing = false;
   let isInitialized = false;
@@ -145,8 +145,8 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           isInitializing = true;
           
-          // Import EnhancedTableRenderer dynamically to avoid circular imports
-          import('../renderers/core/EnhancedTableRenderer').then(({ EnhancedTableRenderer }) => {
+          // Import UnifiedTableRenderer dynamically to avoid circular imports
+          import('../renderers/core/UnifiedTableRenderer').then(({ UnifiedTableRenderer }) => {
             // Merge stored options from window with event options
             const storedOptions = (window as any).__vibegridx_renderer_options || {};
             const mergedOptions = {
@@ -255,7 +255,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                     // Continue with renderer creation using the valid container
                     const finalOptions = { ...mergedOptions, container: retryContainer };
                     
-                    renderer = new EnhancedTableRenderer(finalOptions);
+                    renderer = new UnifiedTableRenderer(finalOptions);
                     isInitializing = false;
                     isInitialized = true;
                     
@@ -317,7 +317,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               } : null
             });
             
-            renderer = new EnhancedTableRenderer(finalOptions);
+            renderer = new UnifiedTableRenderer(finalOptions);
             isInitializing = false;
             isInitialized = true;
             

@@ -214,12 +214,11 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   }
   
   // ✅ SIMPLIFIED: Just pass the essentials, let UniversalEntityPage and VibeGrid handle the rest
-  // Use the original entity name from schema if available for proper display
-  const displayEntityName = entitySchema?._originalName || actualEntityKey
+  // Pass the properly formatted entity name with org prefix - UniversalEntityPage will handle display formatting
   
   return (
     <UniversalEntityPage
-      entityName={displayEntityName}
+      entityName={actualEntityKey}
       schema={entitySchema}
       orgId={orgId}
     />
