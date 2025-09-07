@@ -60,6 +60,14 @@ api.route('/generic-kysely', genericKysely)
 // Replace the old Drizzle generic API with Kysely
 api.route('/generic', genericKysely) // Now using Kysely instead of Drizzle
 
+// File Import API
+import fileImportApi from '../routes/file-import-api'
+api.route('/file-import', fileImportApi)
+
+// Test Parser API (development only)
+import testParserApi from '../routes/test-parser'
+api.route('/test-parser', testParserApi)
+
 // Add a test route directly to verify OpenAPI works
 import { createRoute, z } from '@hono/zod-openapi';
 

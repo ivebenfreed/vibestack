@@ -1,7 +1,7 @@
 import { Separator } from '@/components/ui/separator'
 import { ContentContainer } from '@/components/layout/content-container'
 import SidebarNav from './components/sidebar-nav'
-import { User, Settings as SettingsIcon, Palette, Bell, Monitor, Shield } from 'lucide-react'
+import { User, Settings as SettingsIcon, Palette, Bell, Monitor, Shield, Upload } from 'lucide-react'
 import { useAuth } from '@/state-machines'
 import { Outlet } from '@tanstack/react-router'
 
@@ -30,6 +30,11 @@ const sidebarNavItems = [
     title: 'Display',
     href: '/settings/display',
     icon: <Monitor className="w-4 h-4" />,
+  },
+  {
+    title: 'File Import',
+    href: '/settings/import',
+    icon: <Upload className="w-4 h-4" />,
   },
 ]
 

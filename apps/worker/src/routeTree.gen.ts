@@ -44,6 +44,7 @@ import { Route as AuthenticatedWorldsWorldIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedTasksTimelineRouteImport } from './routes/_authenticated/tasks/timeline'
 import { Route as AuthenticatedTasksKanbanRouteImport } from './routes/_authenticated/tasks/kanban'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
+import { Route as AuthenticatedSettingsImportRouteImport } from './routes/_authenticated/settings/import'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
@@ -309,6 +310,12 @@ const AuthenticatedSettingsNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedSettingsImportRoute =
+  AuthenticatedSettingsImportRouteImport.update({
+    id: '/import',
+    path: '/import',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsDisplayRoute =
   AuthenticatedSettingsDisplayRouteImport.update({
     id: '/display',
@@ -431,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/settings/import': typeof AuthenticatedSettingsImportRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
@@ -484,6 +492,7 @@ export interface FileRoutesByTo {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/settings/import': typeof AuthenticatedSettingsImportRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
@@ -541,6 +550,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/_authenticated/settings/import': typeof AuthenticatedSettingsImportRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
@@ -598,6 +608,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
+    | '/settings/import'
     | '/settings/notifications'
     | '/tasks/kanban'
     | '/tasks/timeline'
@@ -651,6 +662,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
+    | '/settings/import'
     | '/settings/notifications'
     | '/tasks/kanban'
     | '/tasks/timeline'
@@ -707,6 +719,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
+    | '/_authenticated/settings/import'
     | '/_authenticated/settings/notifications'
     | '/_authenticated/tasks/kanban'
     | '/_authenticated/tasks/timeline'
@@ -1027,6 +1040,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/settings/import': {
+      id: '/_authenticated/settings/import'
+      path: '/import'
+      fullPath: '/settings/import'
+      preLoaderRoute: typeof AuthenticatedSettingsImportRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/display': {
       id: '/_authenticated/settings/display'
       path: '/display'
@@ -1191,6 +1211,7 @@ interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
   AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
+  AuthenticatedSettingsImportRoute: typeof AuthenticatedSettingsImportRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
   AuthenticatedSettingsAdminUsersRoute: typeof AuthenticatedSettingsAdminUsersRoute
@@ -1201,6 +1222,7 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
     AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
     AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
+    AuthenticatedSettingsImportRoute: AuthenticatedSettingsImportRoute,
     AuthenticatedSettingsNotificationsRoute:
       AuthenticatedSettingsNotificationsRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
