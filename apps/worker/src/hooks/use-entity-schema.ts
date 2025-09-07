@@ -16,7 +16,8 @@ import {
   orgSchemaClient, 
   type OrgEntitySchema, 
   type EntityDefinition, 
-  type FieldDefinition, 
+  type FieldDefinition,
+  type RelationshipFieldDefinition, 
   type FormFieldConfig,
   type ValidationResult 
 } from '@/lib/schema-client';
@@ -27,6 +28,8 @@ export interface UseEntitySchemaResult {
   schema: OrgEntitySchema | null;
   entitySchema: EntityDefinition | null;
   syncableFields: Record<string, FieldDefinition> | null;
+  customFields: Record<string, FieldDefinition> | null;
+  relationshipFields: Record<string, RelationshipFieldDefinition> | null;
   formFields: FormFieldConfig[];
   loading: boolean;
   error: string | null;
@@ -41,7 +44,7 @@ export interface UseEntitySchemaResult {
  * Hook to load and manage organization schema
  * Uses Legend State's universe context to ensure schema is loaded after auth
  */
-export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 'entitySchema' | 'syncableFields' | 'formFields' | 'validateData'> {
+export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 'entitySchema' | 'syncableFields' | 'customFields' | 'relationshipFields' | 'formFields' | 'validateData'> {
   // Get schema from Legend State's universe context (loaded by Legend State init machine)
   const universeLoading = use$(universeContext$.loading);
   const universeError = use$(universeContext$.error);
@@ -106,6 +109,8 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
   
   const [entitySchema, setEntitySchema] = useState<EntityDefinition | null>(null);
   const [syncableFields, setSyncableFields] = useState<Record<string, FieldDefinition> | null>(null);
+  const [customFields, setCustomFields] = useState<Record<string, FieldDefinition> | null>(null);
+  const [relationshipFields, setRelationshipFields] = useState<Record<string, RelationshipFieldDefinition> | null>(null);
   const [formFields, setFormFields] = useState<FormFieldConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +121,8 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
       if (!schema || !entityName) {
         setEntitySchema(null);
         setSyncableFields(null);
+        setCustomFields(null);
+        setRelationshipFields(null);
         setFormFields([]);
         setError(null);
         return;
@@ -130,6 +137,8 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
         if (!entity) {
           setEntitySchema(null);
           setSyncableFields(null);
+          setCustomFields(null);
+          setRelationshipFields(null);
           setFormFields([]);
           setError(`Entity '${entityName}' not found in organization schema`);
           return;
@@ -137,11 +146,16 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
 
         setEntitySchema(entity);
 
-        // Get syncable fields
+        // Get all field types from enhanced schema client
         const syncable = await orgSchemaClient.getSyncableFields(schema.orgId, entityName);
+        const custom = await orgSchemaClient.getCustomFields(schema.orgId, entityName);
+        const relationships = await orgSchemaClient.getRelationshipFields(schema.orgId, entityName);
+        
         setSyncableFields(syncable);
+        setCustomFields(custom);
+        setRelationshipFields(relationships);
 
-        // Generate form fields
+        // Generate enhanced form fields including relationships
         const forms = await orgSchemaClient.generateFormFields(schema.orgId, entityName);
         setFormFields(forms);
 
@@ -149,6 +163,8 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
       } catch (err) {
         setEntitySchema(null);
         setSyncableFields(null);
+        setCustomFields(null);
+        setRelationshipFields(null);
         setFormFields([]);
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -174,6 +190,8 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
     schema,
     entitySchema,
     syncableFields,
+    customFields,
+    relationshipFields,
     formFields,
     loading: schemaLoading || loading,
     error: schemaError || error,
