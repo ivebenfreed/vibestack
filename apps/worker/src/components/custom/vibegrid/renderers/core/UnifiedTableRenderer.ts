@@ -232,9 +232,8 @@ export class UnifiedTableRenderer {
     
     log.info('UnifiedTableRenderer: render() called', {
       columnCount: state.columns?.length,
-      hasRows: !!state.rows,
-      rowCount: state.rows?.length || 0,
-      hasVirtualRows: !!state.virtualRows,
+      hasLegendStateIntegration: !!(this.legendStateObservable && this.uiStore),
+      entityType: this.entityType,
       version: state.version,
       columnVisibility: state.columnVisibility,
       visibleColumnCount: this.getVisibleColumns().length
@@ -277,105 +276,71 @@ export class UnifiedTableRenderer {
   private convertToUnifiedRows(state: RenderState): void {
     this.unifiedRows = [];
     
-    // NEW UNIFIED APPROACH: Get data directly from Legend State, UI state from UI store
-    if (this.legendStateObservable && this.uiStore) {
-      const rawData = this.legendStateObservable.get(); // Direct from Legend State
-      const uiState = this.uiStore.getSnapshot(); // Get UI configuration
-      
-      if (rawData && typeof rawData === 'object') {
-        const entityRecords = Object.values(rawData);
-        
-        // Convert Legend State entities to unified rows
-        entityRecords.forEach((entity: any) => {
-          if (entity && typeof entity === 'object' && entity.id) {
-            const unifiedRow: UnifiedTableRow = {
-              id: entity.id,
-              type: 'data',
-              data: entity, // Direct entity data from Legend State
-              height: ROW_HEIGHT,
-              originalData: {
-                id: entity.id,
-                data: entity,
-                metadata: {
-                  isSelected: false,
-                  isDirty: false,
-                  isGroup: false,
-                  level: 0
-                }
-              }
-            };
-            
-            this.unifiedRows.push(unifiedRow);
-          }
-        });
-        
-        // Apply sorting from UI store
-        if (uiState.context.sortBy && uiState.context.sortBy.length > 0) {
-          this.applySortingToUnifiedRows(uiState.context.sortBy);
-        }
-        
-        // Apply filtering from UI store
-        if (uiState.context.filters && uiState.context.filters.length > 0) {
-          this.applyFiltersToUnifiedRows(uiState.context.filters);
-        }
-        
-        log.info('🔗 UnifiedTableRenderer: Converted from Legend State', {
-          totalRows: this.unifiedRows.length,
-          dataRows: this.unifiedRows.filter(r => r.type === 'data').length,
-          entityType: this.entityType,
-          appliedSort: uiState.context.sortBy?.length > 0,
-          appliedFilters: uiState.context.filters?.length > 0
-        });
-      } else {
-        log.warn('🔗 UnifiedTableRenderer: No data available from Legend State', {
-          rawDataType: typeof rawData,
-          hasData: !!rawData
-        });
-      }
-    } else {
-      // FALLBACK: Use old approach if Legend State not set up
-      if (state.virtualRows && state.virtualRows.length > 0) {
-        // Convert virtual rows (grouped data)
-        state.virtualRows.forEach((virtualRow) => {
-          const unifiedRow: UnifiedTableRow = {
-            id: virtualRow.id,
-            type: virtualRow.type as 'data' | 'group' | 'summary',
-            data: virtualRow.data || {},
-            level: virtualRow.level,
-            height: virtualRow.height,
-            originalData: virtualRow.type === 'data' ? virtualRow.data as TableRow : undefined
-          };
-          
-          if (virtualRow.type === 'group') {
-            const groupNode = virtualRow.data as GroupNode;
-            unifiedRow.isExpanded = this.expandedGroups.has(groupNode.id);
-            unifiedRow.groupId = groupNode.id;
-          }
-          
-          this.unifiedRows.push(unifiedRow);
-        });
-      } else if (state.rows && state.rows.length > 0) {
-        // Convert regular rows (flat data)
-        state.rows.forEach((row) => {
-          const unifiedRow: UnifiedTableRow = {
-            id: row.id,
-            type: 'data',
-            data: row.data,
-            height: ROW_HEIGHT,
-            originalData: row
-          };
-          
-          this.unifiedRows.push(unifiedRow);
-        });
-      }
-      
-      log.info('UnifiedTableRenderer: Converted using fallback approach', {
-        totalRows: this.unifiedRows.length,
-        dataRows: this.unifiedRows.filter(r => r.type === 'data').length,
-        groupRows: this.unifiedRows.filter(r => r.type === 'group').length,
-        summaryRows: this.unifiedRows.filter(r => r.type === 'summary').length
+    // UNIFIED APPROACH: Get data directly from Legend State, UI state from UI store
+    if (!this.legendStateObservable || !this.uiStore) {
+      log.error('🔗 UnifiedTableRenderer: Legend State integration not configured', {
+        hasLegendState: !!this.legendStateObservable,
+        hasUIStore: !!this.uiStore,
+        entityType: this.entityType
       });
+      return;
     }
+
+    const rawData = this.legendStateObservable.get(); // Direct from Legend State
+    const uiState = this.uiStore.getSnapshot(); // Get UI configuration
+    
+    if (!rawData || typeof rawData !== 'object') {
+      log.warn('🔗 UnifiedTableRenderer: No data available from Legend State', {
+        rawDataType: typeof rawData,
+        hasData: !!rawData,
+        entityType: this.entityType
+      });
+      return;
+    }
+
+    const entityRecords = Object.values(rawData);
+    
+    // Convert Legend State entities to unified rows
+    entityRecords.forEach((entity: any) => {
+      if (entity && typeof entity === 'object' && entity.id) {
+        const unifiedRow: UnifiedTableRow = {
+          id: entity.id,
+          type: 'data',
+          data: entity, // Direct entity data from Legend State
+          height: ROW_HEIGHT,
+          originalData: {
+            id: entity.id,
+            data: entity,
+            metadata: {
+              isSelected: false,
+              isDirty: false,
+              isGroup: false,
+              level: 0
+            }
+          }
+        };
+        
+        this.unifiedRows.push(unifiedRow);
+      }
+    });
+    
+    // Apply sorting from UI store
+    if (uiState.context.sortBy && uiState.context.sortBy.length > 0) {
+      this.applySortingToUnifiedRows(uiState.context.sortBy);
+    }
+    
+    // Apply filtering from UI store
+    if (uiState.context.filters && uiState.context.filters.length > 0) {
+      this.applyFiltersToUnifiedRows(uiState.context.filters);
+    }
+    
+    log.info('🔗 UnifiedTableRenderer: Converted from Legend State', {
+      totalRows: this.unifiedRows.length,
+      dataRows: this.unifiedRows.filter(r => r.type === 'data').length,
+      entityType: this.entityType,
+      appliedSort: uiState.context.sortBy?.length > 0,
+      appliedFilters: uiState.context.filters?.length > 0
+    });
   }
 
   // ====================================
