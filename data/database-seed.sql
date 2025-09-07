@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z4RfxKClqie4kT2j5VYin0o9TGH9gUVsqrHe8d7gCoGLGZ7gU9TLzVrifus6jB5
+\restrict FmGTzYpOUA9bR9y6SpgrccmVjHItrTzAenYkmVy41ePB9u6pWsdEfKVIwxOwVKy
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -150,6 +150,10 @@ fdb25983-b942-46b5-9d9e-2cd3b3aa0fed	0198b059-5999-7f84-8217-0506a838e0da	entity
 --
 
 COPY public.custom_option_sets (id, org_id, option_set_type, name, description, is_active, sort_order, created_at, updated_at) FROM stdin;
+13d22c5a-9351-4f0b-a3f3-157b6eea65da	01920000-1000-7000-8000-000000000001	relationship_type	Relationship Types	Available relationship types between entities	t	1	2025-09-07 11:41:55.795161	2025-09-07 11:41:55.795161
+59c3d657-0a03-44ec-8dbd-e1f306a92734	01920000-1000-7000-8000-000000000001	relationship_role	Relationship Roles	Roles within relationships	t	2	2025-09-07 11:41:55.795161	2025-09-07 11:41:55.795161
+5bd07690-21aa-4771-91eb-092d31ae6802	01920000-1000-7000-8000-000000000001	relationship_status	Relationship Status	Status of relationships	t	3	2025-09-07 11:41:55.795161	2025-09-07 11:41:55.795161
+a7993c2d-2431-46f6-8567-a25ed13c9434	01920000-1000-7000-8000-000000000001	entity_type	Entity Types	Types of entities that can be related	t	4	2025-09-07 11:41:55.795161	2025-09-07 11:41:55.795161
 \.
 
 
@@ -158,6 +162,63 @@ COPY public.custom_option_sets (id, org_id, option_set_type, name, description, 
 --
 
 COPY public.custom_options (id, option_set_id, value, label, description, color, icon, is_active, sort_order, metadata, created_at, updated_at) FROM stdin;
+6955efdc-97f6-4432-a0fc-8635943f0bc0	13d22c5a-9351-4f0b-a3f3-157b6eea65da	assigned_to	Assigned To	User assigned to work on this item	#3B82F6	user-check	t	1	{"cardinality": "many-to-many", "allowed_source": ["Task", "Project"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+69809655-ac22-44a8-85ac-068c1a3e8f6a	13d22c5a-9351-4f0b-a3f3-157b6eea65da	blocks	Blocks	This item blocks another	#EF4444	ban	t	2	{"cardinality": "one-to-many", "allowed_source": ["Task"], "allowed_target": ["Task"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+8da16efa-c823-4ff4-ada6-d17b067cf123	13d22c5a-9351-4f0b-a3f3-157b6eea65da	blocked_by	Blocked By	This item is blocked by another	#F59E0B	alert-triangle	t	3	{"cardinality": "many-to-one", "allowed_source": ["Task"], "allowed_target": ["Task"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+4c5c8da6-3951-4cdf-abaf-adc4e8dd67e9	13d22c5a-9351-4f0b-a3f3-157b6eea65da	subtask_of	Subtask Of	This is a subtask of another	#8B5CF6	git-branch	t	4	{"cardinality": "many-to-one", "allowed_source": ["Task"], "allowed_target": ["Task"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+a8b58379-8e2f-4457-bf11-0d15e202bb9a	13d22c5a-9351-4f0b-a3f3-157b6eea65da	member_of	Member Of	Member of project or team	#10B981	users	t	5	{"cardinality": "many-to-many", "allowed_source": ["User", "Task"], "allowed_target": ["Project"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+b2fc48f9-c653-4b87-9f47-6faad0e9995f	13d22c5a-9351-4f0b-a3f3-157b6eea65da	manages	Manages	Manages this entity	#6366F1	briefcase	t	6	{"cardinality": "one-to-many", "allowed_source": ["User"], "allowed_target": ["Project", "Task"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+ddc1042a-cd72-4001-9c44-639dc7b9ca20	13d22c5a-9351-4f0b-a3f3-157b6eea65da	authored_by	Authored By	Authored by user	#EC4899	edit	t	7	{"cardinality": "many-to-many", "allowed_source": ["Document", "Invoice", "Task"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+f1620952-658f-4c65-bba8-4e4484c705f1	13d22c5a-9351-4f0b-a3f3-157b6eea65da	references	References	References another entity	#06B6D4	link	t	8	{"cardinality": "many-to-many", "allowed_source": ["*"], "allowed_target": ["*"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+95dc5483-58db-46fd-9ded-6ce661557f74	13d22c5a-9351-4f0b-a3f3-157b6eea65da	requires_approval_from	Requires Approval	Requires approval from	#F97316	check-circle	t	9	{"cardinality": "many-to-many", "allowed_source": ["Invoice", "Expense"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+215d5cd7-1af5-41fb-bcb8-40f889621056	13d22c5a-9351-4f0b-a3f3-157b6eea65da	approved_by	Approved By	Approved by user	#84CC16	check	t	10	{"cardinality": "many-to-one", "allowed_source": ["Invoice", "Expense"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+43b62ab7-764b-4590-b5f7-3865d4d31282	13d22c5a-9351-4f0b-a3f3-157b6eea65da	watching	Watching	Watching for updates	#A78BFA	eye	t	11	{"cardinality": "many-to-many", "allowed_source": ["User"], "allowed_target": ["Task", "Project"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+a85e12dc-f3e0-473b-9cbb-fd6696f59500	13d22c5a-9351-4f0b-a3f3-157b6eea65da	collaborates_with	Collaborates With	Collaborates with	#FB923C	users	t	12	{"cardinality": "many-to-many", "allowed_source": ["User"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+85d1ec91-cb71-4dd3-9976-4976b0cc4845	13d22c5a-9351-4f0b-a3f3-157b6eea65da	reports_to	Reports To	Reports to in org hierarchy	#0EA5E9	trending-up	t	13	{"cardinality": "many-to-one", "allowed_source": ["User"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+036d8ec1-907e-42db-a25e-bc9366e3401b	13d22c5a-9351-4f0b-a3f3-157b6eea65da	mentors	Mentors	Mentors another user	#7C3AED	award	t	14	{"cardinality": "one-to-many", "allowed_source": ["User"], "allowed_target": ["User"]}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+b2407d8a-4b88-4e69-97ef-3af83cc6801e	59c3d657-0a03-44ec-8dbd-e1f306a92734	owner	Owner	Primary owner	#EF4444	crown	t	1	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+a5db202d-84c9-40ba-888f-66b6b59b895b	59c3d657-0a03-44ec-8dbd-e1f306a92734	admin	Admin	Administrator	#F59E0B	shield	t	2	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+4ff4f72e-3716-4d39-a665-e059a96656e5	59c3d657-0a03-44ec-8dbd-e1f306a92734	manager	Manager	Manager role	#3B82F6	briefcase	t	3	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+e180b20c-66f4-4769-9b44-9610e663e164	59c3d657-0a03-44ec-8dbd-e1f306a92734	tech_lead	Tech Lead	Technical lead	#8B5CF6	cpu	t	4	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+78a8df79-c8a2-4620-91b8-67a40668ebae	59c3d657-0a03-44ec-8dbd-e1f306a92734	member	Member	Team member	#10B981	user	t	5	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+c1ae97ba-6417-4b76-86ef-997e25d49de1	59c3d657-0a03-44ec-8dbd-e1f306a92734	contributor	Contributor	Active contributor	#06B6D4	git-commit	t	6	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+c2fb3029-e120-4d58-b493-796562907c58	59c3d657-0a03-44ec-8dbd-e1f306a92734	reviewer	Reviewer	Reviews work	#EC4899	eye	t	7	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+88b5095c-d35d-4db9-96a0-7cdf672f0693	59c3d657-0a03-44ec-8dbd-e1f306a92734	viewer	Viewer	Read-only access	#6B7280	eye-off	t	8	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+974024c5-b012-4183-86f1-43681a6786ce	59c3d657-0a03-44ec-8dbd-e1f306a92734	stakeholder	Stakeholder	Key stakeholder	#F97316	star	t	9	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+2a2ddf63-1d67-47b0-928d-11830bf90f22	59c3d657-0a03-44ec-8dbd-e1f306a92734	approver	Approver	Can approve	#84CC16	check-circle	t	10	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+950b41df-f697-48df-b4ab-092448f50472	5bd07690-21aa-4771-91eb-092d31ae6802	active	Active	Currently active	#10B981	play	t	1	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+996a3741-dc98-4614-b48e-6d53a73b826a	5bd07690-21aa-4771-91eb-092d31ae6802	pending	Pending	Pending approval	#F59E0B	clock	t	2	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+32bbd45a-9d74-4134-b744-c39df524a611	5bd07690-21aa-4771-91eb-092d31ae6802	suspended	Suspended	Temporarily suspended	#EF4444	pause	t	3	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+2f8a04bd-42fc-46e2-bd46-0d7039d5d223	5bd07690-21aa-4771-91eb-092d31ae6802	expired	Expired	No longer valid	#6B7280	x-circle	t	4	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+0a1142d5-ace1-4cdd-9d01-8b650d316a72	5bd07690-21aa-4771-91eb-092d31ae6802	archived	Archived	Archived for history	#9CA3AF	archive	t	5	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+a4c15158-ee4c-4d9e-ab05-c9b33e370313	a7993c2d-2431-46f6-8567-a25ed13c9434	User	User	System user	#3B82F6	user	t	1	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+203b1c40-7e89-4f2c-9398-2ad41c9048e2	a7993c2d-2431-46f6-8567-a25ed13c9434	Task	Task	Task entity	#10B981	check-square	t	2	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+328bb7e7-5210-41d1-9268-9f1787054afc	a7993c2d-2431-46f6-8567-a25ed13c9434	Project	Project	Project entity	#8B5CF6	folder	t	3	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+ad4ab97f-111b-4f66-bf9d-fb026c573764	a7993c2d-2431-46f6-8567-a25ed13c9434	Document	Document	Document entity	#F59E0B	file-text	t	4	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+a4de0898-e0ed-4c2a-9cc7-c04c6cc2ead8	a7993c2d-2431-46f6-8567-a25ed13c9434	Invoice	Invoice	Invoice entity	#EF4444	dollar-sign	t	5	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+011e15f5-4405-477b-bb9b-79ec559d2d1a	a7993c2d-2431-46f6-8567-a25ed13c9434	File	File	File entity	#06B6D4	paperclip	t	6	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+f26596bd-182f-46f1-9845-a0975a81c530	a7993c2d-2431-46f6-8567-a25ed13c9434	Discussion	Discussion	Discussion entity	#EC4899	message-circle	t	7	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+00ab1261-0610-4f54-8572-8e72d2071f58	a7993c2d-2431-46f6-8567-a25ed13c9434	Meeting	Meeting	Meeting entity	#F97316	calendar	t	8	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+d29bc182-535e-4f3d-a7a1-d19c381795b4	a7993c2d-2431-46f6-8567-a25ed13c9434	Contract	Contract	Contract entity	#7C3AED	file-plus	t	9	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+f4edeb74-1848-47bb-bfff-142286d8339e	a7993c2d-2431-46f6-8567-a25ed13c9434	Expense	Expense	Expense entity	#DC2626	credit-card	t	10	{}	2025-09-07 11:41:55.802995	2025-09-07 11:41:55.802995
+\.
+
+
+--
+-- Data for Name: dataforge_relationship_fields; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.dataforge_relationship_fields (id, org_id, entity_type, field_name, relationship_type, target_entity_type, cardinality, display_format, validation_rules, ui_config, created_at, updated_at) FROM stdin;
+9c4706a6-9dfd-4060-8344-c7cdb1ef5d6c	01920000-1000-7000-8000-000000000001	Task	assignees	assigned_to	User	many-to-many	{name} ({role})	\N	{"component": "multi-select", "searchable": true, "show_avatar": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+936b7896-f5c5-45cd-a77b-4e53bb991681	01920000-1000-7000-8000-000000000001	Task	blocked_by_tasks	blocked_by	Task	many-to-one	{title}	\N	{"component": "single-select", "searchable": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+e72c80c0-811e-47f6-8a49-a2011eeba594	01920000-1000-7000-8000-000000000001	Task	blocks_tasks	blocks	Task	one-to-many	{title}	\N	{"component": "multi-select", "searchable": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+c99b903d-a0ba-42e3-a300-777e28cbf8c4	01920000-1000-7000-8000-000000000001	Task	parent_task	subtask_of	Task	many-to-one	{title}	\N	{"component": "single-select", "searchable": true, "show_hierarchy": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+9a4d5626-0dbf-45d8-a2f3-55175cf30ac9	01920000-1000-7000-8000-000000000001	Task	watchers	watched_by	User	many-to-many	{name}	\N	{"component": "multi-select", "searchable": true, "show_avatar": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+5ea9a42b-5d9d-42bc-9e42-e479b17ac2e3	01920000-1000-7000-8000-000000000001	Project	members	member_of	User	many-to-many	{name} ({role})	\N	{"component": "multi-select", "searchable": true, "show_avatar": true, "group_by_role": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+6cccf304-c2d9-4dd1-9a4c-3792f73cbcf1	01920000-1000-7000-8000-000000000001	Project	manager	managed_by	User	many-to-one	{name}	\N	{"component": "single-select", "searchable": true, "show_avatar": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+607245db-b0f2-4780-991e-82d1487b0c32	01920000-1000-7000-8000-000000000001	Invoice	author	authored_by	User	many-to-one	{name}	\N	{"component": "single-select", "searchable": true, "show_avatar": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+ef62a5b4-1979-481d-b705-cdcd62399398	01920000-1000-7000-8000-000000000001	Invoice	approvers	requires_approval_from	User	many-to-many	{name} (Level {approval_level})	\N	{"component": "approval-chain", "searchable": true, "show_levels": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
+4a54c4d0-b1e0-4715-bab1-f9252f1f3046	01920000-1000-7000-8000-000000000001	Invoice	related_project	references	Project	many-to-one	{name}	\N	{"component": "single-select", "searchable": true}	2025-09-07 11:41:55.8173	2025-09-07 11:41:55.8173
 \.
 
 
@@ -261,6 +322,8 @@ fdb6bff8-e11e-4a98-a5f8-4a8531386701	Support Agent's Personal Workspace	personal
 --
 
 COPY public.file_imports (id, org_id, file_name, file_type, file_size, file_path, file_hash, status, detected_columns, row_count, sample_data, target_entity, column_mappings, transformation_rules, import_mode, records_processed, records_imported, records_updated, records_failed, records_skipped, error_details, validation_errors, created_at, started_at, completed_at, created_by) FROM stdin;
+019923ec-cfe6-707f-878e-11ac979094a2	0198b046-c453-72d9-b71a-092e1f75601a	test-upload.csv	csv	131	imports/0198b046-c453-72d9-b71a-092e1f75601a/019923ec-cfca-793f-82a2-982c50275073/test-upload.csv	7e5290580de9d1e8f843d3899d0079402e0b110e0df4c0ebb25cfcc3e6a555e8	uploaded	\N	\N	\N	\N	\N	\N	create	0	0	0	0	0	\N	\N	2025-09-07 11:25:46.343	\N	\N	demo-user-id
+019923f8-1747-7dbe-9718-97f72ce7becb	0198b046-c453-72d9-b71a-092e1f75601a	test-upload.json	json	566	imports/0198b046-c453-72d9-b71a-092e1f75601a/019923f8-1736-7dc6-aa43-087478687e2b/test-upload.json	408f0ce42339dfb8013f16af168e7f1e2bce250da9add96ab6b6597fcc84dccb	uploaded	\N	\N	\N	\N	\N	\N	create	0	0	0	0	0	\N	\N	2025-09-07 11:38:05.512	\N	\N	demo-user-id
 \.
 
 
@@ -12453,6 +12516,37 @@ ddc61642-c77e-42c0-8a25-fa12962cfd6d	01920000-1000-7000-8000-000000000001	\N	202
 
 
 --
+-- Data for Name: org_01920000_1000_7000_8000_000000000001_relationships; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_01920000_1000_7000_8000_000000000001_relationships (id, source_entity_type, source_entity_id, relationship_type, relationship_subtype, target_entity_type, target_entity_id, properties, valid_from, valid_until, created_by, created_at, updated_by, updated_at) FROM stdin;
+c8c251c6-f23a-4fa1-ac44-46000f8bba5c	Task	6f9458dd-0986-4abc-905c-0c3ac96de314	assigned_to	\N	User	0198b046-d931-7772-a1e8-b63c68c7f43d	{"role": "assignee", "migrated_from": "assignee_id"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+3ccb32d9-10e7-418d-b493-bb5662ed9e5b	Task	13b79f1e-74d1-44f5-9137-cc9683471c45	assigned_to	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	{"role": "assignee", "migrated_from": "assignee_id"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+0130ca26-c97b-4884-a4f3-e2349cf9d8d8	Invoice	11e16936-e930-48f6-bebf-364abdc125dc	authored_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	{"role": "primary_author", "migrated_from": "author_id"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+6d4c1596-12c0-46c5-83ad-72e81cbf620d	Discussion	bc711997-bfdb-496c-a68b-8ca2fc8bed7e	authored_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	{"migrated_from": "author_id"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+a201aa12-6c9b-4a56-a467-c5b15bb4443d	User	0198b046-c453-72d9-b71a-092e1f75601a	member_of	\N	Project	dea1e46d-dcc8-4501-94ea-611de57def0d	{"role": "owner", "joined_date": "2024-01-01"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+adc0e073-b552-4225-bd90-e0db599e39f7	User	0198b046-ce51-7755-bbce-7e68a6d3f953	member_of	\N	Project	dea1e46d-dcc8-4501-94ea-611de57def0d	{"role": "tech_lead", "joined_date": "2024-01-02"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+6a3b4b02-d863-4527-8819-dd497cb71447	User	0198b046-d931-7772-a1e8-b63c68c7f43d	member_of	\N	Project	dea1e46d-dcc8-4501-94ea-611de57def0d	{"role": "member", "joined_date": "2024-01-03"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+a92242cf-78b9-44d5-b97e-edd2a37b84a1	Task	6f9458dd-0986-4abc-905c-0c3ac96de314	blocks	\N	Task	82840242-591a-4115-b230-417f3b9644de	{"reason": "Must complete API first", "severity": "critical"}	2025-09-07 11:27:42.422513	\N	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-09-07 11:27:42.422513	\N	\N
+9c64ff07-4465-4214-b842-e48b22b41983	Task	82840242-591a-4115-b230-417f3b9644de	blocks	\N	Task	7a6df292-01eb-40b3-852d-36599b59d86e	{"reason": "Deployment dependency", "severity": "high"}	2025-09-07 11:27:42.422513	\N	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-09-07 11:27:42.422513	\N	\N
+af6b3e7d-7f86-4583-bc93-eb963dd9df1b	User	0198b046-d931-7772-a1e8-b63c68c7f43d	reports_to	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	{"since": "2024-01-01", "department": "Product"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+bdca4cc1-38f1-407e-976a-9dd2459a082d	User	0198b046-dadb-788a-8a65-e3f11ad45a75	reports_to	\N	User	0198b046-ce51-7755-bbce-7e68a6d3f953	{"since": "2024-01-01", "department": "Engineering"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+4995625e-2305-4dfc-9c1e-3da4e60d73f9	User	0198b046-ce51-7755-bbce-7e68a6d3f953	mentors	\N	User	0198b046-dadb-788a-8a65-e3f11ad45a75	{"started": "2024-02-01", "focus_areas": ["backend", "architecture"]}	2025-09-07 11:27:42.422513	\N	0198b046-ce51-7755-bbce-7e68a6d3f953	2025-09-07 11:27:42.422513	\N	\N
+db5e8205-a1b6-4ff0-b196-1fa9cbb2231c	User	0198b046-ce51-7755-bbce-7e68a6d3f953	collaborates_with	\N	User	0198b046-d931-7772-a1e8-b63c68c7f43d	{"projects": ["API Design", "Architecture"], "strength": "high"}	2025-09-07 11:27:42.422513	\N	0198b046-ce51-7755-bbce-7e68a6d3f953	2025-09-07 11:27:42.422513	\N	\N
+7264bf4e-b213-43c7-8c6a-d801ecc1038c	User	0198b046-c453-72d9-b71a-092e1f75601a	watching	\N	Task	82840242-591a-4115-b230-417f3b9644de	{"reason": "critical_priority", "notifications": true}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+25a2b9ec-1701-422d-bd09-62aa33094ea0	User	0198b046-ce51-7755-bbce-7e68a6d3f953	watching	\N	Task	82840242-591a-4115-b230-417f3b9644de	{"reason": "technical_oversight", "notifications": false}	2025-09-07 11:27:42.422513	\N	0198b046-ce51-7755-bbce-7e68a6d3f953	2025-09-07 11:27:42.422513	\N	\N
+764b26c2-80bf-44ee-b14a-3d257278625f	User	0198b046-c453-72d9-b71a-092e1f75601a	stakeholder_in	\N	Project	dea1e46d-dcc8-4501-94ea-611de57def0d	{"decision_maker": true, "interest_level": "high"}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+b3147ed1-ec9c-48ef-8595-afef7a14f022	Task	7a6df292-01eb-40b3-852d-36599b59d86e	assigned_to	\N	User	0198b046-ce51-7755-bbce-7e68a6d3f953	{"role": "developer", "effort_percentage": 60}	2025-09-07 11:27:42.422513	\N	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-09-07 11:27:42.422513	\N	\N
+81e4bf89-09d8-4270-ac68-30d64292c101	Task	7a6df292-01eb-40b3-852d-36599b59d86e	assigned_to	\N	User	0198b046-dadb-788a-8a65-e3f11ad45a75	{"role": "reviewer", "effort_percentage": 40}	2025-09-07 11:27:42.422513	\N	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-09-07 11:27:42.422513	\N	\N
+96767e6b-64e5-4cd5-9e43-d4fcd6706a33	Invoice	e8e01470-713c-44f8-aa3f-893fdb3c7780	requires_approval_from	\N	User	0198b046-d931-7772-a1e8-b63c68c7f43d	{"threshold": 5000, "approval_level": 1}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+d2f2a875-9504-472b-aff1-fc48bea062a8	Invoice	e8e01470-713c-44f8-aa3f-893fdb3c7780	requires_approval_from	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	{"threshold": 10000, "approval_level": 2}	2025-09-07 11:27:42.422513	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 11:27:42.422513	\N	\N
+1c0d622a-0a42-4bc9-9fc1-f1b1e634407d	Invoice	40bd1de7-f9a3-43ef-91b8-fa2d251d0d05	references	\N	Project	dea1e46d-dcc8-4501-94ea-611de57def0d	{"amount": 25000, "reference_type": "billing_for"}	2025-09-07 11:27:42.422513	\N	0198b046-d931-7772-a1e8-b63c68c7f43d	2025-09-07 11:27:42.422513	\N	\N
+dd4e490a-8dfb-4307-bdab-7c688dda27b6	Task	5f6ea29a-0a15-4f8e-9b34-e12c515d8fed	references	\N	Invoice	40bd1de7-f9a3-43ef-91b8-fa2d251d0d05	{"notes": "Implementing features from invoice", "reference_type": "implementation_of"}	2025-09-07 11:27:42.422513	\N	0198b046-dadb-788a-8a65-e3f11ad45a75	2025-09-07 11:27:42.422513	\N	\N
+eeb40901-673b-44b0-bcff-d90166f63983	Task	82840242-591a-4115-b230-417f3b9644de	assigned_to	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	{"role": "owner", "effort_percentage": 100}	2025-09-07 12:00:41.629762	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-07 12:00:41.629762	\N	\N
+\.
+
+
+--
 -- Data for Name: org_01920000_1000_7000_8000_000000000001_replicatestentity17571; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -13012,6 +13106,37 @@ a9e18a8f-ece8-41ed-bbf7-9f644d8debd9	01920000-2000-7000-8000-000000000002	Featur
 
 
 --
+-- Data for Name: org_relationship_definitions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.org_relationship_definitions (id, org_id, relationship_type, display_name, description, allowed_source_types, allowed_target_types, cardinality, is_directional, inverse_relationship_type, property_schema, ui_config, is_system, is_active) FROM stdin;
+f162688e-a29e-4fb3-a48b-7a8fbb6b9c77	01920000-1000-7000-8000-000000000001	assigned_to	Assigned To	User assigned to work on this item	{Task,Project,Document}	{User}	many-to-many	t	\N	\N	\N	f	t
+0a6b9a9f-768b-46a3-9aab-b63a299c172e	01920000-1000-7000-8000-000000000001	blocks	Blocks	This task blocks another task	{Task}	{Task}	one-to-many	t	blocked_by	\N	\N	f	t
+7233eaa9-e740-48e7-b873-83c477efc2ba	01920000-1000-7000-8000-000000000001	blocked_by	Blocked By	This task is blocked by another task	{Task}	{Task}	many-to-one	t	blocks	\N	\N	f	t
+c04ff6d8-de38-4e2c-9493-c57f0706e12a	01920000-1000-7000-8000-000000000001	subtask_of	Subtask Of	This task is a subtask of another	{Task}	{Task}	many-to-one	t	has_subtask	\N	\N	f	t
+acb14f62-9936-420a-a0b0-2136efc8ffc1	01920000-1000-7000-8000-000000000001	has_subtask	Has Subtask	This task has subtasks	{Task}	{Task}	one-to-many	t	subtask_of	\N	\N	f	t
+52ec74fc-7b16-48cf-a8af-0f2c6e96bbc4	01920000-1000-7000-8000-000000000001	member_of	Member Of	User is member of project/team	{User}	{Project}	many-to-many	f	\N	\N	\N	f	t
+b80cb25e-b5c5-4834-bd47-405fd569d0ef	01920000-1000-7000-8000-000000000001	manages	Manages	User manages this entity	{User}	{Project,Task}	one-to-many	t	managed_by	\N	\N	f	t
+1193a07e-eb7a-4ef0-b90a-f75181a14c17	01920000-1000-7000-8000-000000000001	managed_by	Managed By	Entity is managed by user	{Project,Task}	{User}	many-to-one	t	manages	\N	\N	f	t
+2c3dd02f-fa05-4e98-a7ff-6d144d31b8c2	01920000-1000-7000-8000-000000000001	authored_by	Authored By	Document authored by user	{Document,Invoice,Contract}	{User}	many-to-many	t	author_of	\N	\N	f	t
+9cbfe4a6-f46e-467b-8669-84f5ed084f68	01920000-1000-7000-8000-000000000001	author_of	Author Of	User authored this document	{User}	{Document,Invoice,Contract}	many-to-many	t	authored_by	\N	\N	f	t
+816d73b9-3656-4b77-917a-a2e78ec5d721	01920000-1000-7000-8000-000000000001	references	References	Entity references another entity	{*}	{*}	many-to-many	t	referenced_by	\N	\N	f	t
+c934020a-545a-498b-9ab4-b0b089462bbf	01920000-1000-7000-8000-000000000001	referenced_by	Referenced By	Entity is referenced by another	{*}	{*}	many-to-many	t	references	\N	\N	f	t
+c9dad8b9-ab28-42c7-8319-6ca2ee1a9445	01920000-1000-7000-8000-000000000001	requires_approval_from	Requires Approval	Requires approval from user	{Invoice,Expense,Contract}	{User}	many-to-many	t	can_approve	\N	\N	f	t
+709fb23f-403c-41d2-a31c-74042e67b087	01920000-1000-7000-8000-000000000001	approved_by	Approved By	Approved by user	{Invoice,Expense,Contract}	{User}	many-to-one	t	\N	\N	\N	f	t
+dff24d69-f907-4de2-bfbd-6f4381369488	01920000-1000-7000-8000-000000000001	collaborates_with	Collaborates With	Users collaborate together	{User}	{User}	many-to-many	f	\N	\N	\N	f	t
+fb02292b-27c5-4466-af00-a4bbeb814ad1	01920000-1000-7000-8000-000000000001	watching	Watching	User is watching for updates	{User}	{Task,Project,Document}	many-to-many	t	watched_by	\N	\N	f	t
+16c18925-3434-4752-838c-c4c4b30a7fd1	01920000-1000-7000-8000-000000000001	watched_by	Watched By	Entity is watched by users	{Task,Project,Document}	{User}	many-to-many	t	watching	\N	\N	f	t
+412dcddb-3d16-47e5-b5e5-8d0aad3b7783	01920000-1000-7000-8000-000000000001	reports_to	Reports To	Organizational reporting structure	{User}	{User}	many-to-one	t	supervises	\N	\N	f	t
+f2c6c2a0-bed2-485c-b9b4-e098ef91e90c	01920000-1000-7000-8000-000000000001	supervises	Supervises	User supervises other users	{User}	{User}	one-to-many	t	reports_to	\N	\N	f	t
+424aa3d3-dc1c-43b4-bd46-0743b3034fbe	01920000-1000-7000-8000-000000000001	stakeholder_in	Stakeholder In	User is stakeholder in entity	{User}	{Project,Task}	many-to-many	t	has_stakeholder	\N	\N	f	t
+70f6a1f5-f863-4b92-bc8d-11baacc24647	01920000-1000-7000-8000-000000000001	escalated_to	Escalated To	Issue escalated to user	{Task,Issue}	{User}	many-to-one	t	\N	\N	\N	f	t
+9d3a8d04-a3bb-43b2-a6aa-202c2d646d4c	01920000-1000-7000-8000-000000000001	mentors	Mentors	User mentors another user	{User}	{User}	one-to-many	t	mentored_by	\N	\N	f	t
+4576832c-3de8-4177-98ad-bbae159ccb85	01920000-1000-7000-8000-000000000001	mentored_by	Mentored By	User is mentored by another	{User}	{User}	many-to-one	t	mentors	\N	\N	f	t
+\.
+
+
+--
 -- Data for Name: organization_members; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -13299,5 +13424,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z4RfxKClqie4kT2j5VYin0o9TGH9gUVsqrHe8d7gCoGLGZ7gU9TLzVrifus6jB5
+\unrestrict FmGTzYpOUA9bR9y6SpgrccmVjHItrTzAenYkmVy41ePB9u6pWsdEfKVIwxOwVKy
 

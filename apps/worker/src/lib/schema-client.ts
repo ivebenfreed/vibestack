@@ -45,9 +45,9 @@ export class OrgSchemaClient {
 
 
   /**
-   * Load schema for an organization with caching
+   * Load schema for an organization with caching and retry logic
    */
-  async loadOrgSchema(orgId: string): Promise<SchemaLoadResult> {
+  async loadOrgSchema(orgId: string, maxRetries: number = 3): Promise<SchemaLoadResult> {
     try {
       // Check cache first
       const cached = this.getCachedSchema(orgId);
@@ -59,51 +59,111 @@ export class OrgSchemaClient {
         };
       }
 
-      // Load schema from PostgreSQL-native Universal Archetype API (same as POC)
-      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/schema`, {
-        method: 'GET',
-        credentials: 'include'
-      });
+      // Retry logic with exponential backoff
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Add delay for retries (exponential backoff)
+          if (attempt > 0) {
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+            log.info(`Retrying schema load for ${orgId} after ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
 
-      if (!response.ok) {
-        throw new Error(`Schema loading failed: ${response.status} ${response.statusText}`);
-      }
+          // Load schema from PostgreSQL-native Universal Archetype API (same as POC)
+          const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/schema`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
 
-      const rawData = await response.json();
-      
-      log.info('🔍 Schema client raw response:', rawData);
-      
-      // Handle the new API format - check if it's the wrapped response format
-      let schemaArray: any[];
-      if (rawData && typeof rawData === 'object' && 'success' in rawData) {
-        if (!rawData.success) {
+          if (!response.ok) {
+            throw new Error(`Schema loading failed: ${response.status} ${response.statusText}`);
+          }
+
+          // If we got here, the request succeeded - continue with normal processing
+          const rawData = await response.json();
+          
+          log.info('🔍 Schema client raw response:', rawData);
+          
+          // Handle the new API format - check if it's the wrapped response format
+          let schemaArray: any[];
+          if (rawData && typeof rawData === 'object' && 'success' in rawData) {
+            if (!rawData.success) {
+              return {
+                success: false,
+                error: rawData.error || 'Server returned error'
+              };
+            }
+            schemaArray = rawData.schema;
+          } else if (Array.isArray(rawData)) {
+            // Legacy format - direct array
+            schemaArray = rawData;
+          } else {
+            return {
+              success: false,
+              error: 'Invalid schema format: expected wrapped response or array of entities'
+            };
+          }
+
+          if (!Array.isArray(schemaArray)) {
+            return {
+              success: false,
+              error: 'Invalid schema format: schema field must be an array'
+            };
+          }
+
+          // Continue with the rest of the processing (moving it here)
+          const processedSchema = this.processSchemaResponse(orgId, schemaArray);
+          
+          // Cache the result
+          this.cache.set(orgId, {
+            schema: processedSchema,
+            timestamp: Date.now()
+          });
+
           return {
-            success: false,
-            error: rawData.error || 'Server returned error'
+            success: true,
+            schema: processedSchema
           };
+          
+        } catch (error) {
+          lastError = error as Error;
+          log.error(`Schema loading attempt ${attempt + 1} failed for org ${orgId}:`, error);
+          
+          // If it's a network error and we have more retries, continue
+          if (attempt < maxRetries - 1 && 
+              (error instanceof TypeError || // Network errors
+               (error as any)?.message?.includes('fetch'))) {
+            continue;
+          }
+          // Otherwise, throw the error
+          throw error;
         }
-        schemaArray = rawData.schema;
-      } else if (Array.isArray(rawData)) {
-        // Legacy format - direct array
-        schemaArray = rawData;
-      } else {
-        return {
-          success: false,
-          error: 'Invalid schema format: expected wrapped response or array of entities'
-        };
       }
 
-      if (!Array.isArray(schemaArray)) {
-        return {
-          success: false,
-          error: 'Invalid schema format: schema field must be an array'
-        };
-      }
-
-      // Transform array of entities into schema format
-      const entities: Record<string, any> = {};
+      // If we exhausted all retries, throw the last error
+      throw lastError || new Error('Schema loading failed after all retries');
       
-      schemaArray.forEach(entity => {
+    } catch (error) {
+      log.error('Failed to load org schema:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Process the schema response into the expected format
+   */
+  private processSchemaResponse(orgId: string, schemaArray: any[]): OrgEntitySchema {
+    // Transform array of entities into schema format
+    const entities: Record<string, any> = {};
+    
+    schemaArray.forEach(entity => {
         // Extract fields from businessMetadata if available
         const businessMetadata = entity.businessMetadata || {};
         const fields = businessMetadata.fields || [];
@@ -148,26 +208,10 @@ export class OrgSchemaClient {
         version: Date.now().toString(),
         entities
       };
+      
       log.info('🔍 Schema client processed schema:', schema);
       
-      // Cache the schema
-      this.cacheSchema(orgId, schema);
-      
-      // Schema loaded - Legend State handles initialization automatically
-      log.info('[Schema] ✅ Organization schema loaded - Legend State will handle initialization');
-
-      return {
-        success: true,
-        schema: schema,
-        cached: false
-      };
-    } catch (error) {
-      log.error('Failed to load org schema:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
+      return schema;
   }
 
   /**

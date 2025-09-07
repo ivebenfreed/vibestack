@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict oWzQKktkRrPxFs3VwSXg5qZesWVfMxg95uTBpWsSmnrOmF10rCg0FV7U3GoIgzn
+\restrict WSrKOCuSjh5VCVH7cA0bUYiHauQopoOhR6ThDD5m29XTJaxjBK9tcNBdc689gTt
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict oWzQKktkRrPxFs3VwSXg5qZesWVfMxg95uTBpWsSmnrOmF10rCg0FV7U3GoIgzn
+\unrestrict WSrKOCuSjh5VCVH7cA0bUYiHauQopoOhR6ThDD5m29XTJaxjBK9tcNBdc689gTt
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict 8JjTmIi2oz7VEmaZJpqHEjvG9z1CJCufJC7HRmK4OhnfHaK7fhe7EB0c45k6LXe
+\restrict FovBTu5BhniYMc4QbfpOOvwIKzMxMzc9YUSZZwAR22iX3WzaXznH3GIxAcpDmWL
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8JjTmIi2oz7VEmaZJpqHEjvG9z1CJCufJC7HRmK4OhnfHaK7fhe7EB0c45k6LXe
+\unrestrict FovBTu5BhniYMc4QbfpOOvwIKzMxMzc9YUSZZwAR22iX3WzaXznH3GIxAcpDmWL
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict YcPk1siIwkNsEK7I4XEE3fIq52q8a6UbW0rV8C2A1Z7S9arNbfpJ9g02wl87V9e
+\restrict fecFFkJTkczyg4jJadqsrrDpS0ouPCkGoWNf8DcgIJylfrmaVgJ2o6LPCwGazqA
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YcPk1siIwkNsEK7I4XEE3fIq52q8a6UbW0rV8C2A1Z7S9arNbfpJ9g02wl87V9e
+\unrestrict fecFFkJTkczyg4jJadqsrrDpS0ouPCkGoWNf8DcgIJylfrmaVgJ2o6LPCwGazqA
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict WyJnJdznjnbAiFax6INZj1qALFQIdRk76wigZjK9lCgFXeoDUIKnDwwFv1xuhoB
+\restrict TLuNmGrJ5bHo03Pimdy51vj1WNP1GhM0ffiqwXDHKdzoiQezfZ6sr11gzaQIoMV
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict WyJnJdznjnbAiFax6INZj1qALFQIdRk76wigZjK9lCgFXeoDUIKnDwwFv1xuhoB
+\unrestrict TLuNmGrJ5bHo03Pimdy51vj1WNP1GhM0ffiqwXDHKdzoiQezfZ6sr11gzaQIoMV
 \connect vibestack_dev
-\restrict WyJnJdznjnbAiFax6INZj1qALFQIdRk76wigZjK9lCgFXeoDUIKnDwwFv1xuhoB
+\restrict TLuNmGrJ5bHo03Pimdy51vj1WNP1GhM0ffiqwXDHKdzoiQezfZ6sr11gzaQIoMV
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -695,6 +695,45 @@ CREATE FUNCTION public.generate_uuidv7() RETURNS uuid
 
 
 ALTER FUNCTION public.generate_uuidv7() OWNER TO postgres;
+
+--
+-- Name: get_available_relationship_types(uuid, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_available_relationship_types(p_org_id uuid, p_source_entity_type character varying DEFAULT NULL::character varying, p_target_entity_type character varying DEFAULT NULL::character varying) RETURNS TABLE(relationship_type text, label text, description text, color text, icon text, allowed_target_types text[], cardinality text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        co.value::TEXT as relationship_type,
+        co.label,
+        co.description,
+        co.color,
+        co.icon,
+        ARRAY(SELECT jsonb_array_elements_text(co.metadata->'allowed_target')) as allowed_target_types,
+        co.metadata->>'cardinality' as cardinality
+    FROM custom_options co
+    JOIN custom_option_sets cos ON co.option_set_id = cos.id
+    WHERE cos.org_id = p_org_id::text
+        AND cos.option_set_type = 'relationship_type'
+        AND co.is_active = true
+        AND (
+            p_source_entity_type IS NULL
+            OR co.metadata->'allowed_source' ? p_source_entity_type
+            OR co.metadata->'allowed_source' ? '*'
+        )
+        AND (
+            p_target_entity_type IS NULL
+            OR co.metadata->'allowed_target' ? p_target_entity_type
+            OR co.metadata->'allowed_target' ? '*'
+        )
+    ORDER BY co.sort_order;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_available_relationship_types(p_org_id uuid, p_source_entity_type character varying, p_target_entity_type character varying) OWNER TO postgres;
 
 --
 -- Name: get_current_organization_id(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1619,6 +1658,61 @@ $$;
 ALTER FUNCTION public.validate_billing_schema() OWNER TO postgres;
 
 --
+-- Name: validate_relationship(uuid, character varying, uuid, character varying, character varying, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validate_relationship(p_org_id uuid, p_source_entity_type character varying, p_source_entity_id uuid, p_relationship_type character varying, p_target_entity_type character varying, p_target_entity_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_valid BOOLEAN := true;
+    v_errors JSONB := '[]'::jsonb;
+    v_relationship_config JSONB;
+    v_existing_count INT;
+    v_max_allowed INT;
+BEGIN
+    -- Get relationship configuration
+    SELECT metadata INTO v_relationship_config
+    FROM custom_options co
+    JOIN custom_option_sets cos ON co.option_set_id = cos.id
+    WHERE cos.org_id = p_org_id
+        AND cos.option_set_type = 'relationship_type'
+        AND co.value = p_relationship_type;
+    
+    IF v_relationship_config IS NULL THEN
+        v_valid := false;
+        v_errors := v_errors || jsonb_build_object('error', 'Invalid relationship type');
+    END IF;
+    
+    -- Check cardinality constraints
+    IF v_relationship_config->>'cardinality' = 'one-to-one' THEN
+        -- Check if source already has this relationship
+        SELECT COUNT(*) INTO v_existing_count
+        FROM org_01920000_1000_7000_8000_000000000001_relationships
+        WHERE source_entity_type = p_source_entity_type
+            AND source_entity_id = p_source_entity_id
+            AND relationship_type = p_relationship_type
+            AND valid_until IS NULL;
+        
+        IF v_existing_count > 0 THEN
+            v_valid := false;
+            v_errors := v_errors || jsonb_build_object('error', 'Source already has this one-to-one relationship');
+        END IF;
+    END IF;
+    
+    -- Additional validation rules can be added here
+    
+    RETURN jsonb_build_object(
+        'valid', v_valid,
+        'errors', v_errors
+    );
+END;
+$$;
+
+
+ALTER FUNCTION public.validate_relationship(p_org_id uuid, p_source_entity_type character varying, p_source_entity_id uuid, p_relationship_type character varying, p_target_entity_type character varying, p_target_entity_id uuid) OWNER TO postgres;
+
+--
 -- Name: validate_rls_context(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1987,6 +2081,28 @@ ALTER TABLE public.custom_options OWNER TO postgres;
 
 COMMENT ON TABLE public.custom_options IS 'Organization-specific option values with custom labels and styling';
 
+
+--
+-- Name: dataforge_relationship_fields; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_relationship_fields (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    entity_type character varying(100) NOT NULL,
+    field_name character varying(100) NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    target_entity_type character varying(100),
+    cardinality character varying(50),
+    display_format character varying(200),
+    validation_rules jsonb,
+    ui_config jsonb,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.dataforge_relationship_fields OWNER TO postgres;
 
 --
 -- Name: file_imports; Type: TABLE; Schema: public; Owner: postgres
@@ -2689,6 +2805,30 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_records REPLICA
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_records OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_relationships; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_relationships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_entity_type character varying(100) NOT NULL,
+    source_entity_id uuid NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    relationship_subtype character varying(100),
+    target_entity_type character varying(100) NOT NULL,
+    target_entity_id uuid NOT NULL,
+    properties jsonb DEFAULT '{}'::jsonb,
+    valid_from timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    valid_until timestamp without time zone,
+    created_by uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_by uuid,
+    updated_at timestamp without time zone
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_relationships OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_replicatestentity17571; Type: TABLE; Schema: public; Owner: postgres
@@ -4204,6 +4344,30 @@ ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_ticket REPLICA 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_ticket OWNER TO postgres;
 
 --
+-- Name: org_relationship_definitions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_relationship_definitions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    display_name character varying(200) NOT NULL,
+    description text,
+    allowed_source_types text[],
+    allowed_target_types text[],
+    cardinality character varying(20),
+    is_directional boolean DEFAULT true,
+    inverse_relationship_type character varying(100),
+    property_schema jsonb,
+    ui_config jsonb,
+    is_system boolean DEFAULT false,
+    is_active boolean DEFAULT true
+);
+
+
+ALTER TABLE public.org_relationship_definitions OWNER TO postgres;
+
+--
 -- Name: organization_members; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4563,6 +4727,255 @@ CREATE TABLE public.verification (
 ALTER TABLE public.verification OWNER TO postgres;
 
 --
+-- Name: wide_corp_entity_relationships; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_entity_relationships AS
+ SELECT r.id,
+    r.source_entity_type,
+    r.source_entity_id,
+    r.relationship_type,
+    r.relationship_subtype,
+    r.target_entity_type,
+    r.target_entity_id,
+    r.properties,
+    r.valid_from,
+    r.valid_until,
+    r.created_by,
+    r.created_at,
+    r.updated_by,
+    r.updated_at,
+    rd.display_name AS relationship_display_name,
+    rd.description AS relationship_description,
+        CASE
+            WHEN ((r.target_entity_type)::text = 'User'::text) THEN u.name
+            WHEN ((r.target_entity_type)::text = 'Task'::text) THEN t.title
+            WHEN ((r.target_entity_type)::text = 'Project'::text) THEN (p.name)::text
+            WHEN ((r.target_entity_type)::text = 'Invoice'::text) THEN i.title
+            ELSE (r.target_entity_id)::text
+        END AS target_display_name
+   FROM (((((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     LEFT JOIN public.org_relationship_definitions rd ON (((rd.org_id = '01920000-1000-7000-8000-000000000001'::uuid) AND ((rd.relationship_type)::text = (r.relationship_type)::text))))
+     LEFT JOIN public."user" u ON ((((r.target_entity_type)::text = 'User'::text) AND (r.target_entity_id = (u.id)::uuid))))
+     LEFT JOIN public.org_01920000_1000_7000_8000_000000000001_task t ON ((((r.target_entity_type)::text = 'Task'::text) AND (r.target_entity_id = (t.id)::uuid))))
+     LEFT JOIN public.org_01920000_1000_7000_8000_000000000001_project p ON ((((r.target_entity_type)::text = 'Project'::text) AND (r.target_entity_id = p.id))))
+     LEFT JOIN public.org_01920000_1000_7000_8000_000000000001_invoice i ON ((((r.target_entity_type)::text = 'Invoice'::text) AND (r.target_entity_id = (i.id)::uuid))))
+  WHERE (r.valid_until IS NULL);
+
+
+ALTER VIEW public.wide_corp_entity_relationships OWNER TO postgres;
+
+--
+-- Name: wide_corp_org_chart; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_org_chart AS
+ SELECT r.source_entity_id AS employee_id,
+    u1.name AS employee_name,
+    u1.email AS employee_email,
+    r.target_entity_id AS manager_id,
+    u2.name AS manager_name,
+    u2.email AS manager_email,
+    (r.properties ->> 'department'::text) AS department,
+    (r.properties ->> 'since'::text) AS reporting_since
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public."user" u1 ON ((r.source_entity_id = (u1.id)::uuid)))
+     JOIN public."user" u2 ON ((r.target_entity_id = (u2.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'User'::text) AND ((r.relationship_type)::text = 'reports_to'::text) AND ((r.target_entity_type)::text = 'User'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_org_chart OWNER TO postgres;
+
+--
+-- Name: wide_corp_project_members; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_project_members AS
+ SELECT r.target_entity_id AS project_id,
+    p.name AS project_name,
+    r.source_entity_id AS user_id,
+    u.name AS user_name,
+    u.email AS user_email,
+    (r.properties ->> 'role'::text) AS project_role,
+    (r.properties ->> 'joined_date'::text) AS joined_date,
+    r.created_at AS relationship_created
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_project p ON ((r.target_entity_id = p.id)))
+     JOIN public."user" u ON ((r.source_entity_id = (u.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'User'::text) AND ((r.relationship_type)::text = 'member_of'::text) AND ((r.target_entity_type)::text = 'Project'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_project_members OWNER TO postgres;
+
+--
+-- Name: wide_corp_relationship_field_configs; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_relationship_field_configs AS
+ SELECT drf.id,
+    drf.org_id,
+    drf.entity_type,
+    drf.field_name,
+    drf.relationship_type,
+    drf.target_entity_type,
+    drf.cardinality,
+    drf.display_format,
+    drf.validation_rules,
+    drf.ui_config,
+    drf.created_at,
+    drf.updated_at,
+    cos.name AS option_set_name,
+    ( SELECT jsonb_agg(jsonb_build_object('value', co.value, 'label', co.label, 'color', co.color, 'icon', co.icon) ORDER BY co.sort_order) AS jsonb_agg
+           FROM (public.custom_options co
+             JOIN public.custom_option_sets cos2 ON ((co.option_set_id = cos2.id)))
+          WHERE ((cos2.org_id = (drf.org_id)::text) AND (cos2.option_set_type = 'relationship_type'::text) AND (co.value = (drf.relationship_type)::text))) AS relationship_options
+   FROM (public.dataforge_relationship_fields drf
+     LEFT JOIN public.custom_option_sets cos ON (((cos.org_id = (drf.org_id)::text) AND (cos.option_set_type = 'relationship_type'::text))))
+  WHERE (drf.org_id = '01920000-1000-7000-8000-000000000001'::uuid);
+
+
+ALTER VIEW public.wide_corp_relationship_field_configs OWNER TO postgres;
+
+--
+-- Name: wide_corp_relationships_with_options; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_relationships_with_options AS
+ SELECT r.id,
+    r.source_entity_type,
+    r.source_entity_id,
+    r.relationship_type,
+    r.relationship_subtype,
+    r.target_entity_type,
+    r.target_entity_id,
+    r.properties,
+    r.valid_from,
+    r.valid_until,
+    r.created_by,
+    r.created_at,
+    r.updated_by,
+    r.updated_at,
+    rt.label AS relationship_label,
+    rt.color AS relationship_color,
+    rt.icon AS relationship_icon,
+    role_opt.label AS role_label,
+    role_opt.color AS role_color,
+    role_opt.icon AS role_icon,
+        CASE
+            WHEN ((r.source_entity_type)::text = 'User'::text) THEN ( SELECT "user".name
+               FROM public."user"
+              WHERE ("user".id = (r.source_entity_id)::text))
+            WHEN ((r.source_entity_type)::text = 'Task'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_task.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_task
+              WHERE ((org_01920000_1000_7000_8000_000000000001_task.id)::uuid = r.source_entity_id))
+            WHEN ((r.source_entity_type)::text = 'Project'::text) THEN (( SELECT org_01920000_1000_7000_8000_000000000001_project.name
+               FROM public.org_01920000_1000_7000_8000_000000000001_project
+              WHERE (org_01920000_1000_7000_8000_000000000001_project.id = r.source_entity_id)))::text
+            WHEN ((r.source_entity_type)::text = 'Invoice'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_invoice.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_invoice
+              WHERE ((org_01920000_1000_7000_8000_000000000001_invoice.id)::uuid = r.source_entity_id))
+            ELSE (r.source_entity_id)::text
+        END AS source_display_name,
+        CASE
+            WHEN ((r.target_entity_type)::text = 'User'::text) THEN ( SELECT "user".name
+               FROM public."user"
+              WHERE ("user".id = (r.target_entity_id)::text))
+            WHEN ((r.target_entity_type)::text = 'Task'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_task.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_task
+              WHERE ((org_01920000_1000_7000_8000_000000000001_task.id)::uuid = r.target_entity_id))
+            WHEN ((r.target_entity_type)::text = 'Project'::text) THEN (( SELECT org_01920000_1000_7000_8000_000000000001_project.name
+               FROM public.org_01920000_1000_7000_8000_000000000001_project
+              WHERE (org_01920000_1000_7000_8000_000000000001_project.id = r.target_entity_id)))::text
+            WHEN ((r.target_entity_type)::text = 'Invoice'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_invoice.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_invoice
+              WHERE ((org_01920000_1000_7000_8000_000000000001_invoice.id)::uuid = r.target_entity_id))
+            ELSE (r.target_entity_id)::text
+        END AS target_display_name
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     LEFT JOIN LATERAL ( SELECT co.label,
+            co.color,
+            co.icon
+           FROM (public.custom_options co
+             JOIN public.custom_option_sets cos ON ((co.option_set_id = cos.id)))
+          WHERE ((cos.org_id = '01920000-1000-7000-8000-000000000001'::text) AND (cos.option_set_type = 'relationship_type'::text) AND (co.value = (r.relationship_type)::text))) rt ON (true))
+     LEFT JOIN LATERAL ( SELECT co.label,
+            co.color,
+            co.icon
+           FROM (public.custom_options co
+             JOIN public.custom_option_sets cos ON ((co.option_set_id = cos.id)))
+          WHERE ((cos.org_id = '01920000-1000-7000-8000-000000000001'::text) AND (cos.option_set_type = 'relationship_role'::text) AND (co.value = (r.properties ->> 'role'::text)))) role_opt ON ((r.properties ? 'role'::text)))
+  WHERE (r.valid_until IS NULL);
+
+
+ALTER VIEW public.wide_corp_relationships_with_options OWNER TO postgres;
+
+--
+-- Name: wide_corp_task_assignments; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_task_assignments AS
+ SELECT r.id AS relationship_id,
+    r.source_entity_id AS task_id,
+    t.title AS task_title,
+    t.status AS task_status,
+    t.priority AS task_priority,
+    r.target_entity_id AS user_id,
+    u.name AS user_name,
+    u.email AS user_email,
+    (r.properties ->> 'role'::text) AS assignment_role,
+    (r.properties ->> 'effort_percentage'::text) AS effort_percentage,
+    r.created_at AS assigned_at,
+    r.created_by AS assigned_by
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t ON ((r.source_entity_id = (t.id)::uuid)))
+     JOIN public."user" u ON ((r.target_entity_id = (u.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'Task'::text) AND ((r.relationship_type)::text = 'assigned_to'::text) AND ((r.target_entity_type)::text = 'User'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_task_assignments OWNER TO postgres;
+
+--
+-- Name: wide_corp_task_dependencies; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_task_dependencies AS
+ SELECT r.source_entity_id AS blocking_task_id,
+    t1.title AS blocking_task_title,
+    t1.status AS blocking_task_status,
+    r.target_entity_id AS blocked_task_id,
+    t2.title AS blocked_task_title,
+    t2.status AS blocked_task_status,
+    (r.properties ->> 'reason'::text) AS block_reason,
+    (r.properties ->> 'severity'::text) AS severity
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t1 ON ((r.source_entity_id = (t1.id)::uuid)))
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t2 ON ((r.target_entity_id = (t2.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'Task'::text) AND ((r.relationship_type)::text = 'blocks'::text) AND ((r.target_entity_type)::text = 'Task'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_task_dependencies OWNER TO postgres;
+
+--
+-- Name: wide_corp_task_watchers; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_task_watchers AS
+ SELECT r.target_entity_id AS task_id,
+    t.title AS task_title,
+    r.source_entity_id AS watcher_id,
+    u.name AS watcher_name,
+    (r.properties ->> 'reason'::text) AS watch_reason,
+    (r.properties ->> 'notifications'::text) AS notifications_enabled,
+    r.created_at AS watching_since
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t ON ((r.target_entity_id = (t.id)::uuid)))
+     JOIN public."user" u ON ((r.source_entity_id = (u.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'User'::text) AND ((r.relationship_type)::text = 'watching'::text) AND ((r.target_entity_type)::text = 'Task'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_task_watchers OWNER TO postgres;
+
+--
 -- Name: endpoints endpoints_pkey; Type: CONSTRAINT; Schema: neon_control_plane; Owner: postgres
 --
 
@@ -4632,6 +5045,22 @@ ALTER TABLE ONLY public.custom_options
 
 ALTER TABLE ONLY public.custom_options
     ADD CONSTRAINT custom_options_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dataforge_relationship_fields dataforge_relationship_fields_org_id_entity_type_field_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_relationship_fields
+    ADD CONSTRAINT dataforge_relationship_fields_org_id_entity_type_field_name_key UNIQUE (org_id, entity_type, field_name);
+
+
+--
+-- Name: dataforge_relationship_fields dataforge_relationship_fields_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_relationship_fields
+    ADD CONSTRAINT dataforge_relationship_fields_pkey PRIMARY KEY (id);
 
 
 --
@@ -4712,6 +5141,14 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meeting
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_project
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_projects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_relationships org_01920000_1000_7000_8000_000000000001_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_relationships
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_relationships_pkey PRIMARY KEY (id);
 
 
 --
@@ -4800,6 +5237,22 @@ ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_tagging
 
 ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_ticket
     ADD CONSTRAINT org_01920000_2000_7000_8000_000000000002_ticket_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_relationship_definitions org_relationship_definitions_org_id_relationship_type_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_relationship_definitions
+    ADD CONSTRAINT org_relationship_definitions_org_id_relationship_type_key UNIQUE (org_id, relationship_type);
+
+
+--
+-- Name: org_relationship_definitions org_relationship_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_relationship_definitions
+    ADD CONSTRAINT org_relationship_definitions_pkey PRIMARY KEY (id);
 
 
 --
@@ -4952,6 +5405,14 @@ ALTER TABLE ONLY public.team_memberships
 
 ALTER TABLE ONLY public.teams
     ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_relationships unique_active_relationship; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_relationships
+    ADD CONSTRAINT unique_active_relationship UNIQUE (source_entity_type, source_entity_id, relationship_type, target_entity_type, target_entity_id);
 
 
 --
@@ -5369,6 +5830,34 @@ CREATE INDEX idx_user_last_org_access_at ON public."user" USING btree (last_org_
 --
 
 CREATE INDEX idx_user_last_used_organization_id ON public."user" USING btree (last_used_organization_id);
+
+
+--
+-- Name: idx_widecorp_rel_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_created ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (created_at DESC) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_widecorp_rel_source; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_source ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (source_entity_type, source_entity_id) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_widecorp_rel_target; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_target ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (target_entity_type, target_entity_id) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_widecorp_rel_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_type ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (relationship_type) WHERE (valid_until IS NULL);
 
 
 --
@@ -6005,7 +6494,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WyJnJdznjnbAiFax6INZj1qALFQIdRk76wigZjK9lCgFXeoDUIKnDwwFv1xuhoB
+\unrestrict TLuNmGrJ5bHo03Pimdy51vj1WNP1GhM0ffiqwXDHKdzoiQezfZ6sr11gzaQIoMV
 
 --
 -- PostgreSQL database cluster dump complete
