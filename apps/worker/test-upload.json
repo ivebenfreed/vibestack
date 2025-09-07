@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "department": "Engineering",
+    "salary": 75000,
+    "active": true,
+    "hire_date": "2023-01-15"
+  },
+  {
+    "id": 2,
+    "name": "Jane Smith",
+    "email": "jane.smith@example.com",
+    "department": "Marketing",
+    "salary": 65000,
+    "active": true,
+    "hire_date": "2023-03-20"
+  },
+  {
+    "id": 3,
+    "name": "Bob Johnson",
+    "email": "bob.johnson@example.com",
+    "department": "Sales",
+    "salary": 70000,
+    "active": false,
+    "hire_date": "2022-11-10"
+  }
+]
