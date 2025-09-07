@@ -35,7 +35,7 @@ export function VibeGridXHeader({
   
   React.useEffect(() => {
     // Get store actor from window (set by table machine)
-    const storeActor = (window as any).__vibegridx_store_actor;
+    const storeActor = (window as any).__vibegrid_store_actor;
     if (!storeActor) return;
     
     // Get initial state

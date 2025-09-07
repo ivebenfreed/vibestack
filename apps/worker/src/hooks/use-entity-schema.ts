@@ -3,10 +3,15 @@
  * 
  * Provides React integration for organization-specific entity schemas.
  * Handles loading, caching, and real-time updates.
+ * 
+ * IMPORTANT: This hook uses Legend State's universe context to ensure
+ * schemas are only loaded after authentication is ready.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { stateLog } from '@/logger';
+import { use$ } from '@legendapp/state/react';
+import { universeContext$, universeSchema$ } from '@/legend-state';
 import { 
   orgSchemaClient, 
   type OrgEntitySchema, 
@@ -34,76 +39,39 @@ export interface UseEntitySchemaResult {
 
 /**
  * Hook to load and manage organization schema
+ * Uses Legend State's universe context to ensure schema is loaded after auth
  */
 export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 'entitySchema' | 'syncableFields' | 'formFields' | 'validateData'> {
-  const [schema, setSchema] = useState<OrgEntitySchema | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Get schema from Legend State's universe context (loaded by Legend State init machine)
+  const universeLoading = use$(universeContext$.loading);
+  const universeError = use$(universeContext$.error);
+  const orgContext = orgId ? use$(universeContext$.organizations[orgId]) : null;
+  
+  // For primary org, use the universeSchema$ directly
+  const primarySchema = use$(universeSchema$);
+  const isPrimaryOrg = primarySchema?.orgId === orgId;
+  
   const [cached, setCached] = useState(false);
 
+  // Get schema from Legend State context or primary schema
+  const schema = isPrimaryOrg ? primarySchema : orgContext?.schema || null;
+  const loading = universeLoading || (orgContext?.loading ?? false);
+  const error = universeError || orgContext?.error || null;
+
+  // No need to load - Legend State init machine handles all loading
   const loadSchema = useCallback(async () => {
-    if (!orgId) {
-      setSchema(null);
-      setError(null);
-      return;
-    }
+    // Schema is loaded by Legend State init machine after auth is ready
+    // This ensures we never try to fetch before authentication
+    log.info('[useOrgSchema] Schema request for org:', orgId, 'Already loaded:', !!schema);
+  }, [orgId, schema]);
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await orgSchemaClient.loadOrgSchema(orgId);
-      
-      if (result.success && result.schema) {
-        setSchema(result.schema);
-        setCached(result.cached || false);
-        setError(null);
-        
-        // 🎯 OPTIMIZATION: Notify app init that schema is ready for fast dashboard loading
-        log.info('[Schema] ✅ Organization schema loaded - triggering app initialization');
-        const appInitActor = (window as any).appInitActor;
-        if (appInitActor) {
-          appInitActor.send({ type: 'SCHEMA_READY' });
-        } else {
-          // Fallback: dispatch window event
-          window.dispatchEvent(new CustomEvent('schema:ready', {
-            detail: { orgId, entityCount: Object.keys(result.schema.entities).length }
-          }));
-        }
-      } else {
-        setSchema(null);
-        setError(result.error || 'Failed to load schema');
-        
-        // Notify app init about schema loading failure
-        log.error('[Schema] ❌ Schema loading failed:', result.error);
-        const appInitActor = (window as any).appInitActor;
-        if (appInitActor) {
-          appInitActor.send({ type: 'SCHEMA_ERROR', error: result.error || 'Failed to load schema' });
-        }
-      }
-    } catch (err) {
-      setSchema(null);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  // Load schema when orgId changes
-  useEffect(() => {
-    loadSchema();
-  }, [loadSchema]);
-
-  // Listen for local schema ready events (from app init machine)
+  // Listen for local schema ready events (from Legend State init machine)
   useEffect(() => {
     const handleLocalSchemaReady = (event: CustomEvent) => {
-      const { schema, source } = event.detail;
-      if (schema && schema.orgId === orgId) {
-        log.info('[useOrgSchema] 🚀 Using local schema immediately from:', source);
-        setSchema(schema);
+      const { schema: eventSchema, source } = event.detail;
+      if (eventSchema && eventSchema.orgId === orgId) {
+        log.info('[useOrgSchema] 🚀 Schema ready from:', source);
         setCached(true);
-        setError(null);
-        setLoading(false);
       }
     };
 
@@ -121,9 +89,9 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
   }, [orgId]);
 
   return {
-    schema,
+    schema: schema as OrgEntitySchema | null,
     loading,
-    error,
+    error: error as string | null,
     cached,
     refetch: loadSchema,
     clearCache
@@ -218,34 +186,22 @@ export function useEntitySchema(orgId: string | null, entityName: string | null)
 
 /**
  * Hook to preload schemas for multiple organizations
+ * Note: Schemas are now loaded by Legend State init machine after auth
  */
 export function usePreloadSchemas(orgIds: string[]) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Schemas are preloaded by Legend State init machine
+  // This hook is kept for backward compatibility but doesn't need to do anything
+  const universeLoading = use$(universeContext$.loading);
+  const universeError = use$(universeContext$.error);
 
   const preload = useCallback(async () => {
-    if (orgIds.length === 0) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      await orgSchemaClient.preloadSchemas(orgIds);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to preload schemas');
-    } finally {
-      setLoading(false);
-    }
-  }, [orgIds]);
-
-  useEffect(() => {
-    preload();
-  }, [preload]);
+    // No-op: Legend State init machine handles all schema loading
+    log.info('[usePreloadSchemas] Schema preloading handled by Legend State init machine');
+  }, []);
 
   return {
-    loading,
-    error,
+    loading: universeLoading || false,
+    error: universeError as string | null,
     preload
   };
 }

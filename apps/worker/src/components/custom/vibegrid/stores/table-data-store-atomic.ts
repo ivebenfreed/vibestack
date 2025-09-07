@@ -697,18 +697,27 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       
       toggleColumnVisibility: {
         columnVisibility: (context, event: { columnId: string }) => {
+          // If column is not in visibility map or is true, it's visible -> hide it (set to false)
+          // If column is false, it's hidden -> show it (set to true or remove from map)
+          const currentVisibility = context.columnVisibility[event.columnId];
+          const isCurrentlyVisible = currentVisibility !== false;
+          
           const newVisibility = {
             ...context.columnVisibility,
-            [event.columnId]: !context.columnVisibility[event.columnId]
+            [event.columnId]: !isCurrentlyVisible  // Toggle: visible->false, hidden->true
           };
           return newVisibility;
         },
         hiddenColumnCount: (context, event) => {
+          // Same logic for calculating new visibility
+          const currentVisibility = context.columnVisibility[event.columnId];
+          const isCurrentlyVisible = currentVisibility !== false;
+          
           const newVisibility = {
             ...context.columnVisibility,
-            [event.columnId]: !context.columnVisibility[event.columnId]
+            [event.columnId]: !isCurrentlyVisible
           };
-          return Object.values(newVisibility).filter(v => !v).length;
+          return Object.values(newVisibility).filter(v => v === false).length;
         }
       },
       

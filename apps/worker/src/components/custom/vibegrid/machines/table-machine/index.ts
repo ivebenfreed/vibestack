@@ -871,6 +871,20 @@ export const tableBaseMachine = setup({
           // Recalculate coordinate mapping with the new columns from store
           dimensionActions.recalculateCoordinateMapping,
           
+          // Send updated coordinates to canvas after recalculation
+          ({ context, self }) => {
+            if (context.actors?.canvasActor && context.coordinateMapping) {
+              log.info('TableMachine: Sending updated coordinates to canvas after store update', {
+                version: context.coordinateMapping.version,
+                columnCount: context.coordinateMapping.columns.length
+              });
+              context.actors.canvasActor.send({
+                type: 'UPDATE_COORDINATES',
+                mapping: context.coordinateMapping
+              });
+            }
+          },
+          
           // Always render when store emits new data - store decides what changed
           ({ context, self, event }) => {
             if (!context.actors.rendererActor) {

@@ -873,35 +873,15 @@ export const viewHandlers = {
   
   'COLUMN_LAYOUT_CHANGED': {
     actions: [
-      // Recalculate coordinate mapping AFTER the context has been updated with new columns
+      // Log that column layout changed and coordinate recalculation will happen on store update
       ({ context, event }) => {
         const isReorderOnly = (event as any).isReorderOnly;
-        log.info('🔄 COLUMN_LAYOUT_CHANGED: Deferring coordinate recalculation', {
-          isReorderOnly
+        log.info('🔄 COLUMN_LAYOUT_CHANGED: Column layout changed, waiting for store update', {
+          isReorderOnly,
+          hasStoreActor: !!context.storeActor
         });
-        // The coordinate recalculation will happen after STORE_SNAPSHOT_RECEIVED updates context.columns
-      },
-      
-      // Forward updated coordinates to canvas for overlay sync
-      ({ context, self, event }) => {
-        if (context.actors?.canvasActor) {
-          const isReorderOnly = (event as any).isReorderOnly;
-          
-          // Skip canvas update for column-only reorder to avoid forced reflow
-          if (isReorderOnly) {
-            log.info('🔄 COLUMN_LAYOUT_CHANGED: Skipping canvas update for column reorder (optimization)');
-            return;
-          }
-          
-          log.info('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to canvas');
-          self.send({
-            type: 'FORWARD_TO_CANVAS',
-            event: {
-              type: 'UPDATE_COORDINATES',
-              mapping: context.coordinateMapping
-            }
-          });
-        }
+        // The coordinate recalculation and canvas update will happen after STORE_SNAPSHOT_RECEIVED
+        // This ensures we have the updated columns and visibility before recalculating
       }
     ]
   }
