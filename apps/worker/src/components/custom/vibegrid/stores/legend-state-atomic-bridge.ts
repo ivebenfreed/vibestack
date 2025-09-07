@@ -38,7 +38,7 @@ export function createAtomicObservableBridge(
   
   const entityDataDisposer = observe(() => {
     observerRunCount++;
-    log.info(`🔗 AtomicBridge: Manual change tracking observer running for ${entityTableName}`, {
+    log.debug(`🔗 AtomicBridge: Manual change tracking observer running for ${entityTableName}`, {
       runCount: observerRunCount,
       timestamp: Date.now(),
       hasPreviousData: !!previousEntityData
@@ -84,23 +84,24 @@ export function createAtomicObservableBridge(
           log.warn(`🔗 AtomicBridge: Could not peek observable data:`, peekError);
         }
         
-        // Initialize with empty data to ensure bridge is ready, but only if we never had data before
-        // This prevents clearing existing data during temporary empty states (e.g., during system options loading)
-        if (!isInitialized && !previousEntityData) {
-          tableSend({
-            type: 'STORE_DATA_UPDATED',
-            entities: [],
-            loading: false,
-            source: 'atomic_bridge_empty_initial'
-          });
-          isInitialized = true;
-          previousEntityData = {};
-        } else if (previousEntityData && (typeof previousEntityData === 'object' && Object.keys(previousEntityData).length > 0)) {
-          // We had data before - don't clear it during temporary empty states
-          log.warn(`🔗 AtomicBridge: Preserving previous data during temporary empty state for ${entityTableName}`, {
+        // CRITICAL FIX: Never clear data if we had entities before, even during initial load
+        // This prevents the column hide bug where the atomic bridge clears data after store mutations
+        if (previousEntityData && (typeof previousEntityData === 'object' && Object.keys(previousEntityData).length > 0)) {
+          // We had data before - NEVER clear it during temporary empty states or after store mutations
+          log.warn(`🔗 AtomicBridge: PRESERVING previous data during empty observable read for ${entityTableName}`, {
             previousEntityCount: Object.keys(previousEntityData).length,
-            reason: 'preventing_data_loss_during_temporary_empty_read'
+            reason: 'critical_fix_preventing_data_loss_during_column_operations',
+            skipSendingEmptyUpdate: true
           });
+          return; // Critical: Don't send any update that would clear existing data
+        }
+        
+        // IMPORTANT: Don't send empty data on initial load - wait for actual data
+        // This prevents the table from clearing when data is still loading
+        if (!isInitialized && !previousEntityData) {
+          log.info(`🔗 AtomicBridge: Waiting for initial data load for ${entityTableName} - not sending empty update`);
+          // Don't mark as initialized yet - wait for actual data
+          // Don't set previousEntityData to {} - keep it null to detect real initial load
         }
         return;
       }
@@ -118,10 +119,12 @@ export function createAtomicObservableBridge(
         : 0;
       
       // Detect bulk load scenarios:
-      // 1. Initial load (no previous data)
-      // 2. Fresh reload: Getting many entities when we had few or none before
-      // 3. Full sync: Getting a complete dataset (> 1000 entities) all at once
+      // 1. Initial load (no previous data) - ALWAYS treat as bulk load
+      // 2. Fresh reload: Getting ANY entities when we had none before
+      // 3. Getting many entities when we had few or none before
+      // 4. Full sync: Getting a complete dataset (> 1000 entities) all at once
       const isBulkLoad = isInitialLoad || 
+                        (currentEntityCount > 0 && previousEntityCount === 0) ||
                         (currentEntityCount > 100 && previousEntityCount < 10) ||
                         (currentEntityCount > 1000 && currentEntityCount - previousEntityCount > 500);
       
