@@ -32,6 +32,13 @@ DataForge is a dynamic entity management system that allows organizations to cre
    - Generates PostgreSQL DDL statements
    - Handles complex default values (arrays, objects, booleans)
    - Ensures lowercase table names for PostgreSQL compatibility
+   - **NEW**: Automatically filters out relationship fields from table creation
+
+5. **RelationshipFieldHandler** (`services/RelationshipFieldHandler.ts`)
+   - **NEW**: Converts reference fields to relationship metadata
+   - Manages per-org relationship table creation
+   - Stores relationship field configurations
+   - Handles relationship CRUD operations with rich properties
 
 ## Entity Naming Convention
 
@@ -56,22 +63,34 @@ EntityNameUtils.toDisplayFormat(name)  // For UI: "Customer Order"
 
 ## Field Storage Architecture
 
-### Base Fields vs Custom Fields
+### Base Fields vs Custom Fields vs Relationship Fields
 
 ```typescript
-// Base fields are actual columns in the table
+// Base fields are system columns in every table
 const baseFields = {
   id: 'TEXT PRIMARY KEY',
   organization_id: 'TEXT NOT NULL',
   created_at: 'TIMESTAMP NOT NULL',
   updated_at: 'TIMESTAMP NOT NULL',
   created_by: 'TEXT',
-  // ... archetype-specific fields
+  // ... archetype-specific fields (non-relationship)
 };
 
-// Custom fields are stored in JSONB column
+// Custom fields are NOW real database columns (no longer JSONB)
 const customFields = {
-  custom_fields: 'JSONB DEFAULT {}'
+  team_name: 'TEXT NOT NULL',           // Real column
+  sprint_number: 'INTEGER DEFAULT 1',   // Real column
+  customer_email: 'TEXT',               // Real column
+  order_total: 'NUMERIC DEFAULT 0'      // Real column
+};
+
+// Relationship fields are NOT stored as columns at all
+// Instead, they are stored in org_xxx_relationships table
+const relationshipFields = {
+  // These DON'T become columns:
+  assignee_id: 'user_reference',      // → assigned_to relationship
+  parent_task_id: 'entity_reference', // → subtask_of relationship
+  project_id: 'entity_reference'      // → belongs_to relationship
 };
 ```
 
@@ -168,21 +187,27 @@ GET /api/dataforge/orgs/:orgId/data/:entityName?limit=10&offset=0
 
 ### 1. Custom Fields Storage
 
-Custom fields are stored in a JSONB column and merged seamlessly:
+Custom fields are now stored as real database columns (no longer JSONB):
 
 ```typescript
-// When creating/updating:
-const { baseData, customData } = fieldManager.extractCustomFieldData(data, customFields);
-// baseData → goes to table columns
-// customData → goes to custom_fields JSONB column
+// When creating entity table:
+const allFields = {
+  // System fields
+  id: 'TEXT PRIMARY KEY',
+  organization_id: 'TEXT NOT NULL',
+  // ... other system fields
+  
+  // Archetype fields (minus relationship fields)
+  title: 'TEXT NOT NULL',
+  status: 'TEXT DEFAULT \'draft\'',
+  
+  // Custom fields as real columns
+  team_name: 'TEXT NOT NULL',
+  sprint_number: 'INTEGER DEFAULT 1'
+};
 
-// When retrieving:
-const result = await kysely.selectFrom(tableName).selectAll().execute();
-// Merge custom_fields back into response
-if (result.custom_fields) {
-  Object.assign(responseData, result.custom_fields);
-  delete responseData.custom_fields;
-}
+// DDL Generation creates all fields as columns
+const ddl = DDLGenerator.generateCreateTableDDL(tableName, allFields);
 ```
 
 ### 2. Default Value Handling in DDL
@@ -239,13 +264,7 @@ async getEntityConfig(orgId: string, entityName: string) {
 
 ### Issue: Custom fields not appearing in responses
 
-**Solution**: Ensure custom_fields JSONB is merged back into response:
-```typescript
-if (result.custom_fields && typeof result.custom_fields === 'object') {
-  Object.assign(responseData, result.custom_fields);
-  delete responseData.custom_fields;
-}
-```
+**Solution**: Custom fields are now real columns, so they appear automatically in SELECT * queries. No special merging needed.
 
 ### Issue: Table names case sensitivity
 
@@ -259,18 +278,23 @@ return `org_${orgId.replace(/-/g, '_')}_${tableName}`.toLowerCase();
 ### Create Test Entity
 
 ```bash
-# With custom fields
+# With custom fields and relationship fields
 curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/entities" \
   -H "Content-Type: application/json" \
   -b cookies.txt \
   -d '{
-    "entityName": "ProductCatalog",
-    "archetype": "collection",
+    "entityName": "TeamTask", 
+    "archetype": "task",
     "customFields": [
-      {"name": "sku", "type": "text", "required": true},
-      {"name": "price", "type": "decimal", "defaultValue": 0}
+      {"name": "team_name", "type": "text", "required": true},
+      {"name": "sprint_number", "type": "number", "defaultValue": 1}
     ]
   }'
+
+# Note: Task archetype automatically includes relationship fields:
+# - assignee_id (user_reference) → assigned_to relationship
+# - parent_task_id (entity_reference) → subtask_of relationship  
+# - project_id (entity_reference) → belongs_to relationship
 ```
 
 ### Create Record with Custom Fields
@@ -309,15 +333,79 @@ curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-0
    - Entity definitions stored in business_metadata JSONB
    - Clean separation between base columns and custom JSONB
 
+5. **Relationship System Implementation (September 2025)**
+   - **NEW**: Complete relationship system using per-organization relationship tables
+   - **NEW**: RelationshipFieldHandler service for processing archetype reference fields
+   - **BREAKING**: Reference fields (`user_reference`, `entity_reference`) no longer create table columns
+   - **NEW**: Per-org relationship tables with temporal support and rich metadata
+   - **INTEGRATION**: Full integration with custom options system for relationship configuration
+
+## Relationship System Architecture
+
+### Per-Organization Relationship Tables
+
+Each organization gets its own relationship table for complete data isolation:
+
+```sql
+-- Example: org_01920000_1000_7000_8000_000000000001_relationships
+CREATE TABLE org_xxx_relationships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_entity_type TEXT NOT NULL,        -- e.g., 'Task'
+  source_entity_id UUID NOT NULL,          -- ID of the source record
+  target_entity_type TEXT NOT NULL,        -- e.g., 'User', 'Project'
+  target_entity_id UUID NOT NULL,          -- ID of the target record
+  relationship_type TEXT NOT NULL,         -- e.g., 'assigned_to', 'belongs_to'
+  field_name TEXT NOT NULL,                -- Original field name from archetype
+  properties JSONB DEFAULT '{}',           -- Rich relationship metadata
+  valid_from TIMESTAMP DEFAULT now(),      -- For temporal relationships
+  valid_until TIMESTAMP,                   -- NULL = currently active
+  created_at TIMESTAMP DEFAULT now(),
+  created_by UUID
+);
+```
+
+### Relationship Processing Flow
+
+1. **Archetype Definition** → Entity contains `user_reference` or `entity_reference` fields
+2. **DDL Generation** → Reference fields are **filtered out** (no table columns created)
+3. **RelationshipFieldHandler** → Converts reference fields to relationship metadata
+4. **Relationship Storage** → Configuration stored in `dataforge_relationship_fields` table
+5. **Data Operations** → Relationships stored in per-org relationship tables
+
+### Archetype Reference Fields
+
+The Task archetype (and others) now include relationship fields:
+
+```typescript
+// Task archetype fields processed as relationships
+{
+  assignee_id: 'user_reference',      // → assigned_to relationship
+  parent_task_id: 'entity_reference', // → subtask_of relationship  
+  project_id: 'entity_reference'      // → belongs_to relationship
+}
+```
+
+These fields are automatically:
+- **Excluded** from table creation (no columns)
+- **Converted** to relationship metadata
+- **Stored** in `dataforge_relationship_fields` configuration table
+- **Available** for UI dropdowns via custom options integration
+
 ## Best Practices
 
 1. **Always use EntityNameUtils** for name transformations
 2. **Validate fields through FieldManager** before table creation
-3. **Store custom fields in JSONB** to maintain schema flexibility
+3. **Custom fields are now real columns** with proper SQL types and constraints
 4. **Use soft deletes** for entities (mark as deleted, preserve data)
 5. **Cache entity configurations** to reduce database lookups
 6. **Test with various field types** including arrays and objects
 7. **Preserve PascalCase** in entity names for consistency
+8. **NEW: Understand the three field types**:
+   - **Base fields**: System columns (id, organization_id, created_at, etc.)
+   - **Custom fields**: Real database columns with proper SQL types
+   - **Relationship fields**: Stored in per-org relationship tables, not as columns
+9. **NEW: Use RelationshipFieldHandler** for all relationship operations
+10. **NEW: Reference fields in archetypes** (`user_reference`, `entity_reference`) are automatically processed
 
 ## Future Considerations
 

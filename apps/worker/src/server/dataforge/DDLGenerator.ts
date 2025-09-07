@@ -17,18 +17,55 @@ export interface FieldDefinition {
 export class DDLGenerator {
   /**
    * Generate CREATE TABLE DDL for an entity
+   * Note: Relationship fields (user_reference, entity_reference) are NOT created as columns
+   * They are stored in the org's relationship table instead
    */
   static generateCreateTableDDL(
     tableName: string, 
-    fields: Record<string, FieldDefinition>
+    fields: Record<string, FieldDefinition>,
+    orgId?: string
   ): string {
-    const columnDefs = Object.entries(fields).map(([name, field]) => {
-      const sqlType = this.getSqlType(field.type);
-      const constraints = this.getColumnConstraints(field);
-      return `${name} ${sqlType} ${constraints}`.trim();
-    }).join(',\n    ');
+    // Filter out relationship fields - they don't get columns
+    const columnDefs = Object.entries(fields)
+      .filter(([name, field]) => {
+        // Skip relationship fields - they go to relationship table
+        return field.type !== 'user_reference' && field.type !== 'entity_reference';
+      })
+      .map(([name, field]) => {
+        const sqlType = this.getSqlType(field.type, orgId, name);
+        const constraints = this.getColumnConstraints(field);
+        return `${name} ${sqlType} ${constraints}`.trim();
+      }).join(',\n    ');
 
     return `CREATE TABLE ${tableName} (\n    ${columnDefs}\n)`;
+  }
+
+  /**
+   * Generate CREATE TABLE DDL with automatic foreign key constraints
+   * Note: With the new relationship system, foreign keys are no longer needed
+   * as relationships are stored in the org's relationship table
+   */
+  static generateCreateTableWithForeignKeysDDL(
+    tableName: string,
+    fields: Record<string, FieldDefinition>,
+    orgId: string
+  ): { tableSQL: string; foreignKeySQL: string[]; relationshipFields: Array<{name: string, type: string}> } {
+    // Generate table creation SQL (relationship fields are automatically filtered out)
+    const tableSQL = this.generateCreateTableDDL(tableName, fields, orgId);
+    
+    // No foreign keys needed with relationship system
+    const foreignKeySQL: string[] = [];
+    
+    // Collect relationship fields for processing by RelationshipFieldHandler
+    const relationshipFields: Array<{name: string, type: string}> = [];
+    
+    Object.entries(fields).forEach(([fieldName, field]) => {
+      if (field.type === 'user_reference' || field.type === 'entity_reference') {
+        relationshipFields.push({ name: fieldName, type: field.type });
+      }
+    });
+    
+    return { tableSQL, foreignKeySQL, relationshipFields };
   }
 
   /**
@@ -67,20 +104,94 @@ export class DDLGenerator {
   }
 
   /**
-   * Convert field type to SQL type
+   * Generate foreign key constraint DDL for reference fields
    */
-  private static getSqlType(fieldType: string): string {
+  static generateForeignKeyConstraintDDL(
+    tableName: string,
+    fieldName: string,
+    fieldType: string,
+    orgId?: string
+  ): string | null {
+    switch (fieldType) {
+      case 'user_reference':
+        return `ALTER TABLE ${tableName} ADD CONSTRAINT fk_${tableName}_${fieldName} FOREIGN KEY (${fieldName}) REFERENCES "user"(id) ON DELETE SET NULL`;
+        
+      case 'entity_reference':
+        // For entity references, we need to determine the target entity from field naming
+        const targetEntity = this.inferTargetEntityFromFieldName(fieldName);
+        if (targetEntity && orgId) {
+          const targetTable = this.generateTableName(orgId, targetEntity);
+          return `ALTER TABLE ${tableName} ADD CONSTRAINT fk_${tableName}_${fieldName} FOREIGN KEY (${fieldName}) REFERENCES ${targetTable}(id) ON DELETE SET NULL`;
+        }
+        break;
+    }
+    return null;
+  }
+
+  /**
+   * Infer target entity type from field naming conventions
+   */
+  private static inferTargetEntityFromFieldName(fieldName: string): string | null {
+    // Handle common patterns:
+    // project_id -> Project
+    // parent_task_id -> Task (same entity type)
+    // parent_document_id -> Document
+    
+    if (fieldName === 'parent_task_id') return 'Task';
+    if (fieldName === 'parent_document_id') return 'Document';
+    if (fieldName === 'parent_project_id') return 'Project';
+    if (fieldName === 'project_id') return 'Project';
+    if (fieldName === 'task_id') return 'Task';
+    if (fieldName === 'document_id') return 'Document';
+    
+    // Generic pattern: remove _id and capitalize
+    if (fieldName.endsWith('_id')) {
+      const entityName = fieldName.replace(/_id$/, '');
+      return entityName.charAt(0).toUpperCase() + entityName.slice(1);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Generate table name for organization entity
+   */
+  private static generateTableName(orgId: string, entityName: string): string {
+    return `org_${orgId.replace(/-/g, '_')}_${entityName.toLowerCase()}`;
+  }
+
+  /**
+   * Convert field type to SQL type with proper foreign key handling
+   */
+  private static getSqlType(fieldType: string, orgId?: string, fieldName?: string): string {
     switch (fieldType) {
       case 'text': return 'TEXT';
       case 'longtext': return 'TEXT';
-      case 'number': return 'NUMERIC';
+      case 'rich_text': return 'TEXT';
+      case 'email': return 'TEXT';
+      case 'url': return 'TEXT';
+      case 'number': 
+      case 'decimal': return 'NUMERIC';
       case 'integer': return 'INTEGER';
       case 'boolean': return 'BOOLEAN';
       case 'date': return 'DATE';
-      case 'datetime': return 'TIMESTAMP';
-      case 'timestamp': return 'TIMESTAMP';
+      case 'datetime': return 'TIMESTAMP WITHOUT TIME ZONE';
+      case 'timestamp': return 'TIMESTAMP WITHOUT TIME ZONE';
       case 'json': return 'JSONB';
-      case 'status_option': return 'TEXT';
+      
+      // Option field types (stored as text with validation)
+      case 'status_option': 
+      case 'priority_option':
+      case 'category_option':
+      case 'discussion_type_option':
+      case 'custom_option_reference': return 'TEXT';
+      
+      // Reference field types - these should be UUIDs with foreign keys
+      case 'user_reference': 
+        return 'UUID'; // FK constraint should be added separately
+      case 'entity_reference':
+        return 'UUID'; // FK constraint should be added separately
+        
       default: return 'TEXT';
     }
   }

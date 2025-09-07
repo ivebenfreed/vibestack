@@ -957,10 +957,19 @@ export class DataForgeEntityManager {
       }
       
       // Generate DDL using DDLGenerator with base fields only (custom fields go in JSONB)
-      const ddl = DDLGenerator.generateCreateTableDDL(fullTableName, baseFieldsForTable);
+      // Note: DDLGenerator now automatically filters out relationship fields
+      const ddl = DDLGenerator.generateCreateTableDDL(fullTableName, baseFieldsForTable, orgId);
       
       console.log('[DataForgeEntityManager] Generated DDL:', ddl);
       console.log('[DataForgeEntityManager] All fields:', JSON.stringify(baseFieldsForTable, null, 2));
+      
+      // Collect relationship fields for processing
+      const relationshipFields: Array<{name: string, type: string}> = [];
+      Object.entries(baseFieldsForTable).forEach(([fieldName, field]) => {
+        if (field.type === 'user_reference' || field.type === 'entity_reference') {
+          relationshipFields.push({ name: fieldName, type: field.type });
+        }
+      });
       
       // Execute DDL
       try {
@@ -977,6 +986,30 @@ export class DataForgeEntityManager {
           sql: replicaIdentityDDL,
           parameters: []
         });
+        
+        // Process relationship fields if any exist
+        if (relationshipFields.length > 0) {
+          console.log('[DataForgeEntityManager] Processing relationship fields:', relationshipFields);
+          const { RelationshipFieldHandler } = await import('../services/RelationshipFieldHandler');
+          
+          for (const relField of relationshipFields) {
+            const relationshipDef = RelationshipFieldHandler.convertToRelationshipMetadata(
+              relField.name,
+              relField.type,
+              normalizedEntityName
+            );
+            
+            // Store relationship field configuration
+            await RelationshipFieldHandler.storeRelationshipFieldConfig(
+              this.config.kysely,
+              orgId,
+              normalizedEntityName,
+              relationshipDef
+            );
+            
+            console.log(`[DataForgeEntityManager] Configured relationship field: ${relField.name} as ${relationshipDef.relationshipType}`);
+          }
+        }
       } catch (sqlError: any) {
         console.error('[DataForgeEntityManager] SQL execution error:', sqlError);
         console.error('[DataForgeEntityManager] Failed SQL:', ddl);
