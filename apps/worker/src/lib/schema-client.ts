@@ -14,9 +14,13 @@ export interface OrgEntitySchema {
 }
 
 export interface EntityDefinition {
-  extends: string;
+  archetype: string;
   tableName: string;
   syncableFields: Record<string, FieldDefinition>;
+  customFields?: Record<string, FieldDefinition>;
+  relationshipFields?: Record<string, RelationshipFieldDefinition>;
+  allFields?: Record<string, FieldDefinition>;
+  businessMetadata?: any;
 }
 
 export interface FieldDefinition {
@@ -24,11 +28,21 @@ export interface FieldDefinition {
   required?: boolean;
   syncable?: boolean;
   enum?: string[];
+  defaultValue?: any;
   validation?: {
     pattern?: string;
     min?: number;
     max?: number;
   };
+}
+
+export interface RelationshipFieldDefinition {
+  name: string;
+  type: 'user_reference' | 'entity_reference';
+  relationshipType?: string;
+  targetEntityType?: string;
+  cardinality?: 'one-to-one' | 'one-to-many' | 'many-to-one' | 'many-to-many';
+  properties?: Record<string, any>;
 }
 
 export interface SchemaLoadResult {
@@ -157,29 +171,66 @@ export class OrgSchemaClient {
   }
 
   /**
-   * Process the schema response into the expected format
+   * Process the schema response into the expected format with relationship support
    */
   private processSchemaResponse(orgId: string, schemaArray: any[]): OrgEntitySchema {
     // Transform array of entities into schema format
     const entities: Record<string, any> = {};
     
     schemaArray.forEach(entity => {
-        // Extract fields from businessMetadata if available
+        // Extract complete entity definition from businessMetadata
         const businessMetadata = entity.businessMetadata || {};
-        const fields = businessMetadata.fields || [];
         
-        // Convert fields array to syncableFields object
-        const syncableFields: Record<string, any> = {};
+        // Process different field types from the new DataForge structure
+        const allFields = businessMetadata.allFields || [];
+        const customFields = businessMetadata.customFields || [];
+        const relationshipFields = businessMetadata.relationshipFields || [];
         
-        // Add fields from businessMetadata
-        fields.forEach((field: any) => {
-          syncableFields[field.name] = {
+        // Separate fields by category for enhanced schema structure
+        const syncableFields: Record<string, FieldDefinition> = {};
+        const customFieldsMap: Record<string, FieldDefinition> = {};
+        const relationshipFieldsMap: Record<string, RelationshipFieldDefinition> = {};
+        
+        // Process all fields (includes base archetype + custom fields, but NOT relationship fields)
+        allFields.forEach((field: any) => {
+          const fieldDef: FieldDefinition = {
             type: field.type,
             required: field.required || false,
             syncable: field.syncable !== false,
             enum: field.enum || undefined,
-            defaultValue: field.defaultValue || undefined
+            defaultValue: field.defaultValue || undefined,
+            validation: field.validation || undefined
           };
+          
+          syncableFields[field.name] = fieldDef;
+        });
+        
+        // Process custom fields separately (real database columns)
+        customFields.forEach((field: any) => {
+          const fieldDef: FieldDefinition = {
+            type: field.type,
+            required: field.required || false,
+            syncable: field.syncable !== false,
+            enum: field.enum || undefined,
+            defaultValue: field.defaultValue || undefined,
+            validation: field.validation || undefined
+          };
+          
+          customFieldsMap[field.name] = fieldDef;
+        });
+        
+        // Process relationship fields separately (stored in relationship tables)
+        relationshipFields.forEach((field: any) => {
+          const relationshipDef: RelationshipFieldDefinition = {
+            name: field.name,
+            type: field.type as 'user_reference' | 'entity_reference',
+            relationshipType: field.relationshipType,
+            targetEntityType: field.targetEntityType,
+            cardinality: field.cardinality || 'many-to-one',
+            properties: field.properties || {}
+          };
+          
+          relationshipFieldsMap[field.name] = relationshipDef;
         });
         
         // Add default timestamp fields if not already present
@@ -190,16 +241,23 @@ export class OrgSchemaClient {
           syncableFields.updated_at = { type: 'timestamp', required: false, syncable: false };
         }
 
-        log.info('🔍 Processing entity:', {
+        log.info('🔍 Processing entity with enhanced structure:', {
           entityName: entity.entityName,
           tableName: entity.tableName,
-          archetype: entity.archetype
+          archetype: entity.archetype,
+          syncableFieldCount: Object.keys(syncableFields).length,
+          customFieldCount: Object.keys(customFieldsMap).length,
+          relationshipFieldCount: Object.keys(relationshipFieldsMap).length
         });
         
         entities[entity.entityName] = {
           tableName: entity.tableName,
           archetype: entity.archetype,
-          syncableFields
+          syncableFields,
+          customFields: customFieldsMap,
+          relationshipFields: relationshipFieldsMap,
+          allFields: { ...syncableFields, ...customFieldsMap },
+          businessMetadata
         };
       });
 
@@ -227,7 +285,7 @@ export class OrgSchemaClient {
   }
 
   /**
-   * Get all syncable fields for an entity
+   * Get all syncable fields for an entity (excludes relationship fields)
    */
   async getSyncableFields(orgId: string, entityName: string): Promise<Record<string, FieldDefinition> | null> {
     const entitySchema = await this.getEntitySchema(orgId, entityName);
@@ -235,7 +293,7 @@ export class OrgSchemaClient {
       return null;
     }
 
-    // Filter only syncable fields
+    // Filter only syncable fields (these are real database columns)
     const syncableFields: Record<string, FieldDefinition> = {};
     for (const [fieldName, fieldDef] of Object.entries(entitySchema.syncableFields)) {
       if (fieldDef.syncable !== false) {
@@ -247,23 +305,93 @@ export class OrgSchemaClient {
   }
 
   /**
-   * Generate form fields from entity schema
+   * Get custom fields for an entity (real database columns added by user)
+   */
+  async getCustomFields(orgId: string, entityName: string): Promise<Record<string, FieldDefinition> | null> {
+    const entitySchema = await this.getEntitySchema(orgId, entityName);
+    if (!entitySchema) {
+      return null;
+    }
+
+    return entitySchema.customFields || {};
+  }
+
+  /**
+   * Get relationship fields for an entity (stored in relationship tables)
+   */
+  async getRelationshipFields(orgId: string, entityName: string): Promise<Record<string, RelationshipFieldDefinition> | null> {
+    const entitySchema = await this.getEntitySchema(orgId, entityName);
+    if (!entitySchema) {
+      return null;
+    }
+
+    return entitySchema.relationshipFields || {};
+  }
+
+  /**
+   * Get all fields including relationships for complete entity definition
+   */
+  async getAllFields(orgId: string, entityName: string): Promise<{
+    syncableFields: Record<string, FieldDefinition>;
+    customFields: Record<string, FieldDefinition>;
+    relationshipFields: Record<string, RelationshipFieldDefinition>;
+  } | null> {
+    const entitySchema = await this.getEntitySchema(orgId, entityName);
+    if (!entitySchema) {
+      return null;
+    }
+
+    return {
+      syncableFields: entitySchema.syncableFields,
+      customFields: entitySchema.customFields || {},
+      relationshipFields: entitySchema.relationshipFields || {}
+    };
+  }
+
+  /**
+   * Generate form fields from entity schema (includes relationship fields)
    */
   async generateFormFields(orgId: string, entityName: string): Promise<FormFieldConfig[]> {
-    const syncableFields = await this.getSyncableFields(orgId, entityName);
-    if (!syncableFields) {
+    const allFieldData = await this.getAllFields(orgId, entityName);
+    if (!allFieldData) {
       return [];
     }
 
     const formFields: FormFieldConfig[] = [];
 
-    for (const [fieldName, fieldDef] of Object.entries(syncableFields)) {
+    // Process syncable fields (real database columns)
+    for (const [fieldName, fieldDef] of Object.entries(allFieldData.syncableFields)) {
+      if (fieldDef.syncable !== false) {
+        const formField: FormFieldConfig = {
+          name: fieldName,
+          label: this.generateFieldLabel(fieldName),
+          type: this.mapFieldTypeToInputType(fieldDef.type),
+          required: fieldDef.required || false,
+          validation: fieldDef.validation,
+          fieldCategory: 'syncable'
+        };
+
+        // Add enum options if available
+        if (fieldDef.enum) {
+          formField.options = fieldDef.enum.map(value => ({
+            value,
+            label: this.generateOptionLabel(value)
+          }));
+        }
+
+        formFields.push(formField);
+      }
+    }
+
+    // Process custom fields (user-added database columns)
+    for (const [fieldName, fieldDef] of Object.entries(allFieldData.customFields)) {
       const formField: FormFieldConfig = {
         name: fieldName,
         label: this.generateFieldLabel(fieldName),
         type: this.mapFieldTypeToInputType(fieldDef.type),
         required: fieldDef.required || false,
-        validation: fieldDef.validation
+        validation: fieldDef.validation,
+        fieldCategory: 'custom'
       };
 
       // Add enum options if available
@@ -273,6 +401,22 @@ export class OrgSchemaClient {
           label: this.generateOptionLabel(value)
         }));
       }
+
+      formFields.push(formField);
+    }
+
+    // Process relationship fields (stored in relationship tables)
+    for (const [fieldName, relationshipDef] of Object.entries(allFieldData.relationshipFields)) {
+      const formField: FormFieldConfig = {
+        name: fieldName,
+        label: this.generateFieldLabel(fieldName),
+        type: this.mapRelationshipTypeToInputType(relationshipDef.type),
+        required: false, // Relationships are typically optional
+        fieldCategory: 'relationship',
+        relationshipType: relationshipDef.relationshipType,
+        targetEntityType: relationshipDef.targetEntityType,
+        cardinality: relationshipDef.cardinality
+      };
 
       formFields.push(formField);
     }
@@ -345,6 +489,92 @@ export class OrgSchemaClient {
    */
   async preloadSchemas(orgIds: string[]): Promise<void> {
     await Promise.all(orgIds.map(orgId => this.loadOrgSchema(orgId)));
+  }
+
+  /**
+   * Add fields to an existing entity
+   */
+  async addFields(orgId: string, entityName: string, fields: any[]): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities/${entityName}/fields`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ fields })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Add fields failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error adding fields'
+        };
+      }
+
+      // Clear cache to force reload of schema on next access
+      this.clearCache(orgId);
+      
+      log.info(`[Schema] Successfully added ${fields.length} fields to entity: ${entityName}`);
+      return { success: true };
+      
+    } catch (error) {
+      log.error('Failed to add fields to entity:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Remove field from an existing entity
+   */
+  async removeField(orgId: string, entityName: string, fieldName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities/${entityName}/fields/${fieldName}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Remove field failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error removing field'
+        };
+      }
+
+      // Clear cache to force reload of schema on next access
+      this.clearCache(orgId);
+      
+      log.info(`[Schema] Successfully removed field '${fieldName}' from entity: ${entityName}`);
+      return { success: true };
+      
+    } catch (error) {
+      log.error('Failed to remove field from entity:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   /**
@@ -623,7 +853,21 @@ export class OrgSchemaClient {
       case 'boolean': return 'checkbox';
       case 'text': return 'textarea';
       case 'array': return 'select';
+      case 'date': return 'date';
+      case 'datetime': return 'datetime-local';
+      case 'email': return 'email';
+      case 'url': return 'url';
+      case 'json': return 'textarea';
+      case 'jsonb': return 'textarea';
       default: return 'text';
+    }
+  }
+
+  private mapRelationshipTypeToInputType(relationshipType: 'user_reference' | 'entity_reference'): string {
+    switch (relationshipType) {
+      case 'user_reference': return 'user-select';
+      case 'entity_reference': return 'entity-select';
+      default: return 'select';
     }
   }
 
@@ -669,6 +913,10 @@ export interface FormFieldConfig {
     value: string;
     label: string;
   }>;
+  fieldCategory?: 'syncable' | 'custom' | 'relationship';
+  relationshipType?: string;
+  targetEntityType?: string;
+  cardinality?: string;
 }
 
 export interface ValidationResult {
