@@ -1347,10 +1347,14 @@ export class DataForgeEntityManager {
     try {
       console.log(`[DataForgeEntityManager] Adding fields to entity: ${entityName}`);
 
-      // Get entity details
+      // Import required modules
+      const { fieldManager } = await import('../services/FieldManager');
+      const { getEntityDefinition, storeEntityDefinition } = await import('./entity-storage');
+
+      // Get entity details and current definition
       const entity = await this.config.kysely
         .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype'])
+        .select(['table_name as tableName', 'archetype', 'business_metadata'])
         .where('org_id', '=', orgId)
         .where('entity_name', '=', entityName)
         .where('deleted', '!=', true)
@@ -1360,9 +1364,25 @@ export class DataForgeEntityManager {
         return { success: false, error: 'Entity not found' };
       }
 
+      // Get current entity definition
+      const currentDefinition = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      if (!currentDefinition) {
+        return { success: false, error: 'Entity definition not found' };
+      }
+
+      // Validate new fields
+      const validation = await fieldManager.validateCustomFields(fields, entity.archetype);
+      if (!validation.success) {
+        return {
+          success: false,
+          errors: validation.errors
+        };
+      }
+
       // Add columns to the table using DDLGenerator
       const addedFields: string[] = [];
       const errors: string[] = [];
+      const addedFieldDefs: any[] = [];
       
       for (const field of fields) {
         try {
@@ -1382,6 +1402,10 @@ export class DataForgeEntityManager {
           });
           
           addedFields.push(field.name);
+          addedFieldDefs.push({
+            ...field,
+            source: 'custom'
+          });
         } catch (error) {
           if (error instanceof Error && error.message.includes('already exists')) {
             errors.push(`Field '${field.name}' already exists`);
@@ -1391,9 +1415,30 @@ export class DataForgeEntityManager {
         }
       }
 
-      // Update schema tracking tables if any fields were successfully added
+      // Update entity definition if any fields were successfully added
       if (addedFields.length > 0) {
         try {
+          // Update the entity definition with new fields
+          const updatedDefinition = {
+            ...currentDefinition,
+            customFields: [...(currentDefinition.customFields || []), ...addedFieldDefs],
+            allFields: [...(currentDefinition.allFields || []), ...addedFieldDefs],
+            version: currentDefinition.version || '2.0'
+          };
+
+          // Store updated definition in entity_schemas
+          await this.config.kysely
+            .updateTable('entity_schemas')
+            .set({
+              business_metadata: updatedDefinition,
+              updated_at: new Date().toISOString()
+            })
+            .where('org_id', '=', orgId)
+            .where('entity_name', '=', entityName)
+            .execute();
+
+          console.log(`[DataForgeEntityManager] Updated entity definition for ${entityName}`);
+
           // Update schema_metadata to trigger WAL events for cache invalidation
           await this.config.kysely
             .insertInto('schema_metadata')
@@ -1417,8 +1462,8 @@ export class DataForgeEntityManager {
 
           console.log(`[DataForgeEntityManager] Updated schema tracking for ${entityName} field additions`);
         } catch (error) {
-          console.warn(`[DataForgeEntityManager] Failed to update schema tracking:`, error);
-          // Don't fail the operation if schema tracking fails
+          console.error(`[DataForgeEntityManager] Failed to update entity definition:`, error);
+          // Don't fail the operation if metadata update fails, but log the error
         }
       }
 
@@ -1462,10 +1507,13 @@ export class DataForgeEntityManager {
     try {
       console.log(`[DataForgeEntityManager] Removing field ${fieldName} from entity: ${entityName}`);
 
-      // Get entity details
+      // Import required modules
+      const { getEntityDefinition } = await import('./entity-storage');
+
+      // Get entity details and current definition
       const entity = await this.config.kysely
         .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype'])
+        .select(['table_name as tableName', 'archetype', 'business_metadata'])
         .where('org_id', '=', orgId)
         .where('entity_name', '=', entityName)
         .where('deleted', '!=', true)
@@ -1475,6 +1523,26 @@ export class DataForgeEntityManager {
         return { success: false, error: 'Entity not found' };
       }
 
+      // Get current entity definition
+      const currentDefinition = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      if (!currentDefinition) {
+        return { success: false, error: 'Entity definition not found' };
+      }
+
+      // Check if field exists in definition
+      const allFields = currentDefinition.allFields || [];
+      const fieldExists = allFields.some((f: any) => f.name === fieldName);
+      if (!fieldExists) {
+        return { success: false, error: `Field '${fieldName}' not found in entity definition` };
+      }
+
+      // Check if field is a base/archetype field (shouldn't be removed)
+      const baseFields = currentDefinition.baseFields || [];
+      const isBaseField = baseFields.some((f: any) => f.name === fieldName);
+      if (isBaseField) {
+        return { success: false, error: `Cannot remove base field '${fieldName}' from archetype` };
+      }
+
       // Drop column from table using DDLGenerator
       const dropColumnDDL = DDLGenerator.generateDropColumnDDL(entity.tableName, fieldName);
       
@@ -1482,6 +1550,55 @@ export class DataForgeEntityManager {
         sql: dropColumnDDL,
         parameters: []
       });
+
+      // Update entity definition to remove the field
+      try {
+        const updatedDefinition = {
+          ...currentDefinition,
+          customFields: (currentDefinition.customFields || []).filter((f: any) => f.name !== fieldName),
+          allFields: (currentDefinition.allFields || []).filter((f: any) => f.name !== fieldName),
+          version: currentDefinition.version || '2.0'
+        };
+
+        // Store updated definition in entity_schemas
+        await this.config.kysely
+          .updateTable('entity_schemas')
+          .set({
+            business_metadata: updatedDefinition,
+            updated_at: new Date().toISOString()
+          })
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .execute();
+
+        console.log(`[DataForgeEntityManager] Updated entity definition after removing field ${fieldName}`);
+
+        // Update schema_metadata to trigger WAL events for cache invalidation
+        await this.config.kysely
+          .insertInto('schema_metadata')
+          .values({
+            key: `entity_${orgId}_${entityName}_fields_modified`,
+            value: JSON.stringify({
+              action: 'remove_field',
+              entityName,
+              removedField: fieldName,
+              timestamp: new Date().toISOString()
+            }),
+            updated_at: new Date()
+          })
+          .onConflict((oc) => 
+            oc.column('key').doUpdateSet({
+              value: (eb) => eb.ref('excluded.value'),
+              updated_at: (eb) => eb.ref('excluded.updated_at')
+            })
+          )
+          .execute();
+
+        console.log(`[DataForgeEntityManager] Updated schema tracking for ${entityName} field removal`);
+      } catch (error) {
+        console.error(`[DataForgeEntityManager] Failed to update entity definition:`, error);
+        // Don't fail the operation if metadata update fails, but log the error
+      }
 
       return {
         success: true,
