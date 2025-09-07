@@ -447,6 +447,9 @@ export function UniversalEntityPage({
                 tableId={`${entityName}-entity-table`}
                 className="h-full"
                 height="100%"
+                enableGrouping={true}
+                enableSorting={true}
+                enableFiltering={true}
                 onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
                   console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, fullEntityName, rowId, updates });
                   try {

@@ -4,12 +4,13 @@
 # Usage: ./scripts/dev-with-logging.sh [preset] [additional-args]
 # 
 # Presets:
-#   quiet - Errors only
+#   quiet - Errors only (perfect for MCP/testing)
 #   sync - Sync and state contexts
 #   ui - UI context only
 #   ui-quiet-vibegrid - UI context with quiet VibeGrid
 #   debug - Multiple debug contexts
 #   all - All contexts
+#   vibegrid-only - Only VibeGrid components at debug level
 #   custom - Custom configuration (see below)
 #
 # Custom usage:
@@ -72,6 +73,13 @@ case $PRESET in
     "all")
         CONTEXTS="sync,state,ui,data,auth,routing,performance,testing,debug"
         LEVEL="debug"
+        ;;
+    
+    "vibegrid-only")
+        # Only show VibeGrid component logs at debug level
+        CONTEXTS="none"
+        LEVEL="error"
+        FILE_LEVELS="vibegrid:debug"
         ;;
     
     "focus-file")
