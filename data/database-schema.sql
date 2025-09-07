@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict DByxnYGVBTzbxid30CmEnac92hyLEODOGrUKLHcXnAmWBcktZJKLIaZvjBU1ewa
+\restrict Cdx8pE6tV1RCi9cbNl0JNyRJ5Hevqw0sh0HlXnCvauZLa1WhIg399HSd7iiU9Gd
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict DByxnYGVBTzbxid30CmEnac92hyLEODOGrUKLHcXnAmWBcktZJKLIaZvjBU1ewa
+\unrestrict Cdx8pE6tV1RCi9cbNl0JNyRJ5Hevqw0sh0HlXnCvauZLa1WhIg399HSd7iiU9Gd
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict lp3iBRW0aOQMrWxMa32KNJQzEVKKQQ83RxwtfKa5kAdTC5p5Uxrs6K00hQB4YD3
+\restrict 0DlYhOgooZ0Wmdgoe6GjxojRAhZJU0hDdMykLy3NSo7A7kqNkhv3LjbR9w5HLCj
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lp3iBRW0aOQMrWxMa32KNJQzEVKKQQ83RxwtfKa5kAdTC5p5Uxrs6K00hQB4YD3
+\unrestrict 0DlYhOgooZ0Wmdgoe6GjxojRAhZJU0hDdMykLy3NSo7A7kqNkhv3LjbR9w5HLCj
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 3zR69gReJnBQf76CkSIDVqf1gbJq42Zjy8j2fppsjtWmIWQ3FCwNA5lB0f3cWfk
+\restrict CJhDEkFRRLZA3eC8IHdVBoZCexrH2bktoCZ0QFCD9JMoDyff8HGUkMgwzgShvIP
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3zR69gReJnBQf76CkSIDVqf1gbJq42Zjy8j2fppsjtWmIWQ3FCwNA5lB0f3cWfk
+\unrestrict CJhDEkFRRLZA3eC8IHdVBoZCexrH2bktoCZ0QFCD9JMoDyff8HGUkMgwzgShvIP
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict rJv8u0J87JqyvKOarDlgGx6kX1rodRscSDmiM7Ce64vpIQh8YsMJQUj5yikNiZ5
+\restrict kzcGqogivU0wG42tWiKNfy07efrrBaGv6cPJoZNXsTLm3WDyk2txayLesJoB60a
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict rJv8u0J87JqyvKOarDlgGx6kX1rodRscSDmiM7Ce64vpIQh8YsMJQUj5yikNiZ5
+\unrestrict kzcGqogivU0wG42tWiKNfy07efrrBaGv6cPJoZNXsTLm3WDyk2txayLesJoB60a
 \connect vibestack_dev
-\restrict rJv8u0J87JqyvKOarDlgGx6kX1rodRscSDmiM7Ce64vpIQh8YsMJQUj5yikNiZ5
+\restrict kzcGqogivU0wG42tWiKNfy07efrrBaGv6cPJoZNXsTLm3WDyk2txayLesJoB60a
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -695,6 +695,45 @@ CREATE FUNCTION public.generate_uuidv7() RETURNS uuid
 
 
 ALTER FUNCTION public.generate_uuidv7() OWNER TO postgres;
+
+--
+-- Name: get_available_relationship_types(uuid, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_available_relationship_types(p_org_id uuid, p_source_entity_type character varying DEFAULT NULL::character varying, p_target_entity_type character varying DEFAULT NULL::character varying) RETURNS TABLE(relationship_type text, label text, description text, color text, icon text, allowed_target_types text[], cardinality text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        co.value::TEXT as relationship_type,
+        co.label,
+        co.description,
+        co.color,
+        co.icon,
+        ARRAY(SELECT jsonb_array_elements_text(co.metadata->'allowed_target')) as allowed_target_types,
+        co.metadata->>'cardinality' as cardinality
+    FROM custom_options co
+    JOIN custom_option_sets cos ON co.option_set_id = cos.id
+    WHERE cos.org_id = p_org_id::text
+        AND cos.option_set_type = 'relationship_type'
+        AND co.is_active = true
+        AND (
+            p_source_entity_type IS NULL
+            OR co.metadata->'allowed_source' ? p_source_entity_type
+            OR co.metadata->'allowed_source' ? '*'
+        )
+        AND (
+            p_target_entity_type IS NULL
+            OR co.metadata->'allowed_target' ? p_target_entity_type
+            OR co.metadata->'allowed_target' ? '*'
+        )
+    ORDER BY co.sort_order;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_available_relationship_types(p_org_id uuid, p_source_entity_type character varying, p_target_entity_type character varying) OWNER TO postgres;
 
 --
 -- Name: get_current_organization_id(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1619,6 +1658,61 @@ $$;
 ALTER FUNCTION public.validate_billing_schema() OWNER TO postgres;
 
 --
+-- Name: validate_relationship(uuid, character varying, uuid, character varying, character varying, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validate_relationship(p_org_id uuid, p_source_entity_type character varying, p_source_entity_id uuid, p_relationship_type character varying, p_target_entity_type character varying, p_target_entity_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_valid BOOLEAN := true;
+    v_errors JSONB := '[]'::jsonb;
+    v_relationship_config JSONB;
+    v_existing_count INT;
+    v_max_allowed INT;
+BEGIN
+    -- Get relationship configuration
+    SELECT metadata INTO v_relationship_config
+    FROM custom_options co
+    JOIN custom_option_sets cos ON co.option_set_id = cos.id
+    WHERE cos.org_id = p_org_id
+        AND cos.option_set_type = 'relationship_type'
+        AND co.value = p_relationship_type;
+    
+    IF v_relationship_config IS NULL THEN
+        v_valid := false;
+        v_errors := v_errors || jsonb_build_object('error', 'Invalid relationship type');
+    END IF;
+    
+    -- Check cardinality constraints
+    IF v_relationship_config->>'cardinality' = 'one-to-one' THEN
+        -- Check if source already has this relationship
+        SELECT COUNT(*) INTO v_existing_count
+        FROM org_01920000_1000_7000_8000_000000000001_relationships
+        WHERE source_entity_type = p_source_entity_type
+            AND source_entity_id = p_source_entity_id
+            AND relationship_type = p_relationship_type
+            AND valid_until IS NULL;
+        
+        IF v_existing_count > 0 THEN
+            v_valid := false;
+            v_errors := v_errors || jsonb_build_object('error', 'Source already has this one-to-one relationship');
+        END IF;
+    END IF;
+    
+    -- Additional validation rules can be added here
+    
+    RETURN jsonb_build_object(
+        'valid', v_valid,
+        'errors', v_errors
+    );
+END;
+$$;
+
+
+ALTER FUNCTION public.validate_relationship(p_org_id uuid, p_source_entity_type character varying, p_source_entity_id uuid, p_relationship_type character varying, p_target_entity_type character varying, p_target_entity_id uuid) OWNER TO postgres;
+
+--
 -- Name: validate_rls_context(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1986,6 +2080,198 @@ ALTER TABLE public.custom_options OWNER TO postgres;
 --
 
 COMMENT ON TABLE public.custom_options IS 'Organization-specific option values with custom labels and styling';
+
+
+--
+-- Name: dataforge_relationship_fields; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_relationship_fields (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    entity_type character varying(100) NOT NULL,
+    field_name character varying(100) NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    target_entity_type character varying(100),
+    cardinality character varying(50),
+    display_format character varying(200),
+    validation_rules jsonb,
+    ui_config jsonb,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.dataforge_relationship_fields OWNER TO postgres;
+
+--
+-- Name: file_imports; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.file_imports (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id text NOT NULL,
+    file_name text NOT NULL,
+    file_type text NOT NULL,
+    file_size integer NOT NULL,
+    file_path text NOT NULL,
+    file_hash text,
+    status text DEFAULT 'uploaded'::text NOT NULL,
+    detected_columns jsonb,
+    row_count integer,
+    sample_data jsonb,
+    target_entity text,
+    column_mappings jsonb,
+    transformation_rules jsonb,
+    import_mode text DEFAULT 'create'::text,
+    records_processed integer DEFAULT 0,
+    records_imported integer DEFAULT 0,
+    records_updated integer DEFAULT 0,
+    records_failed integer DEFAULT 0,
+    records_skipped integer DEFAULT 0,
+    error_details jsonb,
+    validation_errors jsonb,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    started_at timestamp without time zone,
+    completed_at timestamp without time zone,
+    created_by text,
+    CONSTRAINT file_imports_file_type_check CHECK ((file_type = ANY (ARRAY['csv'::text, 'tsv'::text, 'xlsx'::text, 'xls'::text, 'json'::text, 'xml'::text]))),
+    CONSTRAINT file_imports_import_mode_check CHECK ((import_mode = ANY (ARRAY['create'::text, 'update'::text, 'upsert'::text]))),
+    CONSTRAINT file_imports_status_check CHECK ((status = ANY (ARRAY['uploaded'::text, 'analyzing'::text, 'mapped'::text, 'importing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+);
+
+
+ALTER TABLE public.file_imports OWNER TO postgres;
+
+--
+-- Name: TABLE file_imports; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.file_imports IS 'File-based data import jobs with status tracking and results';
+
+
+--
+-- Name: COLUMN file_imports.detected_columns; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_imports.detected_columns IS 'Auto-detected schema: [{name: string, type: string, sample_values: string[], nullable: boolean, unique_count?: number}]';
+
+
+--
+-- Name: COLUMN file_imports.sample_data; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_imports.sample_data IS 'First 5-10 rows as array of objects for preview UI';
+
+
+--
+-- Name: COLUMN file_imports.column_mappings; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_imports.column_mappings IS 'Source to target mapping: {source_column: {target_field, transformation?, validation?}}';
+
+
+--
+-- Name: COLUMN file_imports.transformation_rules; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_imports.transformation_rules IS 'Global transformation rules: {trim_whitespace: boolean, handle_empty_strings: "null"|"empty"|"skip"}';
+
+
+--
+-- Name: import_errors; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.import_errors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    file_import_id uuid NOT NULL,
+    row_number integer,
+    column_name text,
+    error_type text NOT NULL,
+    error_code text,
+    error_message text NOT NULL,
+    source_value text,
+    source_row_data jsonb,
+    resolution_status text DEFAULT 'unresolved'::text,
+    resolution_notes text,
+    resolved_at timestamp without time zone,
+    resolved_by text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT import_errors_resolution_status_check CHECK ((resolution_status = ANY (ARRAY['unresolved'::text, 'ignored'::text, 'fixed'::text])))
+);
+
+
+ALTER TABLE public.import_errors OWNER TO postgres;
+
+--
+-- Name: TABLE import_errors; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.import_errors IS 'Detailed error tracking and resolution for import issues';
+
+
+--
+-- Name: import_field_mappings; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.import_field_mappings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    file_import_id uuid NOT NULL,
+    source_column text NOT NULL,
+    target_field text NOT NULL,
+    field_type text NOT NULL,
+    transformation_function text,
+    transformation_params jsonb,
+    default_value text,
+    is_required boolean DEFAULT false,
+    validation_rules jsonb,
+    values_processed integer DEFAULT 0,
+    values_transformed integer DEFAULT 0,
+    validation_errors integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.import_field_mappings OWNER TO postgres;
+
+--
+-- Name: TABLE import_field_mappings; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.import_field_mappings IS 'Granular field mapping configurations for imports';
+
+
+--
+-- Name: import_templates; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.import_templates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id text NOT NULL,
+    name text NOT NULL,
+    description text,
+    file_type text NOT NULL,
+    target_entity text NOT NULL,
+    column_mappings jsonb NOT NULL,
+    transformation_rules jsonb,
+    import_mode text DEFAULT 'create'::text,
+    is_shared boolean DEFAULT false,
+    is_public boolean DEFAULT false,
+    usage_count integer DEFAULT 0,
+    last_used_at timestamp without time zone,
+    created_by text NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.import_templates OWNER TO postgres;
+
+--
+-- Name: TABLE import_templates; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.import_templates IS 'Reusable import mapping templates for common file structures';
 
 
 --
@@ -2357,8 +2643,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_inventoryitem (
     record_type text NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     data jsonb,
-    parent_record_id text,
-    owner_id text,
+    parent_record_id uuid,
+    owner_id uuid,
     custom_fields jsonb DEFAULT '{}'::jsonb
 );
 
@@ -2381,8 +2667,8 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoice (
     content text,
     status text DEFAULT 'draft'::text NOT NULL,
     category text,
-    author_id text,
-    parent_document_id text
+    author_id uuid,
+    parent_document_id uuid
 );
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice REPLICA IDENTITY FULL;
@@ -2521,6 +2807,30 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_records REPLICA
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_records OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_relationships; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_relationships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_entity_type character varying(100) NOT NULL,
+    source_entity_id uuid NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    relationship_subtype character varying(100),
+    target_entity_type character varying(100) NOT NULL,
+    target_entity_id uuid NOT NULL,
+    properties jsonb DEFAULT '{}'::jsonb,
+    valid_from timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    valid_until timestamp without time zone,
+    created_by uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_by uuid,
+    updated_at timestamp without time zone
+);
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_relationships OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_replicatestentity17571; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2535,9 +2845,11 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_replicatestentity17
     record_type text NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     data jsonb,
-    parent_record_id text,
-    owner_id text,
-    custom_fields jsonb DEFAULT '{}'::jsonb
+    parent_record_id uuid,
+    owner_id uuid,
+    custom_fields jsonb DEFAULT '{}'::jsonb,
+    test_field text,
+    test_number numeric DEFAULT 0
 );
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_replicatestentity17571 REPLICA IDENTITY FULL;
@@ -2560,9 +2872,11 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_reptest76123 (
     record_type text NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     data jsonb,
-    parent_record_id text,
-    owner_id text,
-    custom_fields jsonb DEFAULT '{}'::jsonb
+    parent_record_id uuid,
+    owner_id uuid,
+    custom_fields jsonb DEFAULT '{}'::jsonb,
+    test_field text,
+    test_number numeric DEFAULT 0
 );
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_reptest76123 REPLICA IDENTITY FULL;
@@ -2682,6 +2996,29 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task REPLICA ID
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_teamtask; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_teamtask (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    due_date timestamp without time zone,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teamtask REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_teamtask OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_temptests; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2702,6 +3039,124 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_temptests REPLI
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_temptests OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testactivity1757185633; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testactivity1757185633 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    activity_type text NOT NULL,
+    description text,
+    entity_type text,
+    entity_id text,
+    actor_id text,
+    metadata jsonb,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testactivity1757185633 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testactivity1757185633 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testactivity1757185635; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testactivity1757185635 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    activity_type text NOT NULL,
+    description text,
+    entity_type text,
+    entity_id text,
+    actor_id text,
+    metadata jsonb,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testactivity1757185635 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testactivity1757185635 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testactivity1757185724; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testactivity1757185724 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    activity_type text NOT NULL,
+    description text,
+    entity_type text,
+    entity_id text,
+    actor_id text,
+    metadata jsonb,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testactivity1757185724 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testactivity1757185724 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testcollection17571856; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcollection17571856 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    collection_type text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcollection17571856 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcollection17571856 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testcollection17571857; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcollection17571857 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    collection_type text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcollection17571857 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcollection17571857 OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testcompany2s; Type: TABLE; Schema: public; Owner: postgres
@@ -2756,6 +3211,30 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcompanys RE
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcompanys OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_testdebugentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdebugentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdebugentity REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdebugentity OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_testdeletes; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2787,36 +3266,220 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdeletes REP
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdeletes OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_testentity; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_testdiscussion17571856; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testentity (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdiscussion17571856 (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_by text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     title text NOT NULL,
-    description text,
-    priority text DEFAULT 'medium'::text NOT NULL,
-    status text DEFAULT 'todo'::text NOT NULL,
-    assignee_id text,
-    reporter_id text,
-    due_date timestamp without time zone,
-    estimated_hours text,
-    actual_hours text,
-    task_type text DEFAULT 'feature'::text,
-    parent_task_id text,
-    project_id text,
-    sprint_id text,
-    story_points integer,
+    content text,
+    status text NOT NULL,
+    discussion_type text DEFAULT 'general'::text,
+    author_id text,
+    parent_discussion_id text,
     custom_fields jsonb DEFAULT '{}'::jsonb
 );
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testentity REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdiscussion17571856 REPLICA IDENTITY FULL;
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentity OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdiscussion17571856 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testdiscussion17571857; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdiscussion17571857 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text NOT NULL,
+    discussion_type text DEFAULT 'general'::text,
+    author_id text,
+    parent_discussion_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdiscussion17571857 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdiscussion17571857 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testdocument1757185633; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument1757185633 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text NOT NULL,
+    category text,
+    author_id text,
+    parent_document_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdocument1757185633 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument1757185633 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testdocument1757185635; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument1757185635 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text NOT NULL,
+    category text,
+    author_id text,
+    parent_document_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdocument1757185635 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument1757185635 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testdocument1757185724; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument1757185724 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text NOT NULL,
+    category text,
+    author_id text,
+    parent_document_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdocument1757185724 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument1757185724 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testduplicate175718563; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718563 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testduplicate175718563 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718563 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testduplicate175718572; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718572 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testduplicate175718572 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718572 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testduplicate175718598; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718598 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testduplicate175718598 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718598 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testduplicate175718600; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718600 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testduplicate175718600 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testduplicate175718600 OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testentitys; Type: TABLE; Schema: public; Owner: postgres
@@ -2848,6 +3511,102 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testentitys REP
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testfile1757185633585; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testfile1757185633585 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    file_path text NOT NULL,
+    mime_type text NOT NULL,
+    size_bytes integer NOT NULL,
+    status text NOT NULL,
+    uploaded_by text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testfile1757185633585 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testfile1757185633585 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testfile1757185635467; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testfile1757185635467 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    file_path text NOT NULL,
+    mime_type text NOT NULL,
+    size_bytes integer NOT NULL,
+    status text NOT NULL,
+    uploaded_by text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testfile1757185635467 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testfile1757185635467 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testfile1757185724220; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testfile1757185724220 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    file_path text NOT NULL,
+    mime_type text NOT NULL,
+    size_bytes integer NOT NULL,
+    status text NOT NULL,
+    uploaded_by text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testfile1757185724220 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testfile1757185724220 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testmanualentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testmanualentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testmanualentity REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testmanualentity OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testproductfixed; Type: TABLE; Schema: public; Owner: postgres
@@ -2899,6 +3658,87 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testproducts RE
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproducts OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_testproject17571856328; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testproject17571856328 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    start_date date,
+    end_date date,
+    owner_id text,
+    budget text,
+    progress_percentage integer DEFAULT 0,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testproject17571856328 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproject17571856328 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testproject17571857233; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testproject17571857233 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    start_date date,
+    end_date date,
+    owner_id text,
+    budget text,
+    progress_percentage integer DEFAULT 0,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testproject17571857233 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproject17571857233 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testprojectdebug; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testprojectdebug (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    start_date date,
+    end_date date,
+    owner_id text,
+    budget text,
+    progress_percentage integer DEFAULT 0,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testprojectdebug REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testprojectdebug OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_testprojects; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2924,6 +3764,230 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testprojects RE
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testprojects OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testrecord175718563323; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718563323 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testrecord175718563323 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718563323 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testrecord175718563423; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718563423 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testrecord175718563423 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718563423 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testrecord175718563499; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718563499 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testrecord175718563499 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718563499 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testrecord175718572369; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718572369 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testrecord175718572369 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718572369 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testrecord175718572488; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718572488 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    parent_record_id text,
+    owner_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testrecord175718572488 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718572488 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testtask1757185633070; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185633070 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    assignee_id text,
+    due_date timestamp without time zone,
+    parent_task_id text,
+    project_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask1757185633070 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185633070 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testtask1757185634598; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185634598 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    assignee_id text,
+    due_date timestamp without time zone,
+    parent_task_id text,
+    project_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask1757185634598 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185634598 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testtask1757185723520; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185723520 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    assignee_id text,
+    due_date timestamp without time zone,
+    parent_task_id text,
+    project_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask1757185723520 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185723520 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testtask1757185725218; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185725218 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    assignee_id text,
+    due_date timestamp without time zone,
+    parent_task_id text,
+    project_id text,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask1757185725218 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185725218 OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_time_sheet; Type: TABLE; Schema: public; Owner: postgres
@@ -3303,6 +4367,30 @@ ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_ticket REPLICA 
 ALTER TABLE public.org_01920000_2000_7000_8000_000000000002_ticket OWNER TO postgres;
 
 --
+-- Name: org_relationship_definitions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_relationship_definitions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    display_name character varying(200) NOT NULL,
+    description text,
+    allowed_source_types text[],
+    allowed_target_types text[],
+    cardinality character varying(20),
+    is_directional boolean DEFAULT true,
+    inverse_relationship_type character varying(100),
+    property_schema jsonb,
+    ui_config jsonb,
+    is_system boolean DEFAULT false,
+    is_active boolean DEFAULT true
+);
+
+
+ALTER TABLE public.org_relationship_definitions OWNER TO postgres;
+
+--
 -- Name: organization_members; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3662,6 +4750,255 @@ CREATE TABLE public.verification (
 ALTER TABLE public.verification OWNER TO postgres;
 
 --
+-- Name: wide_corp_entity_relationships; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_entity_relationships AS
+ SELECT r.id,
+    r.source_entity_type,
+    r.source_entity_id,
+    r.relationship_type,
+    r.relationship_subtype,
+    r.target_entity_type,
+    r.target_entity_id,
+    r.properties,
+    r.valid_from,
+    r.valid_until,
+    r.created_by,
+    r.created_at,
+    r.updated_by,
+    r.updated_at,
+    rd.display_name AS relationship_display_name,
+    rd.description AS relationship_description,
+        CASE
+            WHEN ((r.target_entity_type)::text = 'User'::text) THEN u.name
+            WHEN ((r.target_entity_type)::text = 'Task'::text) THEN t.title
+            WHEN ((r.target_entity_type)::text = 'Project'::text) THEN (p.name)::text
+            WHEN ((r.target_entity_type)::text = 'Invoice'::text) THEN i.title
+            ELSE (r.target_entity_id)::text
+        END AS target_display_name
+   FROM (((((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     LEFT JOIN public.org_relationship_definitions rd ON (((rd.org_id = '01920000-1000-7000-8000-000000000001'::uuid) AND ((rd.relationship_type)::text = (r.relationship_type)::text))))
+     LEFT JOIN public."user" u ON ((((r.target_entity_type)::text = 'User'::text) AND (r.target_entity_id = (u.id)::uuid))))
+     LEFT JOIN public.org_01920000_1000_7000_8000_000000000001_task t ON ((((r.target_entity_type)::text = 'Task'::text) AND (r.target_entity_id = (t.id)::uuid))))
+     LEFT JOIN public.org_01920000_1000_7000_8000_000000000001_project p ON ((((r.target_entity_type)::text = 'Project'::text) AND (r.target_entity_id = p.id))))
+     LEFT JOIN public.org_01920000_1000_7000_8000_000000000001_invoice i ON ((((r.target_entity_type)::text = 'Invoice'::text) AND (r.target_entity_id = (i.id)::uuid))))
+  WHERE (r.valid_until IS NULL);
+
+
+ALTER VIEW public.wide_corp_entity_relationships OWNER TO postgres;
+
+--
+-- Name: wide_corp_org_chart; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_org_chart AS
+ SELECT r.source_entity_id AS employee_id,
+    u1.name AS employee_name,
+    u1.email AS employee_email,
+    r.target_entity_id AS manager_id,
+    u2.name AS manager_name,
+    u2.email AS manager_email,
+    (r.properties ->> 'department'::text) AS department,
+    (r.properties ->> 'since'::text) AS reporting_since
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public."user" u1 ON ((r.source_entity_id = (u1.id)::uuid)))
+     JOIN public."user" u2 ON ((r.target_entity_id = (u2.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'User'::text) AND ((r.relationship_type)::text = 'reports_to'::text) AND ((r.target_entity_type)::text = 'User'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_org_chart OWNER TO postgres;
+
+--
+-- Name: wide_corp_project_members; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_project_members AS
+ SELECT r.target_entity_id AS project_id,
+    p.name AS project_name,
+    r.source_entity_id AS user_id,
+    u.name AS user_name,
+    u.email AS user_email,
+    (r.properties ->> 'role'::text) AS project_role,
+    (r.properties ->> 'joined_date'::text) AS joined_date,
+    r.created_at AS relationship_created
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_project p ON ((r.target_entity_id = p.id)))
+     JOIN public."user" u ON ((r.source_entity_id = (u.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'User'::text) AND ((r.relationship_type)::text = 'member_of'::text) AND ((r.target_entity_type)::text = 'Project'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_project_members OWNER TO postgres;
+
+--
+-- Name: wide_corp_relationship_field_configs; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_relationship_field_configs AS
+ SELECT drf.id,
+    drf.org_id,
+    drf.entity_type,
+    drf.field_name,
+    drf.relationship_type,
+    drf.target_entity_type,
+    drf.cardinality,
+    drf.display_format,
+    drf.validation_rules,
+    drf.ui_config,
+    drf.created_at,
+    drf.updated_at,
+    cos.name AS option_set_name,
+    ( SELECT jsonb_agg(jsonb_build_object('value', co.value, 'label', co.label, 'color', co.color, 'icon', co.icon) ORDER BY co.sort_order) AS jsonb_agg
+           FROM (public.custom_options co
+             JOIN public.custom_option_sets cos2 ON ((co.option_set_id = cos2.id)))
+          WHERE ((cos2.org_id = (drf.org_id)::text) AND (cos2.option_set_type = 'relationship_type'::text) AND (co.value = (drf.relationship_type)::text))) AS relationship_options
+   FROM (public.dataforge_relationship_fields drf
+     LEFT JOIN public.custom_option_sets cos ON (((cos.org_id = (drf.org_id)::text) AND (cos.option_set_type = 'relationship_type'::text))))
+  WHERE (drf.org_id = '01920000-1000-7000-8000-000000000001'::uuid);
+
+
+ALTER VIEW public.wide_corp_relationship_field_configs OWNER TO postgres;
+
+--
+-- Name: wide_corp_relationships_with_options; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_relationships_with_options AS
+ SELECT r.id,
+    r.source_entity_type,
+    r.source_entity_id,
+    r.relationship_type,
+    r.relationship_subtype,
+    r.target_entity_type,
+    r.target_entity_id,
+    r.properties,
+    r.valid_from,
+    r.valid_until,
+    r.created_by,
+    r.created_at,
+    r.updated_by,
+    r.updated_at,
+    rt.label AS relationship_label,
+    rt.color AS relationship_color,
+    rt.icon AS relationship_icon,
+    role_opt.label AS role_label,
+    role_opt.color AS role_color,
+    role_opt.icon AS role_icon,
+        CASE
+            WHEN ((r.source_entity_type)::text = 'User'::text) THEN ( SELECT "user".name
+               FROM public."user"
+              WHERE ("user".id = (r.source_entity_id)::text))
+            WHEN ((r.source_entity_type)::text = 'Task'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_task.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_task
+              WHERE ((org_01920000_1000_7000_8000_000000000001_task.id)::uuid = r.source_entity_id))
+            WHEN ((r.source_entity_type)::text = 'Project'::text) THEN (( SELECT org_01920000_1000_7000_8000_000000000001_project.name
+               FROM public.org_01920000_1000_7000_8000_000000000001_project
+              WHERE (org_01920000_1000_7000_8000_000000000001_project.id = r.source_entity_id)))::text
+            WHEN ((r.source_entity_type)::text = 'Invoice'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_invoice.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_invoice
+              WHERE ((org_01920000_1000_7000_8000_000000000001_invoice.id)::uuid = r.source_entity_id))
+            ELSE (r.source_entity_id)::text
+        END AS source_display_name,
+        CASE
+            WHEN ((r.target_entity_type)::text = 'User'::text) THEN ( SELECT "user".name
+               FROM public."user"
+              WHERE ("user".id = (r.target_entity_id)::text))
+            WHEN ((r.target_entity_type)::text = 'Task'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_task.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_task
+              WHERE ((org_01920000_1000_7000_8000_000000000001_task.id)::uuid = r.target_entity_id))
+            WHEN ((r.target_entity_type)::text = 'Project'::text) THEN (( SELECT org_01920000_1000_7000_8000_000000000001_project.name
+               FROM public.org_01920000_1000_7000_8000_000000000001_project
+              WHERE (org_01920000_1000_7000_8000_000000000001_project.id = r.target_entity_id)))::text
+            WHEN ((r.target_entity_type)::text = 'Invoice'::text) THEN ( SELECT org_01920000_1000_7000_8000_000000000001_invoice.title
+               FROM public.org_01920000_1000_7000_8000_000000000001_invoice
+              WHERE ((org_01920000_1000_7000_8000_000000000001_invoice.id)::uuid = r.target_entity_id))
+            ELSE (r.target_entity_id)::text
+        END AS target_display_name
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     LEFT JOIN LATERAL ( SELECT co.label,
+            co.color,
+            co.icon
+           FROM (public.custom_options co
+             JOIN public.custom_option_sets cos ON ((co.option_set_id = cos.id)))
+          WHERE ((cos.org_id = '01920000-1000-7000-8000-000000000001'::text) AND (cos.option_set_type = 'relationship_type'::text) AND (co.value = (r.relationship_type)::text))) rt ON (true))
+     LEFT JOIN LATERAL ( SELECT co.label,
+            co.color,
+            co.icon
+           FROM (public.custom_options co
+             JOIN public.custom_option_sets cos ON ((co.option_set_id = cos.id)))
+          WHERE ((cos.org_id = '01920000-1000-7000-8000-000000000001'::text) AND (cos.option_set_type = 'relationship_role'::text) AND (co.value = (r.properties ->> 'role'::text)))) role_opt ON ((r.properties ? 'role'::text)))
+  WHERE (r.valid_until IS NULL);
+
+
+ALTER VIEW public.wide_corp_relationships_with_options OWNER TO postgres;
+
+--
+-- Name: wide_corp_task_assignments; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_task_assignments AS
+ SELECT r.id AS relationship_id,
+    r.source_entity_id AS task_id,
+    t.title AS task_title,
+    t.status AS task_status,
+    t.priority AS task_priority,
+    r.target_entity_id AS user_id,
+    u.name AS user_name,
+    u.email AS user_email,
+    (r.properties ->> 'role'::text) AS assignment_role,
+    (r.properties ->> 'effort_percentage'::text) AS effort_percentage,
+    r.created_at AS assigned_at,
+    r.created_by AS assigned_by
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t ON ((r.source_entity_id = (t.id)::uuid)))
+     JOIN public."user" u ON ((r.target_entity_id = (u.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'Task'::text) AND ((r.relationship_type)::text = 'assigned_to'::text) AND ((r.target_entity_type)::text = 'User'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_task_assignments OWNER TO postgres;
+
+--
+-- Name: wide_corp_task_dependencies; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_task_dependencies AS
+ SELECT r.source_entity_id AS blocking_task_id,
+    t1.title AS blocking_task_title,
+    t1.status AS blocking_task_status,
+    r.target_entity_id AS blocked_task_id,
+    t2.title AS blocked_task_title,
+    t2.status AS blocked_task_status,
+    (r.properties ->> 'reason'::text) AS block_reason,
+    (r.properties ->> 'severity'::text) AS severity
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t1 ON ((r.source_entity_id = (t1.id)::uuid)))
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t2 ON ((r.target_entity_id = (t2.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'Task'::text) AND ((r.relationship_type)::text = 'blocks'::text) AND ((r.target_entity_type)::text = 'Task'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_task_dependencies OWNER TO postgres;
+
+--
+-- Name: wide_corp_task_watchers; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.wide_corp_task_watchers AS
+ SELECT r.target_entity_id AS task_id,
+    t.title AS task_title,
+    r.source_entity_id AS watcher_id,
+    u.name AS watcher_name,
+    (r.properties ->> 'reason'::text) AS watch_reason,
+    (r.properties ->> 'notifications'::text) AS notifications_enabled,
+    r.created_at AS watching_since
+   FROM ((public.org_01920000_1000_7000_8000_000000000001_relationships r
+     JOIN public.org_01920000_1000_7000_8000_000000000001_task t ON ((r.target_entity_id = (t.id)::uuid)))
+     JOIN public."user" u ON ((r.source_entity_id = (u.id)::uuid)))
+  WHERE (((r.source_entity_type)::text = 'User'::text) AND ((r.relationship_type)::text = 'watching'::text) AND ((r.target_entity_type)::text = 'Task'::text) AND (r.valid_until IS NULL));
+
+
+ALTER VIEW public.wide_corp_task_watchers OWNER TO postgres;
+
+--
 -- Name: endpoints endpoints_pkey; Type: CONSTRAINT; Schema: neon_control_plane; Owner: postgres
 --
 
@@ -3734,11 +5071,59 @@ ALTER TABLE ONLY public.custom_options
 
 
 --
+-- Name: dataforge_relationship_fields dataforge_relationship_fields_org_id_entity_type_field_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_relationship_fields
+    ADD CONSTRAINT dataforge_relationship_fields_org_id_entity_type_field_name_key UNIQUE (org_id, entity_type, field_name);
+
+
+--
+-- Name: dataforge_relationship_fields dataforge_relationship_fields_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_relationship_fields
+    ADD CONSTRAINT dataforge_relationship_fields_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: entity_schemas entity_schemas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.entity_schemas
     ADD CONSTRAINT entity_schemas_pkey PRIMARY KEY (org_id, entity_name);
+
+
+--
+-- Name: file_imports file_imports_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.file_imports
+    ADD CONSTRAINT file_imports_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: import_errors import_errors_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_errors
+    ADD CONSTRAINT import_errors_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: import_field_mappings import_field_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_field_mappings
+    ADD CONSTRAINT import_field_mappings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: import_templates import_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_templates
+    ADD CONSTRAINT import_templates_pkey PRIMARY KEY (id);
 
 
 --
@@ -3779,6 +5164,14 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_meeting
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_project
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_projects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_relationships org_01920000_1000_7000_8000_000000000001_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_relationships
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_relationships_pkey PRIMARY KEY (id);
 
 
 --
@@ -3867,6 +5260,22 @@ ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_tagging
 
 ALTER TABLE ONLY public.org_01920000_2000_7000_8000_000000000002_ticket
     ADD CONSTRAINT org_01920000_2000_7000_8000_000000000002_ticket_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_relationship_definitions org_relationship_definitions_org_id_relationship_type_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_relationship_definitions
+    ADD CONSTRAINT org_relationship_definitions_org_id_relationship_type_key UNIQUE (org_id, relationship_type);
+
+
+--
+-- Name: org_relationship_definitions org_relationship_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_relationship_definitions
+    ADD CONSTRAINT org_relationship_definitions_pkey PRIMARY KEY (id);
 
 
 --
@@ -4022,6 +5431,22 @@ ALTER TABLE ONLY public.teams
 
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_relationships unique_active_relationship; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_relationships
+    ADD CONSTRAINT unique_active_relationship UNIQUE (source_entity_type, source_entity_id, relationship_type, target_entity_type, target_entity_id);
+
+
+--
+-- Name: import_templates unique_template_name_per_org; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_templates
+    ADD CONSTRAINT unique_template_name_per_org UNIQUE (org_id, name);
+
+
+--
 -- Name: user user_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4162,6 +5587,83 @@ CREATE INDEX idx_entity_schemas_org_id ON public.entity_schemas USING btree (org
 --
 
 CREATE INDEX idx_entity_schemas_table_name ON public.entity_schemas USING btree (table_name);
+
+
+--
+-- Name: idx_file_imports_created_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_file_imports_created_at ON public.file_imports USING btree (created_at DESC);
+
+
+--
+-- Name: idx_file_imports_org_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_file_imports_org_id ON public.file_imports USING btree (org_id);
+
+
+--
+-- Name: idx_file_imports_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_file_imports_status ON public.file_imports USING btree (status);
+
+
+--
+-- Name: idx_file_imports_target_entity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_file_imports_target_entity ON public.file_imports USING btree (target_entity);
+
+
+--
+-- Name: idx_import_errors_import_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_errors_import_id ON public.import_errors USING btree (file_import_id);
+
+
+--
+-- Name: idx_import_errors_resolution; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_errors_resolution ON public.import_errors USING btree (resolution_status);
+
+
+--
+-- Name: idx_import_errors_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_errors_type ON public.import_errors USING btree (error_type);
+
+
+--
+-- Name: idx_import_templates_file_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_templates_file_type ON public.import_templates USING btree (file_type);
+
+
+--
+-- Name: idx_import_templates_org_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_templates_org_id ON public.import_templates USING btree (org_id);
+
+
+--
+-- Name: idx_import_templates_shared; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_templates_shared ON public.import_templates USING btree (is_shared) WHERE (is_shared = true);
+
+
+--
+-- Name: idx_import_templates_target_entity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_templates_target_entity ON public.import_templates USING btree (target_entity);
 
 
 --
@@ -4351,6 +5853,34 @@ CREATE INDEX idx_user_last_org_access_at ON public."user" USING btree (last_org_
 --
 
 CREATE INDEX idx_user_last_used_organization_id ON public."user" USING btree (last_used_organization_id);
+
+
+--
+-- Name: idx_widecorp_rel_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_created ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (created_at DESC) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_widecorp_rel_source; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_source ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (source_entity_type, source_entity_id) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_widecorp_rel_target; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_target ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (target_entity_type, target_entity_id) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_widecorp_rel_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_widecorp_rel_type ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (relationship_type) WHERE (valid_until IS NULL);
 
 
 --
@@ -4616,6 +6146,38 @@ ALTER TABLE ONLY public.container_permission
 
 ALTER TABLE ONLY public.custom_options
     ADD CONSTRAINT custom_options_option_set_id_fkey FOREIGN KEY (option_set_id) REFERENCES public.custom_option_sets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: import_field_mappings fk_field_mappings_import; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_field_mappings
+    ADD CONSTRAINT fk_field_mappings_import FOREIGN KEY (file_import_id) REFERENCES public.file_imports(id) ON DELETE CASCADE;
+
+
+--
+-- Name: file_imports fk_file_imports_org; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.file_imports
+    ADD CONSTRAINT fk_file_imports_org FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: import_errors fk_import_errors_import; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_errors
+    ADD CONSTRAINT fk_import_errors_import FOREIGN KEY (file_import_id) REFERENCES public.file_imports(id) ON DELETE CASCADE;
+
+
+--
+-- Name: import_templates fk_import_templates_org; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_templates
+    ADD CONSTRAINT fk_import_templates_org FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -4955,7 +6517,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rJv8u0J87JqyvKOarDlgGx6kX1rodRscSDmiM7Ce64vpIQh8YsMJQUj5yikNiZ5
+\unrestrict kzcGqogivU0wG42tWiKNfy07efrrBaGv6cPJoZNXsTLm3WDyk2txayLesJoB60a
 
 --
 -- PostgreSQL database cluster dump complete
