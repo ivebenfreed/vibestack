@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict P2UrwNuDpyf5kNpKSk4oBW151I4lLefjkAEyVxzTCsBjUo31m4HVqXyeByk3fP2
+\restrict hxh255TJXXVTCVTuE2YgwRZZ0pt1efcfwT6Ll3eV2MXxkyTFPFaZ3l0dS1DCaRp
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict P2UrwNuDpyf5kNpKSk4oBW151I4lLefjkAEyVxzTCsBjUo31m4HVqXyeByk3fP2
+\unrestrict hxh255TJXXVTCVTuE2YgwRZZ0pt1efcfwT6Ll3eV2MXxkyTFPFaZ3l0dS1DCaRp
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict JgfomA3VNq24ty8cdQHRgB0R7CLhix2oFMt8wL58MeMijBcdXicgxCQRSIQELOj
+\restrict GW1AmFMjC1IVoimuyPZjOTWo0nH1paVmrtP2enXAg2Gs00ch3k8tPdiwzy4HJwr
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JgfomA3VNq24ty8cdQHRgB0R7CLhix2oFMt8wL58MeMijBcdXicgxCQRSIQELOj
+\unrestrict GW1AmFMjC1IVoimuyPZjOTWo0nH1paVmrtP2enXAg2Gs00ch3k8tPdiwzy4HJwr
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict if3JdkB7eqcE6mrUJX2yfFbkt3lZyLNFY5HUNoYeMzvQ306i5mkFhmfdn5ttHEY
+\restrict B9PhfNR6eStj3N9k5SgtCwZxQRP8RvcnOJej4eTCf1NtlLQZGHeldSWAubmEo24
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict if3JdkB7eqcE6mrUJX2yfFbkt3lZyLNFY5HUNoYeMzvQ306i5mkFhmfdn5ttHEY
+\unrestrict B9PhfNR6eStj3N9k5SgtCwZxQRP8RvcnOJej4eTCf1NtlLQZGHeldSWAubmEo24
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 0C8zBM0yAcJKC4kUmACBrErDNHnZTyLXsAd3bxfBb0Niz4v4rnaqa7TUAakBQfC
+\restrict QCDX98RdHFRKADqrSZ3lPapRnBVk9csutFgXgPkJ8wcQ8xlg4NH3zuHRfjCDPI4
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict 0C8zBM0yAcJKC4kUmACBrErDNHnZTyLXsAd3bxfBb0Niz4v4rnaqa7TUAakBQfC
+\unrestrict QCDX98RdHFRKADqrSZ3lPapRnBVk9csutFgXgPkJ8wcQ8xlg4NH3zuHRfjCDPI4
 \connect vibestack_dev
-\restrict 0C8zBM0yAcJKC4kUmACBrErDNHnZTyLXsAd3bxfBb0Niz4v4rnaqa7TUAakBQfC
+\restrict QCDX98RdHFRKADqrSZ3lPapRnBVk9csutFgXgPkJ8wcQ8xlg4NH3zuHRfjCDPI4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -4447,7 +4447,13 @@ CREATE TABLE public.organizations (
     owner_user_id text,
     auto_created boolean DEFAULT false,
     lore text,
-    canon jsonb DEFAULT '[]'::jsonb
+    canon jsonb DEFAULT '[]'::jsonb,
+    subscription_tier text DEFAULT 'trial'::text,
+    subscription_status text DEFAULT 'active'::text,
+    billing_cycle text DEFAULT 'monthly'::text,
+    billing_email text,
+    trial_ends_at timestamp with time zone,
+    billing_settings jsonb DEFAULT '{}'::jsonb
 );
 
 ALTER TABLE ONLY public.organizations REPLICA IDENTITY FULL;
@@ -4751,7 +4757,9 @@ CREATE TABLE public."user" (
     password text,
     default_organization_id text,
     last_used_organization_id text,
-    last_org_access_at timestamp with time zone
+    last_org_access_at timestamp with time zone,
+    active_organization_id text,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -6541,7 +6549,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0C8zBM0yAcJKC4kUmACBrErDNHnZTyLXsAd3bxfBb0Niz4v4rnaqa7TUAakBQfC
+\unrestrict QCDX98RdHFRKADqrSZ3lPapRnBVk9csutFgXgPkJ8wcQ8xlg4NH3zuHRfjCDPI4
 
 --
 -- PostgreSQL database cluster dump complete
