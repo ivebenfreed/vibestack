@@ -326,6 +326,22 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const tableActor = useActorRef(tableBaseMachine, tableActorOptions);
   const tableSend = tableActor.send;
   
+  // Set up bridge function for Legend State UI bridge to send data to table machine when grouping is enabled
+  React.useEffect(() => {
+    (window as any).__vibegrid_send_data_to_table_machine = (event: any) => {
+      log.debug('VibeGrid: Sending data to table machine for grouping', {
+        eventType: event.type,
+        entityCount: event.entities?.length || 0,
+        source: event.source
+      });
+      tableSend(event);
+    };
+    
+    return () => {
+      delete (window as any).__vibegrid_send_data_to_table_machine;
+    };
+  }, [tableSend]);
+  
   // Context menu state
   // Context menu state managed directly in contextmenu-handlers.ts
   
@@ -409,6 +425,63 @@ export function VibeGrid<T extends Record<string, any> = any>(
             hasUIStore: !!uiStore,
             hasLegendState: !!entityObservable
           });
+          
+          // CRITICAL: Set up Legend State integration with retry mechanism for renderer availability
+          const setupLegendStateIntegration = () => {
+            const currentRendererInstance = (window as any).__vibegridx_renderer_instance;
+            
+            if (currentRendererInstance && entityObservable && uiStore) {
+              log.info('🔗 VibeGrid: Setting up Legend State integration', {
+                hasRenderer: !!currentRendererInstance,
+                hasObservable: !!entityObservable,
+                hasUIStore: !!uiStore,
+                entityType,
+                attempt: 'success'
+              });
+              
+              // Configure renderer with Legend State integration
+              currentRendererInstance.setLegendStateIntegration(entityType, entityObservable, uiStore);
+              log.info('✅ VibeGrid: Legend State integration configured on renderer');
+              return true; // Integration successful
+            }
+            return false; // Integration not ready yet
+          };
+          
+          // Try immediate setup first
+          if (!setupLegendStateIntegration()) {
+            log.info('🔄 VibeGrid: Renderer not ready, setting up delayed Legend State integration');
+            
+            // Set up a brief retry mechanism with exponential backoff
+            let retryAttempts = 0;
+            const maxRetries = 10;
+            
+            const retrySetup = () => {
+              retryAttempts++;
+              
+              if (setupLegendStateIntegration()) {
+                log.info('✅ VibeGrid: Legend State integration configured after retry', { 
+                  attempts: retryAttempts 
+                });
+                return;
+              }
+              
+              if (retryAttempts < maxRetries) {
+                // Exponential backoff: 10ms, 20ms, 40ms, etc.
+                const delay = Math.min(10 * Math.pow(2, retryAttempts - 1), 200);
+                setTimeout(retrySetup, delay);
+              } else {
+                log.error('❌ VibeGrid: Failed to set up Legend State integration after maximum retries', {
+                  maxRetries,
+                  hasRenderer: !!(window as any).__vibegridx_renderer_instance,
+                  hasObservable: !!entityObservable,
+                  hasUIStore: !!uiStore
+                });
+              }
+            };
+            
+            // Start retry sequence
+            setTimeout(retrySetup, 10);
+          }
           
           // Use the new unified bridge with actual renderer instance
           return bridge.createLegendStateUIBridge(

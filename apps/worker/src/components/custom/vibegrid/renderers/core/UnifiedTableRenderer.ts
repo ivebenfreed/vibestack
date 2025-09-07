@@ -299,30 +299,42 @@ export class UnifiedTableRenderer {
     }
 
     const entityRecords = Object.values(rawData);
+    const groupConfig = uiState.context.groupConfig;
     
-    // Convert Legend State entities to unified rows
-    entityRecords.forEach((entity: any) => {
-      if (entity && typeof entity === 'object' && entity.id) {
-        const unifiedRow: UnifiedTableRow = {
-          id: entity.id,
-          type: 'data',
-          data: entity, // Direct entity data from Legend State
-          height: ROW_HEIGHT,
-          originalData: {
+    // Check if grouping is enabled
+    if (groupConfig && groupConfig.fields && groupConfig.fields.length > 0) {
+      // GROUPED RENDERING: Create group headers + data rows
+      log.info('🔗 UnifiedTableRenderer: Processing grouped data', {
+        groupFields: groupConfig.fields.map(f => f.field),
+        entityCount: entityRecords.length
+      });
+      
+      this.createGroupedUnifiedRows(entityRecords, groupConfig);
+    } else {
+      // FLAT RENDERING: Convert Legend State entities to unified rows
+      entityRecords.forEach((entity: any) => {
+        if (entity && typeof entity === 'object' && entity.id) {
+          const unifiedRow: UnifiedTableRow = {
             id: entity.id,
-            data: entity,
-            metadata: {
-              isSelected: false,
-              isDirty: false,
-              isGroup: false,
-              level: 0
+            type: 'data',
+            data: entity, // Direct entity data from Legend State
+            height: ROW_HEIGHT,
+            originalData: {
+              id: entity.id,
+              data: entity,
+              metadata: {
+                isSelected: false,
+                isDirty: false,
+                isGroup: false,
+                level: 0
+              }
             }
-          }
-        };
-        
-        this.unifiedRows.push(unifiedRow);
-      }
-    });
+          };
+          
+          this.unifiedRows.push(unifiedRow);
+        }
+      });
+    }
     
     // Apply sorting from UI store
     if (uiState.context.sortBy && uiState.context.sortBy.length > 0) {
@@ -340,6 +352,88 @@ export class UnifiedTableRenderer {
       entityType: this.entityType,
       appliedSort: uiState.context.sortBy?.length > 0,
       appliedFilters: uiState.context.filters?.length > 0
+    });
+  }
+
+  /**
+   * Create grouped unified rows with group headers and data rows
+   */
+  private createGroupedUnifiedRows(entityRecords: any[], groupConfig: any): void {
+    // Group entities by the first grouping field
+    const groupField = groupConfig.fields[0].field;
+    const groupMap = new Map<string, any[]>();
+    
+    // Group the data
+    entityRecords.forEach(entity => {
+      if (entity && typeof entity === 'object' && entity.id) {
+        const groupValue = String(entity[groupField] || 'Ungrouped');
+        if (!groupMap.has(groupValue)) {
+          groupMap.set(groupValue, []);
+        }
+        groupMap.get(groupValue)!.push(entity);
+      }
+    });
+    
+    // Create unified rows with group headers + data rows
+    let rowIndex = 0;
+    for (const [groupValue, groupEntities] of groupMap) {
+      // Create group header row
+      const groupHeaderRow: UnifiedTableRow = {
+        id: `group_${groupField}_${groupValue}`,
+        type: 'group',
+        data: {
+          id: `group_${groupField}_${groupValue}`,
+          field: groupField,
+          displayValue: groupValue,
+          value: groupValue,
+          rowCount: groupEntities.length,
+          aggregations: [],
+          isExpanded: groupConfig.expandedGroups?.has(`group_${groupField}_${groupValue}`) || false
+        },
+        height: ROW_HEIGHT,
+        level: 0,
+        isExpanded: groupConfig.expandedGroups?.has(`group_${groupField}_${groupValue}`) || false,
+        groupId: `group_${groupField}_${groupValue}`,
+        originalData: null
+      };
+      
+      this.unifiedRows.push(groupHeaderRow);
+      rowIndex++;
+      
+      // Add data rows for this group (only if expanded)
+      if (groupHeaderRow.isExpanded) {
+        groupEntities.forEach(entity => {
+          const dataRow: UnifiedTableRow = {
+            id: entity.id,
+            type: 'data',
+            data: entity,
+            height: ROW_HEIGHT,
+            level: 1, // Indented under group header
+            groupId: `group_${groupField}_${groupValue}`,
+            originalData: {
+              id: entity.id,
+              data: entity,
+              metadata: {
+                isSelected: false,
+                isDirty: false,
+                isGroup: false,
+                level: 1
+              }
+            }
+          };
+          
+          this.unifiedRows.push(dataRow);
+          rowIndex++;
+        });
+      }
+    }
+    
+    log.info('🔗 UnifiedTableRenderer: Created grouped unified rows', {
+      totalGroups: groupMap.size,
+      totalUnifiedRows: this.unifiedRows.length,
+      groupHeaders: this.unifiedRows.filter(r => r.type === 'group').length,
+      dataRows: this.unifiedRows.filter(r => r.type === 'data').length,
+      expandedGroups: this.unifiedRows.filter(r => r.type === 'group' && r.isExpanded).length
     });
   }
 

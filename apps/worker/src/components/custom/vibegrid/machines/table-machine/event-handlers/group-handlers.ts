@@ -31,8 +31,33 @@ export const groupHandlers = {
         });
       },
       groupActions.setGroupConfig,
-      // Trigger group processing
-      raise({ type: 'PROCESS_GROUPS' })
+      
+      // SIMPLIFIED APPROACH: Let the UI bridge handle the grouping data flow
+      ({ context, self }) => {
+        log.info('🎯 GroupHandlers: group.config.set - triggering UI bridge to send data');
+        
+        // The grouping configuration has been set, now we need to ensure the 
+        // legend-state-ui-bridge detects this and sends the data.
+        // We'll trigger a manual check since the UI change observer might not 
+        // have caught the grouping configuration change yet.
+        
+        // Check if the bridge function exists and trigger it manually
+        if (typeof (window as any).__vibegrid_send_data_to_table_machine === 'function') {
+          log.info('🎯 GroupHandlers: Bridge function available, requesting data from Legend State');
+          
+          // Send a custom event to request the data from the UI bridge
+          setTimeout(() => {
+            // Trigger the UI bridge to re-evaluate and send data
+            const event = new CustomEvent('vibegrid-request-grouping-data', {
+              detail: { source: 'group_config_set' }
+            });
+            window.dispatchEvent(event);
+          }, 10); // Small delay to ensure group config is fully set
+        } else {
+          log.warn('🎯 GroupHandlers: Bridge function not available, falling back to PROCESS_GROUPS');
+          self.send({ type: 'PROCESS_GROUPS' });
+        }
+      }
     ]
   },
   

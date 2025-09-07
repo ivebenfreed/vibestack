@@ -42,6 +42,41 @@ export function createLegendStateUIBridge(
     renderer.setLegendStateIntegration(entityTableName, entityObservable, uiStore);
     log.info(`🎨 UIBridge: Configured renderer with Legend State integration`);
   }
+  
+  // Helper function to send data for grouping
+  const sendDataForGrouping = () => {
+    const currentData = entityObservable.get();
+    if (currentData && typeof currentData === 'object') {
+      const entities = Object.values(currentData);
+      const rows = entities.map((entity: any) => ({
+        id: entity.id,
+        data: entity
+      }));
+      
+      log.info(`🎨 UIBridge: Sending data for grouping`, {
+        entityCount: entities.length,
+        entityTableName
+      });
+      
+      if (typeof (window as any).__vibegrid_send_data_to_table_machine === 'function') {
+        (window as any).__vibegrid_send_data_to_table_machine({
+          type: 'PROCESS_GROUPS_WITH_DATA',
+          entities: entities,
+          rows: rows,
+          loading: false,
+          source: 'legend_state_for_grouping_custom_event'
+        });
+      }
+    }
+  };
+  
+  // Listen for custom event from group handlers
+  const handleGroupingDataRequest = (event: CustomEvent) => {
+    log.info(`🎨 UIBridge: Received grouping data request for ${entityTableName}`, event.detail);
+    sendDataForGrouping();
+  };
+  
+  window.addEventListener('vibegrid-request-grouping-data', handleGroupingDataRequest);
 
   // ====================================
   // REACTIVE RENDERER UPDATES
@@ -49,7 +84,7 @@ export function createLegendStateUIBridge(
   
   /**
    * Observe Legend State changes and trigger renderer updates
-   * NO data copying - just trigger re-render
+   * Handles both direct rendering and table machine integration for grouping
    */
   const dataChangeDisposer = observe(() => {
     try {
@@ -61,23 +96,49 @@ export function createLegendStateUIBridge(
       }
       
       const recordCount = typeof currentData === 'object' ? Object.keys(currentData).length : 0;
+      const uiState = uiStore?.getSnapshot();
+      const hasGrouping = uiState?.context?.groupConfig && uiState.context.groupConfig.fields && uiState.context.groupConfig.fields.length > 0;
       
       log.info(`🎨 UIBridge: Data changed for ${entityTableName}`, {
         recordCount,
-        isInitialized
+        isInitialized,
+        hasGrouping
       });
       
-      // Trigger renderer update - NO data copying
-      // Renderer will read data directly from Legend State
+      // HYBRID APPROACH: Direct rendering for flat data, table machine for grouping
+      if (hasGrouping) {
+        // For grouping, send data directly to PROCESS_GROUPS event to avoid race conditions
+        log.info(`🎨 UIBridge: Grouping enabled, sending data directly to GroupProcessor`);
+        
+        // Convert Legend State data to rows format for GroupProcessor
+        const entities = Object.values(currentData);
+        const rows = entities.map((entity: any) => ({
+          id: entity.id,
+          data: entity
+        }));
+        
+        // Send data directly with PROCESS_GROUPS event to ensure data is available
+        if (typeof (window as any).__vibegrid_send_data_to_table_machine === 'function') {
+          (window as any).__vibegrid_send_data_to_table_machine({
+            type: 'PROCESS_GROUPS_WITH_DATA',
+            entities: entities,
+            rows: rows,
+            loading: false,
+            source: 'legend_state_for_grouping'
+          });
+        }
+      }
+      
+      // Always trigger renderer update for direct rendering path
       if (renderer && typeof renderer.render === 'function') {
         // Create minimal state object with just UI configuration
-        const uiState = uiStore?.getSnapshot();
         const minimalState = {
           columns: uiState?.context.columns || [],
           columnVisibility: uiState?.context.columnVisibility || {},
           sortBy: uiState?.context.sortBy || [],
           filters: uiState?.context.filters || [],
-          // NO rows, entities, processedRows - renderer gets data from Legend State
+          // NO rows for flat rendering - renderer gets data from Legend State
+          // For grouping, rows will come through table machine after GroupProcessor
           version: Date.now() // Force update
         };
         
@@ -114,12 +175,40 @@ export function createLegendStateUIBridge(
   if (uiStore) {
     const observeUIChanges = () => {
       const uiState = uiStore.getSnapshot();
+      const hasGrouping = uiState?.context?.groupConfig && uiState.context.groupConfig.fields && uiState.context.groupConfig.fields.length > 0;
       
       log.info(`🎨 UIBridge: UI state changed for ${entityTableName}`, {
         sortBy: uiState.context.sortBy?.length || 0,
         filters: uiState.context.filters?.length || 0,
-        hiddenColumns: uiState.context.hiddenColumnCount || 0
+        hiddenColumns: uiState.context.hiddenColumnCount || 0,
+        hasGrouping
       });
+      
+      // HYBRID APPROACH: Check if grouping was enabled and we need to send data to table machine
+      if (hasGrouping) {
+        const currentData = entityObservable.get();
+        if (currentData) {
+          log.info(`🎨 UIBridge: Grouping enabled via UI change, sending data directly to GroupProcessor`);
+          
+          // Convert Legend State data to rows format for GroupProcessor
+          const entities = Object.values(currentData);
+          const rows = entities.map((entity: any) => ({
+            id: entity.id,
+            data: entity
+          }));
+          
+          // Send data directly with PROCESS_GROUPS event to ensure data is available
+          if (typeof (window as any).__vibegrid_send_data_to_table_machine === 'function') {
+            (window as any).__vibegrid_send_data_to_table_machine({
+              type: 'PROCESS_GROUPS_WITH_DATA',
+              entities: entities,
+              rows: rows,
+              loading: false,
+              source: 'legend_state_for_grouping_ui_change'
+            });
+          }
+        }
+      }
       
       // Trigger renderer update with new UI state
       if (renderer && typeof renderer.render === 'function') {
@@ -155,6 +244,9 @@ export function createLegendStateUIBridge(
     if (uiChangeDisposer) {
       uiChangeDisposer();
     }
+    
+    // Clean up event listener
+    window.removeEventListener('vibegrid-request-grouping-data', handleGroupingDataRequest);
   };
 
   return {

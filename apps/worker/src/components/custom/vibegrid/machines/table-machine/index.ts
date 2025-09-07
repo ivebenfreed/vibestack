@@ -1689,6 +1689,94 @@ on: {
       ]
     },
     
+    // Handle data from Legend State for grouping - updates context and triggers group processing
+    PROCESS_GROUPS_WITH_DATA: {
+      actions: [
+        // Update context with rows data
+        assign({
+          entities: ({ event }) => event.entities || [],
+          rows: ({ event }) => {
+            const entities = event.entities || [];
+            return entities.map((entity: any) => ({
+              id: entity.id,
+              data: entity,
+              metadata: {
+                isSelected: false,
+                isDirty: false,
+                isGroup: false,
+                level: 0
+              }
+            }));
+          },
+          visibleRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id),
+          allRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id)
+        }),
+        
+        // Log the data received
+        ({ context, event }) => {
+          log.info('TableMachine: PROCESS_GROUPS_WITH_DATA - Data received for grouping', {
+            entityCount: context.entities.length,
+            rowCount: context.rows.length,
+            source: (event as any).source
+          });
+        },
+        
+        // Now trigger group processing with data available
+        ({ context, self }) => {
+          // Import and use the same logic as the group-handlers PROCESS_GROUPS handler
+          const groupConfig = context.groupConfig;
+          const rows = context.rows;
+          const columns = context.columns;
+          
+          if (!groupConfig || !rows || !columns) {
+            log.warn('🚫 TableMachine: Missing required data for group processing', {
+              hasGroupConfig: !!groupConfig,
+              hasRows: !!rows,
+              hasColumns: !!columns,
+              rowCount: rows?.length || 0,
+              columnCount: columns?.length || 0
+            });
+            return;
+          }
+          
+          log.info('🔄 TableMachine: Starting GroupProcessor with data', {
+            rowCount: rows.length,
+            columnCount: columns.length,
+            groupFields: groupConfig.fields.map(f => f.field)
+          });
+          
+          // Import and use GroupProcessor
+          import('../../processors/GroupProcessor').then(({ GroupProcessor }) => {
+            try {
+              const result = GroupProcessor.processData(rows, columns, groupConfig);
+              
+              log.info('🎉 TableMachine: Group processing completed successfully', {
+                groupCount: result.groupCount,
+                virtualRowCount: result.virtualRows.length,
+                totalHeight: result.totalHeight,
+                firstVirtualRow: result.virtualRows[0],
+                groupTree: result.groups
+              });
+              
+              // Send results back to machine
+              self.send({
+                type: 'GROUP_PROCESSING_COMPLETE',
+                groupTree: result.groups,
+                virtualRows: result.virtualRows,
+                totalHeight: result.totalHeight
+              });
+            } catch (error) {
+              log.error('❌ TableMachine: Group processing failed', error);
+              self.send({ 
+                type: 'GROUP_PROCESSING_ERROR', 
+                error 
+              });
+            }
+          });
+        }
+      ]
+    },
+    
     // Handle coordinate mapping calculation requests from selection handlers
     CALCULATE_INITIAL_COORDINATES: {
       actions: [

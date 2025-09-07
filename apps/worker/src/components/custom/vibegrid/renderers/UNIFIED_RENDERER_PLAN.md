@@ -139,13 +139,16 @@ renderers/
 ### Migration Checklist
 
 - [x] Remove deprecated TableRenderer
-- [ ] Create UnifiedTableRenderer with merged functionality
+- [x] Create UnifiedTableRenderer with merged functionality
+- [x] Implement unified row model
+- [x] Add Legend State integration for clean data flow
+- [x] Remove fallback code paths 
+- [x] Test with flat data (6 task records, sorting verified)
 - [ ] Extract shared utilities from Clean/Enhanced
-- [ ] Implement unified row model
-- [ ] Add full interactivity for all row types
-- [ ] Update RendererActor to use unified renderer
+- [ ] Add full interactivity for all row types (editing, selection, drag/drop)
+- [ ] Test with grouped data functionality
+- [ ] Update RendererActor to use unified renderer (partially done)
 - [ ] Update all imports across codebase
-- [ ] Test with both flat and grouped data
 - [ ] Remove CleanTableRenderer and EnhancedTableRenderer
 - [ ] Update type definitions and exports
 
