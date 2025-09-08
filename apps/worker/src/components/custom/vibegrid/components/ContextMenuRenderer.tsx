@@ -15,8 +15,14 @@ const log = uiLog('components/custom/vibegrid/components/ContextMenuRenderer.tsx
 let globalContextMenuManager: ContextMenuManager | null = null;
 
 export function ContextMenuRenderer({ tableActor, containerRef }: ContextMenuRendererProps) {
-  // Subscribe to context menu state from XState machine
-  const contextMenuState = useSelector(tableActor, (state: any) => state.context.contextMenu);
+  // Subscribe to context menu state from XState machine via store actor
+  const contextMenuState = useSelector(tableActor, (state: any) => {
+    if (!state?.context?.storeActor) {
+      return null;
+    }
+    const storeSnapshot = state.context.storeActor?.getSnapshot();
+    return storeSnapshot?.context?.contextMenu || null;
+  });
   
   // Initialize context menu manager
   React.useEffect(() => {

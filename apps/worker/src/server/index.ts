@@ -53,10 +53,12 @@ apiApp.use('*', cors({
       // In development, allow common localhost ports for unified worker architecture
       allowedOrigins.push(
         'http://localhost:4000',  // Default unified worker port
+        'http://localhost:4001',  // Development worker port
         'http://localhost:5173',  // Legacy Vite dev server port
         'http://localhost:5174',  // Alternative Vite port
         'http://localhost:5175',  // Alternative Vite port
         'http://127.0.0.1:4000',
+        'http://127.0.0.1:4001',
         'http://127.0.0.1:5173',
         'http://127.0.0.1:5174',
         'http://127.0.0.1:5175'

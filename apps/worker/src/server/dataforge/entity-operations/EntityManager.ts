@@ -203,15 +203,35 @@ export class DataForgeEntityManager {
    * Update a single record (archetype-based)
    */
   async updateRecord(orgId: string, entityName: string, recordId: string, updates: any): Promise<any> {
+    console.log(`🔍 [EntityManager] updateRecord called:`, {
+      orgId,
+      entityName,
+      recordId,
+      updatesKeys: Object.keys(updates),
+      updates: updates
+    });
+
     try {
       const config = await this.getEntityConfig(orgId, entityName);
+      console.log(`⚙️ [EntityManager] Entity config:`, {
+        hasConfig: !!config,
+        tableName: config?.tableName
+      });
+
       if (!config) {
+        console.log(`❌ [EntityManager] Entity ${entityName} not found for org ${orgId}`);
         return { success: false, errors: [`Entity ${entityName} not found for org ${orgId}`] };
       }
 
       // Get entity definition to understand custom fields
       const { getEntityDefinition } = await import('./entity-storage');
       const entityDef = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      
+      console.log(`📋 [EntityManager] Entity definition:`, {
+        hasEntityDef: !!entityDef,
+        customFieldsCount: entityDef?.customFields?.length || 0,
+        customFields: entityDef?.customFields?.map(f => f.name) || []
+      });
       
       let baseUpdates: any;
       let customUpdates: any = {};
@@ -227,13 +247,23 @@ export class DataForgeEntityManager {
           customFieldsMap.set(field.name, field);
         }
         
+        console.log(`🔀 [EntityManager] Separating custom fields with FieldManager...`);
+        
         // Extract custom field data
         const extracted = fieldManager.extractCustomFieldData(updates, customFieldsMap);
         baseUpdates = extracted.baseData;
         customUpdates = extracted.customData;
+
+        console.log(`📊 [EntityManager] Field separation result:`, {
+          baseUpdatesKeys: Object.keys(baseUpdates),
+          customUpdatesKeys: Object.keys(customUpdates)
+        });
       } else {
         // No custom fields defined, all data goes to base columns
         baseUpdates = { ...updates };
+        console.log(`📊 [EntityManager] No custom fields, all data goes to base columns:`, {
+          baseUpdatesKeys: Object.keys(baseUpdates)
+        });
       }
 
       // Prepare update data
@@ -242,8 +272,15 @@ export class DataForgeEntityManager {
         updated_at: new Date().toISOString()
       };
 
+      console.log(`⚡ [EntityManager] Prepared update data:`, {
+        updateDataKeys: Object.keys(updateData),
+        updateData: updateData
+      });
+
       // If there are custom field updates, merge them with existing custom_fields
       if (Object.keys(customUpdates).length > 0) {
+        console.log(`📥 [EntityManager] Processing custom field updates...`);
+        
         // First get existing custom fields
         const existing = await this.config.kysely
           .selectFrom(config.tableName as any)
@@ -252,14 +289,25 @@ export class DataForgeEntityManager {
           .where('organization_id', '=', orgId)
           .executeTakeFirst();
         
+        console.log(`🗂️ [EntityManager] Existing custom fields:`, existing?.custom_fields);
+        
         const existingCustom = existing?.custom_fields || {};
         updateData.custom_fields = { ...existingCustom, ...customUpdates };
+
+        console.log(`🔄 [EntityManager] Merged custom fields:`, updateData.custom_fields);
       }
 
       // Remove system fields that shouldn't be updated
       delete updateData.id;
       delete updateData.organization_id;
       delete updateData.created_at;
+
+      console.log(`🧹 [EntityManager] Final update data after cleanup:`, {
+        finalKeys: Object.keys(updateData),
+        finalData: updateData
+      });
+
+      console.log(`🚀 [EntityManager] Executing Kysely update query...`);
 
       const result = await this.config.kysely
         .updateTable(config.tableName as any)
@@ -269,19 +317,36 @@ export class DataForgeEntityManager {
         .returningAll()
         .executeTakeFirst();
 
+      console.log(`📊 [EntityManager] Kysely update result:`, {
+        hasResult: !!result,
+        resultKeys: result ? Object.keys(result) : []
+      });
+
       if (!result) {
+        console.log(`❌ [EntityManager] No result from update query - record not found or no changes made`);
         return { success: false, errors: ['Record not found or no changes made'] };
       }
 
       // Merge custom fields back into the response
       const responseData = { ...result };
       if (result.custom_fields && typeof result.custom_fields === 'object') {
+        console.log(`🔄 [EntityManager] Merging custom fields into response:`, result.custom_fields);
         Object.assign(responseData, result.custom_fields);
         delete responseData.custom_fields; // Remove the JSONB column from response
       }
 
+      console.log(`✅ [EntityManager] Update successful:`, {
+        responseDataKeys: Object.keys(responseData)
+      });
+
       return { success: true, data: responseData };
     } catch (error) {
+      console.log(`💥 [EntityManager] Update failed with error:`, {
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorObject: error
+      });
+
       return { 
         success: false, 
         errors: [`Failed to update record: ${error instanceof Error ? error.message : 'Unknown error'}`] 
@@ -420,10 +485,12 @@ export class DataForgeEntityManager {
       });
 
       // Resolve reference fields if requested
+      // NOTE: Reference resolution disabled as of September 2025 - _resolved fields are deprecated
+      // The new relationship system handles reference data differently
       let resolvedResults = mergedResults;
-      if (options.resolveReferences !== false) {
-        resolvedResults = await this.referenceResolver.resolveReferences(orgId, entityName, mergedResults);
-      }
+      // if (options.resolveReferences !== false) {
+      //   resolvedResults = await this.referenceResolver.resolveReferences(orgId, entityName, mergedResults);
+      // }
 
       return {
         success: true,

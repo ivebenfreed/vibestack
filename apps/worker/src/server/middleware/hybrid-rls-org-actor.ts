@@ -38,6 +38,12 @@ export interface HybridSecurityContext {
 function extractOrganizationId(c: Context<AppBindings>): string | null {
   // Method 1: Path parameter (preferred for API routes)
   const pathOrgId = c.req.param('orgId');
+  console.log(`🔍 [HybridRLS] extractOrganizationId - Path param extraction:`, {
+    pathOrgId,
+    allParams: c.req.param(),
+    path: c.req.path,
+    method: c.req.method
+  });
   if (pathOrgId) return pathOrgId;
   
   // Method 2: Query parameter
@@ -258,9 +264,27 @@ export const hybridRLSOrgActorMiddleware = createMiddleware<AppBindings>(async (
   }
   
   // Extract organization ID from request
+  console.log(`🔍 [HybridRLS] Extracting orgId from request:`, {
+    path: c.req.path,
+    method: c.req.method,
+    params: c.req.param(),
+    query: c.req.query(),
+    headers: Object.fromEntries(c.req.raw.headers.entries())
+  });
+  
   const organizationId = extractOrganizationId(c);
   
+  console.log(`🔍 [HybridRLS] Extracted organizationId:`, organizationId);
+  
   if (!organizationId) {
+    console.log(`❌ [HybridRLS] Organization ID not found in request - THIS IS THE 400 ERROR SOURCE`, {
+      path: c.req.path,
+      method: c.req.method,
+      userId: user.id.substring(0, 8) + '...',
+      params: c.req.param(),
+      query: c.req.query()
+    });
+    
     syncLogger.warn('Organization ID not found in request', {
       path: c.req.path,
       method: c.req.method,

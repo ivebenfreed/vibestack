@@ -326,6 +326,22 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const tableActor = useActorRef(tableBaseMachine, tableActorOptions);
   const tableSend = tableActor.send;
   
+  // Set up bridge function for Legend State UI bridge to send data to table machine when grouping is enabled
+  React.useEffect(() => {
+    (window as any).__vibegrid_send_data_to_table_machine = (event: any) => {
+      log.debug('VibeGrid: Sending data to table machine for grouping', {
+        eventType: event.type,
+        entityCount: event.entities?.length || 0,
+        source: event.source
+      });
+      tableSend(event);
+    };
+    
+    return () => {
+      delete (window as any).__vibegrid_send_data_to_table_machine;
+    };
+  }, [tableSend]);
+  
   // Context menu state
   // Context menu state managed directly in contextmenu-handlers.ts
   
@@ -355,18 +371,20 @@ export function VibeGrid<T extends Record<string, any> = any>(
     // Dynamically import and setup new atomic bridge
     const setupAtomicBridge = async () => {
       try {
-        const bridge = await import('./stores/legend-state-atomic-bridge');
+        const bridge = await import('./stores/legend-state-ui-bridge');
         
         log.info('Setting up atomic bridge', { entityType });
         
-        // Immediately try to load data if available
+        // Get Legend State observable first
+        let entityObservable = null;
         try {
           const { getEntity$, universeLoading$, universeSchema$ } = await import('@/legend-state/observables');
           const isLoading = universeLoading$.get();
           const schema = universeSchema$.get();
           
           if (!isLoading && schema) {
-            const entityObservable = getEntity$(entityType);
+            entityObservable = getEntity$(entityType);
+            
             if (entityObservable) {
               const currentData = entityObservable.get();
               log.info('🔗 VibeGrid: Attempting immediate data load', {
@@ -390,25 +408,89 @@ export function VibeGrid<T extends Record<string, any> = any>(
           log.warn('Failed to attempt immediate data load:', error);
         }
         
-        // Create atomic observer with proper event handling
-        const cleanup = bridge.createAtomicObservableBridge(entityType, (event) => {
-          // Don't process events if cleanup is active
-          if ((window as any).__vibegrid_cleanup_active) {
-            log.debug('Ignoring atomic event during cleanup', { entityType, eventType: event.type });
-            return;
-          }
+        // Create unified UI bridge with Legend State integration
+        const cleanup = (() => {
+          // Get the renderer and UI store from the table machine
+          const tableSnapshot = tableActor.getSnapshot();
+          const rendererActor = tableSnapshot.context?.actors?.rendererActor;
+          const uiStore = tableSnapshot.context?.storeActor;
           
-          log.debug('Atomic change detected via bridge', {
+          // Get the actual renderer instance from window (set by renderer actor)
+          const rendererInstance = (window as any).__vibegridx_renderer_instance;
+          
+          log.debug('Setting up unified bridge', {
             entityType,
-            eventType: event.type,
-            entityCount: event.entities?.length || 0,
-            source: event.source,
-            timestamp: Date.now()
+            hasRendererActor: !!rendererActor,
+            hasRendererInstance: !!rendererInstance,
+            hasUIStore: !!uiStore,
+            hasLegendState: !!entityObservable
           });
           
-          // Send atomic updates to table machine
-          tableSend(event);
-        });
+          // CRITICAL: Set up Legend State integration with retry mechanism for renderer availability
+          const setupLegendStateIntegration = () => {
+            const currentRendererInstance = (window as any).__vibegridx_renderer_instance;
+            
+            if (currentRendererInstance && entityObservable && uiStore) {
+              log.info('🔗 VibeGrid: Setting up Legend State integration', {
+                hasRenderer: !!currentRendererInstance,
+                hasObservable: !!entityObservable,
+                hasUIStore: !!uiStore,
+                entityType,
+                attempt: 'success'
+              });
+              
+              // Configure renderer with Legend State integration
+              currentRendererInstance.setLegendStateIntegration(entityType, entityObservable, uiStore);
+              log.info('✅ VibeGrid: Legend State integration configured on renderer');
+              return true; // Integration successful
+            }
+            return false; // Integration not ready yet
+          };
+          
+          // Try immediate setup first
+          if (!setupLegendStateIntegration()) {
+            log.info('🔄 VibeGrid: Renderer not ready, setting up delayed Legend State integration');
+            
+            // Set up a brief retry mechanism with exponential backoff
+            let retryAttempts = 0;
+            const maxRetries = 10;
+            
+            const retrySetup = () => {
+              retryAttempts++;
+              
+              if (setupLegendStateIntegration()) {
+                log.info('✅ VibeGrid: Legend State integration configured after retry', { 
+                  attempts: retryAttempts 
+                });
+                return;
+              }
+              
+              if (retryAttempts < maxRetries) {
+                // Exponential backoff: 10ms, 20ms, 40ms, etc.
+                const delay = Math.min(10 * Math.pow(2, retryAttempts - 1), 200);
+                setTimeout(retrySetup, delay);
+              } else {
+                log.error('❌ VibeGrid: Failed to set up Legend State integration after maximum retries', {
+                  maxRetries,
+                  hasRenderer: !!(window as any).__vibegridx_renderer_instance,
+                  hasObservable: !!entityObservable,
+                  hasUIStore: !!uiStore
+                });
+              }
+            };
+            
+            // Start retry sequence
+            setTimeout(retrySetup, 10);
+          }
+          
+          // Use the new unified bridge with actual renderer instance
+          return bridge.createLegendStateUIBridge(
+            entityType, 
+            uiStore,           // UI store from table machine
+            rendererInstance,  // Actual renderer instance from window
+            entityObservable   // Legend State observable
+          );
+        })();
         
         // Store cleanup function in ref
         atomicBridge.current = cleanup;
@@ -691,7 +773,13 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const vibeGridXApi = tableActor ? useVibeGridXApi(tableSend, null, tableActor, null) : null;
   
   // Group configuration state and handlers
-  const groupConfig = useSelector(tableActor, (snapshot) => snapshot.context.groupConfig as GroupConfig | null);
+  const groupConfig = useSelector(tableActor, (snapshot) => {
+    if (!snapshot?.context?.storeActor) {
+      return null;
+    }
+    const storeSnapshot = snapshot.context.storeActor?.getSnapshot();
+    return storeSnapshot?.context?.groupConfig as GroupConfig | null;
+  });
   
   const handleGroupConfigChange = useCallback((config: GroupConfig | null) => {
     if (config) {

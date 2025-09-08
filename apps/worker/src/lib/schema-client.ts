@@ -181,56 +181,44 @@ export class OrgSchemaClient {
         // Extract complete entity definition from businessMetadata
         const businessMetadata = entity.businessMetadata || {};
         
-        // Process different field types from the new DataForge structure
-        const allFields = businessMetadata.allFields || [];
-        const customFields = businessMetadata.customFields || [];
-        const relationshipFields = businessMetadata.relationshipFields || [];
+        // Process fields from the actual server response structure
+        const fields = businessMetadata.fields || [];
         
-        // Separate fields by category for enhanced schema structure
+        // Separate fields by category based on field type for enhanced schema structure
         const syncableFields: Record<string, FieldDefinition> = {};
         const customFieldsMap: Record<string, FieldDefinition> = {};
         const relationshipFieldsMap: Record<string, RelationshipFieldDefinition> = {};
         
-        // Process all fields (includes base archetype + custom fields, but NOT relationship fields)
-        allFields.forEach((field: any) => {
-          const fieldDef: FieldDefinition = {
-            type: field.type,
-            required: field.required || false,
-            syncable: field.syncable !== false,
-            enum: field.enum || undefined,
-            defaultValue: field.defaultValue || undefined,
-            validation: field.validation || undefined
-          };
-          
-          syncableFields[field.name] = fieldDef;
-        });
-        
-        // Process custom fields separately (real database columns)
-        customFields.forEach((field: any) => {
-          const fieldDef: FieldDefinition = {
-            type: field.type,
-            required: field.required || false,
-            syncable: field.syncable !== false,
-            enum: field.enum || undefined,
-            defaultValue: field.defaultValue || undefined,
-            validation: field.validation || undefined
-          };
-          
-          customFieldsMap[field.name] = fieldDef;
-        });
-        
-        // Process relationship fields separately (stored in relationship tables)
-        relationshipFields.forEach((field: any) => {
-          const relationshipDef: RelationshipFieldDefinition = {
-            name: field.name,
-            type: field.type as 'user_reference' | 'entity_reference',
-            relationshipType: field.relationshipType,
-            targetEntityType: field.targetEntityType,
-            cardinality: field.cardinality || 'many-to-one',
-            properties: field.properties || {}
-          };
-          
-          relationshipFieldsMap[field.name] = relationshipDef;
+        // Process all fields and categorize them based on type
+        fields.forEach((field: any) => {
+          // Check if this is a relationship field
+          if (field.type === 'user_reference' || field.type === 'entity_reference') {
+            const relationshipDef: RelationshipFieldDefinition = {
+              name: field.name,
+              type: field.type as 'user_reference' | 'entity_reference',
+              relationshipType: field.relationshipType || field.type,
+              targetEntityType: field.targetEntityType,
+              cardinality: field.cardinality || 'many-to-one',
+              properties: field.properties || {}
+            };
+            
+            relationshipFieldsMap[field.name] = relationshipDef;
+          } else {
+            // Regular syncable field
+            const fieldDef: FieldDefinition = {
+              type: field.type,
+              required: field.required || false,
+              syncable: field.syncable !== false,
+              enum: field.enum || field.enumOptions?.map((opt: any) => opt.value) || undefined,
+              defaultValue: field.defaultValue || undefined,
+              validation: field.validation || undefined
+            };
+            
+            syncableFields[field.name] = fieldDef;
+            
+            // For now, treat all non-relationship fields as syncable
+            // In the future, we could distinguish based on metadata flags
+          }
         });
         
         // Add default timestamp fields if not already present

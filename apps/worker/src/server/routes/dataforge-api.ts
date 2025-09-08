@@ -512,12 +512,29 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
   async (c) => {
     const { orgId, entityName, id } = c.req.param();
     const security = c.get('security');
+    const user = c.get('user');
+    
+    console.log(`🔍 [DataForge API] PUT UPDATE REQUEST RECEIVED:`, {
+      orgId,
+      entityName,
+      id,
+      userEmail: user?.email || 'anonymous',
+      securityOrgId: security?.organizationId
+    });
     
     if (orgId !== security.organizationId) {
+      console.log(`❌ [DataForge API] Access denied: orgId ${orgId} !== securityOrgId ${security.organizationId}`);
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const updateData = await c.req.json();
+    let updateData;
+    try {
+      updateData = await c.req.json();
+      console.log(`📝 [DataForge API] Update data received:`, updateData);
+    } catch (error) {
+      console.log(`❌ [DataForge API] Failed to parse JSON:`, error);
+      return c.json({ error: 'Invalid JSON in request body' }, 400);
+    }
     
     const { createKyselyForPersistentUse } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
@@ -527,12 +544,28 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
+    console.log(`⚡ [DataForge API] Calling EntityManager.updateRecord with:`, {
+      orgId,
+      entityName,
+      id,
+      updateDataKeys: Object.keys(updateData)
+    });
+    
     const result = await entityManager.updateRecord(orgId, entityName, id, updateData);
     
+    console.log(`📊 [DataForge API] EntityManager.updateRecord result:`, {
+      success: result.success,
+      hasData: !!result.data,
+      errors: result.errors,
+      statusCode: result.success ? 200 : 400
+    });
+    
     if (!result.success) {
+      console.log(`❌ [DataForge API] Update failed with errors:`, result.errors);
       return c.json({ error: 'Failed to update record', errors: result.errors }, 400);
     }
     
+    console.log(`✅ [DataForge API] Update successful for ${entityName}/${id}`);
     return c.json({ success: true, data: result.data });
   }
 );

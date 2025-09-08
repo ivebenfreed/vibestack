@@ -143,10 +143,10 @@ export const viewHandlers = {
   
   'view.columns.toggle': {
     actions: [
-      // CRITICAL DEBUG: First action to prove handler executes
+      // Debug: Log when handler executes
       ({ context, event, self }) => {
         const snapshot = self.getSnapshot();
-        log.error('🚨 CRITICAL: view.columns.toggle handler EXECUTING!', {
+        log.debug('view.columns.toggle handler executing', {
           columnId: event.columnId,
           currentState: snapshot?.value,
           stateCanProcess: snapshot?.can?.(event),
@@ -179,7 +179,7 @@ export const viewHandlers = {
             columnId: event.columnId
           });
         } else {
-          log.error('🔍 DEBUG: NO STORE ACTOR FOUND when trying to toggle column visibility!', {
+          log.warn('No store actor found when trying to toggle column visibility', {
             columnId: event.columnId,
             contextStoreActor: context.storeActor,
             contextKeys: Object.keys(context)

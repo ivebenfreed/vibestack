@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, MutableRefObject } from 'react';
 import { useMachine } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
-import { TableRenderer } from './renderers/core/TableRenderer';
+import { UnifiedTableRenderer } from './renderers/core/UnifiedTableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
 import type { TableConfig, RendererOptions, Column } from './types';
 
@@ -12,7 +12,7 @@ import type { TableConfig, RendererOptions, Column } from './types';
 export interface InitializationRefs {
   containerRef: MutableRefObject<HTMLDivElement | null>;
   overlayContainerRef: MutableRefObject<HTMLDivElement | null>;
-  rendererRef: MutableRefObject<TableRenderer | null>;
+  rendererRef: MutableRefObject<UnifiedTableRenderer | null>;
   canvasOverlayRef: MutableRefObject<CanvasOverlay | null>;
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<any>;
@@ -71,7 +71,7 @@ export const useRendererInitialization = (
     });
     
     // Initialize atomic renderer with canvas container callback
-    refs.rendererRef.current = new TableRenderer({
+    refs.rendererRef.current = new UnifiedTableRenderer({
       container: refs.containerRef.current,
       coordinateManager, // Pass coordinate manager for direct updates
       ...rendererOptions,

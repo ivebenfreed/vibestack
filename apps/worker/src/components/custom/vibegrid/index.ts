@@ -50,7 +50,7 @@ export { tableBaseMachine, createTableEvent, measurePerformance } from './machin
 // HYBRID RENDERING
 // ====================================
 
-export { EnhancedTableRenderer as TableRenderer } from './renderers';
+export { UnifiedTableRenderer as TableRenderer } from './renderers';
 
 // Entity integration removed - table machine now subscribes directly to atoms
 
@@ -58,7 +58,7 @@ export { EnhancedTableRenderer as TableRenderer } from './renderers';
 // VIRTUALIZATION
 // ====================================
 
-// Virtualization handled internally by CleanTableRenderer
+// Virtualization handled internally by UnifiedTableRenderer
 
 // ====================================
 // CANVAS OVERLAYS

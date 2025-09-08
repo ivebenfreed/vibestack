@@ -52,6 +52,7 @@ import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_a
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugUltraTableTestRouteImport } from './routes/_authenticated/debug/ultra-table-test'
+import { Route as AuthenticatedDebugTestVibegridPureRouteImport } from './routes/_authenticated/debug/test-vibegrid-pure'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
@@ -60,6 +61,7 @@ import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
 import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
 import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
+import { Route as AuthenticatedOrgOrgIdTestPassiveRendererRouteImport } from './routes/_authenticated/org/$orgId/test-passive-renderer'
 import { Route as AuthenticatedOrgOrgIdDashboardRouteImport } from './routes/_authenticated/org/$orgId/dashboard'
 import { Route as AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport } from './routes/_authenticated/org/$orgId/entities/$entityName'
 
@@ -359,6 +361,12 @@ const AuthenticatedDebugUltraTableTestRoute =
     path: '/ultra-table-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugTestVibegridPureRoute =
+  AuthenticatedDebugTestVibegridPureRouteImport.update({
+    id: '/test-vibegrid-pure',
+    path: '/test-vibegrid-pure',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugSystemOptionsRoute =
   AuthenticatedDebugSystemOptionsRouteImport.update({
     id: '/system-options',
@@ -407,6 +415,12 @@ const AuthenticatedSettingsAdminUsersRoute =
     path: '/admin/users',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedOrgOrgIdTestPassiveRendererRoute =
+  AuthenticatedOrgOrgIdTestPassiveRendererRouteImport.update({
+    id: '/org/$orgId/test-passive-renderer',
+    path: '/org/$orgId/test-passive-renderer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOrgOrgIdDashboardRoute =
   AuthenticatedOrgOrgIdDashboardRouteImport.update({
     id: '/org/$orgId/dashboard',
@@ -447,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/debug/test-vibegrid-pure': typeof AuthenticatedDebugTestVibegridPureRoute
   '/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -474,6 +489,7 @@ export interface FileRoutesByFullPath {
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/worlds': typeof AuthenticatedWorldsIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
+  '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -503,6 +519,7 @@ export interface FileRoutesByTo {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/debug/test-vibegrid-pure': typeof AuthenticatedDebugTestVibegridPureRoute
   '/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -530,6 +547,7 @@ export interface FileRoutesByTo {
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/worlds': typeof AuthenticatedWorldsIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
+  '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -563,6 +581,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/_authenticated/debug/test-vibegrid-pure': typeof AuthenticatedDebugTestVibegridPureRoute
   '/_authenticated/debug/ultra-table-test': typeof AuthenticatedDebugUltraTableTestRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -590,6 +609,7 @@ export interface FileRoutesById {
   '/_authenticated/universe/': typeof AuthenticatedUniverseIndexRoute
   '/_authenticated/worlds/': typeof AuthenticatedWorldsIndexRoute
   '/_authenticated/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
+  '/_authenticated/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/_authenticated/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
   '/_authenticated/org/$orgId/': typeof AuthenticatedOrgOrgIdIndexRoute
   '/_authenticated/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -623,6 +643,7 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/system-options'
+    | '/debug/test-vibegrid-pure'
     | '/debug/ultra-table-test'
     | '/debug/vibegrid-legend-state'
     | '/settings/account'
@@ -650,6 +671,7 @@ export interface FileRouteTypes {
     | '/universe'
     | '/worlds'
     | '/org/$orgId/dashboard'
+    | '/org/$orgId/test-passive-renderer'
     | '/settings/admin/users'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
@@ -679,6 +701,7 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/system-options'
+    | '/debug/test-vibegrid-pure'
     | '/debug/ultra-table-test'
     | '/debug/vibegrid-legend-state'
     | '/settings/account'
@@ -706,6 +729,7 @@ export interface FileRouteTypes {
     | '/universe'
     | '/worlds'
     | '/org/$orgId/dashboard'
+    | '/org/$orgId/test-passive-renderer'
     | '/settings/admin/users'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
@@ -738,6 +762,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
+    | '/_authenticated/debug/test-vibegrid-pure'
     | '/_authenticated/debug/ultra-table-test'
     | '/_authenticated/debug/vibegrid-legend-state'
     | '/_authenticated/settings/account'
@@ -765,6 +790,7 @@ export interface FileRouteTypes {
     | '/_authenticated/universe/'
     | '/_authenticated/worlds/'
     | '/_authenticated/org/$orgId/dashboard'
+    | '/_authenticated/org/$orgId/test-passive-renderer'
     | '/_authenticated/settings/admin/users'
     | '/_authenticated/org/$orgId/'
     | '/_authenticated/org/$orgId/entities/$entityName'
@@ -1122,6 +1148,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugUltraTableTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/test-vibegrid-pure': {
+      id: '/_authenticated/debug/test-vibegrid-pure'
+      path: '/test-vibegrid-pure'
+      fullPath: '/debug/test-vibegrid-pure'
+      preLoaderRoute: typeof AuthenticatedDebugTestVibegridPureRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/system-options': {
       id: '/_authenticated/debug/system-options'
       path: '/system-options'
@@ -1178,6 +1211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAdminUsersRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/org/$orgId/test-passive-renderer': {
+      id: '/_authenticated/org/$orgId/test-passive-renderer'
+      path: '/org/$orgId/test-passive-renderer'
+      fullPath: '/org/$orgId/test-passive-renderer'
+      preLoaderRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/org/$orgId/dashboard': {
       id: '/_authenticated/org/$orgId/dashboard'
       path: '/org/$orgId/dashboard'
@@ -1202,6 +1242,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
+  AuthenticatedDebugTestVibegridPureRoute: typeof AuthenticatedDebugTestVibegridPureRoute
   AuthenticatedDebugUltraTableTestRoute: typeof AuthenticatedDebugUltraTableTestRoute
   AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
@@ -1225,6 +1266,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,
+    AuthenticatedDebugTestVibegridPureRoute:
+      AuthenticatedDebugTestVibegridPureRoute,
     AuthenticatedDebugUltraTableTestRoute:
       AuthenticatedDebugUltraTableTestRoute,
     AuthenticatedDebugVibegridLegendStateRoute:
@@ -1291,6 +1334,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUniverseIndexRoute: typeof AuthenticatedUniverseIndexRoute
   AuthenticatedWorldsIndexRoute: typeof AuthenticatedWorldsIndexRoute
   AuthenticatedOrgOrgIdDashboardRoute: typeof AuthenticatedOrgOrgIdDashboardRoute
+  AuthenticatedOrgOrgIdTestPassiveRendererRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   AuthenticatedOrgOrgIdIndexRoute: typeof AuthenticatedOrgOrgIdIndexRoute
   AuthenticatedOrgOrgIdEntitiesEntityNameRoute: typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
@@ -1310,6 +1354,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUniverseIndexRoute: AuthenticatedUniverseIndexRoute,
   AuthenticatedWorldsIndexRoute: AuthenticatedWorldsIndexRoute,
   AuthenticatedOrgOrgIdDashboardRoute: AuthenticatedOrgOrgIdDashboardRoute,
+  AuthenticatedOrgOrgIdTestPassiveRendererRoute:
+    AuthenticatedOrgOrgIdTestPassiveRendererRoute,
   AuthenticatedOrgOrgIdIndexRoute: AuthenticatedOrgOrgIdIndexRoute,
   AuthenticatedOrgOrgIdEntitiesEntityNameRoute:
     AuthenticatedOrgOrgIdEntitiesEntityNameRoute,

@@ -955,13 +955,27 @@ export function getEntity$(entityName: string) {
     
     // Debug logging removed - was causing excessive console spam
     
-    if (!currentSchema?.entities?.[entityName]) {
+    // IMPORTANT: Always use org-prefixed names for data operations
+    // The schema should have entities stored with org-prefixed keys
+    const entitySchema = currentSchema?.entities?.[entityName]
+    
+    if (!entitySchema) {
+      // For backward compatibility, try extracting and looking up with clean name
+      // This is a fallback that should be removed once all callers use org-prefixed names
+      const { entityName: cleanEntityName } = EntityNameUtils.extractOrgPrefix(entityName)
+      const fallbackSchema = currentSchema?.entities?.[cleanEntityName]
+      
+      if (fallbackSchema) {
+        log.warn(`[Observable] DEPRECATED: Entity ${entityName} not found with org-prefix, found with clean name ${cleanEntityName}. Callers should use org-prefixed names.`)
+        // Don't proceed with fallback - enforce org-prefixed usage
+      }
+      
       log.warn(`[Observable] Entity ${entityName} not available in universe schema`)
       // Entity not found - this is expected during initial load
       return null
     }
     
-    // Use entity name as cache key (already org-prefixed in universe schema)
+    // Use the original entity name as cache key (must be org-prefixed)
     const cacheKey = entityName
     
     // Check if we already have the observable cached
@@ -973,7 +987,7 @@ export function getEntity$(entityName: string) {
     // Create the observable directly if not cached
     try {
       log.info(`[Observable] Creating new observable for ${entityName}`)
-      const observable = createEntityObservable(entityName, currentSchema.entities[entityName])
+      const observable = createEntityObservable(entityName, entitySchema)
       globalEntityCache[cacheKey] = observable
       
       // DEBUG: Check what we created

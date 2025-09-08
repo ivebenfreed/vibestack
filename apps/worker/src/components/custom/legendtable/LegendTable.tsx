@@ -3,7 +3,7 @@ import { observe } from '@legendapp/state';
 import { useLegendTableState } from './hooks/use-legend-table-state';
 import { useTableData } from './hooks/use-table-data';
 import { useTableViewport } from './hooks/use-table-viewport';
-import { TableRenderer } from './renderers/core/TableRenderer';
+import { UnifiedTableRenderer } from '../vibegrid/renderers/core/UnifiedTableRenderer';
 import type { LegendTableProps } from './types';
 import { generateColumns } from './utils/legend-helpers';
 import { CanvasOverlayDOM } from './overlays/CanvasOverlayDOM';
@@ -62,7 +62,7 @@ function createCoordinateMapping(columns: any[], rows: any[]) {
 export function LegendTable(props: LegendTableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererContainerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<TableRenderer | null>(null);
+  const rendererRef = useRef<UnifiedTableRenderer | null>(null);
   const canvasOverlayRef = useRef<CanvasOverlayDOM | null>(null);
   const [isRendererReady, setIsRendererReady] = useState(false);
   
@@ -99,8 +99,8 @@ export function LegendTable(props: LegendTableProps) {
     let unsubscribeSelection: (() => void) | null = null;
     
     try {
-      // Create TableRenderer directly with Legend State integration
-      rendererRef.current = new TableRenderer({
+      // Create UnifiedTableRenderer directly with Legend State integration
+      rendererRef.current = new UnifiedTableRenderer({
         container: rendererContainerRef.current,
         columns: props.columns,
         enableSelectionColumn: props.enableSelectionColumn ?? true,

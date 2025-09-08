@@ -63,8 +63,8 @@ import { dragActor } from '../../actors/drag-actor';
 // Data subscription actor removed - using store subscription
 // No overlay actor needed - canvas subscribes directly to table machine context
 
-// Import atomic store setup utilities  
-import { createTableStoreLogic } from '../../stores/table-data-store-atomic';
+// Import simplified UI store setup utilities  
+import { createTableUIStore } from '../../stores/table-ui-store-simplified';
 import { createActor } from 'xstate';
 import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
 import { createLogger, type LogLevel } from '@/logger/simple-logger';
@@ -429,37 +429,47 @@ export const tableBaseMachine = setup({
         // Create store actor with atomic mutations and Promise.all loader
         assign({
           storeActor: ({ context, self }) => {
-            log.info('TableMachine: Creating atomic store actor for', context.entityType);
-            const storeLogic = createTableStoreLogic(context.entityType, context.columns);
-            const storeActor = createActor(storeLogic);
-            storeActor.start();
+            log.info('TableMachine: Creating simplified UI store actor for', context.entityType);
+            const uiStore = createTableUIStore(context.entityType, context.columns);
+            // Convert store to actor so it has subscribe/getSnapshot methods
+            const uiStoreActor = createActor(uiStore);
+            uiStoreActor.start();
+            
+            // Debug: Log the actual structure of uiStoreActor
+            log.info('🔍 TableMachine: uiStoreActor structure debug', {
+              uiStoreActor,
+              hasSubscribe: typeof uiStoreActor.subscribe === 'function',
+              hasGetSnapshot: typeof uiStoreActor.getSnapshot === 'function',
+              uiStoreActorType: typeof uiStoreActor,
+              uiStoreActorKeys: Object.keys(uiStoreActor)
+            });
             
             // Store in window for relationship providers
-            (window as any).__vibegrid_store_actor = storeActor;
+            (window as any).__vibegrid_store_actor = uiStoreActor;
             
             // Subscribe to store changes and forward to table machine
             log.info('TableMachine: Setting up store subscription', { 
-              hasSubscribe: typeof storeActor.subscribe === 'function',
-              storeActorKeys: Object.keys(storeActor)
+              hasSubscribe: typeof uiStoreActor.subscribe === 'function',
+              storeActorKeys: Object.keys(uiStoreActor)
             });
             
             // Set up persistence subscription for display state changes
-            storeActor.subscribe((snapshot) => {
+            uiStoreActor.subscribe((snapshot) => {
               if (snapshot?.context && !snapshot.context.loading) {
                 // Debounce persistence to avoid too many writes
                 if ((context as any)._persistenceTimer) {
                   clearTimeout((context as any)._persistenceTimer);
                 }
                 (context as any)._persistenceTimer = setTimeout(() => {
-                  import('../../stores/table-data-store-atomic').then(({ saveDisplayState }) => {
-                    saveDisplayState(context.entityType, snapshot.context);
+                  import('../../stores/table-ui-store-simplified').then(() => {
+                    // Note: Simplified UI store uses Legend State persistence automatically
                   });
                 }, 500); // 500ms debounce
               }
             });
             
             // Get initial snapshot to verify structure
-            const initialSnapshot = storeActor.getSnapshot();
+            const initialSnapshot = uiStoreActor.getSnapshot();
             log.info('🔍 TableMachine: Initial store snapshot', {
               initialSnapshot,
               hasContext: !!initialSnapshot?.context,
@@ -467,7 +477,7 @@ export const tableBaseMachine = setup({
               entityCount: initialSnapshot?.context?.entities ? Object.keys(initialSnapshot.context.entities).length : 0
             });
             
-            const subscription = storeActor.subscribe((snapshot) => {
+            const subscription = uiStoreActor.subscribe((snapshot) => {
               log.info('🔍 TableMachine: Atomic store snapshot received', {
                 snapshot,
                 hasContext: !!snapshot?.context,
@@ -492,11 +502,11 @@ export const tableBaseMachine = setup({
             
             // Store cleanup in global registry (bridge cleanup is handled separately)
             (window as any).__vibegrid_store_cleanup = () => {
-              storeActor.stop();
+              // UI store cleanup is automatic
               delete (window as any).__vibegrid_store_actor;
             };
             
-            return storeActor;
+            return uiStoreActor;
           }
         }),
         
@@ -622,7 +632,7 @@ export const tableBaseMachine = setup({
                 // Only log view.columns.toggle events to avoid spam
                 if (event.type === 'view.columns.toggle') {
                   const snapshot = self.getSnapshot();
-                  log.error('🚨 IDLE STATE: Received view.columns.toggle event!', {
+                  log.debug('IDLE STATE: Received view.columns.toggle event', {
                     eventType: event.type,
                     columnId: event.columnId,
                     currentState: snapshot?.value,
@@ -986,6 +996,13 @@ export const tableBaseMachine = setup({
             // Get visible columns using centralized logic
             const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
             const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
+            
+            log.info('🔍 TableMachine: Sending CALCULATE_COORDINATES', {
+              rowCount: context.rows.length,
+              visibleColumnCount: visibleColumns.length,
+              columnsWithSelectionCount: columnsWithSelection.length,
+              hasRows: !!context.rows && context.rows.length > 0
+            });
             
             context.actors.rendererActor.send({
               type: 'CALCULATE_COORDINATES',
@@ -1672,6 +1689,94 @@ on: {
       ]
     },
     
+    // Handle data from Legend State for grouping - updates context and triggers group processing
+    PROCESS_GROUPS_WITH_DATA: {
+      actions: [
+        // Update context with rows data
+        assign({
+          entities: ({ event }) => event.entities || [],
+          rows: ({ event }) => {
+            const entities = event.entities || [];
+            return entities.map((entity: any) => ({
+              id: entity.id,
+              data: entity,
+              metadata: {
+                isSelected: false,
+                isDirty: false,
+                isGroup: false,
+                level: 0
+              }
+            }));
+          },
+          visibleRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id),
+          allRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id)
+        }),
+        
+        // Log the data received
+        ({ context, event }) => {
+          log.info('TableMachine: PROCESS_GROUPS_WITH_DATA - Data received for grouping', {
+            entityCount: context.entities.length,
+            rowCount: context.rows.length,
+            source: (event as any).source
+          });
+        },
+        
+        // Now trigger group processing with data available
+        ({ context, self }) => {
+          // Import and use the same logic as the group-handlers PROCESS_GROUPS handler
+          const groupConfig = context.groupConfig;
+          const rows = context.rows;
+          const columns = context.columns;
+          
+          if (!groupConfig || !rows || !columns) {
+            log.warn('🚫 TableMachine: Missing required data for group processing', {
+              hasGroupConfig: !!groupConfig,
+              hasRows: !!rows,
+              hasColumns: !!columns,
+              rowCount: rows?.length || 0,
+              columnCount: columns?.length || 0
+            });
+            return;
+          }
+          
+          log.info('🔄 TableMachine: Starting GroupProcessor with data', {
+            rowCount: rows.length,
+            columnCount: columns.length,
+            groupFields: groupConfig.fields.map(f => f.field)
+          });
+          
+          // Import and use GroupProcessor
+          import('../../processors/GroupProcessor').then(({ GroupProcessor }) => {
+            try {
+              const result = GroupProcessor.processData(rows, columns, groupConfig);
+              
+              log.info('🎉 TableMachine: Group processing completed successfully', {
+                groupCount: result.groupCount,
+                virtualRowCount: result.virtualRows.length,
+                totalHeight: result.totalHeight,
+                firstVirtualRow: result.virtualRows[0],
+                groupTree: result.groups
+              });
+              
+              // Send results back to machine
+              self.send({
+                type: 'GROUP_PROCESSING_COMPLETE',
+                groupTree: result.groups,
+                virtualRows: result.virtualRows,
+                totalHeight: result.totalHeight
+              });
+            } catch (error) {
+              log.error('❌ TableMachine: Group processing failed', error);
+              self.send({ 
+                type: 'GROUP_PROCESSING_ERROR', 
+                error 
+              });
+            }
+          });
+        }
+      ]
+    },
+    
     // Handle coordinate mapping calculation requests from selection handlers
     CALCULATE_INITIAL_COORDINATES: {
       actions: [
@@ -1748,6 +1853,13 @@ on: {
             const columnsWithWidths = columnsWithSelection.map(col => {
               const coordCol = context.coordinateMapping.columns.find(c => c.columnId === col.id);
               return coordCol ? { ...col, width: coordCol.width } : col;
+            });
+            
+            log.info('🔍 TableMachine: Sending RENDER after COORDINATES_CALCULATED', {
+              rowCount: context.rows?.length || 0,
+              hasRows: !!context.rows && context.rows.length > 0,
+              columnCount: columnsWithWidths.length,
+              columnVisibility: columnVisibility
             });
             
             context.actors.rendererActor.send({
