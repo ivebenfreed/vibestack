@@ -9,6 +9,7 @@ import type { Context } from 'hono';
 import type { AuthType } from '../lib/auth';
 import { dbLogger } from '../middleware/logger';
 import { getAuth } from '../lib/auth';
+import { RelationshipQueryService } from './RelationshipQueryService';
 
 export interface DeletionResult {
   blockers: Array<{
@@ -27,11 +28,13 @@ export interface DeletionResult {
 export class KyselyUserService {
   private db: any; // Kysely database instance
   private c: Context<AuthType>;
+  private relationshipService: RelationshipQueryService;
 
   constructor(c: Context<AuthType>) {
     this.c = c;
     const authInstance = getAuth(c);
     this.db = authInstance.options.database.db;
+    this.relationshipService = new RelationshipQueryService(this.db);
   }
 
   /**
@@ -116,19 +119,17 @@ export class KyselyUserService {
       if (options.dryRun) {
         // Plan the operations
         
-        // Tasks assigned to user
-        const assignedTasks = await this.db
-          .selectFrom('tasks')
-          .where('assignee_id', '=', userId)
-          .select(sql`count(*)::int as count`)
-          .executeTakeFirst();
+        // Tasks assigned to user - using relationship table
+        // TODO: Get organization ID from user context
+        const orgId = user.organization_id || this.c.env.DEFAULT_ORG_ID;
+        const assignedTaskCount = await this.relationshipService.getAssignedTaskCount(orgId, userId);
         
-        if (assignedTasks?.count > 0) {
+        if (assignedTaskCount > 0) {
           result.operations.push({
             type: 'update',
             entity: 'tasks',
-            action: 'Clear assignee',
-            count: assignedTasks.count
+            action: 'Clear assignee relationships',
+            count: assignedTaskCount
           });
         }
 
@@ -180,35 +181,24 @@ export class KyselyUserService {
 
       // Start transaction for atomic deletion
       await this.db.transaction().execute(async (trx: any) => {
-        // 1. Transfer project ownership if needed
+        // 1. Transfer project ownership relationships if needed
+        const orgId = user.organization_id || this.c.env.DEFAULT_ORG_ID;
         if (ownedProjects.length > 0 && options.transferProjectsTo) {
-          await trx
-            .updateTable('projects')
-            .set({ 
-              owner_id: options.transferProjectsTo,
-              updated_at: new Date()
-            })
-            .where('owner_id', '=', userId)
-            .execute();
+          const relationshipService = new RelationshipQueryService(trx);
+          await relationshipService.transferOwnership(orgId, userId, options.transferProjectsTo, 'Project');
           
-          dbLogger.debug('Transferred project ownership', { 
+          dbLogger.debug('Transferred project ownership relationships', { 
             count: ownedProjects.length, 
             to: options.transferProjectsTo 
           });
         }
 
-        // 2. Clear task assignments
-        const taskResult = await trx
-          .updateTable('tasks')
-          .set({ 
-            assignee_id: null,
-            updated_at: new Date()
-          })
-          .where('assignee_id', '=', userId)
-          .execute();
+        // 2. Clear all user relationships (tasks, assignments, etc.)
+        const relationshipService = new RelationshipQueryService(trx);
+        const clearedRelationships = await relationshipService.removeUserRelationships(orgId, userId);
         
-        if (taskResult.numUpdatedRows > 0) {
-          dbLogger.debug('Cleared task assignments', { count: taskResult.numUpdatedRows });
+        if (clearedRelationships > 0) {
+          dbLogger.debug('Cleared user relationships', { count: clearedRelationships });
         }
 
         // 3. Clear comment authors

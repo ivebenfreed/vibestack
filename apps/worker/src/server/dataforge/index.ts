@@ -48,9 +48,7 @@ export {
 // Schema Management
 // =============================================================================
 
-export { 
-  RuntimeSchemaGenerator 
-} from './runtime-schema-generator';
+// RuntimeSchemaGenerator removed - using stored truth from entity_schemas table
 
 export { 
   type OrgEntityDefinition,
