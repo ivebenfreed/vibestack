@@ -17,8 +17,43 @@ import type {
   GroupNode,
   GroupConfig
 } from '../../types';
-import { CellPipeline } from './CellPipeline';
 import { createLogger, type LogLevel } from '@/logger/simple-logger';
+
+// Import extracted utilities
+import {
+  ROW_HEIGHT,
+  GROUP_ROW_HEIGHT,
+  SUMMARY_ROW_HEIGHT,
+  calculateRowOffset,
+  calculateTotalHeight,
+  findVisibleRange,
+  applyRowTypeClasses,
+  createRowElement
+} from '../utils/row-rendering';
+import {
+  createCellElement,
+  createCheckbox,
+  createCellContent,
+  updateCellContent,
+  createHeaderCell
+} from '../utils/cell-rendering';
+import {
+  createGroupToggle,
+  createGroupHeaderContent,
+  groupDataByField,
+  calculateGroupAggregations,
+  applyGroupRowStyles,
+  applySummaryRowStyles
+} from '../utils/group-behaviors';
+import {
+  setupColumnDragHandlers,
+  setupColumnResizeHandlers,
+  setupRowSelectionHandlers,
+  setupCellEditingHandlers,
+  setupKeyboardHandlers,
+  setupContextMenuHandlers,
+  setupRowDragHandlers
+} from '../utils/interaction-handlers';
 
 // File-level log control
 const LOG_LEVEL: LogLevel | undefined = undefined;  // Use global (quiet)
@@ -28,7 +63,7 @@ const log = createLogger('UnifiedTableRenderer', LOG_LEVEL);
 // UNIFIED ROW MODEL
 // ====================================
 
-interface UnifiedTableRow {
+export interface UnifiedTableRow {
   id: string;
   type: 'data' | 'group' | 'summary';
   data: Record<string, any>;
@@ -43,9 +78,6 @@ interface UnifiedTableRow {
 // CONSTANTS
 // ====================================
 
-const ROW_HEIGHT = 40;
-const GROUP_ROW_HEIGHT = 44;
-const SUMMARY_ROW_HEIGHT = 36;
 const HEADER_HEIGHT = 40;
 const BUFFER_ROWS = 5;
 
@@ -87,6 +119,11 @@ export class UnifiedTableRenderer {
   // Caches - unified for all row types
   private rowElements = new Map<string, HTMLElement>();
   private cellElements = new Map<string, HTMLElement>(); // key: "rowId:columnId"
+  
+  // Interaction state
+  private cleanupKeyboard: (() => void) | null = null;
+  private focusedCell: { rowId: string; columnId: string } | null = null;
+  private editingCell: { rowId: string; columnId: string } | null = null;
   
   // Options and callbacks
   private options: RendererOptions;
@@ -299,12 +336,19 @@ export class UnifiedTableRenderer {
     }
 
     const entityRecords = Object.values(rawData);
-    const groupConfig = uiState.context.groupConfig;
+    
+    // Check for grouping from BOTH state and UI store
+    const stateGroupConfig = state.groupConfig;
+    const uiGroupConfig = uiState.context?.groupConfig;
+    const groupConfig = stateGroupConfig || uiGroupConfig;
     
     // Debug grouping state
     log.info('🔗 UnifiedTableRenderer: Grouping state debug', {
-      hasGroupConfig: !!groupConfig,
-      groupConfig: groupConfig,
+      hasStateGroupConfig: !!stateGroupConfig,
+      stateGroupConfig: stateGroupConfig,
+      hasUIGroupConfig: !!uiGroupConfig,
+      uiGroupConfig: uiGroupConfig,
+      finalGroupConfig: groupConfig,
       contextKeys: Object.keys(uiState.context || {}),
       uiStateKeys: Object.keys(uiState || {})
     });
@@ -314,9 +358,12 @@ export class UnifiedTableRenderer {
       // GROUPED RENDERING: Create group headers + data rows
       log.info('🔗 UnifiedTableRenderer: Processing grouped data', {
         groupFields: groupConfig.fields.map(f => f.field),
-        entityCount: entityRecords.length
+        entityCount: entityRecords.length,
+        expandedGroups: Array.from(groupConfig.expandedGroups || new Set())
       });
       
+      // Update expanded groups from config
+      this.expandedGroups = groupConfig.expandedGroups || new Set();
       this.createGroupedUnifiedRows(entityRecords, groupConfig);
     } else {
       // FLAT RENDERING: Convert Legend State entities to unified rows
@@ -382,15 +429,24 @@ export class UnifiedTableRenderer {
       }
     });
     
-    // Auto-expand groups if no groups are currently expanded (UX improvement)
-    const hasExpandedGroups = groupConfig.expandedGroups && groupConfig.expandedGroups.size > 0;
-    const shouldAutoExpand = !hasExpandedGroups;
+    // Check if we have expanded groups from the group config
+    const expandedGroups = groupConfig.expandedGroups || new Set();
+    const hasExpandedGroups = expandedGroups.size > 0;
+    const shouldAutoExpand = !hasExpandedGroups && groupMap.size > 0;
     
     if (shouldAutoExpand) {
       log.info('🔗 UnifiedTableRenderer: Auto-expanding all groups (no groups currently expanded)', {
         totalGroups: groupMap.size,
-        expandedGroupsBefore: groupConfig.expandedGroups?.size || 0
+        expandedGroupsSize: expandedGroups.size
       });
+      // Auto-expand all groups
+      for (const [groupValue] of groupMap) {
+        const groupId = `group_${groupField}_${groupValue}`;
+        expandedGroups.add(groupId);
+      }
+      this.expandedGroups = expandedGroups;
+    } else {
+      this.expandedGroups = expandedGroups;
     }
     
     // Create unified rows with group headers + data rows
@@ -399,8 +455,7 @@ export class UnifiedTableRenderer {
       const groupId = `group_${groupField}_${groupValue}`;
       
       // Determine if this group should be expanded
-      const isConfigExpanded = groupConfig.expandedGroups?.has(groupId) || false;
-      const isExpanded = shouldAutoExpand || isConfigExpanded;
+      const isExpanded = this.expandedGroups.has(groupId);
       
       // Create group header row
       const groupHeaderRow: UnifiedTableRow = {
@@ -415,7 +470,7 @@ export class UnifiedTableRenderer {
           aggregations: [],
           isExpanded: isExpanded
         },
-        height: ROW_HEIGHT,
+        height: GROUP_ROW_HEIGHT,
         level: 0,
         isExpanded: isExpanded,
         groupId: groupId,
@@ -596,78 +651,66 @@ export class UnifiedTableRenderer {
   }
   
   private createHeaderCell(column: Column, colMapping: any): HTMLElement {
-    const cell = this.createElement('div', 'vibegridx-header-cell');
+    // Use utility to create header cell
+    const cell = createHeaderCell(
+      column,
+      colMapping.width,
+      column.sortable !== false,
+      column.resizable !== false
+    );
     
-    // Essential attributes for event handling
-    cell.dataset.column = column.id;
-    cell.dataset.field = column.field || column.id;
-    
-    // Positioning - use flex layout
-    Object.assign(cell.style, {
-      position: 'relative',
-      width: `${colMapping.width}px`,
-      height: `${HEADER_HEIGHT}px`,
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 12px',
-      borderRight: '1px solid var(--border)',
-      cursor: column.sortable !== false ? 'pointer' : 'default',
-      userSelect: 'none',
-      flexShrink: '0'
-    });
-    
-    if (column.id === '__selection') {
-      // Selection checkbox
-      cell.classList.add('vibegridx-selection-header');
-      const checkbox = this.createCheckbox(this.unifiedRows.filter(r => r.type === 'data').every(row => this.selectedRows.has(row.id)));
-      cell.appendChild(checkbox);
-    } else {
-      // Column content with sort icon
-      const contentWrapper = document.createElement('div');
-      contentWrapper.style.display = 'flex';
-      contentWrapper.style.alignItems = 'center';
-      contentWrapper.style.flex = '1';
-      contentWrapper.style.gap = '4px';
-      contentWrapper.style.overflow = 'hidden';
+    // Add sort indicator if not selection column
+    if (column.id !== '__selection' && column.sortable !== false) {
+      const currentSortState = this.getCurrentSortState();
+      const sortConfig = currentSortState.find(s => s.field === (column.field || column.id));
       
-      const content = document.createElement('span');
-      content.className = 'vibegridx-header-text';
-      content.textContent = column.name || column.id;
-      contentWrapper.appendChild(content);
-      
-      // Sort indicator
-      if (column.sortable !== false) {
-        const currentSortState = this.getCurrentSortState();
-        const sortConfig = currentSortState.find(s => s.field === (column.field || column.id));
-        
+      const contentWrapper = cell.querySelector('div') as HTMLElement;
+      if (contentWrapper) {
         const sortIcon = this.createSortIcon(sortConfig);
+        contentWrapper.appendChild(sortIcon);
         
         // Add sort state class to header cell
         cell.classList.remove('sort-asc', 'sort-desc');
         if (sortConfig) {
           cell.classList.add(`sort-${sortConfig.direction}`);
         }
-        
-        contentWrapper.appendChild(sortIcon);
       }
-      
-      cell.appendChild(contentWrapper);
-      
-      // Resize handle
-      if (column.resizable !== false) {
-        const handle = document.createElement('div');
-        handle.className = 'vibegridx-resize-handle';
-        handle.dataset.column = column.id;
-        Object.assign(handle.style, {
-          position: 'absolute',
-          right: '0',
-          top: '0',
-          width: '4px',
-          height: '100%',
-          cursor: 'col-resize'
-        });
-        cell.appendChild(handle);
+    }
+    
+    // Update checkbox state for selection header
+    if (column.id === '__selection') {
+      const checkbox = cell.querySelector('.vibegridx-checkbox') as HTMLInputElement;
+      if (checkbox) {
+        const dataRows = this.unifiedRows.filter(r => r.type === 'data');
+        checkbox.checked = dataRows.length > 0 && 
+          dataRows.every(row => this.selectedRows.has(row.id));
       }
+    }
+    
+    // Setup column drag and resize handlers
+    if (column.id !== '__selection') {
+      setupColumnDragHandlers(
+        cell,
+        column,
+        (columnId, e) => {
+          this.dragState.type = 'column';
+          this.dragState.columnId = columnId;
+        },
+        (columnId, e) => {
+          this.dragState.type = null;
+          this.dragState.columnId = null;
+          this.callbacks.onColumnReorder?.(columnId, 0); // TODO: Calculate new index
+        },
+        (e) => {
+          // Handle drag over
+        },
+        (targetColumnId, e) => {
+          // Handle drop
+          if (this.dragState.columnId && this.dragState.columnId !== targetColumnId) {
+            // TODO: Calculate new positions and reorder
+          }
+        }
+      );
     }
     
     return cell;
@@ -767,61 +810,47 @@ export class UnifiedTableRenderer {
   }
 
   private createUnifiedRowElement(unifiedRow: UnifiedTableRow, index: number): HTMLElement {
-    const rowEl = this.createElement('div', 'vibegridx-row');
-    rowEl.dataset.rowId = unifiedRow.id;
-    rowEl.dataset.rowType = unifiedRow.type;
-    
-    if (unifiedRow.groupId) {
-      rowEl.dataset.groupId = unifiedRow.groupId;
-    }
-    
     const offset = this.calculateRowOffset(index);
+    // Use utility function for creating row element
+    const rowEl = createRowElement(unifiedRow, offset);
     
-    Object.assign(rowEl.style, {
-      position: 'absolute',
-      top: `${offset}px`,
-      left: '0',
-      right: '0',
-      height: `${unifiedRow.height}px`,
-      display: 'flex',
-      width: 'fit-content'
-    });
+    // Setup row interactivity based on type
+    if (unifiedRow.type === 'data') {
+      setupRowSelectionHandlers(
+        rowEl,
+        unifiedRow.id,
+        (rowId, multi, range) => this.handleRowSelection(rowId, multi, range)
+      );
+      
+      setupRowDragHandlers(
+        rowEl,
+        unifiedRow.id,
+        unifiedRow.type,
+        (rowId) => this.handleRowDragStart(rowId),
+        (e, targetRowId) => this.handleRowDragOver(e, targetRowId),
+        (sourceRowId, targetRowId, position) => this.handleRowDrop(sourceRowId, targetRowId, position)
+      );
+    }
     
     return rowEl;
   }
 
   private applyRowTypeStyles(rowEl: HTMLElement, unifiedRow: UnifiedTableRow): void {
-    // Remove existing type classes
-    rowEl.classList.remove('vibegridx-data-row', 'vibegridx-group-row', 'vibegridx-summary-row', 'vibegridx-grouped-row');
-    
-    // Apply type-specific classes
-    rowEl.classList.add(`vibegridx-${unifiedRow.type}-row`);
+    // Use utility function for applying row type classes
+    applyRowTypeClasses(rowEl, unifiedRow);
     
     // Apply nesting styles for grouped rows
     if (unifiedRow.level && unifiedRow.level > 0) {
       rowEl.style.paddingLeft = `${unifiedRow.level * 20}px`;
-      rowEl.classList.add('vibegridx-grouped-row');
-      rowEl.dataset.groupLevel = String(unifiedRow.level);
     } else {
       rowEl.style.paddingLeft = '';
-      rowEl.dataset.groupLevel = '';
     }
     
-    // Apply group-specific styling
+    // Apply type-specific styling using utilities
     if (unifiedRow.type === 'group') {
-      Object.assign(rowEl.style, {
-        backgroundColor: 'var(--muted/50)',
-        borderBottom: '1px solid var(--border)',
-        fontWeight: '500',
-        fontSize: '14px'
-      });
+      applyGroupRowStyles(rowEl);
     } else if (unifiedRow.type === 'summary') {
-      Object.assign(rowEl.style, {
-        backgroundColor: 'var(--accent/10)',
-        borderTop: '1px solid var(--accent)',
-        fontWeight: '500',
-        fontSize: '13px'
-      });
+      applySummaryRowStyles(rowEl);
     }
   }
 
@@ -841,48 +870,16 @@ export class UnifiedTableRenderer {
 
   private renderGroupRowContent(rowEl: HTMLElement, unifiedRow: UnifiedTableRow): void {
     const groupNode = unifiedRow.data as GroupNode;
+    const isExpanded = this.expandedGroups.has(groupNode.id);
     
-    // Expand/collapse toggle
-    const toggle = this.createGroupToggle(groupNode);
-    rowEl.appendChild(toggle);
+    // Use utility to create group header content
+    const content = createGroupHeaderContent(
+      groupNode,
+      isExpanded,
+      (groupId) => this.toggleGroup(groupId)
+    );
     
-    // Group title and value
-    const title = this.createElement('span', 'vibegridx-group-title');
-    title.textContent = `${groupNode.field}: ${groupNode.displayValue}`;
-    rowEl.appendChild(title);
-    
-    // Item count badge
-    const countBadge = this.createElement('span', 'vibegridx-group-count');
-    countBadge.textContent = `(${groupNode.rowCount})`;
-    countBadge.style.cssText = `
-      margin-left: 8px;
-      padding: 2px 6px;
-      background: var(--muted);
-      border-radius: 4px;
-      font-size: 12px;
-      color: var(--muted-foreground);
-    `;
-    rowEl.appendChild(countBadge);
-    
-    // Aggregations display
-    if (groupNode.aggregations && groupNode.aggregations.length > 0) {
-      const aggregationsEl = this.createElement('div', 'vibegridx-group-aggregations');
-      aggregationsEl.style.cssText = `
-        margin-left: auto;
-        display: flex;
-        gap: 12px;
-        font-size: 12px;
-        color: var(--muted-foreground);
-      `;
-      
-      groupNode.aggregations.forEach(agg => {
-        const aggEl = this.createElement('span', 'vibegridx-group-aggregation');
-        aggEl.textContent = `${agg.function}: ${agg.displayValue}`;
-        aggregationsEl.appendChild(aggEl);
-      });
-      
-      rowEl.appendChild(aggregationsEl);
-    }
+    rowEl.appendChild(content);
   }
 
   private renderSummaryRowContent(rowEl: HTMLElement, unifiedRow: UnifiedTableRow): void {
@@ -921,34 +918,44 @@ export class UnifiedTableRenderer {
   }
 
   private createCell(unifiedRow: UnifiedTableRow, column: Column, colMapping: any): HTMLElement {
-    const cell = this.createElement('div', 'vibegridx-cell');
-    cell.dataset.rowId = unifiedRow.id;
-    cell.dataset.columnId = column.id;
+    // Use utility to create cell element
+    const cell = createCellElement(
+      unifiedRow.id,
+      column,
+      colMapping.width,
+      unifiedRow.height
+    );
     
-    Object.assign(cell.style, {
-      position: 'relative',
-      width: `${colMapping.width}px`,
-      height: `${unifiedRow.height}px`,
-      borderRight: '1px solid var(--border)',
-      flexShrink: '0',
-      overflow: 'hidden',
-      minWidth: '0'
-    });
+    // Setup cell editing handlers for data cells
+    if (unifiedRow.type === 'data' && column.id !== '__selection') {
+      setupCellEditingHandlers(
+        cell,
+        unifiedRow.id,
+        column.id,
+        (rowId, columnId) => this.startCellEdit(rowId, columnId),
+        (rowId, columnId, value) => this.callbacks.onCellEdit?.(rowId, columnId, value),
+        (rowId, columnId) => {
+          this.editingCell = null;
+          if (this.callbacks.onStateChange) {
+            this.callbacks.onStateChange({
+              type: 'cell.edit.cancel',
+              rowId,
+              columnId
+            });
+          }
+        }
+      );
+    }
     
     return cell;
   }
 
   private updateCellContent(cell: HTMLElement, unifiedRow: UnifiedTableRow, column: Column): void {
-    cell.innerHTML = '';
+    const value = unifiedRow.data[column.field || column.id];
+    const isSelected = this.selectedRows.has(unifiedRow.id);
     
-    if (column.id === '__selection') {
-      const checkbox = this.createCheckbox(this.selectedRows.has(unifiedRow.id));
-      cell.appendChild(checkbox);
-    } else {
-      const value = unifiedRow.data[column.field || column.id];
-      const content = CellPipeline.createCellContent(value, column, unifiedRow.data);
-      cell.appendChild(content);
-    }
+    // Use utility to update cell content
+    updateCellContent(cell, value, column, isSelected);
   }
 
   // ====================================
@@ -983,43 +990,6 @@ export class UnifiedTableRenderer {
   // GROUP INTERACTIONS
   // ====================================
   
-  private createGroupToggle(groupNode: GroupNode): HTMLElement {
-    const toggle = this.createElement('button', 'vibegridx-group-toggle');
-    toggle.dataset.groupId = groupNode.id;
-    
-    const isExpanded = this.expandedGroups.has(groupNode.id);
-    
-    Object.assign(toggle.style, {
-      border: 'none',
-      background: 'none',
-      padding: '4px',
-      marginRight: '8px',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: '2px',
-      width: '20px',
-      height: '20px'
-    });
-    
-    // Arrow icon (chevron right/down)
-    toggle.innerHTML = isExpanded 
-      ? `<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-           <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-         </svg>`
-      : `<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-           <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" fill="none"/>
-         </svg>`;
-    
-    // Click handler for expand/collapse
-    toggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleGroup(groupNode.id);
-    });
-    
-    return toggle;
-  }
   
   private toggleGroup(groupId: string): void {
     log.info('UnifiedTableRenderer: toggleGroup', { groupId });
@@ -1065,23 +1035,6 @@ export class UnifiedTableRenderer {
     return el;
   }
 
-  private createCheckbox(checked: boolean): HTMLElement {
-    const wrapper = document.createElement('label');
-    wrapper.className = 'vibegridx-checkbox-wrapper';
-    
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.className = 'vibegridx-checkbox';
-    checkbox.checked = checked;
-    
-    const custom = document.createElement('span');
-    custom.className = 'vibegridx-checkbox-custom';
-    
-    wrapper.appendChild(checkbox);
-    wrapper.appendChild(custom);
-    
-    return wrapper;
-  }
 
   private updateDimensions(): void {
     if (!this.state) return;
@@ -1119,51 +1072,18 @@ export class UnifiedTableRenderer {
     scrollTop = scrollTop ?? this.viewport.scrollTop;
     viewportHeight = viewportHeight ?? this.viewport.clientHeight;
     
-    if (this.unifiedRows.length === 0) {
-      this.visibleRange = { start: 0, end: 0 };
-      return;
-    }
-    
-    // Find visible range using cumulative offsets
-    let currentOffset = 0;
-    let start = 0;
-    let end = this.unifiedRows.length;
-    
-    // Find start index
-    for (let i = 0; i < this.unifiedRows.length; i++) {
-      if (currentOffset >= scrollTop - BUFFER_ROWS * ROW_HEIGHT) {
-        start = Math.max(0, i);
-        break;
-      }
-      currentOffset += this.unifiedRows[i].height;
-    }
-    
-    // Find end index
-    const viewportBottom = scrollTop + viewportHeight;
-    currentOffset = 0;
-    for (let i = 0; i < this.unifiedRows.length; i++) {
-      currentOffset += this.unifiedRows[i].height;
-      if (currentOffset >= viewportBottom + BUFFER_ROWS * ROW_HEIGHT) {
-        end = Math.min(this.unifiedRows.length, i + 1);
-        break;
-      }
-    }
-    
-    this.visibleRange = { start, end };
+    // Use utility function for finding visible range
+    this.visibleRange = findVisibleRange(
+      this.unifiedRows,
+      scrollTop,
+      viewportHeight,
+      BUFFER_ROWS
+    );
   }
 
   private calculateRowOffset(virtualIndex: number): number {
-    if (!this.unifiedRows || virtualIndex >= this.unifiedRows.length) {
-      return virtualIndex * ROW_HEIGHT; // Fallback
-    }
-    
-    // Sum up heights of all previous rows
-    let offset = 0;
-    for (let i = 0; i < virtualIndex; i++) {
-      offset += this.unifiedRows[i].height;
-    }
-    
-    return offset;
+    // Use utility function for calculating row offset
+    return calculateRowOffset(this.unifiedRows, virtualIndex);
   }
 
   private cleanupRows(): void {
@@ -1208,6 +1128,32 @@ export class UnifiedTableRenderer {
     
     // Selection
     this.table.addEventListener('change', this.handleCheckboxChange);
+    
+    // Header interactions
+    this.header.addEventListener('click', this.handleHeaderClick);
+    this.header.addEventListener('mousedown', this.handleHeaderMouseDown);
+    
+    // Row interactions
+    this.body.addEventListener('click', this.handleBodyClick);
+    this.body.addEventListener('dblclick', this.handleBodyDoubleClick);
+    
+    // Keyboard navigation
+    this.cleanupKeyboard = setupKeyboardHandlers(
+      this.table,
+      (direction) => this.handleKeyboardNavigation(direction),
+      () => this.startCellEdit(),
+      () => this.deleteCellContent(),
+      () => this.selectAll(),
+      () => this.copySelection(),
+      () => this.pasteSelection(),
+      () => this.undo(),
+      () => this.redo()
+    );
+    
+    // Context menu
+    setupContextMenuHandlers(this.table, (x, y, context) => {
+      this.handleContextMenu(x, y, context);
+    });
   }
 
   private handleScroll = (): void => {
@@ -1269,6 +1215,213 @@ export class UnifiedTableRenderer {
     }
     
     this.callbacks.onSelectionChange?.(this.selectedRows);
+  };
+  
+  private handleHeaderClick = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
+    if (!headerCell) return;
+    
+    const columnId = headerCell.dataset.column;
+    if (!columnId || columnId === '__selection') return;
+    
+    // Trigger sort unless clicking resize handle
+    if (!target.classList.contains('vibegridx-resize-handle')) {
+      this.callbacks.onSort?.(columnId);
+    }
+  };
+  
+  private handleHeaderMouseDown = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains('vibegridx-resize-handle')) return;
+    
+    const columnId = target.dataset.column;
+    if (!columnId) return;
+    
+    const headerCell = target.parentElement as HTMLElement;
+    const startX = e.clientX;
+    const startWidth = headerCell.offsetWidth;
+    
+    setupColumnResizeHandlers(
+      target,
+      { id: columnId } as Column,
+      (colId, x, width) => {
+        this.dragState.type = 'resize';
+        this.dragState.columnId = colId;
+        this.dragState.startX = x;
+        this.dragState.startWidth = width;
+      },
+      (deltaX) => {
+        if (headerCell) {
+          const newWidth = Math.max(50, startWidth + deltaX);
+          headerCell.style.width = `${newWidth}px`;
+        }
+      },
+      (colId, newWidth) => {
+        this.callbacks.onColumnResize?.(colId, newWidth);
+        this.dragState.type = null;
+        this.dragState.columnId = null;
+      }
+    );
+  };
+  
+  private handleBodyClick = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    const cell = target.closest('.vibegridx-cell') as HTMLElement;
+    const row = target.closest('.vibegridx-row') as HTMLElement;
+    
+    if (!cell || !row) return;
+    
+    const rowId = row.dataset.rowId;
+    const columnId = cell.dataset.columnId;
+    const rowType = row.dataset.rowType;
+    
+    if (!rowId || !columnId) return;
+    
+    // Handle group toggle
+    if (rowType === 'group' && target.closest('.vibegridx-group-toggle')) {
+      this.toggleGroup(rowId);
+      return;
+    }
+    
+    // Handle cell focus
+    this.focusedCell = { rowId, columnId };
+    
+    // Notify about cell click
+    if (this.callbacks.onStateChange) {
+      this.callbacks.onStateChange({
+        type: 'cell.click',
+        rowId,
+        columnId
+      });
+    }
+  };
+  
+  private handleBodyDoubleClick = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    const cell = target.closest('.vibegridx-cell') as HTMLElement;
+    const row = target.closest('.vibegridx-row') as HTMLElement;
+    
+    if (!cell || !row) return;
+    
+    const rowId = row.dataset.rowId;
+    const columnId = cell.dataset.columnId;
+    const rowType = row.dataset.rowType;
+    
+    if (!rowId || !columnId || rowType !== 'data') return;
+    
+    // Start cell editing
+    this.startCellEdit(rowId, columnId);
+  };
+  
+  private handleContextMenu = (x: number, y: number, context: any): void => {
+    if (this.callbacks.onStateChange) {
+      this.callbacks.onStateChange({
+        type: 'contextmenu.show',
+        x,
+        y,
+        context
+      });
+    }
+  };
+  
+  private handleKeyboardNavigation = (direction: 'up' | 'down' | 'left' | 'right'): void => {
+    if (!this.focusedCell) return;
+    
+    const currentRowIndex = this.unifiedRows.findIndex(r => r.id === this.focusedCell!.rowId);
+    if (currentRowIndex === -1) return;
+    
+    const visibleColumns = this.getVisibleColumns();
+    const currentColIndex = visibleColumns.findIndex(c => c.id === this.focusedCell!.columnId);
+    
+    let newRowIndex = currentRowIndex;
+    let newColIndex = currentColIndex;
+    
+    switch (direction) {
+      case 'up':
+        newRowIndex = Math.max(0, currentRowIndex - 1);
+        break;
+      case 'down':
+        newRowIndex = Math.min(this.unifiedRows.length - 1, currentRowIndex + 1);
+        break;
+      case 'left':
+        newColIndex = Math.max(0, currentColIndex - 1);
+        break;
+      case 'right':
+        newColIndex = Math.min(visibleColumns.length - 1, currentColIndex + 1);
+        break;
+    }
+    
+    if (newRowIndex !== currentRowIndex || newColIndex !== currentColIndex) {
+      const newRow = this.unifiedRows[newRowIndex];
+      const newColumn = visibleColumns[newColIndex];
+      
+      if (newRow && newColumn) {
+        this.focusedCell = { rowId: newRow.id, columnId: newColumn.id };
+        this.ensureCellVisible(newRow.id, newColumn.id);
+      }
+    }
+  };
+  
+  private handleRowSelection = (rowId: string, multi: boolean, range: boolean): void => {
+    if (multi) {
+      if (this.selectedRows.has(rowId)) {
+        this.selectedRows.delete(rowId);
+      } else {
+        this.selectedRows.add(rowId);
+      }
+    } else if (range && this.focusedCell) {
+      // Range selection
+      const startIndex = this.unifiedRows.findIndex(r => r.id === this.focusedCell!.rowId);
+      const endIndex = this.unifiedRows.findIndex(r => r.id === rowId);
+      
+      if (startIndex !== -1 && endIndex !== -1) {
+        const start = Math.min(startIndex, endIndex);
+        const end = Math.max(startIndex, endIndex);
+        
+        for (let i = start; i <= end; i++) {
+          const row = this.unifiedRows[i];
+          if (row.type === 'data') {
+            this.selectedRows.add(row.id);
+          }
+        }
+      }
+    } else {
+      this.selectedRows.clear();
+      this.selectedRows.add(rowId);
+    }
+    
+    this.updateAllCheckboxes();
+    this.updateHeaderCheckbox();
+    this.callbacks.onSelectionChange?.(this.selectedRows);
+  };
+  
+  private handleRowDragStart = (rowId: string): void => {
+    this.dragState.type = 'row';
+    this.dragState.rowId = rowId;
+  };
+  
+  private handleRowDragOver = (e: DragEvent, targetRowId: string): void => {
+    // Visual feedback during drag
+    const targetRow = this.rowElements.get(targetRowId);
+    if (targetRow) {
+      targetRow.classList.add('drag-over');
+    }
+  };
+  
+  private handleRowDrop = (sourceRowId: string, targetRowId: string, position: 'before' | 'after'): void => {
+    // Notify about row reorder
+    if (this.callbacks.onStateChange) {
+      this.callbacks.onStateChange({
+        type: 'row.reorder',
+        sourceRowId,
+        targetRowId,
+        position
+      });
+    }
+    
+    this.dragState.type = null;
+    this.dragState.rowId = null;
   };
 
   private updateAllCheckboxes(): void {
@@ -1372,9 +1525,100 @@ export class UnifiedTableRenderer {
     });
   }
 
+  // ====================================
+  // CELL EDITING METHODS
+  // ====================================
+  
+  private startCellEdit(rowId?: string, columnId?: string): void {
+    const targetRowId = rowId || this.focusedCell?.rowId;
+    const targetColumnId = columnId || this.focusedCell?.columnId;
+    
+    if (!targetRowId || !targetColumnId) return;
+    
+    this.editingCell = { rowId: targetRowId, columnId: targetColumnId };
+    
+    if (this.callbacks.onStateChange) {
+      this.callbacks.onStateChange({
+        type: 'cell.edit.start',
+        rowId: targetRowId,
+        columnId: targetColumnId
+      });
+    }
+  }
+  
+  private deleteCellContent(): void {
+    if (!this.focusedCell) return;
+    
+    const row = this.unifiedRows.find(r => r.id === this.focusedCell!.rowId);
+    if (!row || row.type !== 'data') return;
+    
+    this.callbacks.onCellEdit?.(
+      this.focusedCell.rowId,
+      this.focusedCell.columnId,
+      null
+    );
+  }
+  
+  private selectAll(): void {
+    const dataRows = this.unifiedRows.filter(r => r.type === 'data');
+    this.selectedRows = new Set(dataRows.map(r => r.id));
+    this.updateAllCheckboxes();
+    this.updateHeaderCheckbox();
+    this.callbacks.onSelectionChange?.(this.selectedRows);
+  }
+  
+  private copySelection(): void {
+    // TODO: Implement copy to clipboard
+    log.info('Copy selection');
+  }
+  
+  private pasteSelection(): void {
+    // TODO: Implement paste from clipboard
+    log.info('Paste selection');
+  }
+  
+  private undo(): void {
+    // TODO: Implement undo
+    log.info('Undo');
+  }
+  
+  private redo(): void {
+    // TODO: Implement redo
+    log.info('Redo');
+  }
+  
+  private ensureCellVisible(rowId: string, columnId: string): void {
+    const rowIndex = this.unifiedRows.findIndex(r => r.id === rowId);
+    if (rowIndex === -1) return;
+    
+    const rowOffset = this.calculateRowOffset(rowIndex);
+    const rowHeight = this.unifiedRows[rowIndex].height;
+    
+    const scrollTop = this.viewport.scrollTop;
+    const viewportHeight = this.viewport.clientHeight;
+    
+    // Scroll vertically if needed
+    if (rowOffset < scrollTop) {
+      this.viewport.scrollTop = rowOffset;
+    } else if (rowOffset + rowHeight > scrollTop + viewportHeight) {
+      this.viewport.scrollTop = rowOffset + rowHeight - viewportHeight;
+    }
+    
+    // TODO: Horizontal scrolling for column visibility
+  }
+  
   destroy(): void {
     this.viewport.removeEventListener('scroll', this.handleScroll);
     this.table.removeEventListener('change', this.handleCheckboxChange);
+    this.header.removeEventListener('click', this.handleHeaderClick);
+    this.header.removeEventListener('mousedown', this.handleHeaderMouseDown);
+    this.body.removeEventListener('click', this.handleBodyClick);
+    this.body.removeEventListener('dblclick', this.handleBodyDoubleClick);
+    
+    if (this.cleanupKeyboard) {
+      this.cleanupKeyboard();
+      this.cleanupKeyboard = null;
+    }
     
     if (this._scrollRAF) {
       cancelAnimationFrame(this._scrollRAF);

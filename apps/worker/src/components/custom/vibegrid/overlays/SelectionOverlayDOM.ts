@@ -33,7 +33,13 @@ export class SelectionOverlayDOM {
     config: SelectionOverlayConfig
   ) {
     this.container = container;
-    this.config = config;
+    // Make selection much more visible
+    this.config = {
+      ...config,
+      selectionColor: 'rgba(59, 130, 246, 0.15)', // More opaque background
+      selectionBorderColor: 'rgb(59, 130, 246)', // Solid border
+      borderWidth: 2
+    };
     
     // Ensure container has relative positioning for absolute children
     if (getComputedStyle(this.container).position === 'static') {
@@ -77,6 +83,9 @@ export class SelectionOverlayDOM {
     const visibleCells = new Set<string>();
     const cellPositions = new Map<string, { x: number; y: number; width: number; height: number }>();
     
+    // Find the header height to offset the selection properly
+    const headerHeight = 48; // HEADER_HEIGHT from SimplePassiveRenderer
+    
     for (const cellKey of selectedCells) {
       const [rowId, columnId] = cellKey.split(':');
       
@@ -88,20 +97,30 @@ export class SelectionOverlayDOM {
       
       const rowIndex = coordinateMapping.rows.indexOf(rowCoord);
       
-      // Check if cell is in viewport
-      if (rowIndex >= viewport.start && rowIndex <= viewport.end) {
-        visibleCells.add(cellKey);
-        
-        // Calculate position based on coordinate mapping
-        // Adjust for viewport offset
-        const viewportOffset = viewport.start * this.config.cellHeight;
-        cellPositions.set(cellKey, {
+      // Always show selected cells, don't filter by viewport for now to debug alignment
+      visibleCells.add(cellKey);
+      
+      // Calculate position based on coordinate mapping with proper header offset
+      // The row coordinates are absolute within the body container, 
+      // but overlay needs to be relative to the main container (including header)
+      cellPositions.set(cellKey, {
+        x: colCoord.x,
+        y: rowCoord.y + headerHeight, // Add header height to position correctly
+        width: colCoord.width,
+        height: rowCoord.height
+      });
+      
+      log.info('SelectionOverlayDOM: Cell position calculated', {
+        cellKey,
+        rowCoord: { y: rowCoord.y, height: rowCoord.height },
+        colCoord: { x: colCoord.x, width: colCoord.width },
+        finalPosition: {
           x: colCoord.x,
-          y: rowCoord.y - viewportOffset,
+          y: rowCoord.y + headerHeight,
           width: colCoord.width,
           height: rowCoord.height
-        });
-      }
+        }
+      });
     }
 
     log.info('SelectionOverlayDOM: Visible cells calculated', {
@@ -213,10 +232,12 @@ export class SelectionOverlayDOM {
         backgroundColor: this.config.selectionColor,
         border: `${this.config.borderWidth}px solid ${this.config.selectionBorderColor}`,
         boxSizing: 'border-box',
-        zIndex: '10',
+        zIndex: '50', // Much higher z-index to appear above everything
         opacity: '0', // Start invisible for animation
         transform: 'scale(0.95)',
-        transition: 'opacity 200ms ease-out, transform 200ms ease-out'
+        transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+        // Ensure pixel-perfect alignment
+        borderRadius: '2px'
       });
       
       this.container.appendChild(element);
@@ -229,7 +250,7 @@ export class SelectionOverlayDOM {
       
       // Trigger animation on next frame
       requestAnimationFrame(() => {
-        element.style.opacity = '0.2';
+        element.style.opacity = '0.3';
         element.style.transform = 'scale(1)';
         log.info(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
       });

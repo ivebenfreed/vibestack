@@ -628,11 +628,59 @@ export function createTableInteraction$(tableCore$?: any) {
       if (cellId) {
         const [rowId, columnId] = cellId.split(':');
         
-        // Trigger entity update through Legend State
-        // TODO: Pass entityType from the factory function or make this configurable
-        // await entityOperations.updateEntity(entityType, rowId, { [columnId]: value });
+        log.info('🎯 Saving edit', { cellId, value, rowId, columnId });
         
-        log.info('🎯 Edit saved', { cellId, value });
+        // Ensure we have a valid tableCore$ reference
+        if (!tableCore$) {
+          throw new Error('tableCore$ is not available in saveEdit method');
+        }
+        
+        // Get the entity type from the tableCore$ - make sure to get the actual value, not observable
+        const entityType = tableCore$.entityType.get ? tableCore$.entityType.get() : tableCore$.entityType;
+        
+        try {
+          
+          log.info('🔄 Attempting to save edit', { entityType, rowId, columnId, value });
+          
+          // CORRECT LEGEND STATE PATTERN: Use syncedCrud with .get() and .set()
+          // Import the correct entity operations
+          const { getUniverseEntity$, entityOperations } = await import('@/legend-state/observables');
+          
+          // Use the org-prefixed entity name directly
+          // Legend State getEntity$() expects org-prefixed names for proper lookup
+          const orgPrefixedEntityName = entityType;
+          
+          log.info('🔄 Using entityOperations.updateEntity for database persistence', { 
+            originalEntityType: entityType,
+            orgPrefixedEntityName: orgPrefixedEntityName,
+            rowId,
+            columnId,
+            value 
+          });
+          
+          await entityOperations.updateEntity(orgPrefixedEntityName, rowId, {
+            [columnId]: value
+          });
+          
+          log.info('✅ Edit saved successfully via syncedCrud', { entityType, rowId, columnId, value });
+          
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log.error('❌ Error saving edit', { cellId, value, error: errorMessage });
+          
+          // Show user-friendly error
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('vibestack:edit-error', {
+              detail: { 
+                entityType: entityType, 
+                rowId, 
+                columnId, 
+                value, 
+                error: errorMessage 
+              }
+            }));
+          }
+        }
       }
       
       tableInteraction$.cancelEdit();

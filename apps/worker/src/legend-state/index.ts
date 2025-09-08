@@ -69,3 +69,12 @@ export {
   useEntities$,
   type UseEntityResult
 } from './hooks/use-entity'
+
+// Table Columns - Schema-driven column definitions  
+export {
+  getEntityColumns$,
+  allEntityColumns$,
+  createEntityColumnsObservable,
+  getColumnsForEntity,
+  type TableColumn
+} from './observables/table-columns'
