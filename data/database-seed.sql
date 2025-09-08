@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KhvgKCgkbDdQec5jMZeT63lvf1Qv9sGlKFugnMtb4wb7nfm56J5WfSuchsDKMCH
+\restrict CsOXL3C3qKfFVS6jw08iPcDCtHfpxrqTRydrLty5mkqOeHggWakOhH8MSoMljva
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -631,10 +631,7 @@ COPY public.org_01920000_1000_7000_8000_000000000001_softdeletetests (id, organi
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_task (id, organization_id, created_by, created_at, updated_at, title, description, priority, status, assignee_id, reporter_id, due_date, estimated_hours, actual_hours, task_type, parent_task_id, project_id, sprint_id, story_points) FROM stdin;
-21851e6e-2c44-45d6-802f-b813a70ff89e	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Setup development environment	Configure local dev setup	high	completed	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	setup	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
-e1a00686-898b-4b89-ac6a-283a09d373f4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Design mockups	Create UI/UX mockups	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	design	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
-62e20872-53e7-4fb5-aad7-2e69bbf7bb19	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	API integration	Integrate with backend APIs	medium	todo	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	feature	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
-7ce84b7e-4d57-45db-9dd5-9ab7690c166f	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Testing and QA	Complete testing suite	medium	todo	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	testing	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+21851e6e-2c44-45d6-802f-b813a70ff89e	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-08 20:50:03.588	CURL TEST UPDATE	Configure local dev setup	high	completed	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	setup	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 41521a77-42eb-4f8c-9bfc-a72f5f0fbe8d	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Database schema design	Design and implement database schema	high	completed	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	design	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 160e57e6-4eef-4e32-9afe-e4d052e9bde4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-07 16:51:29.535293	Authentication system	Implement user authentication	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	feature	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 90c9f585-ff23-4d3c-8e6c-08f359b6f776	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:23.618	2025-09-08 12:25:23.618	Test Vertical Scroll 1	Testing vertical scrolling with many tasks - Task 1	high	todo	\N	\N	\N	8	\N	feature	\N	\N	\N	\N
@@ -648,6 +645,9 @@ a13c8b30-f6cc-4009-89f7-4a56351b5047	01920000-1000-7000-8000-000000000001	0198b0
 541d78cb-72c9-4acc-892b-c480600019f5	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.329	2025-09-08 12:25:35.329	Test Vertical Scroll 9	Testing vertical scrolling with many tasks - Task 9	high	in_progress	\N	\N	\N	10	\N	feature	\N	\N	\N	\N
 50f82ac0-8fe8-4d42-8d23-b29bad53047f	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.511	2025-09-08 12:25:35.511	Test Vertical Scroll 10	Testing vertical scrolling with many tasks - Task 10	medium	todo	\N	\N	\N	11	\N	bug	\N	\N	\N	\N
 c3cb3e4c-82fe-4105-a2ff-e655bcd68f46	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.708	2025-09-08 12:25:35.708	Test Vertical Scroll 11	Testing vertical scrolling with many tasks - Task 11	low	todo	\N	\N	\N	12	\N	enhancement	\N	\N	\N	\N
+e1a00686-898b-4b89-ac6a-283a09d373f4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-08 20:50:52.545	Design mockups	Create UI/UX mockups	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	design	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+7ce84b7e-4d57-45db-9dd5-9ab7690c166f	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-08 20:51:33.05	Testing and QA	Complete testing suite	medium	todo	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	testing	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
+62e20872-53e7-4fb5-aad7-2e69bbf7bb19	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-08 20:51:53.771	API integration	Integrate with backend APIs	medium	todo	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	feature	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 aaccd2af-15ee-4bca-9158-6d4dd9f44db3	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.899	2025-09-08 12:25:35.899	Test Vertical Scroll 12	Testing vertical scrolling with many tasks - Task 12	high	completed	\N	\N	\N	13	\N	feature	\N	\N	\N	\N
 7880be54-9ac1-4add-b349-9a205da057f0	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:36.092	2025-09-08 12:25:36.093	Test Vertical Scroll 13	Testing vertical scrolling with many tasks - Task 13	medium	in_progress	\N	\N	\N	14	\N	bug	\N	\N	\N	\N
 7e2be59a-c5eb-4003-8e97-047794b48206	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:36.276	2025-09-08 12:25:36.276	Test Vertical Scroll 14	Testing vertical scrolling with many tasks - Task 14	low	todo	\N	\N	\N	15	\N	enhancement	\N	\N	\N	\N
@@ -1495,5 +1495,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KhvgKCgkbDdQec5jMZeT63lvf1Qv9sGlKFugnMtb4wb7nfm56J5WfSuchsDKMCH
+\unrestrict CsOXL3C3qKfFVS6jw08iPcDCtHfpxrqTRydrLty5mkqOeHggWakOhH8MSoMljva
 

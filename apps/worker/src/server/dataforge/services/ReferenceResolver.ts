@@ -13,6 +13,11 @@ export interface ReferenceResolverConfig {
 }
 
 export class ReferenceResolver {
+  // Cache lookup maps to avoid expensive repeated queries
+  private lookupCache = new Map<string, Record<string, any>>();
+  private cacheTimestamps = new Map<string, number>();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor(private config: ReferenceResolverConfig) {}
 
   /**
@@ -34,21 +39,13 @@ export class ReferenceResolver {
       const referenceMaps = await this.buildReferenceLookupMaps(orgId, entityMetadata.referenceFields);
 
       // Resolve references for each result
+      // NOTE: _resolved field pattern is deprecated as of September 2025
+      // The new relationship system handles reference resolution differently
+      // For now, return original results without adding _resolved fields
+      // to prevent Legend State sync conflicts
       const resolvedResults = results.map(record => {
-        const resolvedRecord = { ...record };
-        
-        for (const [fieldName, fieldInfo] of Object.entries(entityMetadata.referenceFields)) {
-          const fieldValue = record[fieldName];
-          if (fieldValue && referenceMaps[fieldName]) {
-            const resolvedValue = referenceMaps[fieldName][fieldValue];
-            if (resolvedValue) {
-              // Add resolved reference data
-              resolvedRecord[`${fieldName}_resolved`] = resolvedValue;
-            }
-          }
-        }
-
-        return resolvedRecord;
+        // Simply return the original record without adding _resolved fields
+        return { ...record };
       });
 
       return resolvedResults;
@@ -122,39 +119,54 @@ export class ReferenceResolver {
   }
 
   /**
-   * Build lookup maps for all reference fields
+   * Build lookup maps for all reference fields (with caching)
    */
   private async buildReferenceLookupMaps(orgId: string, referenceFields: Record<string, any>): Promise<Record<string, Record<string, any>>> {
     const lookupMaps: Record<string, Record<string, any>> = {};
 
     for (const [fieldName, fieldInfo] of Object.entries(referenceFields)) {
       try {
+        // Check cache first
+        const cacheKey = `${orgId}:${fieldName}:${fieldInfo.type}`;
+        const cached = this.getCachedLookup(cacheKey);
+        if (cached) {
+          lookupMaps[fieldName] = cached;
+          continue;
+        }
+
+        let lookup: Record<string, any> = {};
+
         switch (fieldInfo.type) {
           case 'priority_option':
-            lookupMaps[fieldName] = await this.getSystemOptionLookup('priority', fieldInfo.archetype);
+            lookup = await this.getSystemOptionLookup('priority', fieldInfo.archetype);
             break;
           case 'status_option':
-            lookupMaps[fieldName] = await this.getSystemOptionLookup('status', fieldInfo.archetype);
+            lookup = await this.getSystemOptionLookup('status', fieldInfo.archetype);
             break;
           case 'category_option':
-            lookupMaps[fieldName] = await this.getSystemOptionLookup('category', fieldInfo.archetype);
+            lookup = await this.getSystemOptionLookup('category', fieldInfo.archetype);
             break;
           case 'discussion_type_option':
-            lookupMaps[fieldName] = await this.getSystemOptionLookup('discussion_type', fieldInfo.archetype);
+            lookup = await this.getSystemOptionLookup('discussion_type', fieldInfo.archetype);
             break;
           case 'custom_option_reference':
-            lookupMaps[fieldName] = await this.getCustomOptionLookup(orgId, fieldName);
+            lookup = await this.getCustomOptionLookup(orgId, fieldName);
             break;
           case 'user_reference':
-            lookupMaps[fieldName] = await this.getUserLookup(orgId);
+            lookup = await this.getUserLookup(orgId);
             break;
           case 'entity_reference':
             const targetEntity = this.inferTargetEntity(fieldName, fieldInfo.archetype);
             if (targetEntity) {
-              lookupMaps[fieldName] = await this.getEntityLookup(orgId, targetEntity);
+              lookup = await this.getEntityLookup(orgId, targetEntity);
             }
             break;
         }
+
+        // Cache the result
+        this.setCachedLookup(cacheKey, lookup);
+        lookupMaps[fieldName] = lookup;
+
       } catch (error) {
         console.warn(`[ReferenceResolver] Failed to build lookup map for ${fieldName}:`, error);
       }
@@ -252,13 +264,13 @@ export class ReferenceResolver {
     try {
       // Get all users in the organization
       const users = await this.config.kysely
-        .selectFrom('"user"')
+        .selectFrom('user')
         .innerJoin('organization_members', 'user.id', 'organization_members.user_id')
         .select([
-          '"user".id',
-          '"user".name',
-          '"user".email',
-          '"user".image',
+          'user.id',
+          'user.name',
+          'user.email',
+          'user.image',
           'organization_members.role'
         ])
         .where('organization_members.organization_id', '=', orgId)
@@ -302,20 +314,53 @@ export class ReferenceResolver {
         return {};
       }
 
-      // Query records from the target entity table
-      // Use common fields that most entities should have
-      const records = await this.config.kysely
+      // Get actual table columns using information_schema
+      const tableColumns = await this.config.kysely
+        .selectFrom('information_schema.columns' as any)
+        .select(['column_name'])
+        .where('table_name', '=', targetEntity.table_name)
+        .where('table_schema', '=', 'public')
+        .execute();
+
+      const availableColumns = tableColumns.map((col: any) => col.column_name);
+      
+      // Always include base fields if they exist
+      let selectFields = ['id', 'created_at', 'updated_at'].filter(field => 
+        availableColumns.includes(field)
+      );
+      
+      // Determine best display field from available columns
+      let displayField = 'id'; // fallback
+      
+      if (availableColumns.includes('title')) {
+        selectFields.push('title');
+        displayField = 'title';
+      } else if (availableColumns.includes('name')) {
+        selectFields.push('name');
+        displayField = 'name';
+      }
+      
+      // Add status if available
+      if (availableColumns.includes('status')) {
+        selectFields.push('status');
+      }
+
+      // Query records with only columns that actually exist
+      const fullRecords = await this.config.kysely
         .selectFrom(targetEntity.table_name as any)
-        .select(['id', 'name', 'title', 'status', 'created_at', 'updated_at'])
-        .limit(1000) // Reasonable limit for lookup maps
+        .select(selectFields as any)
+        .limit(1000)
         .execute();
 
       const lookup: Record<string, any> = {};
-      for (const record of records) {
+      for (const record of fullRecords) {
+        const displayName = record[displayField] || 
+                           `${targetEntity.archetype} ${record.id.slice(0, 8)}`;
+        
         lookup[record.id] = {
           id: record.id,
-          name: record.name || record.title || `${targetEntity.archetype} ${record.id.slice(0, 8)}`,
-          status: record.status,
+          name: displayName,
+          status: record.status || undefined,
           archetype: targetEntity.archetype,
           created_at: record.created_at,
           updated_at: record.updated_at
@@ -356,5 +401,32 @@ export class ReferenceResolver {
     }
     
     return null;
+  }
+
+  /**
+   * Cache management methods
+   */
+  private getCachedLookup(cacheKey: string): Record<string, any> | null {
+    const timestamp = this.cacheTimestamps.get(cacheKey);
+    if (!timestamp || Date.now() - timestamp > this.CACHE_TTL_MS) {
+      // Cache expired
+      this.lookupCache.delete(cacheKey);
+      this.cacheTimestamps.delete(cacheKey);
+      return null;
+    }
+    return this.lookupCache.get(cacheKey) || null;
+  }
+
+  private setCachedLookup(cacheKey: string, lookup: Record<string, any>): void {
+    this.lookupCache.set(cacheKey, lookup);
+    this.cacheTimestamps.set(cacheKey, Date.now());
+  }
+
+  /**
+   * Clear cache (useful for testing or when reference data changes)
+   */
+  public clearCache(): void {
+    this.lookupCache.clear();
+    this.cacheTimestamps.clear();
   }
 }
