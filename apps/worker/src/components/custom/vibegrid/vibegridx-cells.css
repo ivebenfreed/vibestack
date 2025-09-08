@@ -404,10 +404,10 @@
   background-color: var(--destructive-alpha, rgba(239, 68, 68, 0.05));
 }
 
-/* Hover Effects */
-.vibegridx-cell:hover .vibegridx-cell-content {
+/* Hover Effects - DISABLED to allow precise editable content hover */
+/* .vibegridx-cell:hover .vibegridx-cell-content {
   background-color: var(--accent, #f9fafb);
-}
+} */
 
 .vibegridx-cell-hovered .vibegridx-cell-content {
   background-color: var(--accent, #f9fafb);
@@ -425,9 +425,9 @@
     color: var(--foreground, #f9fafb);
   }
   
-  .vibegridx-cell:hover .vibegridx-cell-content {
+  /* .vibegridx-cell:hover .vibegridx-cell-content {
     background-color: var(--accent, #1f2937);
-  }
+  } */
   
   .vibegridx-enum-tag {
     background-color: var(--muted, #374151);

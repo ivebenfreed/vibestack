@@ -458,12 +458,11 @@ body.vibegridx-dragging-active * {
 .vibegridx-cell-text-editable {
   cursor: pointer;
   transition: background-color 0.15s ease;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
+  border-radius: 2px;
+  padding: 1px 2px;
+  margin: -1px -2px;
   display: inline-block; /* inline-block to keep highlight around text only */
-  min-height: 1.2em;
-  min-width: 20px;
+  min-height: 1em;
   max-width: 100%; /* Ensure it doesn't exceed cell width */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -494,12 +493,11 @@ body.vibegridx-dragging-active * {
 .vibegridx-cell-number-editable {
   cursor: pointer;
   transition: background-color 0.15s ease;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
+  border-radius: 2px;
+  padding: 1px 2px;
+  margin: -1px -2px;
   display: inline-block; /* inline-block to keep highlight around text only */
-  min-height: 1.2em;
-  min-width: 20px;
+  min-height: 1em;
   max-width: 100%; /* Ensure it doesn't exceed cell width */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -515,13 +513,12 @@ body.vibegridx-dragging-active * {
 .vibegridx-cell-boolean-editable {
   cursor: pointer;
   transition: background-color 0.15s ease;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
+  border-radius: 2px;
+  padding: 1px 2px;
+  margin: -1px -2px;
   display: inline-flex;
   align-items: center;
-  min-height: 1.2em;
-  min-width: 20px;
+  min-height: 1em;
 }
 
 .vibegridx-cell-boolean-editable:hover {
@@ -676,7 +673,8 @@ body.vibegridx-dragging-active * {
 .vibegridx-selected {
   background-color: hsl(var(--primary) / 0.15) !important;
   outline: 2px solid hsl(var(--primary)) !important;
-  outline-offset: -2px;
+  outline-offset: -1px; /* Reduced offset to minimize gaps */
+  z-index: 1; /* Ensure selected cells appear above adjacent cells */
 }
 
 .vibegridx-editing {
