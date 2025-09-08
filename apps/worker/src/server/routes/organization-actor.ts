@@ -2,6 +2,7 @@
  * Organization Actor routing
  * 
  * Routes requests to the appropriate Organization Actor based on organization ID.
+ * Includes MCP agent endpoints scoped to the organization.
  * Runs alongside existing sync routes for gradual migration.
  */
 
@@ -660,6 +661,327 @@ organizationActorRouter.post('/:orgId/cache-role', async (c) => {
     }, 500);
   }
 });
+
+/**
+ * MCP Agent Status for Organization
+ * GET /api/org-actor/:orgId/mcp/status
+ */
+organizationActorRouter.get('/:orgId/mcp/status', async (c) => {
+  const orgId = c.req.param('orgId');
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  try {
+    return c.json({
+      status: "ok",
+      agent: "VibeStack Organization MCP Agent",
+      version: "1.0.0",
+      organizationId: orgId,
+      endpoints: {
+        mcp: `/api/org-actor/${orgId}/mcp/agent`,
+        status: `/api/org-actor/${orgId}/mcp/status`
+      },
+      tools: [
+        "get_organization_info",
+        "get_projects", 
+        "get_teams",
+        "get_members",
+        "get_context"
+      ],
+      context: {
+        currentOrganization: orgId,
+        authenticatedUser: {
+          id: user.id,
+          email: user.email
+        }
+      }
+    });
+  } catch (error) {
+    syncLogger.error('Failed to get MCP status', {
+      orgId,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    return c.json({ 
+      error: 'Failed to get MCP status',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+/**
+ * MCP Agent Tool Execution for Organization
+ * POST /api/org-actor/:orgId/mcp/agent
+ */
+organizationActorRouter.post('/:orgId/mcp/agent', async (c) => {
+  const orgId = c.req.param('orgId');
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  try {
+    const mcpRequest = await c.req.json();
+    
+    // Simple MCP tool execution - we'll implement the actual tools here
+    const toolResult = await executeMCPTool(orgId, mcpRequest, user, c.env);
+    
+    return c.json({
+      jsonrpc: "2.0",
+      id: mcpRequest.id,
+      result: toolResult
+    });
+    
+  } catch (error) {
+    syncLogger.error('Failed to execute MCP tool', {
+      orgId,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    return c.json({
+      jsonrpc: "2.0", 
+      id: mcpRequest?.id || null,
+      error: {
+        code: -32603,
+        message: 'Internal error',
+        data: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }, 500);
+  }
+});
+
+/**
+ * Test EmbeddingGeneratorDO functionality
+ * GET /api/org-actor/:orgId/test-embedding
+ */
+organizationActorRouter.get('/:orgId/test-embedding', async (c) => {
+  const orgId = c.req.param('orgId');
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+  
+  try {
+    // Get EmbeddingGeneratorDO for this organization
+    const embeddingGenId = c.env.EMBEDDING_GENERATOR.idFromName(`org:${orgId}`);
+    const embeddingGen = c.env.EMBEDDING_GENERATOR.get(embeddingGenId);
+    
+    // Test basic embedding generation
+    const testResponse = await embeddingGen.fetch(new Request('https://internal/test-embedding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        text: "Testing EmbeddingGemma model with VibeStack project descriptions and semantic search capabilities" 
+      })
+    }));
+    
+    const testResult = await testResponse.json();
+    
+    // Get status
+    const statusResponse = await embeddingGen.fetch(new Request('https://internal/status'));
+    const statusResult = await statusResponse.json();
+    
+    return c.json({
+      organizationId: orgId,
+      user: { id: user.id, email: user.email },
+      embeddingTest: testResult,
+      embeddingGeneratorStatus: statusResult
+    });
+    
+  } catch (error) {
+    syncLogger.error('Failed to test EmbeddingGeneratorDO', {
+      orgId,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    return c.json({ 
+      error: 'Failed to test embedding generator',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+/**
+ * Generate embedding for a specific project
+ * GET /api/org-actor/:orgId/generate-for-project/:projectId
+ */
+organizationActorRouter.get('/:orgId/generate-for-project/:projectId', async (c) => {
+  const orgId = c.req.param('orgId');
+  const projectId = c.req.param('projectId');
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+  
+  try {
+    // Get EmbeddingGeneratorDO for this organization
+    const embeddingGenId = c.env.EMBEDDING_GENERATOR.idFromName(`org:${orgId}`);
+    const embeddingGen = c.env.EMBEDDING_GENERATOR.get(embeddingGenId);
+    
+    // Generate embedding for the specific project
+    const response = await embeddingGen.fetch(new Request('https://internal/generate-for-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        projectId,
+        organizationId: orgId,
+        updateDatabase: false
+      })
+    }));
+    
+    const result = await response.json();
+    
+    syncLogger.info('Project embedding generation completed', { 
+      orgId, 
+      projectId, 
+      success: response.ok,
+      dimensions: result?.embedding?.length
+    }, MODULE_NAME);
+    
+    return c.json({
+      success: true,
+      projectId,
+      organizationId: orgId,
+      user: { id: user.id, email: user.email },
+      generationResult: result
+    });
+    
+  } catch (error) {
+    syncLogger.error('Failed to generate project embedding', {
+      orgId,
+      projectId,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    return c.json({ 
+      error: 'Failed to generate project embedding',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+/**
+ * Simple MCP tool execution function
+ */
+async function executeMCPTool(orgId: string, mcpRequest: any, user: any, env: any) {
+  const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+  createDatabaseConnection(env);
+  const db = getKysely();
+
+  // Extract tool name - handle both direct method and MCP call_tool format
+  const toolName = mcpRequest.params?.name || mcpRequest.method;
+  const args = mcpRequest.params?.arguments || {};
+  
+  syncLogger.info('Executing MCP tool', { toolName, args, orgId }, MODULE_NAME);
+  
+  if (!toolName) {
+    throw new Error(`Unknown tool: ${toolName}`);
+  }
+
+  switch (toolName) {
+    case 'get_organization_info':
+      const org = await db
+        .selectFrom('organizations')
+        .select(['id', 'name', 'slug', 'lore', 'subscription_tier', 'created_at'])
+        .where('id', '=', orgId)
+        .executeTakeFirst();
+
+      return {
+        content: [{
+          type: "text",
+          text: org ? 
+            `Organization: ${org.name} (${org.slug})\nTier: ${org.subscription_tier}\nLore: ${org.lore || 'No lore defined'}\nID: ${org.id}` :
+            `Organization ${orgId} not found`
+        }]
+      };
+
+    case 'get_projects':
+      const projects = await db
+        .selectFrom('projects')
+        .select(['id', 'name', 'description', 'status', 'priority', 'created_at'])
+        .where('organization_id', '=', orgId)
+        .limit(args.limit || 20)
+        .execute();
+
+      const projectList = projects.map(p => 
+        `• ${p.name} (${p.status || 'No Status'}) - Priority: ${p.priority || 'None'}\n  ${p.description || 'No description'} - ID: ${p.id}`
+      ).join('\n\n');
+
+      return {
+        content: [{
+          type: "text",
+          text: projects.length > 0 ? 
+            `Found ${projects.length} projects:\n\n${projectList}` :
+            `No projects found in organization ${orgId}`
+        }]
+      };
+
+    case 'get_teams':
+      const teams = await db
+        .selectFrom('teams')
+        .select(['id', 'name', 'description', 'created_at'])
+        .where('organization_id', '=', orgId)
+        .limit(args.limit || 20)
+        .execute();
+
+      const teamList = teams.map(t => 
+        `• ${t.name}\n  ${t.description || 'No description'} - ID: ${t.id}`
+      ).join('\n\n');
+
+      return {
+        content: [{
+          type: "text",
+          text: teams.length > 0 ?
+            `Found ${teams.length} teams:\n\n${teamList}` :
+            `No teams found in organization ${orgId}`
+        }]
+      };
+
+    case 'get_members':
+      const members = await db
+        .selectFrom('organization_members as m')
+        .innerJoin('user as u', 'u.id', 'm.user_id')  
+        .select([
+          'm.role',
+          'u.name as user_name',
+          'u.email as user_email',
+          'm.created_at'
+        ])
+        .where('m.organization_id', '=', orgId)
+        .limit(args.limit || 20)
+        .execute();
+
+      const memberList = members.map(m =>
+        `• ${m.user_name || m.user_email} (${m.role}) - ${m.user_email}`
+      ).join('\n');
+
+      return {
+        content: [{
+          type: "text", 
+          text: members.length > 0 ?
+            `Found ${members.length} members:\n\n${memberList}` :
+            `No members found in organization ${orgId}`
+        }]
+      };
+
+    case 'get_context':
+      return {
+        content: [{
+          type: "text",
+          text: `Organization MCP Agent Context:\n\nCurrent Organization: ${orgId}\nAuthenticated User: ${user.email}\n\nAvailable tools:\n• get_organization_info - Get organization details\n• get_projects - Get projects in organization\n• get_teams - Get teams in organization  \n• get_members - Get organization members\n• get_context - Show current context`
+        }]
+      };
+
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
+}
 
 /**
  * List all Organization Actors (for debugging)

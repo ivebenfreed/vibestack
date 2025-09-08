@@ -53,6 +53,12 @@ export function useAuth() {
       hasMultipleOrganizations: false,
       organizationName: 'No Organization',
       
+      // Billing/Trial data
+      isTrialExpired: false,
+      needsBillingSetup: false,
+      subscriptionInfo: null,
+      trialStatus: null,
+      
       // Auth actions
       signIn: () => log.error('[useAuth] AuthMachine not available'),
       signOut: () => log.error('[useAuth] AuthMachine not available'),
@@ -218,6 +224,20 @@ export function useAuth() {
   const displayName = user?.name || user?.displayName || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
   
+  // Trial expiration selector
+  const isTrialExpired = useSelector(authActor, (state) => 
+    state?.context?.isTrialExpired || false
+  );
+  const needsBillingSetup = useSelector(authActor, (state) => 
+    state?.context?.needsBillingSetup || false
+  );
+  const subscriptionInfo = useSelector(authActor, (state) => 
+    state?.context?.subscriptionInfo || null
+  );
+  const trialStatus = useSelector(authActor, (state) => 
+    state?.context?.trialStatus || null
+  );
+  
   // Organization computed values
   const hasMultipleOrganizations = userOrganizations.length > 1;
   const organizationName = currentOrganization?.name || 'No Organization';
@@ -265,6 +285,12 @@ export function useAuth() {
     hasMultipleOrganizations,
     organizationName,
     effectiveUserRole,
+    
+    // Billing/Trial data
+    isTrialExpired,
+    needsBillingSetup,
+    subscriptionInfo,
+    trialStatus,
     
     // Compatibility aliases
     displayUser,

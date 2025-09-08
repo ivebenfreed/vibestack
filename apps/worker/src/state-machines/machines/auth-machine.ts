@@ -229,11 +229,51 @@ export const authMachine = setup({
       trialStatus: ({ event }) => event.output?.trialInfo || null,
       usageStats: ({ event }) => event.output?.usage || null,
       isTrialExpired: ({ event, context }) => {
+        // Check from billing info first
+        const billingInfo = event.output?.billingInfo;
         const trialInfo = event.output?.trialInfo;
-        if (!trialInfo || !trialInfo.trialEndsAt) return false;
-        return new Date(trialInfo.trialEndsAt) < new Date();
+        
+        // Check if subscription_tier is 'trial' and trial has expired
+        if (billingInfo?.subscription_tier === 'trial' || trialInfo?.subscription_tier === 'trial') {
+          const trialEndsAt = billingInfo?.trial_ends_at || trialInfo?.trialEndsAt || trialInfo?.trial_ends_at;
+          if (trialEndsAt) {
+            const isExpired = new Date(trialEndsAt) < new Date();
+            if (isExpired) {
+              log.info('[AuthMachine] Trial has expired', { trialEndsAt, now: new Date().toISOString() });
+            }
+            return isExpired;
+          }
+        }
+        
+        // Also check the current organization's trial status
+        if (context.currentOrganization?.subscription_tier === 'trial') {
+          const trialEndsAt = context.currentOrganization.trial_ends_at;
+          if (trialEndsAt) {
+            const isExpired = new Date(trialEndsAt) < new Date();
+            if (isExpired) {
+              log.info('[AuthMachine] Organization trial has expired', { trialEndsAt, now: new Date().toISOString() });
+            }
+            return isExpired;
+          }
+        }
+        
+        return false;
       },
-      needsBillingSetup: ({ event }) => event.output?.needsSetup || false,
+      needsBillingSetup: ({ event, context }) => {
+        // If trial is expired, billing setup is needed
+        const billingInfo = event.output?.billingInfo;
+        const trialInfo = event.output?.trialInfo;
+        
+        // Check if it's a trial that has expired
+        if (billingInfo?.subscription_tier === 'trial' || trialInfo?.subscription_tier === 'trial') {
+          const trialEndsAt = billingInfo?.trial_ends_at || trialInfo?.trialEndsAt || trialInfo?.trial_ends_at;
+          if (trialEndsAt && new Date(trialEndsAt) < new Date()) {
+            return true; // Trial expired, needs billing setup
+          }
+        }
+        
+        return event.output?.needsSetup || false;
+      },
       billingError: null,
     }),
 
@@ -890,7 +930,9 @@ export const authMachine = setup({
               hasCurrentOrg: !!context.currentOrganization,
               currentOrgId: context.currentOrganization?.id,
               legendStateSetupComplete: context.legendStateSetupComplete,
-              legendStateError: context.legendStateError
+              legendStateError: context.legendStateError,
+              isTrialExpired: context.isTrialExpired,
+              needsBillingSetup: context.needsBillingSetup
             });
           },
           always: [
@@ -903,6 +945,16 @@ export const authMachine = setup({
               target: 'needsOrganizationSelection',
               guard: 'hasNoCurrentOrganization',
               actions: [() => log.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSelection - no current organization')]
+            },
+            {
+              // Check for trial expiration BEFORE setting up Legend State
+              target: 'trialExpiredSetup',
+              guard: 'isTrialExpiredAndNeedsUpgrade',
+              actions: [({ context }) => log.info('[AuthMachine] ➡️ Transitioning to trialExpiredSetup - trial expired, needs upgrade', {
+                orgId: context.currentOrganization?.id,
+                isTrialExpired: context.isTrialExpired,
+                needsBillingSetup: context.needsBillingSetup
+              })]
             },
             {
               // If we have org but no persistence, set up persistence

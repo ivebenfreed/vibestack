@@ -17,11 +17,15 @@ export interface OrganizationInfo {
   id: string;
   name: string;
   domain?: string;
+  slug?: string;
   role: 'owner' | 'admin' | 'member' | 'viewer';
   status: 'active' | 'inactive' | 'trial_expired';
   subscriptionTier: 'trial' | 'starter' | 'pro' | 'enterprise';
-  subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'canceled';
+  subscription_tier?: 'trial' | 'starter' | 'pro' | 'enterprise'; // Alternative field name
+  subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'canceled' | 'trial';
+  subscription_status?: 'trialing' | 'active' | 'past_due' | 'canceled' | 'trial'; // Alternative field name
   trialEndsAt?: string;
+  trial_ends_at?: string; // Alternative field name
   memberCount?: number;
   maxMembers?: number;
   settings?: Record<string, any>;

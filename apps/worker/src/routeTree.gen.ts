@@ -26,6 +26,7 @@ import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
 import { Route as authOtpVerifyRouteImport } from './routes/(auth)/otp-verify'
 import { Route as authOtpRouteImport } from './routes/(auth)/otp'
+import { Route as authOnboardingRouteImport } from './routes/(auth)/onboarding'
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as authCompleteRegistrationRouteImport } from './routes/(auth)/complete-registration'
 import { Route as authCheckEmailRouteImport } from './routes/(auth)/check-email'
@@ -46,6 +47,7 @@ import { Route as AuthenticatedTasksKanbanRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsImportRouteImport } from './routes/_authenticated/settings/import'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
+import { Route as AuthenticatedSettingsBillingRouteImport } from './routes/_authenticated/settings/billing'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
@@ -151,6 +153,11 @@ const authOtpVerifyRoute = authOtpVerifyRouteImport.update({
 const authOtpRoute = authOtpRouteImport.update({
   id: '/(auth)/otp',
   path: '/otp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authOnboardingRoute = authOnboardingRouteImport.update({
+  id: '/(auth)/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
@@ -322,6 +329,12 @@ const AuthenticatedSettingsDisplayRoute =
     path: '/display',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedSettingsBillingRoute =
+  AuthenticatedSettingsBillingRouteImport.update({
+    id: '/billing',
+    path: '/billing',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsAppearanceRoute =
   AuthenticatedSettingsAppearanceRouteImport.update({
     id: '/appearance',
@@ -414,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/check-email': typeof authCheckEmailRoute
   '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
+  '/onboarding': typeof authOnboardingRoute
   '/otp': typeof authOtpRoute
   '/otp-verify': typeof authOtpVerifyRoute
   '/reset-password': typeof authResetPasswordRoute
@@ -437,6 +451,7 @@ export interface FileRoutesByFullPath {
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/settings/billing': typeof AuthenticatedSettingsBillingRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/import': typeof AuthenticatedSettingsImportRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
@@ -468,6 +483,7 @@ export interface FileRoutesByTo {
   '/check-email': typeof authCheckEmailRoute
   '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
+  '/onboarding': typeof authOnboardingRoute
   '/otp': typeof authOtpRoute
   '/otp-verify': typeof authOtpVerifyRoute
   '/reset-password': typeof authResetPasswordRoute
@@ -491,6 +507,7 @@ export interface FileRoutesByTo {
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/settings/billing': typeof AuthenticatedSettingsBillingRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/import': typeof AuthenticatedSettingsImportRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
@@ -526,6 +543,7 @@ export interface FileRoutesById {
   '/(auth)/check-email': typeof authCheckEmailRoute
   '/(auth)/complete-registration': typeof authCompleteRegistrationRoute
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
+  '/(auth)/onboarding': typeof authOnboardingRoute
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/otp-verify': typeof authOtpVerifyRoute
   '/(auth)/reset-password': typeof authResetPasswordRoute
@@ -549,6 +567,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/import': typeof AuthenticatedSettingsImportRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
@@ -584,6 +603,7 @@ export interface FileRouteTypes {
     | '/check-email'
     | '/complete-registration'
     | '/forgot-password'
+    | '/onboarding'
     | '/otp'
     | '/otp-verify'
     | '/reset-password'
@@ -607,6 +627,7 @@ export interface FileRouteTypes {
     | '/debug/vibegrid-legend-state'
     | '/settings/account'
     | '/settings/appearance'
+    | '/settings/billing'
     | '/settings/display'
     | '/settings/import'
     | '/settings/notifications'
@@ -638,6 +659,7 @@ export interface FileRouteTypes {
     | '/check-email'
     | '/complete-registration'
     | '/forgot-password'
+    | '/onboarding'
     | '/otp'
     | '/otp-verify'
     | '/reset-password'
@@ -661,6 +683,7 @@ export interface FileRouteTypes {
     | '/debug/vibegrid-legend-state'
     | '/settings/account'
     | '/settings/appearance'
+    | '/settings/billing'
     | '/settings/display'
     | '/settings/import'
     | '/settings/notifications'
@@ -695,6 +718,7 @@ export interface FileRouteTypes {
     | '/(auth)/check-email'
     | '/(auth)/complete-registration'
     | '/(auth)/forgot-password'
+    | '/(auth)/onboarding'
     | '/(auth)/otp'
     | '/(auth)/otp-verify'
     | '/(auth)/reset-password'
@@ -718,6 +742,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/vibegrid-legend-state'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
+    | '/_authenticated/settings/billing'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/import'
     | '/_authenticated/settings/notifications'
@@ -751,6 +776,7 @@ export interface RootRouteChildren {
   authCheckEmailRoute: typeof authCheckEmailRoute
   authCompleteRegistrationRoute: typeof authCompleteRegistrationRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
+  authOnboardingRoute: typeof authOnboardingRoute
   authOtpRoute: typeof authOtpRoute
   authOtpVerifyRoute: typeof authOtpVerifyRoute
   authResetPasswordRoute: typeof authResetPasswordRoute
@@ -870,6 +896,13 @@ declare module '@tanstack/react-router' {
       path: '/otp'
       fullPath: '/otp'
       preLoaderRoute: typeof authOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/onboarding': {
+      id: '/(auth)/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof authOnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/forgot-password': {
@@ -1054,6 +1087,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsDisplayRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/settings/billing': {
+      id: '/_authenticated/settings/billing'
+      path: '/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof AuthenticatedSettingsBillingRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/appearance': {
       id: '/_authenticated/settings/appearance'
       path: '/appearance'
@@ -1210,6 +1250,7 @@ const AuthenticatedDebugRouteRouteWithChildren =
 interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
+  AuthenticatedSettingsBillingRoute: typeof AuthenticatedSettingsBillingRoute
   AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
   AuthenticatedSettingsImportRoute: typeof AuthenticatedSettingsImportRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
@@ -1221,6 +1262,7 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
   {
     AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
+    AuthenticatedSettingsBillingRoute: AuthenticatedSettingsBillingRoute,
     AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
     AuthenticatedSettingsImportRoute: AuthenticatedSettingsImportRoute,
     AuthenticatedSettingsNotificationsRoute:
@@ -1282,6 +1324,7 @@ const rootRouteChildren: RootRouteChildren = {
   authCheckEmailRoute: authCheckEmailRoute,
   authCompleteRegistrationRoute: authCompleteRegistrationRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
+  authOnboardingRoute: authOnboardingRoute,
   authOtpRoute: authOtpRoute,
   authOtpVerifyRoute: authOtpVerifyRoute,
   authResetPasswordRoute: authResetPasswordRoute,

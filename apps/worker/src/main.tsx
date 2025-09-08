@@ -8,6 +8,9 @@ enableReactTracking({
   warnUnobserved: true
 });
 
+// Initialize global API interceptor for 402 and other error handling
+import './lib/api-interceptor';
+
 // Note: Legend State persistence is configured per-observable in observables.ts
 // using configureSynced(syncedCrud, persistOptions) pattern
 

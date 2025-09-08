@@ -5,6 +5,7 @@ import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
 import { PostAuthOrganizationSetup } from '@/features/auth/components/PostAuthOrganizationSetup'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
+import { TrialExpiredGuard } from '@/components/guards/TrialExpiredGuard'
 import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
@@ -153,11 +154,13 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
     return <UnifiedLoadingScreen />;
   }
 
-  // Render the main app
+  // Render the main app with trial expiration guard
   return (
-    <div data-testid="authenticated-content" className="min-h-screen bg-background">
-      {/* <SkipToMain /> - Disabled: phantom component issue */}
-      <UnifiedLayout />
-    </div>
+    <TrialExpiredGuard>
+      <div data-testid="authenticated-content" className="min-h-screen bg-background">
+        {/* <SkipToMain /> - Disabled: phantom component issue */}
+        <UnifiedLayout />
+      </div>
+    </TrialExpiredGuard>
   )
 })

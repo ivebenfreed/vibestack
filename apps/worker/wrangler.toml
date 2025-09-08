@@ -22,6 +22,10 @@ BETTER_AUTH_URL = "http://localhost:5173"
 RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
 USE_KV_SESSIONS = true
 
+# AI binding for Cloudflare AI/Workers AI
+[ai]
+binding = "AI"
+
 # Durable Objects configuration
 [[durable_objects.bindings]]
 name = "SYNC"
@@ -35,11 +39,21 @@ class_name = "ReplicationDO"
 name = "ORGANIZATION_ACTOR"
 class_name = "OrganizationActor"
 
+[[durable_objects.bindings]]
+name = "EMBEDDING_GENERATOR"
+class_name = "EmbeddingGeneratorDO"
+
+
 
 # Durable Objects migrations
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrganizationActor"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["EmbeddingGeneratorDO"]
+
 
 
 # Cron triggers

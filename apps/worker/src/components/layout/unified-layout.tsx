@@ -13,6 +13,9 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import SyncStatusIcon from '@/features/sync/components/SyncStatusIcon'
+import { TrialBanner } from '@/components/trial-banner'
+import { useOrgTrialStatus } from '@/contexts/AbilityContext'
+import { useAuth } from '@/state-machines'
 import { RotateCcw, Menu, X } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -101,6 +104,8 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false)
   const location = useLocation()
   const isMobile = useIsMobile()
+  const { currentOrganization } = useAuth()
+  const orgTrialStatus = useOrgTrialStatus(currentOrganization)
   
   // Responsive behavior - auto-collapse on tablet screens
   React.useEffect(() => {
@@ -139,142 +144,157 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-background">
-      {/* Mobile Layout */}
-      {isMobile ? (
-        <>
-          {/* Mobile Sidebar as Sheet */}
-          <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-            <SheetContent side="left" className="p-0 w-[300px]">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Navigation Menu</SheetTitle>
-              </SheetHeader>
-              <UnifiedSidebar 
-                isCollapsed={false}
-                onToggle={() => setMobileSidebarOpen(false)}
-              />
-            </SheetContent>
-          </Sheet>
-          
-          {/* Mobile Main Content */}
-          <main className="flex flex-col h-full overflow-hidden">
-            {/* Mobile Header */}
-            <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-              <div className="flex h-14 items-center gap-3 px-4">
-                {/* Mobile Menu button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setMobileSidebarOpen(true)}
-                  className="p-2 shrink-0"
-                >
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-                
-                <div className="flex-1 flex justify-center min-w-0">
-                  <Search />
-                </div>
-                
-                {/* Right side buttons - compact on mobile */}
-                <div className="flex items-center gap-0">
-                  <ThemeSwitch />
-                  <SyncStatusIcon />
-                  <ProfileDropdown />
-                </div>
-              </div>
-            </header>
-            
-            {/* Mobile Content Area */}
-            <div className={cn(
-              "flex-1 overflow-auto",
-              isFullHeight ? "p-0" : "p-4"
-            )}>
-              <div className={cn(
-                "w-full",
-                isFullHeight && "h-full p-4 flex flex-col"
-              )}>
-                {children || <Outlet />}
-              </div>
-            </div>
-          </main>
-        </>
-      ) : (
-        // Desktop Layout
-        <div 
-          className={cn(
-            "grid h-screen transition-all duration-200",
-            sidebarCollapsed 
-              ? "grid-cols-[64px_1fr]" 
-              : "grid-cols-[240px_1fr]"
-          )}
-        >
-          {/* Desktop Sidebar */}
-          <UnifiedSidebar 
-            isCollapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
-          
-          {/* Desktop Main Content */}
-          <main className="flex flex-col overflow-hidden">
-            {/* Desktop Header */}
-            <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-              <div className="flex h-14 items-center gap-3 px-6 sm:gap-4">
-                {/* Toggle button */}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        className="p-2"
-                      >
-                        {sidebarCollapsed ? (
-                          <Menu className="h-4 w-4" />
-                        ) : (
-                          <X className="h-4 w-4" />
-                        )}
-                        <span className="sr-only">Toggle sidebar</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                
-                <Separator orientation='vertical' className='h-6' />
-                
-                <div className="flex-1 flex justify-center">
-                  <Search />
-                </div>
-                
-                {/* Right side buttons */}
-                <div className="flex items-center gap-1">
-                  <RefreshButton />
-                  <ThemeSwitch />
-                  <SyncStatusIcon />
-                  <ProfileDropdown />
-                </div>
-              </div>
-            </header>
-            
-            {/* Desktop Content Area */}
-            <div className={cn(
-              "flex-1 overflow-auto",
-              isFullHeight ? "p-0" : "p-6"
-            )}>
-              <div className={cn(
-                "w-full",
-                isFullHeight && "h-full p-6 flex flex-col"
-              )}>
-                {children || <Outlet />}
-              </div>
-            </div>
-          </main>
-        </div>
+    <div className="h-screen overflow-hidden bg-background flex flex-col">
+      {/* Trial Banner - Organization-specific */}
+      {currentOrganization && currentOrganization.subscription_tier === 'trial' && (
+        <TrialBanner 
+          trialEndsAt={orgTrialStatus.trialEndsAt?.toISOString() || null}
+          organizationName={currentOrganization.name}
+          onUpgrade={() => {
+            // Navigate to billing settings page
+            window.location.href = '/settings/billing'
+          }}
+        />
       )}
+      
+      {/* Main Layout Container */}
+      <div className="flex-1 overflow-hidden">
+        {/* Mobile Layout */}
+        {isMobile ? (
+          <>
+            {/* Mobile Sidebar as Sheet */}
+            <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+              <SheetContent side="left" className="p-0 w-[300px]">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Navigation Menu</SheetTitle>
+                </SheetHeader>
+                <UnifiedSidebar 
+                  isCollapsed={false}
+                  onToggle={() => setMobileSidebarOpen(false)}
+                />
+              </SheetContent>
+            </Sheet>
+            
+            {/* Mobile Main Content */}
+            <main className="flex flex-col h-full overflow-hidden">
+              {/* Mobile Header */}
+              <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+                <div className="flex h-14 items-center gap-3 px-4">
+                  {/* Mobile Menu button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setMobileSidebarOpen(true)}
+                    className="p-2 shrink-0"
+                  >
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                  
+                  <div className="flex-1 flex justify-center min-w-0">
+                    <Search />
+                  </div>
+                  
+                  {/* Right side buttons - compact on mobile */}
+                  <div className="flex items-center gap-0">
+                    <ThemeSwitch />
+                    <SyncStatusIcon />
+                    <ProfileDropdown />
+                  </div>
+                </div>
+              </header>
+              
+              {/* Mobile Content Area */}
+              <div className={cn(
+                "flex-1 overflow-auto",
+                isFullHeight ? "p-0" : "p-4"
+              )}>
+                <div className={cn(
+                  "w-full",
+                  isFullHeight && "h-full p-4 flex flex-col"
+                )}>
+                  {children || <Outlet />}
+                </div>
+              </div>
+            </main>
+          </>
+        ) : (
+          // Desktop Layout
+          <div 
+            className={cn(
+              "grid h-full transition-all duration-200",
+              sidebarCollapsed 
+                ? "grid-cols-[64px_1fr]" 
+                : "grid-cols-[240px_1fr]"
+            )}
+          >
+            {/* Desktop Sidebar */}
+            <UnifiedSidebar 
+              isCollapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            />
+            
+            {/* Desktop Main Content */}
+            <main className="flex flex-col overflow-hidden">
+              {/* Desktop Header */}
+              <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+                <div className="flex h-14 items-center gap-3 px-6 sm:gap-4">
+                  {/* Toggle button */}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                          className="p-2"
+                        >
+                          {sidebarCollapsed ? (
+                            <Menu className="h-4 w-4" />
+                          ) : (
+                            <X className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Toggle sidebar</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  <Separator orientation='vertical' className='h-6' />
+                  
+                  <div className="flex-1 flex justify-center">
+                    <Search />
+                  </div>
+                  
+                  {/* Right side buttons */}
+                  <div className="flex items-center gap-1">
+                    <RefreshButton />
+                    <ThemeSwitch />
+                    <SyncStatusIcon />
+                    <ProfileDropdown />
+                  </div>
+                </div>
+              </header>
+              
+              {/* Desktop Content Area */}
+              <div className={cn(
+                "flex-1 overflow-auto",
+                isFullHeight ? "p-0" : "p-6"
+              )}>
+                <div className={cn(
+                  "w-full",
+                  isFullHeight && "h-full p-6 flex flex-col"
+                )}>
+                  {children || <Outlet />}
+                </div>
+              </div>
+            </main>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

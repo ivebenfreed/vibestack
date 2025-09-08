@@ -67,6 +67,7 @@ function isCriticalEndpoint(method: string, path: string): boolean {
   const criticalEndpoints = [
     '/api/entities',
     '/api/dataforge/entities',
+    '/api/dataforge/orgs',  // DataForge organization-specific operations
     '/api/projects',
     '/api/tasks',
     '/api/records',
@@ -87,25 +88,31 @@ function isCriticalEndpoint(method: string, path: string): boolean {
 function getOrganizationIdFromContext(c: Context): string | null {
   // Try to get organization ID from various sources
   
-  // 1. From request body
+  // 1. From URL path parameter (e.g., /api/dataforge/orgs/:orgId/entities)
+  const pathMatch = c.req.path.match(/\/orgs\/([^\/]+)/);
+  if (pathMatch && pathMatch[1]) {
+    return pathMatch[1];
+  }
+  
+  // 2. From request body
   const body = c.get('requestBody') || {};
   if (body.organization_id) {
     return body.organization_id;
   }
 
-  // 2. From query parameters
+  // 3. From query parameters
   const organizationId = c.req.query('organization_id');
   if (organizationId) {
     return organizationId;
   }
 
-  // 3. From authentication context (set by auth middleware)
+  // 4. From authentication context (set by auth middleware)
   const session = c.get('session');
   if (session?.organizationId) {
     return session.organizationId;
   }
 
-  // 4. From user context
+  // 5. From user context
   const user = c.get('user');
   if (user?.currentOrganizationId) {
     return user.currentOrganizationId;

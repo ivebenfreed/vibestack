@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict 6d9jN1eOzE5QweqCoBNqYOKVlTSjXlUapVe1X63kVcHc9yPAV246m6adfboMLN1
+\restrict sjg7xGTzLVfd5SoiN123AIeVLOgfzPq85KCu6CSDdzY0G4jbyyazff3XYfAfg5X
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict 6d9jN1eOzE5QweqCoBNqYOKVlTSjXlUapVe1X63kVcHc9yPAV246m6adfboMLN1
+\unrestrict sjg7xGTzLVfd5SoiN123AIeVLOgfzPq85KCu6CSDdzY0G4jbyyazff3XYfAfg5X
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict 4iXK8uUek6WxxCYzcNXalNpZcu5fHQ8ExGPIXRtp84ax38fknqtRH3my6d7RuE9
+\restrict lBumyShFhQGVdre1GKnHZO3OkyNYIpahre27fTkoOWKamxjX45dNjKdNE3p6alO
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4iXK8uUek6WxxCYzcNXalNpZcu5fHQ8ExGPIXRtp84ax38fknqtRH3my6d7RuE9
+\unrestrict lBumyShFhQGVdre1GKnHZO3OkyNYIpahre27fTkoOWKamxjX45dNjKdNE3p6alO
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict sJQKMdrxXlQPzEDApgQA22K97UHOJgcZvNBsIEsdjPGNIzOVSYyxZoEywnbneJe
+\restrict lHaff1VBVdStzUa9LKhchSy5ATJdHJ3AMsgMhhgc5HOWMw8kFaqQaHKJbdO45kM
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sJQKMdrxXlQPzEDApgQA22K97UHOJgcZvNBsIEsdjPGNIzOVSYyxZoEywnbneJe
+\unrestrict lHaff1VBVdStzUa9LKhchSy5ATJdHJ3AMsgMhhgc5HOWMw8kFaqQaHKJbdO45kM
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 792Apy97x2nvt29vcbA31nfERiv5Zogn1fJmVIj578HPOdocHbpQeHdFUBfmGB5
+\restrict sgSok1vcBphsCYNo8eZ37dEVOyfwfNLSybloXVw3KSj8gp8x4D9WdGAuocmCnxj
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict 792Apy97x2nvt29vcbA31nfERiv5Zogn1fJmVIj578HPOdocHbpQeHdFUBfmGB5
+\unrestrict sgSok1vcBphsCYNo8eZ37dEVOyfwfNLSybloXVw3KSj8gp8x4D9WdGAuocmCnxj
 \connect vibestack_dev
-\restrict 792Apy97x2nvt29vcbA31nfERiv5Zogn1fJmVIj578HPOdocHbpQeHdFUBfmGB5
+\restrict sgSok1vcBphsCYNo8eZ37dEVOyfwfNLSybloXVw3KSj8gp8x4D9WdGAuocmCnxj
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1469,8 +1469,8 @@ CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
 END;
 $$;
 
@@ -2242,6 +2242,55 @@ COMMENT ON TABLE public.import_field_mappings IS 'Granular field mapping configu
 
 
 --
+-- Name: import_mappings; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.import_mappings (
+    id text DEFAULT public.generate_uuidv7() NOT NULL,
+    org_id text NOT NULL,
+    connection_id text,
+    source_type text NOT NULL,
+    source_id text NOT NULL,
+    source_name text,
+    target_entity text NOT NULL,
+    field_mappings jsonb DEFAULT '{}'::jsonb NOT NULL,
+    transformation_rules jsonb DEFAULT '{}'::jsonb,
+    sync_enabled boolean DEFAULT false,
+    sync_direction text DEFAULT 'import'::text,
+    last_sync_at timestamp with time zone,
+    sync_status text DEFAULT 'pending'::text,
+    sync_error text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT import_mappings_sync_direction_check CHECK ((sync_direction = ANY (ARRAY['import'::text, 'export'::text, 'bidirectional'::text]))),
+    CONSTRAINT import_mappings_sync_status_check CHECK ((sync_status = ANY (ARRAY['pending'::text, 'syncing'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+ALTER TABLE public.import_mappings OWNER TO postgres;
+
+--
+-- Name: TABLE import_mappings; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.import_mappings IS 'Stores field mappings and sync configuration for data imports';
+
+
+--
+-- Name: COLUMN import_mappings.field_mappings; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.import_mappings.field_mappings IS 'JSON object mapping source fields to target fields';
+
+
+--
+-- Name: COLUMN import_mappings.transformation_rules; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.import_mappings.transformation_rules IS 'JSON object defining data transformation rules during import';
+
+
+--
 -- Name: import_templates; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2272,6 +2321,85 @@ ALTER TABLE public.import_templates OWNER TO postgres;
 --
 
 COMMENT ON TABLE public.import_templates IS 'Reusable import mapping templates for common file structures';
+
+
+--
+-- Name: integration_connections; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.integration_connections (
+    id text DEFAULT public.generate_uuidv7() NOT NULL,
+    org_id text NOT NULL,
+    provider text NOT NULL,
+    access_token text NOT NULL,
+    refresh_token text,
+    expires_at timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT integration_connections_provider_check CHECK ((provider = ANY (ARRAY['clickup'::text, 'jira'::text, 'asana'::text, 'notion'::text, 'monday'::text])))
+);
+
+
+ALTER TABLE public.integration_connections OWNER TO postgres;
+
+--
+-- Name: TABLE integration_connections; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.integration_connections IS 'Stores OAuth tokens and API keys for external integrations';
+
+
+--
+-- Name: COLUMN integration_connections.metadata; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.integration_connections.metadata IS 'JSON object containing provider-specific data like workspace_id, user_email, etc.';
+
+
+--
+-- Name: integration_sync_log; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.integration_sync_log (
+    id text DEFAULT public.generate_uuidv7() NOT NULL,
+    org_id text NOT NULL,
+    connection_id text,
+    mapping_id text,
+    sync_type text NOT NULL,
+    sync_direction text NOT NULL,
+    started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    completed_at timestamp with time zone,
+    status text DEFAULT 'running'::text NOT NULL,
+    records_processed integer DEFAULT 0,
+    records_created integer DEFAULT 0,
+    records_updated integer DEFAULT 0,
+    records_deleted integer DEFAULT 0,
+    records_skipped integer DEFAULT 0,
+    records_failed integer DEFAULT 0,
+    error_details jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT integration_sync_log_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text]))),
+    CONSTRAINT integration_sync_log_sync_direction_check CHECK ((sync_direction = ANY (ARRAY['import'::text, 'export'::text]))),
+    CONSTRAINT integration_sync_log_sync_type_check CHECK ((sync_type = ANY (ARRAY['full'::text, 'incremental'::text, 'webhook'::text])))
+);
+
+
+ALTER TABLE public.integration_sync_log OWNER TO postgres;
+
+--
+-- Name: TABLE integration_sync_log; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.integration_sync_log IS 'Audit log of all sync operations between VibeStack and external systems';
+
+
+--
+-- Name: COLUMN integration_sync_log.metadata; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.integration_sync_log.metadata IS 'JSON object containing sync-specific data like filters used, webhook payload, etc.';
 
 
 --
@@ -4447,7 +4575,13 @@ CREATE TABLE public.organizations (
     owner_user_id text,
     auto_created boolean DEFAULT false,
     lore text,
-    canon jsonb DEFAULT '[]'::jsonb
+    canon jsonb DEFAULT '[]'::jsonb,
+    subscription_tier text DEFAULT 'trial'::text,
+    subscription_status text DEFAULT 'active'::text,
+    billing_cycle text DEFAULT 'monthly'::text,
+    billing_email text,
+    trial_ends_at timestamp with time zone,
+    billing_settings jsonb DEFAULT '{}'::jsonb
 );
 
 ALTER TABLE ONLY public.organizations REPLICA IDENTITY FULL;
@@ -4751,7 +4885,9 @@ CREATE TABLE public."user" (
     password text,
     default_organization_id text,
     last_used_organization_id text,
-    last_org_access_at timestamp with time zone
+    last_org_access_at timestamp with time zone,
+    active_organization_id text,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -5143,11 +5279,35 @@ ALTER TABLE ONLY public.import_field_mappings
 
 
 --
+-- Name: import_mappings import_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_mappings
+    ADD CONSTRAINT import_mappings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: import_templates import_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.import_templates
     ADD CONSTRAINT import_templates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: integration_connections integration_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_connections
+    ADD CONSTRAINT integration_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: integration_sync_log integration_sync_log_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_sync_log
+    ADD CONSTRAINT integration_sync_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -5463,6 +5623,22 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_relationships
 
 
 --
+-- Name: integration_connections unique_org_provider; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_connections
+    ADD CONSTRAINT unique_org_provider UNIQUE (org_id, provider);
+
+
+--
+-- Name: import_mappings unique_source_mapping; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_mappings
+    ADD CONSTRAINT unique_source_mapping UNIQUE (org_id, source_type, source_id);
+
+
+--
 -- Name: import_templates unique_template_name_per_org; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5663,6 +5839,27 @@ CREATE INDEX idx_import_errors_type ON public.import_errors USING btree (error_t
 
 
 --
+-- Name: idx_import_mappings_connection; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_mappings_connection ON public.import_mappings USING btree (connection_id);
+
+
+--
+-- Name: idx_import_mappings_org_source; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_mappings_org_source ON public.import_mappings USING btree (org_id, source_type, source_id);
+
+
+--
+-- Name: idx_import_mappings_sync_enabled; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_import_mappings_sync_enabled ON public.import_mappings USING btree (org_id, sync_enabled) WHERE (sync_enabled = true);
+
+
+--
 -- Name: idx_import_templates_file_type; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -5688,6 +5885,13 @@ CREATE INDEX idx_import_templates_shared ON public.import_templates USING btree 
 --
 
 CREATE INDEX idx_import_templates_target_entity ON public.import_templates USING btree (target_entity);
+
+
+--
+-- Name: idx_integration_connections_org_provider; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_integration_connections_org_provider ON public.integration_connections USING btree (org_id, provider);
 
 
 --
@@ -5800,6 +6004,27 @@ CREATE INDEX idx_subscription_limits_type ON public.subscription_limits USING bt
 --
 
 CREATE UNIQUE INDEX idx_subscription_limits_unique ON public.subscription_limits USING btree (tier, limit_type) WHERE (is_active = true);
+
+
+--
+-- Name: idx_sync_log_mapping; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_sync_log_mapping ON public.integration_sync_log USING btree (mapping_id);
+
+
+--
+-- Name: idx_sync_log_org_connection; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_sync_log_org_connection ON public.integration_sync_log USING btree (org_id, connection_id);
+
+
+--
+-- Name: idx_sync_log_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_sync_log_status ON public.integration_sync_log USING btree (org_id, status, started_at DESC);
 
 
 --
@@ -6132,6 +6357,20 @@ CREATE TRIGGER trigger_set_default_organization_for_new_member AFTER INSERT ON p
 
 
 --
+-- Name: import_mappings update_import_mappings_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER update_import_mappings_updated_at BEFORE UPDATE ON public.import_mappings FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: integration_connections update_integration_connections_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER update_integration_connections_updated_at BEFORE UPDATE ON public.integration_connections FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
 -- Name: user user_update_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -6202,6 +6441,54 @@ ALTER TABLE ONLY public.import_errors
 
 ALTER TABLE ONLY public.import_templates
     ADD CONSTRAINT fk_import_templates_org FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: import_mappings import_mappings_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_mappings
+    ADD CONSTRAINT import_mappings_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.integration_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: import_mappings import_mappings_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.import_mappings
+    ADD CONSTRAINT import_mappings_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: integration_connections integration_connections_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_connections
+    ADD CONSTRAINT integration_connections_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: integration_sync_log integration_sync_log_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_sync_log
+    ADD CONSTRAINT integration_sync_log_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.integration_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: integration_sync_log integration_sync_log_mapping_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_sync_log
+    ADD CONSTRAINT integration_sync_log_mapping_id_fkey FOREIGN KEY (mapping_id) REFERENCES public.import_mappings(id) ON DELETE CASCADE;
+
+
+--
+-- Name: integration_sync_log integration_sync_log_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.integration_sync_log
+    ADD CONSTRAINT integration_sync_log_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6541,7 +6828,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 792Apy97x2nvt29vcbA31nfERiv5Zogn1fJmVIj578HPOdocHbpQeHdFUBfmGB5
+\unrestrict sgSok1vcBphsCYNo8eZ37dEVOyfwfNLSybloXVw3KSj8gp8x4D9WdGAuocmCnxj
 
 --
 -- PostgreSQL database cluster dump complete

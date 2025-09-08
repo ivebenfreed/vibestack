@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/state-machines'
+import { useOrgAbility, useOrgTrialStatus } from '@/contexts/AbilityContext'
 // Temporarily commented out - no longer using this pattern
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -98,6 +99,8 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
   const [creating, setCreating] = useState(false)
   
   const { currentOrganization } = useAuth()
+  const orgAbility = useOrgAbility(currentOrganization)
+  const orgTrialStatus = useOrgTrialStatus(currentOrganization)
   
   const handleArchetypeChange = (archetype: string) => {
     setSelectedArchetype(archetype)
@@ -105,6 +108,27 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
   
   const handleCreate = async () => {
     if (!entityName || !selectedArchetype || !currentOrganization) return
+    
+    // Check if user can create entities for this organization
+    if (!orgAbility.can('create', 'entity') || !orgTrialStatus.canCreateEntities) {
+      if (orgTrialStatus.isExpired) {
+        toast.error('Trial Expired', {
+          description: `Your trial for ${currentOrganization.name} has expired. Please upgrade to continue creating entities.`,
+          action: {
+            label: 'Upgrade',
+            onClick: () => {
+              // Navigate to billing page
+              window.location.href = '/settings/billing';
+            }
+          }
+        })
+      } else {
+        toast.error('Access Denied', {
+          description: 'You do not have permission to create entities in this organization.'
+        })
+      }
+      return
+    }
     
     // Validate entity name
     if (!entityName.match(/^[A-Z][a-zA-Z0-9]*$/)) {
@@ -143,7 +167,35 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
         deleted: false
       }
       
-      // TODO: Implement entity creation with new pattern
+      // Make API call to create entity
+      const response = await fetch(`/api/dataforge/orgs/${currentOrganization.id}/entities`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          entityName: entityName,
+          archetype: selectedArchetype,
+          customFields: definition.fields
+        })
+      })
+      
+      // Check for 402 (trial expired)
+      if (response.status === 402) {
+        // The global interceptor will handle showing the toast and redirecting
+        // Just close the dialog
+        onOpenChange(false)
+        return
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || errorData.message || 'Failed to create entity type')
+      }
+      
+      const result = await response.json()
+      
       toast.success('Entity Type Created', {
         description: `Successfully created new entity type: ${entityName}`
       })

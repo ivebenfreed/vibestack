@@ -17,6 +17,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "agents": "^0.0.113",
     "@casl/ability": "^6.7.3",
     "@casl/react": "^5.0.0",
     "@cloudflare/actors": "0.0.1-beta.3",

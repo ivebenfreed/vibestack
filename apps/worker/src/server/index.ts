@@ -25,6 +25,8 @@ import { databaseInit } from './middleware/database-init'; // <-- Import databas
 import authRouter from './api/auth';
 import polarWebhooksRouter from './api/polar-webhooks';
 import debugBillingRouter from './api/debug-billing';
+import registrationRouter from './api/registration';
+import billingRouter from './api/billing';
 import { mountProtectedRoutes } from './routes/protected-routes';
 import { cloudflareSecurityStack } from './middleware/cloudflare-security';
 import { organizationActorRouter } from './routes/organization-actor';
@@ -512,6 +514,12 @@ apiApp.route('/', polarWebhooksRouter);
 // Mount debug endpoints BEFORE auth middleware (for testing)
 apiApp.route('/', debugBillingRouter);
 
+// Mount registration routes (public - no auth required)
+apiApp.route('/registration', registrationRouter);
+
+// Mount billing routes (public - for getting products, but auth required for actions)
+apiApp.route('/', billingRouter);
+
 // Initialize database connection ONCE per request before auth and other operations
 apiApp.use('*', databaseInit);
 
@@ -535,6 +543,10 @@ apiApp.route('/admin', adminRouter);
 // Mount organization-scoped admin routes
 import { orgAdminRouter } from './routes/organization-admin.js';
 apiApp.route('/org-admin', orgAdminRouter);
+
+// Mount MCP agent routes (requires auth for now)
+import { mcpRouter } from './routes/mcp';
+apiApp.route('/mcp', mcpRouter);
 
 // Mount protected routes with mandatory context validation
 mountProtectedRoutes(apiApp);
