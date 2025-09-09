@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lYJWjwczT8xf3eV4hRtNFjCdbPRw8vGAl3vahFqa7NTiwsgm7hLXdmwdwUqgQig
+\restrict fWENata5h0z3sVaPcmBbCxvqdCgN1G52k0f9W3T6DXzQwesY9so5a9q9qO8LiTP
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -890,10 +890,10 @@ dc0e450d-7a03-449b-8573-04a5c83c5c8f	01920000-1000-7000-8000-000000000001	0198b0
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_taskv2 (id, organization_id, created_at, updated_at, title, description, priority, status, due_date, custom_fields, label, tags, start_date) FROM stdin;
+9b551adb-c7e8-4a30-b3e4-968bf6731c41	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.34	2025-09-09 14:16:32.318	Implement contact form with spam protection	Build secure contact form with reCAPTCHA, email notifications, and CRM integration	medium	blocked	2025-09-22 21:00:00	{"tags": "frontend,backend", "label": "feature", "start_date": "2025-09-16T09:00:00Z"}	\N	[]	\N
 6db6824d-f9a9-4179-91e7-dfd73acbc206	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:04.18	2025-09-09 12:55:26.099	Conduct user acceptance testing	Run comprehensive UAT sessions with key stakeholders to validate the new design meets requirements	high	not_started	2025-09-30 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-13T09:00:00Z"}	\N	[]	\N
 1fc89bdc-84ff-4b9c-b4c2-b64fc5355855	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:04.481	2025-09-09 12:55:26.344	Update SEO meta tags and schema markup	Implement proper SEO optimization including meta descriptions, structured data, and Open Graph tags	medium	not_started	2025-10-05 17:00:00	{"tags": ["database"], "label": "enhancement", "start_date": "2025-09-14T09:00:00Z"}	\N	[]	\N
 650d122c-00a4-4d0f-88df-5ebb0156907a	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.059	2025-09-09 12:55:26.584	Create content migration strategy	Plan and execute migration of existing content to new site structure with proper URL redirects	critical	active	2025-09-18 17:00:00	{"tags": ["database"], "label": "feature", "start_date": "2025-09-15T09:00:00Z"}	\N	[]	\N
-9b551adb-c7e8-4a30-b3e4-968bf6731c41	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.34	2025-09-09 12:55:26.831	Implement contact form with spam protection	Build secure contact form with reCAPTCHA, email notifications, and CRM integration	medium	blocked	2025-09-22 17:00:00	{"tags": ["frontend", "backend"], "label": "feature", "start_date": "2025-09-16T09:00:00Z"}	\N	[]	\N
 47b0e358-9b36-4132-a714-8c12eb04c93c	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.639	2025-09-09 12:55:27.073	Launch website to production environment	Deploy new website to production with proper monitoring, rollback plan, and performance verification	critical	not_started	2025-10-15 17:00:00	{"tags": ["backend"], "label": "feature", "start_date": "2025-09-17T09:00:00Z"}	\N	[]	\N
 812fc56a-edac-43f0-a1ed-1727d98f42a5	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.931	2025-09-09 12:55:27.324	Research and select cross-platform framework	Evaluate React Native vs Flutter for cross-platform development, considering team skills and project requirements	critical	done	2025-08-30 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-18T09:00:00Z"}	\N	[]	\N
 51c66282-c6fa-4e12-a2cd-2588627565e7	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:06.231	2025-09-09 12:55:27.601	Design mobile app user interface mockups	Create detailed UI/UX mockups for all app screens with focus on mobile-first design principles	high	active	2025-09-25 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-19T09:00:00Z"}	\N	[]	\N
@@ -1780,5 +1780,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lYJWjwczT8xf3eV4hRtNFjCdbPRw8vGAl3vahFqa7NTiwsgm7hLXdmwdwUqgQig
+\unrestrict fWENata5h0z3sVaPcmBbCxvqdCgN1G52k0f9W3T6DXzQwesY9so5a9q9qO8LiTP
 
