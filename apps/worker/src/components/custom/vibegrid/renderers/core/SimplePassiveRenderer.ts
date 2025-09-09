@@ -39,6 +39,7 @@ export class SimplePassiveRenderer {
   private container: HTMLElement;
   private viewport: HTMLElement | null = null;
   private headerContainer: HTMLElement | null = null;
+  private headerViewport: HTMLElement | null = null;
   private bodyContainer: HTMLElement | null = null;
   private disposers: (() => void)[] = [];
   
@@ -173,9 +174,9 @@ export class SimplePassiveRenderer {
     // Create main table container
     const table = this.createElement('div', 'vibegridx-table');
     
-    // Header container
-    this.headerContainer = this.createElement('div', 'vibegridx-header');
-    this.headerContainer.style.cssText = `
+    // Header viewport wrapper (for proper horizontal scrolling sync)
+    this.headerViewport = this.createElement('div', 'vibegridx-header-viewport');
+    this.headerViewport.style.cssText = `
       position: absolute;
       top: 0;
       left: 0;
@@ -183,8 +184,22 @@ export class SimplePassiveRenderer {
       height: ${HEADER_HEIGHT}px;
       background: #f8f9fa;
       border-bottom: 1px solid #e9ecef;
-      overflow: hidden;
+      overflow-x: scroll;
+      overflow-y: hidden;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
       z-index: 10;
+    `;
+    
+    // Hide webkit scrollbars for header viewport
+    this.headerViewport.style.setProperty('-webkit-overflow-scrolling', 'touch');
+    
+    // Header container (scrollable content inside viewport)
+    this.headerContainer = this.createElement('div', 'vibegridx-header');
+    this.headerContainer.style.cssText = `
+      position: relative;
+      white-space: nowrap;
+      height: 100%;
     `;
     
     // Viewport (scrollable area)
@@ -205,9 +220,10 @@ export class SimplePassiveRenderer {
       width: 100%;
     `;
     
-    // Assemble structure like UnifiedTableRenderer
+    // Assemble structure with header viewport wrapper
+    this.headerViewport.appendChild(this.headerContainer);
     this.viewport.appendChild(this.bodyContainer);
-    table.appendChild(this.headerContainer);
+    table.appendChild(this.headerViewport);
     table.appendChild(this.viewport);
     this.container.appendChild(table);
     
@@ -678,19 +694,46 @@ export class SimplePassiveRenderer {
     
     headerRow.appendChild(cornerCell);
     
-    // Filter columns by visibility (using cached columnVisibility)
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    // Get virtual column range for horizontal scrolling
+    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
+    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
-    log.info('🎨 Rendering header with visible columns', { 
-      totalColumns: columns.length, 
-      visibleColumns: visibleColumns.length 
+    // Apply horizontal virtual scrolling - only render columns in visible range
+    const startColIndex = Math.max(0, visibleColumnRange.start);
+    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
+    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
+    
+    log.info('🎨 Rendering header with column virtual scrolling', { 
+      totalColumns: columns.length,
+      allVisibleColumns: allVisibleColumns.length,
+      virtualRange: `${startColIndex}-${endColIndex}`,
+      renderingColumns: virtualColumns.length
     });
     
     // Update column coordinate mapping (account for 40px row header)
     this.coordinateMapping.columns = [];
     let xOffset = 40; // Start after row header
     
-    visibleColumns.forEach((column, index) => {
+    // Build complete coordinate mapping for all visible columns (for overlays)
+    allVisibleColumns.forEach((column, index) => {
+      this.coordinateMapping.columns.push({
+        columnId: column.id,
+        x: xOffset,
+        width: column.width,
+        index: index,
+        offset: xOffset
+      });
+      xOffset += column.width;
+    });
+    
+    // Reset xOffset for virtual column rendering
+    xOffset = 40;
+    for (let i = 0; i < startColIndex; i++) {
+      xOffset += allVisibleColumns[i].width;
+    }
+    
+    virtualColumns.forEach((column, virtualIndex) => {
+      const actualIndex = startColIndex + virtualIndex;
       const headerCell = this.createElement('div', 'vibegridx-header-cell');
       headerCell.style.cssText = `
         flex: 0 0 ${column.width}px;
@@ -779,14 +822,7 @@ export class SimplePassiveRenderer {
       
       headerCell.appendChild(resizeHandle);
       
-      // Add to coordinate mapping
-      this.coordinateMapping.columns.push({
-        columnId: column.id,
-        x: xOffset,
-        width: column.width,
-        index: index,
-        offset: xOffset
-      });
+      // Update xOffset for next column positioning
       xOffset += column.width;
       
       // Add click handler for sorting and column selection
@@ -855,8 +891,14 @@ export class SimplePassiveRenderer {
       rendering: visibleRows.length
     });
     
-    // Filter columns by visibility (using cached columnVisibility)
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    // Get virtual column range for horizontal scrolling (same as header)
+    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
+    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    
+    // Apply horizontal virtual scrolling - only render columns in visible range
+    const startColIndex = Math.max(0, visibleColumnRange.start);
+    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
+    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
     
     // Render only visible rows with proper positioning
     visibleRows.forEach((row, visibleIndex) => {
@@ -868,7 +910,7 @@ export class SimplePassiveRenderer {
       if (row.type === 'group') {
         rowElement = this.createGroupHeaderElement(row, actualRowIndex);
       } else {
-        rowElement = this.createRowElement(row.data || row, actualRowIndex, visibleColumns, columnVisibility);
+        rowElement = this.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility);
       }
       
       this.bodyContainer.appendChild(rowElement);
@@ -1002,13 +1044,15 @@ export class SimplePassiveRenderer {
       `;
       checkbox.dataset.rowId = row.id;
       
-      // Check if this row is currently selected (use the visible columns passed in)
-      const visibleColumns = columns; // columns parameter is now already filtered
+      // Check if this row is currently selected (use ALL visible columns, not just virtual ones)
+      const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
+        this.tableCore$.columnVisibility.get()[col.id] !== false
+      );
       
       const selectedCells = this.tableInteraction$.selectedCells.get();
-      const isRowSelected = visibleColumns.every(col => 
+      const isRowSelected = allVisibleColumns.every(col => 
         selectedCells.has(`${row.id}:${col.id}`)
-      ) && visibleColumns.length > 0;
+      ) && allVisibleColumns.length > 0;
       
       checkbox.checked = isRowSelected;
       
@@ -1337,6 +1381,7 @@ export class SimplePassiveRenderer {
     this.activeRows.clear();
     this.viewport = null;
     this.headerContainer = null;
+    this.headerViewport = null;
     this.bodyContainer = null;
     this.selectionManager = null;
     this.canvasOverlay = null;
@@ -1770,13 +1815,13 @@ export class SimplePassiveRenderer {
   
   /**
    * Synchronize header horizontal scroll with viewport
-   * Reused from UnifiedTableRenderer.syncHeaderScroll() - 100% compatible
+   * Now properly syncs header scroll position instead of using transforms
    */
   private syncHeaderScroll(scrollLeft: number): void {
-    if (!this._scrollRAF && this.headerContainer) {
+    if (!this._scrollRAF && this.headerViewport) {
       this._scrollRAF = requestAnimationFrame(() => {
-        if (this.headerContainer) {
-          this.headerContainer.style.transform = `translateX(-${scrollLeft}px)`;
+        if (this.headerViewport) {
+          this.headerViewport.scrollLeft = scrollLeft;
           log.debug('📜 Header scroll synced', { scrollLeft });
         }
         this._scrollRAF = null;
