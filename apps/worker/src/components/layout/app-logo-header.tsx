@@ -47,7 +47,7 @@ export function AppLogoHeader({ isCollapsed }: AppLogoHeaderProps) {
           visibility: isCollapsed ? 'hidden' : 'visible'
         }}
       >
-        Vibestack
+        Elevra
       </span>
     </div>
   );

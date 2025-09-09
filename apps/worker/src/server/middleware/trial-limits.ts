@@ -33,7 +33,7 @@ export async function enforceTrialLimits(c: Context, next: Next) {
       return c.json({
         error: 'Trial expired',
         details: {
-          message: `Your 14-day trial expired ${trialCheck.daysExpired} days ago. Please upgrade to continue using VibeStack.`,
+          message: `Your 14-day trial expired ${trialCheck.daysExpired} days ago. Please upgrade to continue using Elevra.`,
           trial_ended_at: trialCheck.trialEndedAt,
           days_expired: trialCheck.daysExpired,
           upgrade_url: '/billing/upgrade',

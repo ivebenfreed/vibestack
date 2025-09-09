@@ -8,12 +8,12 @@
 
 - **Unified Application**: `http://localhost:4000` (configurable via `DEV_PORT` env var)
 - **Frontend & Backend**: Single Cloudflare Worker with integrated Vite dev server
-- **Database**: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
+- **Database**: `postgres://postgres:postgres@localhost:5432/elevra_dev`
 - **Architecture**: Full-stack React app with Cloudflare Workers backend, unified in single app
 
 ## Single Worker App Architecture
 
-**VibeStack has been unified into a single Cloudflare Worker application that combines both frontend and backend:**
+**Elevra has been unified into a single Cloudflare Worker application that combines both frontend and backend:**
 
 ### Key Benefits
 - **Simplified Development**: Single `pnpm dev` command starts everything
@@ -136,7 +136,7 @@ pnpm dev
 
 # Test API directly
 curl -X GET http://localhost:4000/health
-psql postgres://postgres:postgres@localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
+psql postgres://postgres:postgres@localhost:5432/elevra_dev -c "SELECT * FROM organizations;"
 
 # Test authentication (recommended approach using JSON file with heredoc)
 cat > /tmp/login_payload.json << 'EOF'
@@ -256,12 +256,12 @@ cd main-postgres
 docker compose up -d
 
 # Database will be available at:
-# postgres://postgres:postgres@localhost:5432/vibestack_dev
+# postgres://postgres:postgres@localhost:5432/elevra_dev
 ```
 
 **IMPORTANT**: The PostgreSQL container uses `data/postgres-live/` as its data directory, which contains git-tracked database state. This ensures consistent database schema and test data across all development environments.
 
-**Data Directory**: `/home/benfreed/dev/vibestack/data/postgres-live/`
+**Data Directory**: `/home/benfreed/dev/elevra/data/postgres-live/`
 - Contains complete PostgreSQL data directory
 - Includes all tables, schemas, and test data
 - Automatically synced to git on commits via pre-commit hook
@@ -301,12 +301,12 @@ If you see database connection errors:
 3. **Check container status**:
    ```bash
    docker ps | grep postgres
-   # Should show vibestack-postgres running on port 5432
+   # Should show elevra-postgres running on port 5432
    ```
 
 4. **Verify database connectivity**:
    ```bash
-   docker exec vibestack-postgres pg_isready -U postgres
+   docker exec elevra-postgres pg_isready -U postgres
    ```
 
 **Error patterns to look for:**
@@ -628,7 +628,7 @@ rm -rf .playwright/profiles/profile-main/
 
 - Maintain a precise understanding of the interaction flow between components
 - Track message types, data transformations, and sync mechanisms
-- Memorize the nuanced communication patterns in the VibeStack architecture
+- Memorize the nuanced communication patterns in the Elevra architecture
 - Pay special attention to WebSocket message structures and sync protocols
 
 

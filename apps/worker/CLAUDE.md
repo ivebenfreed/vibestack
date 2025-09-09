@@ -72,7 +72,7 @@ This is a full-stack React admin dashboard built for Cloudflare Workers with the
 
 ## AI Universe Architecture
 
-VibeStack implements an **AI Universe** model for organizing life and work across major areas with lore and canon frameworks:
+Elevra implements an **AI Universe** model for organizing life and work across major areas with lore and canon frameworks:
 
 ### Universe Hierarchy
 ```

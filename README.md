@@ -1,4 +1,4 @@
-# VibeStack
+# Elevra
 
 ## A full stack, local first, edge and AI native framework for data intensive web applications.
 
@@ -95,7 +95,7 @@
 ## Project Structure
 
 ```
-vibestack/
+elevra/
 ├── apps/                    # Application implementations
 │   ├── server/             # Hono server with ReplicationDO and SyncDO
 │   └── web/                # React client with PGLite integration
@@ -127,8 +127,8 @@ vibestack/
 
 1. Clone the repository:
    ```bash
-   git clone git@github.com:codevibesmatter/vibestack.git
-   cd vibestack
+   git clone git@github.com:codevibesmatter/elevra.git
+   cd elevra
    ```
 2. Install dependencies:
    ```bash
@@ -147,7 +147,7 @@ vibestack/
 
 ## Authentication System (Better Auth)
 
-VibeStack uses **Better Auth** for a complete, secure authentication system with advanced features:
+Elevra uses **Better Auth** for a complete, secure authentication system with advanced features:
 
 ### Core Authentication Features
 
@@ -265,7 +265,7 @@ pnpm --filter @repo/sync-test test
 pnpm test:sync-isolation
 
 # Run web sync isolation tests
-pnpm --filter vibestack-web test:sync-isolation
+pnpm --filter elevra-web test:sync-isolation
 ```
 
 #### Build and Quality Tests
@@ -383,7 +383,7 @@ pnpm cli init-dataforge
 
 ## Acknowledgments
 
-VibeStack is built with amazing open-source technologies and draws inspiration from various community projects:
+Elevra is built with amazing open-source technologies and draws inspiration from various community projects:
 
 - **[shadcn/ui](https://ui.shadcn.com/)** - Beautiful, accessible React components built with Radix UI and Tailwind CSS
 - **Shadcn-based admin templates** - UI patterns and design inspiration for modern admin dashboards
@@ -391,7 +391,7 @@ VibeStack is built with amazing open-source technologies and draws inspiration f
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
 - **[Tabler Icons](https://tabler.io/icons)** & **[Lucide React](https://lucide.dev/)** - Beautiful icon libraries
 
-Special thanks to the open-source community for creating the foundational tools that make VibeStack possible.
+Special thanks to the open-source community for creating the foundational tools that make Elevra possible.
 
 For detailed attributions and credits, see [ATTRIBUTIONS.md](./ATTRIBUTIONS.md).
 

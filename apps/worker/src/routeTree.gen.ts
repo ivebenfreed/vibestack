@@ -44,9 +44,9 @@ import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authentica
 import { Route as AuthenticatedWorldsWorldIdRouteImport } from './routes/_authenticated/worlds/$worldId'
 import { Route as AuthenticatedTasksTimelineRouteImport } from './routes/_authenticated/tasks/timeline'
 import { Route as AuthenticatedTasksKanbanRouteImport } from './routes/_authenticated/tasks/kanban'
+import { Route as AuthenticatedSettingsOrganizationRouteImport } from './routes/_authenticated/settings/organization'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
-import { Route as AuthenticatedSettingsImportRouteImport } from './routes/_authenticated/settings/import'
-import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
+import { Route as AuthenticatedSettingsMembersRouteImport } from './routes/_authenticated/settings/members'
 import { Route as AuthenticatedSettingsBillingRouteImport } from './routes/_authenticated/settings/billing'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
@@ -61,7 +61,6 @@ import { Route as AuthenticatedDebugLegendTableRouteImport } from './routes/_aut
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
 import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
-import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
 import { Route as AuthenticatedOrgOrgIdTestPassiveRendererRouteImport } from './routes/_authenticated/org/$orgId/test-passive-renderer'
 import { Route as AuthenticatedOrgOrgIdDashboardRouteImport } from './routes/_authenticated/org/$orgId/dashboard'
 import { Route as AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport } from './routes/_authenticated/org/$orgId/entities/$entityName'
@@ -314,22 +313,22 @@ const AuthenticatedTasksKanbanRoute =
     path: '/tasks/kanban',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSettingsOrganizationRoute =
+  AuthenticatedSettingsOrganizationRouteImport.update({
+    id: '/organization',
+    path: '/organization',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-const AuthenticatedSettingsImportRoute =
-  AuthenticatedSettingsImportRouteImport.update({
-    id: '/import',
-    path: '/import',
-    getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any)
-const AuthenticatedSettingsDisplayRoute =
-  AuthenticatedSettingsDisplayRouteImport.update({
-    id: '/display',
-    path: '/display',
+const AuthenticatedSettingsMembersRoute =
+  AuthenticatedSettingsMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
 const AuthenticatedSettingsBillingRoute =
@@ -416,12 +415,6 @@ const AuthenticatedOrgOrgIdIndexRoute =
     path: '/org/$orgId/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedSettingsAdminUsersRoute =
-  AuthenticatedSettingsAdminUsersRouteImport.update({
-    id: '/admin/users',
-    path: '/admin/users',
-    getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any)
 const AuthenticatedOrgOrgIdTestPassiveRendererRoute =
   AuthenticatedOrgOrgIdTestPassiveRendererRouteImport.update({
     id: '/org/$orgId/test-passive-renderer',
@@ -475,9 +468,9 @@ export interface FileRoutesByFullPath {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/billing': typeof AuthenticatedSettingsBillingRoute
-  '/settings/display': typeof AuthenticatedSettingsDisplayRoute
-  '/settings/import': typeof AuthenticatedSettingsImportRoute
+  '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/settings/organization': typeof AuthenticatedSettingsOrganizationRoute
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
@@ -498,7 +491,6 @@ export interface FileRoutesByFullPath {
   '/worlds': typeof AuthenticatedWorldsIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
-  '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
@@ -534,9 +526,9 @@ export interface FileRoutesByTo {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/billing': typeof AuthenticatedSettingsBillingRoute
-  '/settings/display': typeof AuthenticatedSettingsDisplayRoute
-  '/settings/import': typeof AuthenticatedSettingsImportRoute
+  '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/settings/organization': typeof AuthenticatedSettingsOrganizationRoute
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
@@ -557,7 +549,6 @@ export interface FileRoutesByTo {
   '/worlds': typeof AuthenticatedWorldsIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
-  '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
@@ -597,9 +588,9 @@ export interface FileRoutesById {
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingRoute
-  '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
-  '/_authenticated/settings/import': typeof AuthenticatedSettingsImportRoute
+  '/_authenticated/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationRoute
   '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/_authenticated/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
@@ -620,7 +611,6 @@ export interface FileRoutesById {
   '/_authenticated/worlds/': typeof AuthenticatedWorldsIndexRoute
   '/_authenticated/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/_authenticated/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
-  '/_authenticated/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
   '/_authenticated/org/$orgId/': typeof AuthenticatedOrgOrgIdIndexRoute
   '/_authenticated/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
 }
@@ -660,9 +650,9 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/billing'
-    | '/settings/display'
-    | '/settings/import'
+    | '/settings/members'
     | '/settings/notifications'
+    | '/settings/organization'
     | '/tasks/kanban'
     | '/tasks/timeline'
     | '/worlds/$worldId'
@@ -683,7 +673,6 @@ export interface FileRouteTypes {
     | '/worlds'
     | '/org/$orgId/dashboard'
     | '/org/$orgId/test-passive-renderer'
-    | '/settings/admin/users'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
   fileRoutesByTo: FileRoutesByTo
@@ -719,9 +708,9 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/billing'
-    | '/settings/display'
-    | '/settings/import'
+    | '/settings/members'
     | '/settings/notifications'
+    | '/settings/organization'
     | '/tasks/kanban'
     | '/tasks/timeline'
     | '/worlds/$worldId'
@@ -742,7 +731,6 @@ export interface FileRouteTypes {
     | '/worlds'
     | '/org/$orgId/dashboard'
     | '/org/$orgId/test-passive-renderer'
-    | '/settings/admin/users'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
   id:
@@ -781,9 +769,9 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/billing'
-    | '/_authenticated/settings/display'
-    | '/_authenticated/settings/import'
+    | '/_authenticated/settings/members'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/settings/organization'
     | '/_authenticated/tasks/kanban'
     | '/_authenticated/tasks/timeline'
     | '/_authenticated/worlds/$worldId'
@@ -804,7 +792,6 @@ export interface FileRouteTypes {
     | '/_authenticated/worlds/'
     | '/_authenticated/org/$orgId/dashboard'
     | '/_authenticated/org/$orgId/test-passive-renderer'
-    | '/_authenticated/settings/admin/users'
     | '/_authenticated/org/$orgId/'
     | '/_authenticated/org/$orgId/entities/$entityName'
   fileRoutesById: FileRoutesById
@@ -1105,6 +1092,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTasksKanbanRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings/organization': {
+      id: '/_authenticated/settings/organization'
+      path: '/organization'
+      fullPath: '/settings/organization'
+      preLoaderRoute: typeof AuthenticatedSettingsOrganizationRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/notifications': {
       id: '/_authenticated/settings/notifications'
       path: '/notifications'
@@ -1112,18 +1106,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/_authenticated/settings/import': {
-      id: '/_authenticated/settings/import'
-      path: '/import'
-      fullPath: '/settings/import'
-      preLoaderRoute: typeof AuthenticatedSettingsImportRouteImport
-      parentRoute: typeof AuthenticatedSettingsRouteRoute
-    }
-    '/_authenticated/settings/display': {
-      id: '/_authenticated/settings/display'
-      path: '/display'
-      fullPath: '/settings/display'
-      preLoaderRoute: typeof AuthenticatedSettingsDisplayRouteImport
+    '/_authenticated/settings/members': {
+      id: '/_authenticated/settings/members'
+      path: '/members'
+      fullPath: '/settings/members'
+      preLoaderRoute: typeof AuthenticatedSettingsMembersRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
     '/_authenticated/settings/billing': {
@@ -1224,13 +1211,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrgOrgIdIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/settings/admin/users': {
-      id: '/_authenticated/settings/admin/users'
-      path: '/admin/users'
-      fullPath: '/settings/admin/users'
-      preLoaderRoute: typeof AuthenticatedSettingsAdminUsersRouteImport
-      parentRoute: typeof AuthenticatedSettingsRouteRoute
-    }
     '/_authenticated/org/$orgId/test-passive-renderer': {
       id: '/_authenticated/org/$orgId/test-passive-renderer'
       path: '/org/$orgId/test-passive-renderer'
@@ -1317,11 +1297,10 @@ interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
   AuthenticatedSettingsBillingRoute: typeof AuthenticatedSettingsBillingRoute
-  AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
-  AuthenticatedSettingsImportRoute: typeof AuthenticatedSettingsImportRoute
+  AuthenticatedSettingsMembersRoute: typeof AuthenticatedSettingsMembersRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
+  AuthenticatedSettingsOrganizationRoute: typeof AuthenticatedSettingsOrganizationRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
-  AuthenticatedSettingsAdminUsersRoute: typeof AuthenticatedSettingsAdminUsersRoute
 }
 
 const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
@@ -1329,12 +1308,12 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
     AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
     AuthenticatedSettingsBillingRoute: AuthenticatedSettingsBillingRoute,
-    AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
-    AuthenticatedSettingsImportRoute: AuthenticatedSettingsImportRoute,
+    AuthenticatedSettingsMembersRoute: AuthenticatedSettingsMembersRoute,
     AuthenticatedSettingsNotificationsRoute:
       AuthenticatedSettingsNotificationsRoute,
+    AuthenticatedSettingsOrganizationRoute:
+      AuthenticatedSettingsOrganizationRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
-    AuthenticatedSettingsAdminUsersRoute: AuthenticatedSettingsAdminUsersRoute,
   }
 
 const AuthenticatedSettingsRouteRouteWithChildren =

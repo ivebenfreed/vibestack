@@ -1,5 +1,5 @@
 {
-  "name": "vibestack",
+  "name": "elevra",
   "private": true,
   "scripts": {
     "build": "pnpm --filter @repo/sync-types build && pnpm --filter ./apps/worker build",

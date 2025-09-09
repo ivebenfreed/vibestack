@@ -561,12 +561,12 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
     const signupUrl = `${baseUrl}/sign-up?token=${tokenResult.token}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&role=${encodeURIComponent(role)}&invitedBy=${encodeURIComponent(c.var.user?.email || '')}`;
     
     await resend.emails.send({
-      from: 'VibeStack <noreply@codevibesmatter.com>',
+      from: 'Elevra <noreply@codevibesmatter.com>',
       to: email,
-      subject: 'Welcome to VibeStack - Create Your Account',
+      subject: 'Welcome to Elevra - Create Your Account',
       html: `
-        <h1>Welcome to VibeStack!</h1>
-        <p>You've been invited to join VibeStack as a <strong>${role}</strong>. Click the link below to create your account:</p>
+        <h1>Welcome to Elevra!</h1>
+        <p>You've been invited to join Elevra as a <strong>${role}</strong>. Click the link below to create your account:</p>
         <a href="${signupUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 16px 0;">
           Create Your Account
         </a>
@@ -575,7 +575,7 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
           <li>Click the link above to access the signup page</li>
           <li>Choose your own password</li>
           <li>Verify your email address</li>
-          <li>Start using VibeStack!</li>
+          <li>Start using Elevra!</li>
         </ul>
         <p style="color: #666; font-size: 14px;">This invitation link will expire in 24 hours for security. If you have any questions, please contact your administrator.</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
@@ -795,7 +795,7 @@ authRouter.post("/enable-totp", async (c) => {
       return c.json({ error: "Failed to generate TOTP setup" }, 500);
     }
 
-    const qrCodeUri = `otpauth://totp/VibeStack:${encodeURIComponent(user.email)}?secret=${totpResult.totpSecret}&issuer=VibeStack&algorithm=SHA1&digits=6&period=30`;
+    const qrCodeUri = `otpauth://totp/Elevra:${encodeURIComponent(user.email)}?secret=${totpResult.totpSecret}&issuer=Elevra&algorithm=SHA1&digits=6&period=30`;
 
     dbLogger.info('TOTP setup initiated', { 
       userId: user.id, 

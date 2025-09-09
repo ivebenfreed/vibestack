@@ -74,7 +74,7 @@ export class EmbeddingGeneratorDO extends DurableObject {
    * Test endpoint to validate EmbeddingGemma model and get dimensions
    */
   private async testEmbedding(request: { text: string }): Promise<Response> {
-    const text = request.text || "Testing EmbeddingGemma model with VibeStack content analysis";
+    const text = request.text || "Testing EmbeddingGemma model with Elevra content analysis";
     
     log.info('Testing EmbeddingGemma model', { textLength: text.length });
     

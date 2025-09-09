@@ -1,4 +1,4 @@
-name = "vibestack-worker"
+name = "elevra-worker"
 main = "worker.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -77,7 +77,7 @@ simple = { limit = 3, period = 3600 }
 [[hyperdrive]]
 binding = "HYPERDRIVE_DB"
 id = "placeholder-hyperdrive-id"
-localConnectionString = "postgresql://postgres:postgres@localhost:5432/vibestack_dev"
+localConnectionString = "postgresql://postgres:postgres@localhost:5432/elevra_dev"
 
 # KV namespace configuration
 [[kv_namespaces]]
@@ -92,7 +92,7 @@ preview_id = "b35f1142406543d79f9445f1af5c6abc"
 
 # Staging environment
 [env.staging]
-name = "vibestack-worker-staging"
+name = "elevra-worker-staging"
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
@@ -104,7 +104,7 @@ RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
 
 # Production environment
 [env.production]
-name = "vibestack-worker-production"
+name = "elevra-worker-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
