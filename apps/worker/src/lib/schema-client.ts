@@ -244,7 +244,7 @@ export class OrgSchemaClient {
           syncableFields,
           customFields: customFieldsMap,
           relationshipFields: relationshipFieldsMap,
-          allFields: { ...syncableFields, ...customFieldsMap },
+          allFields: { ...syncableFields, ...customFieldsMap, ...relationshipFieldsMap },
           businessMetadata
         };
       });

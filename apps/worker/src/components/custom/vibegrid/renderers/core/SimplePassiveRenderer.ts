@@ -139,6 +139,16 @@ export class SimplePassiveRenderer {
       },
       onCancel: () => {
         this.tableInteraction$.cancelEdit();
+      },
+      // Add relationshipContext for ComboboxEditor options loading
+      relationshipContext: {
+        // Basic context object - ComboboxEditor mainly just checks for existence
+        relationshipResolvers: {}
+      },
+      // Add getRowData function to access current row data from observables
+      getRowData: (rowId: string) => {
+        const processedRows = this.tableCore$.processedRows.get();
+        return processedRows.find((row: any) => row.id === rowId) || null;
       }
     });
     

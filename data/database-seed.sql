@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qIN8eF2jLQ499rB2aNECU9sei9QsAoPwG7kT9P5JTZE7GA0yy6KgeW8jvEPsp84
+\restrict DA8ZOWDvYviJ0e3Fex0Pe8Y8c0Dmpv8MVKIUARFI0nIYU6oGBtGUkHKY9hAxb36
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -631,9 +631,7 @@ COPY public.org_01920000_1000_7000_8000_000000000001_softdeletetests (id, organi
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_task (id, organization_id, created_by, created_at, updated_at, title, description, priority, status, assignee_id, reporter_id, due_date, estimated_hours, actual_hours, task_type, parent_task_id, project_id, sprint_id, story_points) FROM stdin;
-50c67b55-6e6c-4f0d-b6e6-7e25d0ca9786	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:34.509	2025-09-08 12:25:34.509	Test Vertical Scroll 6	Testing vertical scrolling with many tasks - Task 6	high	todo	\N	\N	\N	7	\N	feature	\N	\N	\N	\N
 a13c8b30-f6cc-4009-89f7-4a56351b5047	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:34.97	2025-09-08 12:25:34.97	Test Vertical Scroll 7	Testing vertical scrolling with many tasks - Task 7	medium	todo	\N	\N	\N	8	\N	bug	\N	\N	\N	\N
-55e0fefd-febe-49ff-a34e-da4d1392184b	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.148	2025-09-08 12:25:35.148	Test Vertical Scroll 8	Testing vertical scrolling with many tasks - Task 8	low	completed	\N	\N	\N	9	\N	enhancement	\N	\N	\N	\N
 541d78cb-72c9-4acc-892b-c480600019f5	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.329	2025-09-08 12:25:35.329	Test Vertical Scroll 9	Testing vertical scrolling with many tasks - Task 9	high	in_progress	\N	\N	\N	10	\N	feature	\N	\N	\N	\N
 50f82ac0-8fe8-4d42-8d23-b29bad53047f	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.511	2025-09-08 12:25:35.511	Test Vertical Scroll 10	Testing vertical scrolling with many tasks - Task 10	medium	todo	\N	\N	\N	11	\N	bug	\N	\N	\N	\N
 c3cb3e4c-82fe-4105-a2ff-e655bcd68f46	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.708	2025-09-08 12:25:35.708	Test Vertical Scroll 11	Testing vertical scrolling with many tasks - Task 11	low	todo	\N	\N	\N	12	\N	enhancement	\N	\N	\N	\N
@@ -648,6 +646,8 @@ c3cb3e4c-82fe-4105-a2ff-e655bcd68f46	01920000-1000-7000-8000-000000000001	0198b0
 160e57e6-4eef-4e32-9afe-e4d052e9bde4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-09 00:55:34.071	Authentication system	Implement user authentication	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	feature	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 e1a00686-898b-4b89-ac6a-283a09d373f4	01920000-1000-7000-8000-000000000001	12480000-0000-4000-8000-000000000001	2025-09-07 16:51:29.535293	2025-09-09 00:56:24.151	Design mockups	Create UI/UX mockups	high	in_progress	12480000-0000-4000-8000-000000000001	\N	\N	\N	\N	design	\N	f95d1f22-1a38-4cf9-b76c-ba8414a8d278	\N	\N
 7186f37d-ea93-4f5e-af5c-61c5f8fac2e2	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:34.328	2025-09-09 01:21:21.431	Test Vertical Scroll 5 134	Testing vertical scrolling with many tasks - Task 5	low	in_progress	\N	\N	\N	6	\N	enhancement	\N	\N	\N	\N
+50c67b55-6e6c-4f0d-b6e6-7e25d0ca9786	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:34.509	2025-09-09 10:11:32.862	Test Vertical Scroll 6	Testing vertical scrolling with many tasks - Task 6	medium	todo	\N	\N	\N	7	\N	feature	\N	\N	\N	\N
+55e0fefd-febe-49ff-a34e-da4d1392184b	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.148	2025-09-09 10:11:37.74	Test Vertical Scroll 8	Testing vertical scrolling with many tasks - Task 8	low	todo	\N	\N	\N	9	\N	enhancement	\N	\N	\N	\N
 aaccd2af-15ee-4bca-9158-6d4dd9f44db3	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:35.899	2025-09-08 12:25:35.899	Test Vertical Scroll 12	Testing vertical scrolling with many tasks - Task 12	high	completed	\N	\N	\N	13	\N	feature	\N	\N	\N	\N
 7880be54-9ac1-4add-b349-9a205da057f0	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:36.092	2025-09-08 12:25:36.093	Test Vertical Scroll 13	Testing vertical scrolling with many tasks - Task 13	medium	in_progress	\N	\N	\N	14	\N	bug	\N	\N	\N	\N
 7e2be59a-c5eb-4003-8e97-047794b48206	01920000-1000-7000-8000-000000000001	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-08 12:25:36.276	2025-09-08 12:25:36.276	Test Vertical Scroll 14	Testing vertical scrolling with many tasks - Task 14	low	todo	\N	\N	\N	15	\N	enhancement	\N	\N	\N	\N
@@ -1495,5 +1495,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qIN8eF2jLQ499rB2aNECU9sei9QsAoPwG7kT9P5JTZE7GA0yy6KgeW8jvEPsp84
+\unrestrict DA8ZOWDvYviJ0e3Fex0Pe8Y8c0Dmpv8MVKIUARFI0nIYU6oGBtGUkHKY9hAxb36
 

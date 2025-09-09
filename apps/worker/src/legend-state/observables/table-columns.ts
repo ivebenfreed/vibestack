@@ -21,8 +21,11 @@ export interface TableColumn {
   sortable?: boolean;
   editable?: boolean;
   // Reference field information
-  referenceType?: 'user_reference' | 'entity_reference' | 'priority_option' | 'status_option' | 'task_type_option';
+  referenceType?: 'user_reference' | 'entity_reference' | 'priority_option' | 'status_option' | 'task_type_option' | 'category_option';
   referenceEntity?: string;
+  // NEW: System options configuration
+  systemOptionType?: string; // e.g., 'priority', 'status', 'task_type'
+  systemArchetype?: string;   // e.g., 'task', 'project', 'record'
   // NOTE: isResolved and baseField properties deprecated as of September 2025
 }
 
@@ -57,9 +60,26 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   );
 
   // Process entity fields from schema
-  const fields = entity.business_metadata?.fields || entity.fields || [];
+  // NEW: Handle Legend State observables - check allFields first, then fallback to legacy paths
+  const allFields = entity.allFields || {};
+  const legacyFields = entity.business_metadata?.fields || entity.fields || [];
   
-  for (const field of fields) {
+  // Convert allFields object to array format, accessing Legend State observables with .peek()
+  const fieldsArray = Object.keys(allFields).length > 0 
+    ? Object.entries(allFields).map(([fieldName, fieldObs]) => {
+        // Access Legend State observable properties with .peek()
+        const fieldData = fieldObs;
+        return {
+          name: fieldName,
+          type: fieldData.type?.peek?.() || fieldData.type,
+          label: fieldData.label?.peek?.() || fieldData.label,
+          required: fieldData.required?.peek?.() || fieldData.required || false,
+          defaultValue: fieldData.defaultValue?.peek?.() || fieldData.defaultValue
+        };
+      })
+    : legacyFields;
+  
+  for (const field of fieldsArray) {
     const column: TableColumn = {
       id: field.name,
       label: field.label || formatFieldLabel(field.name),
@@ -74,6 +94,60 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
     if (isReferenceField(field.type)) {
       column.referenceType = field.type as any;
       column.type = 'select'; // Reference fields are rendered as selects
+      
+      // NEW: For system options, add the systemOptionType and systemArchetype
+      if (['priority_option', 'status_option', 'category_option', 'task_type_option'].includes(field.type)) {
+        const optionType = field.type.replace('_option', ''); // priority_option -> priority
+        column.systemOptionType = optionType === 'category' ? 'task_type' : optionType; // Handle category -> task_type mapping
+        column.systemArchetype = entity.archetype || 'task'; // Default to task archetype
+        
+        // Add the relationship options provider function
+        column.relationshipOptionsProvider = async (relationshipContext) => {
+          const { systemOptionType, systemArchetype } = column;
+          
+          console.log('🔍 System options provider called', {
+            columnId: column.id,
+            systemOptionType,
+            systemArchetype,
+            hasContext: !!relationshipContext
+          });
+          
+          if (!systemOptionType || !systemArchetype) {
+            console.warn('Missing system option metadata for column', column.id);
+            return [];
+          }
+          
+          try {
+            const response = await fetch(`/api/dataforge/system-options/${systemOptionType}/${systemArchetype}`);
+            if (!response.ok) {
+              console.error(`Failed to fetch system options: ${response.status}`);
+              return [];
+            }
+            
+            const response_data = await response.json();
+            const data = response_data.data || response_data; // Handle both {success: true, data: [...]} and direct array formats
+            const mappedOptions = data.map((option: any) => ({
+              value: option.option_key,
+              label: option.label,
+              description: option.description,
+              color: option.color,
+              icon: option.icon,
+              group: 'System Options'
+            }));
+            
+            console.log('🔍 System options loaded successfully', {
+              columnId: column.id,
+              optionCount: mappedOptions.length,
+              options: mappedOptions.slice(0, 3) // Show first 3 for debugging
+            });
+            
+            return mappedOptions;
+          } catch (error) {
+            console.error('Error loading system options:', error);
+            return [];
+          }
+        };
+      }
       
       // Infer target entity for entity_reference
       if (field.type === 'entity_reference') {
@@ -234,3 +308,8 @@ function inferTargetEntity(fieldName: string, archetype?: string): string | unde
 export const getColumnsForEntity = (entityName: string): TableColumn[] => {
   return getEntityColumns$(entityName).get();
 };
+
+// Expose to window for debugging and editor components
+if (typeof window !== 'undefined') {
+  (window as any).getColumnsForEntity = getColumnsForEntity;
+}
