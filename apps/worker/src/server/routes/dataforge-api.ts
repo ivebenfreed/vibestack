@@ -986,8 +986,8 @@ dataforgeRouter.post('/orgs/:orgId/options/:optionType',
       const { createKyselyForPersistentUse } = await import('../lib/database-manager');
       const kysely = createKyselyForPersistentUse();
 
-      // Get the custom option set ID
-      const optionSet = await kysely
+      // Get or create the custom option set
+      let optionSet = await kysely
         .selectFrom('custom_option_sets')
         .select('id')
         .where('org_id', '=', orgId)
@@ -995,10 +995,25 @@ dataforgeRouter.post('/orgs/:orgId/options/:optionType',
         .executeTakeFirst();
 
       if (!optionSet) {
-        return c.json({
-          success: false,
-          error: `Option set '${optionType}' not found for organization`
-        }, 404);
+        // Auto-create option set if it doesn't exist (unified options system)
+        const newOptionSetId = crypto.randomUUID();
+        await kysely
+          .insertInto('custom_option_sets')
+          .values({
+            id: newOptionSetId,
+            org_id: orgId,
+            option_set_type: optionType,
+            name: optionType.charAt(0).toUpperCase() + optionType.slice(1), // Capitalize option type
+            description: `${optionType} options for this organization`,
+            is_active: true,
+            sort_order: 0,
+            created_at: new Date(),
+            updated_at: new Date()
+          })
+          .execute();
+        
+        optionSet = { id: newOptionSetId };
+        console.log(`[UnifiedOptions] Auto-created option set '${optionType}' for org ${orgId}`);
       }
 
       // Check if value already exists
@@ -1232,298 +1247,5 @@ dataforgeRouter.delete('/orgs/:orgId/options/:optionType/:optionValue',
 // VIRTUAL ENTITIES ENDPOINTS - For Legend State synced observables  
 // =============================================================================
 
-// Virtual SystemOption entity endpoint - GET all system options
-dataforgeRouter.get('/system-options',
-  async (c) => {
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-    const kysely = createKyselyForPersistentUse();
-    
-    try {
-      const options = await kysely
-        .selectFrom('system_option_sets')
-        .innerJoin('system_options', 'system_option_sets.id', 'system_options.option_set_id')
-        .select([
-          'system_options.id',
-          'system_option_sets.option_set_type as option_type',
-          'system_option_sets.archetype',
-          'system_options.value',
-          'system_options.label',
-          'system_options.color',
-          'system_options.icon',
-          'system_options.sort_order as order',
-          'system_options.is_active',
-          'system_options.created_at',
-          'system_options.updated_at'
-        ])
-        .where('system_option_sets.is_active', '=', true)
-        .orderBy('system_options.sort_order', 'asc')
-        .execute()
-      
-      console.log(`[SystemOptions] Retrieved ${options.length} system options`)
-      return c.json({ success: true, data: options })
-      
-    } catch (error) {
-      console.error('[SystemOptions] Error:', error)
-      return c.json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }, 500)
-    }
-  }
-)
-
-// Virtual SystemOption entity endpoint - GET system options filtered by type and archetype
-dataforgeRouter.get('/system-options/:optionType/:archetype',
-  async (c) => {
-    const optionType = c.req.param('optionType')
-    const archetype = c.req.param('archetype')
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-    const kysely = createKyselyForPersistentUse();
-    
-    try {
-      const options = await kysely
-        .selectFrom('system_option_sets')
-        .innerJoin('system_options', 'system_option_sets.id', 'system_options.option_set_id')
-        .select([
-          'system_options.id',
-          'system_option_sets.option_set_type as option_type',
-          'system_option_sets.archetype',
-          'system_options.value',
-          'system_options.label',
-          'system_options.color',
-          'system_options.icon',
-          'system_options.sort_order as order',
-          'system_options.is_active',
-          'system_options.created_at',
-          'system_options.updated_at'
-        ])
-        .where('system_option_sets.option_set_type', '=', optionType)
-        .where('system_option_sets.archetype', '=', archetype)
-        .where('system_option_sets.is_active', '=', true)
-        .where('system_options.is_active', '=', true)
-        .orderBy('system_options.sort_order', 'asc')
-        .execute()
-      
-      console.log(`[SystemOptions] Retrieved ${options.length} system options for ${optionType}/${archetype}`)
-      return c.json({ success: true, data: options })
-      
-    } catch (error) {
-      console.error('[SystemOptions] Error:', error)
-      return c.json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }, 500)
-    }
-  }
-)
-
-// Virtual SystemOption entity endpoint - CREATE new system option
-dataforgeRouter.post('/system-options',
-  async (c) => {
-    try {
-      const body = await c.req.json()
-      const { option_type, archetype, value, label, color, icon, order, is_active } = body
-      
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse();
-      
-      // Find or create option set
-      let optionSet = await kysely
-        .selectFrom('system_option_sets')
-        .select('id')
-        .where('option_set_type', '=', option_type)
-        .where('archetype', '=', archetype)
-        .executeTakeFirst()
-      
-      if (!optionSet) {
-        const newSetId = crypto.randomUUID()
-        await kysely
-          .insertInto('system_option_sets')
-          .values({
-            id: newSetId,
-            option_set_type: option_type,
-            archetype: archetype,
-            is_active: true,
-            created_at: new Date()
-          })
-          .execute()
-        
-        optionSet = { id: newSetId }
-      }
-      
-      // Create option
-      const newOptionId = crypto.randomUUID()
-      await kysely
-        .insertInto('system_options')
-        .values({
-          id: newOptionId,
-          option_set_id: optionSet.id,
-          value,
-          label,
-          color,
-          icon,
-          sort_order: order || 0,
-          is_active: is_active !== false,
-          created_at: new Date()
-        })
-        .execute()
-      
-      const newOption = {
-        id: newOptionId,
-        option_type,
-        archetype,
-        value,
-        label,
-        color,
-        icon,
-        order: order || 0,
-        is_active: is_active !== false,
-        created_at: new Date().toISOString()
-      }
-      
-      console.log(`[SystemOptions] Created new system option:`, newOption)
-      return c.json({ success: true, data: newOption })
-      
-    } catch (error) {
-      console.error('[SystemOptions] Create error:', error)
-      return c.json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, 500)
-    }
-  }
-)
-
-// Virtual CustomOption entity endpoint - GET all custom options for an org
-dataforgeRouter.get('/orgs/:orgId/custom-options',
-  requirePermission('entities:read'),
-  async (c) => {
-    try {
-      const orgId = c.req.param('orgId')
-      const security = c.get('security');
-      
-      if (orgId !== security.organizationId) {
-        return c.json({ error: 'Access denied' }, 403);
-      }
-      
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse();
-      
-      const options = await kysely
-        .selectFrom('custom_option_sets')
-        .innerJoin('custom_options', 'custom_option_sets.id', 'custom_options.option_set_id')
-        .select([
-          'custom_options.id',
-          'custom_option_sets.name as option_set_name',
-          'custom_options.value',
-          'custom_options.label', 
-          'custom_options.color',
-          'custom_options.icon',
-          'custom_options.sort_order as order',
-          'custom_options.is_active',
-          'custom_options.created_at',
-          'custom_options.updated_at'
-        ])
-        .where('custom_option_sets.org_id', '=', orgId)
-        .where('custom_option_sets.is_active', '=', true)
-        .orderBy(['custom_option_sets.name', 'custom_options.sort_order'])
-        .execute()
-      
-      console.log(`[CustomOptions] Retrieved ${options.length} custom options for org ${orgId}`)
-      return c.json({ success: true, data: options })
-      
-    } catch (error) {
-      console.error('[CustomOptions] Error:', error)
-      return c.json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, 500)
-    }
-  }
-)
-
-// Virtual CustomOption entity endpoint - CREATE new custom option
-dataforgeRouter.post('/orgs/:orgId/custom-options',
-  requirePermission('entities:write'),
-  async (c) => {
-    try {
-      const orgId = c.req.param('orgId')
-      const security = c.get('security');
-      
-      if (orgId !== security.organizationId) {
-        return c.json({ error: 'Access denied' }, 403);
-      }
-      
-      const body = await c.req.json()
-      const { option_set_name, value, label, color, icon, order, is_active } = body
-      
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse();
-      
-      // Find or create option set
-      let optionSet = await kysely
-        .selectFrom('custom_option_sets')
-        .select('id')
-        .where('org_id', '=', orgId)
-        .where('name', '=', option_set_name)
-        .executeTakeFirst()
-      
-      if (!optionSet) {
-        const newSetId = crypto.randomUUID()
-        await kysely
-          .insertInto('custom_option_sets')
-          .values({
-            id: newSetId,
-            org_id: orgId,
-            name: option_set_name,
-            is_active: true,
-            created_at: new Date()
-          })
-          .execute()
-        
-        optionSet = { id: newSetId }
-      }
-      
-      // Create option
-      const newOptionId = crypto.randomUUID()
-      await kysely
-        .insertInto('custom_options')
-        .values({
-          id: newOptionId,
-          option_set_id: optionSet.id,
-          value,
-          label,
-          color,
-          icon,
-          sort_order: order || 0,
-          is_active: is_active !== false,
-          created_at: new Date()
-        })
-        .execute()
-      
-      const newOption = {
-        id: newOptionId,
-        option_set_name,
-        value,
-        label,
-        color,
-        icon,
-        order: order || 0,
-        is_active: is_active !== false,
-        created_at: new Date().toISOString()
-      }
-      
-      console.log(`[CustomOptions] Created custom option for org ${orgId}:`, newOption)
-      return c.json({ success: true, data: newOption })
-      
-    } catch (error) {
-      console.error('[CustomOptions] Create error:', error)
-      return c.json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, 500)
-    }
-  }
-)
+// REMOVED: Legacy system options endpoint - replaced by unified options API
 

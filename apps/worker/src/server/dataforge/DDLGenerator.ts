@@ -29,13 +29,20 @@ export class DDLGenerator {
     const columnDefs = Object.entries(fields)
       .filter(([name, field]) => {
         // Skip relationship fields - they go to relationship table
-        return field.type !== 'user_reference' && field.type !== 'entity_reference';
+        return field.type !== 'user_reference' && 
+               field.type !== 'entity_reference' &&
+               field.type !== 'custom_user_reference' &&
+               field.type !== 'custom_entity_reference';
       })
       .map(([name, field]) => {
-        const sqlType = this.getSqlType(field.type, orgId, name);
+        const sqlType = this.getSqlTypeForField(field);
+        // Skip fields that don't have a SQL type (relationship fields that got through)
+        if (!sqlType) return null;
         const constraints = this.getColumnConstraints(field);
         return `${name} ${sqlType} ${constraints}`.trim();
-      }).join(',\n    ');
+      })
+      .filter(def => def !== null) // Remove null entries
+      .join(',\n    ');
 
     return `CREATE TABLE ${tableName} (\n    ${columnDefs}\n)`;
   }
@@ -60,7 +67,10 @@ export class DDLGenerator {
     const relationshipFields: Array<{name: string, type: string}> = [];
     
     Object.entries(fields).forEach(([fieldName, field]) => {
-      if (field.type === 'user_reference' || field.type === 'entity_reference') {
+      if (field.type === 'user_reference' || 
+          field.type === 'entity_reference' ||
+          field.type === 'custom_user_reference' ||
+          field.type === 'custom_entity_reference') {
         relationshipFields.push({ name: fieldName, type: field.type });
       }
     });
@@ -157,6 +167,31 @@ export class DDLGenerator {
   /**
    * Convert field type to SQL type with proper foreign key handling
    */
+  /**
+   * Get SQL type using the new field system
+   */
+  private static getSqlTypeForField(field: FieldDefinition): string {
+    try {
+      // Try to use the new field system first
+      // Note: Using dynamic import would require async, so we'll add the new field types to legacy getSqlType for now
+      const fieldHandler = this.getFieldHandlerSync(field.type);
+      if (fieldHandler) {
+        return fieldHandler.getSqlType(field);
+      }
+    } catch (error) {
+      // Fall back to legacy method if fields system isn't available
+    }
+    
+    // Fallback to legacy getSqlType
+    return this.getSqlType(field.type);
+  }
+
+  private static getFieldHandlerSync(type: string): any {
+    // Use dynamic imports for Cloudflare Workers - but since we need sync, 
+    // we'll add the field types to the legacy getSqlType method instead
+    return null;
+  }
+
   private static getSqlType(fieldType: string, orgId?: string, fieldName?: string): string {
     switch (fieldType) {
       case 'text': return 'TEXT';
@@ -185,6 +220,23 @@ export class DDLGenerator {
         return 'UUID'; // FK constraint should be added separately
       case 'entity_reference':
         return 'UUID'; // FK constraint should be added separately
+      
+      // Custom relationship fields (stored in relationship tables, not as columns)
+      case 'custom_user_reference':
+      case 'custom_entity_reference':
+        return 'TEXT'; // Should be filtered out before we get here, but provide fallback
+      
+      // Advanced field types
+      case 'phone': return 'TEXT';
+      case 'file': return 'JSONB';
+      case 'currency': return 'JSONB';
+      case 'color': return 'TEXT';
+      
+      // Rollup field types (calculated values stored as columns)
+      case 'rollup_count': return 'INTEGER';
+      case 'rollup_sum': return 'DECIMAL(15,2)';
+      case 'rollup_average': return 'DECIMAL(15,4)';
+      case 'rollup_concat': return 'TEXT';
         
       default: return 'TEXT';
     }

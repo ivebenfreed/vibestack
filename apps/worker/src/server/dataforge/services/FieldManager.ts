@@ -139,7 +139,7 @@ export class FieldManager {
       }
 
       // Validate field type
-      if (!this.isValidFieldType(field.type)) {
+      if (!(await this.isValidFieldType(field.type))) {
         errors.push(`Invalid field type '${field.type}' for field '${field.name}'`);
         continue;
       }
@@ -389,14 +389,30 @@ export class FieldManager {
   /**
    * Validate field type
    */
-  private isValidFieldType(type: string): boolean {
-    const validTypes = [
-      'text', 'longtext', 'rich_text', 'number', 'decimal', 'integer',
-      'boolean', 'date', 'datetime', 'email', 'url', 'json', 'enum',
-      'status_option', 'priority_option', 'category_option',
-      'discussion_type_option', 'user_reference', 'entity_reference'
-    ];
-    return validTypes.includes(type);
+  private async isValidFieldType(type: string): Promise<boolean> {
+    try {
+      // Import field types registry to check if field handler exists
+      const { getFieldHandler } = await import('../fields');
+      
+      // Special system field types that don't need handlers
+      const systemTypes = [
+        'json', 'enum', 'status_option', 'priority_option', 'category_option',
+        'discussion_type_option', 'user_reference', 'entity_reference'
+      ];
+      
+      // Check if it's a system type or has a field handler
+      return systemTypes.includes(type) || getFieldHandler(type) !== null;
+    } catch (error) {
+      // If import fails, fall back to basic validation
+      const basicTypes = [
+        'text', 'longtext', 'rich_text', 'number', 'decimal', 'integer',
+        'boolean', 'date', 'datetime', 'email', 'url', 'json', 'enum',
+        'phone', 'file', 'currency', 'color',
+        'status_option', 'priority_option', 'category_option',
+        'discussion_type_option', 'user_reference', 'entity_reference'
+      ];
+      return basicTypes.includes(type);
+    }
   }
 
   /**

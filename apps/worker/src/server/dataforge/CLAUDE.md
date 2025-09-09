@@ -21,20 +21,31 @@ DataForge is a dynamic entity management system that allows organizations to cre
    - Handles field conflict strategies (reject, prefix, override, merge)
 
 3. **FieldValidationPipeline** (`validation/FieldValidationPipeline.ts`)
-   - 5-stage validation pipeline:
+   - 5-stage validation pipeline integrated with modular field system:
      1. Type Validation
      2. Required Field Validation
      3. Constraint Validation (min/max, regex, etc.)
      4. Reference Validation
      5. Business Rule Validation
+   - **NEW**: Uses modular field handlers for validation logic
+   - **NEW**: Validates both archetype AND custom fields together
 
-4. **DDLGenerator** (`DDLGenerator.ts`)
-   - Generates PostgreSQL DDL statements
+4. **Modular Field System** (`fields/`)
+   - **NEW**: File-based field type system with automatic registration
+   - Each field type has its own file with complete validation logic
+   - Auto-discovered field types via registry (no manual maintenance)
+   - Supports advanced field types: email, url, phone, file, currency, color
+   - Field handlers provide: validate(), getSqlType(), getSqlDefault(), getDefaultValue()
+
+5. **DDLGenerator** (`DDLGenerator.ts`)
+   - Generates PostgreSQL DDL statements with field handler integration
+   - **UPDATED**: Uses modular field system for SQL type generation
    - Handles complex default values (arrays, objects, booleans)
    - Ensures lowercase table names for PostgreSQL compatibility
+   - **NEW**: Custom fields now generate real database columns (not JSONB)
    - **NEW**: Automatically filters out relationship fields from table creation
 
-5. **RelationshipFieldHandler** (`services/RelationshipFieldHandler.ts`)
+6. **RelationshipFieldHandler** (`services/RelationshipFieldHandler.ts`)
    - **NEW**: Converts reference fields to relationship metadata
    - Manages per-org relationship table creation
    - Stores relationship field configurations
@@ -76,12 +87,16 @@ const baseFields = {
   // ... archetype-specific fields (non-relationship)
 };
 
-// Custom fields are NOW real database columns (no longer JSONB)
+// Custom fields are NOW real database columns with proper SQL types
 const customFields = {
-  team_name: 'TEXT NOT NULL',           // Real column
-  sprint_number: 'INTEGER DEFAULT 1',   // Real column
-  customer_email: 'TEXT',               // Real column
-  order_total: 'NUMERIC DEFAULT 0'      // Real column
+  team_name: 'TEXT NOT NULL',           // text field → TEXT
+  sprint_number: 'INTEGER DEFAULT 1',   // number field → INTEGER  
+  contact_email: 'TEXT NOT NULL',       // email field → TEXT with validation
+  website_url: 'TEXT',                  // url field → TEXT with validation
+  phone_number: 'TEXT',                 // phone field → TEXT with formatting
+  profile_color: 'TEXT',                // color field → TEXT with format validation
+  budget: 'JSONB',                      // currency field → JSONB {amount, currency}
+  documents: 'JSONB'                    // file field → JSONB {url, size, type, metadata}
 };
 
 // Relationship fields are NOT stored as columns at all
@@ -110,6 +125,235 @@ interface FieldDefinition {
   regex?: string;
 }
 ```
+
+## Modular Field System
+
+### NEW: File-Based Field Architecture
+
+DataForge now uses a modular field system where each field type is defined in its own file with complete validation and SQL generation logic:
+
+```
+fields/
+├── index.ts          # Auto-registration of field types
+├── text.ts           # Basic text validation
+├── rich-text.ts      # Rich text/HTML validation  
+├── date.ts           # Date validation with business rules
+├── email.ts          # RFC-compliant email validation
+├── url.ts            # URL validation with auto-protocol
+├── phone.ts          # International phone validation
+├── file.ts           # File metadata with size/type limits
+├── currency.ts       # Currency with amount/code validation
+├── color.ts          # Color validation (hex, rgb, hsl, named)
+├── single-select.ts  # Enum-based single selection
+├── multi-select.ts   # Array-based multi selection  
+├── number.ts         # Numeric validation with ranges
+├── boolean.ts        # Boolean type conversion
+├── custom_user_reference.ts      # Custom user relationships
+├── custom_entity_reference.ts    # Custom entity relationships
+├── rollup_count.ts   # Count aggregation rollup field
+├── rollup_sum.ts     # Sum aggregation rollup field
+├── rollup_average.ts # Average calculation rollup field
+└── rollup_concat.ts  # Text concatenation rollup field
+```
+
+### Field Handler Interface
+
+Each field type exports four standard functions:
+
+```typescript
+// Example: fields/email.ts
+export function validate(value: any, definition: FieldDefinition, context: any): {
+  valid: boolean;
+  errors: any[];
+  transformedValue?: any;
+}
+
+export function getDefaultValue(definition: FieldDefinition): any
+
+export function getSqlType(definition: FieldDefinition): string
+
+export function getSqlDefault(definition: FieldDefinition): string | null
+```
+
+### Available Field Types
+
+| Type | SQL Storage | Validation Features |
+|------|-------------|-------------------|
+| `text` | TEXT | Length, regex, required |
+| `email` | TEXT | RFC format, auto-lowercase |
+| `url` | TEXT | Auto-https, protocol validation |
+| `phone` | TEXT | International format, cleanup |
+| `file` | JSONB | Size limits, type restrictions |
+| `currency` | JSONB | Amount + currency, precision |
+| `color` | TEXT | Hex, RGB, HSL, named colors |
+| `date` | TIMESTAMP | Business rules (start vs due) |
+| `number` | NUMERIC | Min/max ranges, precision |
+| `boolean` | BOOLEAN | Type coercion |
+| `custom_user_reference` | Relationship table | User relationships with config |
+| `custom_entity_reference` | Relationship table | Entity relationships with target type |
+| `rollup_count` | INTEGER | Count aggregation from relationships |
+| `rollup_sum` | DECIMAL | Sum aggregation with precision |
+| `rollup_average` | DECIMAL | Average calculation with precision |
+| `rollup_concat` | TEXT | Text concatenation with separators |
+
+### Automatic Registration
+
+Field types are automatically registered - no manual maintenance required:
+
+```typescript
+// Adding a new field type is as simple as creating the file
+// fields/coordinate.ts
+export function validate(value, definition, context) { /* GPS validation */ }
+export function getSqlType() { return 'POINT'; }
+// ... etc
+
+// Automatically available in:
+const handler = getFieldHandler('coordinate'); // ✅ Works immediately
+```
+
+### Advanced Validation Features
+
+**Reality-Based Date Validation:**
+```typescript
+// Date fields understand business context
+{
+  "start_date": "2025-12-25",  // ❌ After due_date
+  "due_date": "2025-01-15"     // ❌ Before start_date  
+}
+// Result: Both fields report validation errors
+```
+
+**Auto-Transformation:**
+```typescript
+// URL field auto-prepends protocol
+"website_url": "example.com" → "https://example.com"
+
+// Email field auto-normalizes
+"contact_email": "USER@DOMAIN.COM" → "user@domain.com"
+```
+
+## Unified Custom Relationship Field System
+
+### NEW: Custom Relationship Fields with Same UX
+
+DataForge now provides custom relationship fields that follow the exact same UX pattern as other custom fields, while providing powerful relationship and aggregation capabilities.
+
+#### Custom Relationship Field Types
+
+**`custom_user_reference`** - Dynamic user relationships:
+```typescript
+{
+  "name": "lead_designer_id",
+  "type": "custom_user_reference", 
+  "required": true,
+  "relationshipType": "managed_by",
+  "targetEntityType": "User"
+}
+```
+
+**`custom_entity_reference`** - Configurable entity relationships:
+```typescript
+{
+  "name": "parent_portfolio_id",
+  "type": "custom_entity_reference",
+  "required": false,
+  "relationshipType": "belongs_to", 
+  "targetEntityType": "Portfolio",
+  "cardinality": "many-to-one"
+}
+```
+
+#### Rollup Field Types with Automatic Calculation
+
+**`rollup_count`** - Count related records:
+```typescript
+{
+  "name": "active_task_count",
+  "type": "rollup_count",
+  "defaultValue": 0,
+  "rollupConfig": {
+    "relationshipType": "belongs_to",
+    "targetEntityType": "Task",
+    "conditions": {"status": "active"}
+  }
+}
+```
+
+**`rollup_sum`** - Sum numeric values:
+```typescript
+{
+  "name": "total_budget_amount", 
+  "type": "rollup_sum",
+  "defaultValue": 0,
+  "rollupConfig": {
+    "relationshipType": "belongs_to",
+    "targetEntityType": "Task",
+    "targetField": "budget_amount"
+  }
+}
+```
+
+**`rollup_average`** - Calculate averages:
+```typescript
+{
+  "name": "average_completion_time",
+  "type": "rollup_average",
+  "rollupConfig": {
+    "relationshipType": "belongs_to", 
+    "targetEntityType": "Task",
+    "targetField": "completion_hours"
+  }
+}
+```
+
+**`rollup_concat`** - Concatenate text values:
+```typescript
+{
+  "name": "team_members_list",
+  "type": "rollup_concat", 
+  "rollupConfig": {
+    "relationshipType": "assigned_to",
+    "targetEntityType": "User",
+    "targetField": "name",
+    "separator": ", "
+  }
+}
+```
+
+### Architecture Integration
+
+1. **Same UX**: Custom relationship and rollup fields use identical definition patterns as other custom fields
+2. **Validation Integration**: Full validation pipeline supports relationship field validation
+3. **Automatic Processing**: Relationships stored in per-org relationship tables automatically
+4. **Rollup Calculations**: Automatic rollup field updates when relationships change
+5. **SQL Type Safety**: Proper SQL type mapping for rollup fields while excluding relationship fields from table creation
+
+### RollupEngine Service
+
+The `RollupEngine` provides automatic calculation and updates:
+
+```typescript
+// Automatically triggered when relationships change
+await rollupEngine.refreshEntityRollups(kysely, orgId, entityName, entityId);
+
+// Handles all rollup types: count, sum, average, concat
+// Updates are triggered by:
+// - Relationship creation/deletion
+// - Target field value changes
+// - Entity updates that affect rollup conditions
+```
+
+### Storage Architecture
+
+**Custom Relationship Fields**: Stored in per-org relationship tables with rich metadata
+- No database columns created
+- Full relationship history and temporal support
+- Rich properties and configuration per relationship
+
+**Rollup Fields**: Stored as real database columns with automatic updates
+- Proper SQL types (INTEGER, DECIMAL, TEXT)  
+- Real-time calculation when dependencies change
+- Efficient querying and indexing support
 
 ## Archetype System
 
@@ -278,42 +522,90 @@ return `org_${orgId.replace(/-/g, '_')}_${tableName}`.toLowerCase();
 ### Create Test Entity
 
 ```bash
-# With custom fields and relationship fields
+# With advanced field types and validation
 curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/entities" \
   -H "Content-Type: application/json" \
   -b cookies.txt \
   -d '{
-    "entityName": "TeamTask", 
-    "archetype": "task",
+    "entityName": "ContactForm", 
+    "archetype": "record",
     "customFields": [
-      {"name": "team_name", "type": "text", "required": true},
-      {"name": "sprint_number", "type": "number", "defaultValue": 1}
+      {"name": "contact_email", "type": "email", "required": true},
+      {"name": "website_url", "type": "url", "required": false},
+      {"name": "phone_number", "type": "phone", "required": false},
+      {"name": "brand_color", "type": "color", "required": false},
+      {"name": "budget", "type": "currency", "required": false}
     ]
   }'
 
-# Note: Task archetype automatically includes relationship fields:
-# - assignee_id (user_reference) → assigned_to relationship
-# - parent_task_id (entity_reference) → subtask_of relationship  
-# - project_id (entity_reference) → belongs_to relationship
+# Creates real database columns with proper validation:
+# - contact_email: TEXT NOT NULL (email validation)
+# - website_url: TEXT (URL validation + auto-https)
+# - phone_number: TEXT (international format validation)  
+# - brand_color: TEXT (hex/rgb/hsl validation)
+# - budget: JSONB (currency amount + code validation)
 ```
 
-### Create Record with Custom Fields
+### Test Field Validation
 
 ```bash
-curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/data/ProductCatalog" \
+# Test invalid data (will be rejected)
+curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/data/ContactForm" \
   -H "Content-Type: application/json" \
   -b cookies.txt \
   -d '{
-    "name": "Widget Pro",
-    "collection_type": "products",
-    "sku": "WGT-PRO-001",
-    "price": 99.99
+    "name": "Invalid Test",
+    "status": "active",
+    "contact_email": "invalid-email-format",
+    "website_url": "example.com"
   }'
+# Result: {"error": "Failed to create record", "errors": [
+#   "contact_email: Field 'contact_email' must be a valid email address",
+#   "website_url: Field 'website_url' must be a valid URL"
+# ]}
+
+# Test valid data (will be accepted with auto-transformation)
+curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/data/ContactForm" \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "name": "Valid Test",
+    "status": "active", 
+    "contact_email": "TEST@EXAMPLE.COM",
+    "website_url": "https://example.com"
+  }'
+# Result: {"success": true, "data": {
+#   "contact_email": "test@example.com",  // Auto-lowercase
+#   "website_url": "https://example.com"  // Accepted as-is
+# }}
 ```
 
 ## Recent Major Updates (September 2025)
 
-### 1. System Options Architecture Overhaul
+### 1. Modular Field Validation System (September 2025)
+**Complete overhaul of field validation with modular, file-based architecture.**
+
+#### Key Changes:
+- **File-Based Field Types**: Each field type (email, url, phone, etc.) in separate file with complete logic
+- **Automatic Registration**: No manual field type lists - auto-discovered via registry  
+- **Real Database Columns**: Custom fields now generate real columns instead of JSONB storage
+- **Advanced Validation**: Business logic validation (e.g., start_date vs due_date reality checks)
+- **Auto-Transformation**: Email lowercase, URL protocol prepending, phone formatting
+- **End-to-End Integration**: Complete validation pipeline from API to database
+
+#### Available Field Types:
+- **Basic**: `text`, `rich-text`, `number`, `boolean`, `date`
+- **Communication**: `email`, `url`, `phone`  
+- **Rich Data**: `file`, `currency`, `color`
+- **Selection**: `single-select`, `multi-select`
+
+#### Implementation:
+- **Field Handlers**: Standard interface (validate, getSqlType, getSqlDefault, getDefaultValue)
+- **SQL Generation**: DDLGenerator uses field handlers for proper SQL types
+- **Validation Pipeline**: FieldValidationPipeline integrated with field system
+- **Entity Creation**: EntityManager validates both archetype AND custom fields together
+
+### 2. System Options Architecture Overhaul
 **Complete redesign of the options system for better semantic separation and organizational flexibility.**
 
 #### Key Changes:

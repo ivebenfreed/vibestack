@@ -130,20 +130,32 @@ export class DataForgeEntityManager {
       let customData: any = {};
       let relationshipData: any = {};
       
-      // Separate relationship fields from data fields
+      // Separate relationship fields from data fields (archetype + custom)
       if (archetypeClass && archetypeClass.fields) {
         Object.entries(data).forEach(([fieldName, value]) => {
           const fieldDef = archetypeClass.fields[fieldName];
           if (fieldDef && (fieldDef.type === 'user_reference' || fieldDef.type === 'entity_reference')) {
-            // This is a relationship field - store for later processing
+            // This is an archetype relationship field - store for later processing
             relationshipData[fieldName] = value;
           }
         });
         
-        // Remove relationship fields from data to prevent column errors
+        // Remove archetype relationship fields from data to prevent column errors
         Object.keys(relationshipData).forEach(fieldName => {
           delete data[fieldName];
         });
+      }
+      
+      // Handle custom relationship fields from entity definition
+      if (entityDef && entityDef.customFields) {
+        for (const customField of entityDef.customFields) {
+          if (customField.type === 'custom_user_reference' || customField.type === 'custom_entity_reference') {
+            if (data[customField.name] !== undefined) {
+              relationshipData[customField.name] = data[customField.name];
+              delete data[customField.name]; // Remove from data to prevent column errors
+            }
+          }
+        }
       }
       
       if (entityDef && entityDef.customFields && entityDef.customFields.length > 0) {
@@ -173,12 +185,11 @@ export class DataForgeEntityManager {
       // NOTE: Don't add created_by here - it's a relationship field
       const saveData = {
         ...baseData,
+        ...customData, // Custom fields are now real database columns, not JSONB
         id: recordId,
         organization_id: orgId,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        // Add custom fields as JSONB if any
-        ...(Object.keys(customData).length > 0 && { custom_fields: customData })
+        updated_at: new Date().toISOString()
       };
 
       // Apply archetype-specific defaults
@@ -196,9 +207,86 @@ export class DataForgeEntityManager {
         }
       }
 
+      // Validate data using complete field validation pipeline (archetype + custom fields)
+      console.log(`🔍 [EntityManager] About to validate complete field set:`, { archetype: config.archetype, dataKeys: Object.keys(saveData), orgId });
+      
+      // Get all field definitions for this entity (archetype + custom)
+      const allFieldDefinitions = new Map();
+      
+      // Add archetype field definitions
+      const archetypeFields = await this.archetypeOperations.getArchetypeFields(config.archetype);
+      Object.entries(archetypeFields).forEach(([name, config]: [string, any]) => {
+        allFieldDefinitions.set(name, {
+          name,
+          type: config.type || 'text',
+          required: config.required || false,
+          defaultValue: config.defaultValue,
+          unique: config.unique || false,
+          indexed: config.indexed || false,
+          min: config.min,
+          max: config.max,
+          enum: config.enum,
+          regex: config.regex
+        });
+      });
+      
+      // Add custom field definitions from entity config
+      if (entityDef && entityDef.customFields) {
+        for (const customField of entityDef.customFields) {
+          allFieldDefinitions.set(customField.name, {
+            name: customField.name,
+            type: customField.type,
+            required: customField.required || false,
+            defaultValue: customField.defaultValue,
+            unique: customField.unique || false,
+            indexed: customField.indexed || false,
+            min: customField.min,
+            max: customField.max,
+            enum: customField.enum,
+            regex: customField.regex
+          });
+        }
+      }
+      
+      // Use FieldValidationPipeline directly with complete field set
+      const { FieldValidationPipeline } = await import('../validation/FieldValidationPipeline');
+      const pipeline = new FieldValidationPipeline();
+      
+      const validationResult = await pipeline.validate({
+        data: saveData,
+        fields: allFieldDefinitions,
+        orgId,
+        archetype: config.archetype
+      });
+      
+      console.log(`🔍 [EntityManager] Complete validation result:`, { valid: validationResult.isValid, errors: validationResult.errors });
+      
+      // Convert validation result format
+      const errors: string[] = [];
+      
+      if (!validationResult.isValid) {
+        for (const error of validationResult.errors) {
+          if (typeof error === 'string') {
+            errors.push(error);
+          } else if (error.message) {
+            errors.push(`${error.field || 'Field'}: ${error.message}`);
+          }
+        }
+      }
+      
+      if (errors.length > 0) {
+        return {
+          success: false,
+          errors
+        };
+      }
+      
+      // Use the validated/transformed data
+      const finalData = validationResult.transformedData || saveData;
+
       const result = await this.config.kysely
         .insertInto(config.tableName as any)
-        .values(saveData as any)
+        .values(finalData as any)
         .returningAll()
         .executeTakeFirst();
 
@@ -218,10 +306,22 @@ export class DataForgeEntityManager {
         for (const [fieldName, targetId] of Object.entries(relationshipData)) {
           if (targetId) { // Only create relationship if target ID is provided
             try {
-              const fieldDef = archetypeClass?.fields[fieldName];
+              // Check if this is an archetype or custom relationship field
+              let fieldDef = archetypeClass?.fields[fieldName];
+              let fieldType = fieldDef?.type;
+              
+              // If not found in archetype, check custom fields
+              if (!fieldDef && entityDef && entityDef.customFields) {
+                const customField = entityDef.customFields.find(f => f.name === fieldName);
+                if (customField) {
+                  fieldDef = customField;
+                  fieldType = customField.type;
+                }
+              }
+              
               const relationshipDef = RelationshipFieldHandler.convertToRelationshipMetadata(
                 fieldName,
-                fieldDef?.type || 'user_reference',
+                fieldType || 'user_reference',
                 entityName
               );
               
@@ -239,6 +339,41 @@ export class DataForgeEntityManager {
               // Don't fail the entire operation if relationship creation fails
             }
           }
+        }
+      }
+
+      // Process rollup field updates if any relationships were created
+      if (Object.keys(relationshipData).length > 0) {
+        try {
+          const { RollupEngine } = await import('../services/RollupEngine');
+          const rollupEngine = new RollupEngine(this);
+          
+          // Refresh rollups for the newly created entity
+          await rollupEngine.refreshEntityRollups(this.config.kysely, orgId, entityName, recordId);
+          
+          // Also refresh rollups for any target entities that might have rollup fields
+          for (const [fieldName, targetId] of Object.entries(relationshipData)) {
+            if (targetId) {
+              try {
+                const fieldDef = archetypeClass?.fields[fieldName] || 
+                  entityDef?.customFields?.find(f => f.name === fieldName);
+                
+                if (fieldDef && fieldDef.targetEntityType) {
+                  await rollupEngine.refreshEntityRollups(
+                    this.config.kysely, 
+                    orgId, 
+                    fieldDef.targetEntityType, 
+                    targetId
+                  );
+                }
+              } catch (error) {
+                console.warn(`Failed to refresh rollups for target entity ${targetId}:`, error);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to process rollup updates:', error);
+          // Don't fail the entire operation if rollup processing fails
         }
       }
 
@@ -733,7 +868,7 @@ export class DataForgeEntityManager {
       }
 
       // 2. Validate data against archetype business logic
-      const validation = this.validateArchetypeData(metadata.archetype, data);
+      const validation = await this.validateArchetypeData(metadata.archetype, data, orgId);
       if (!validation.valid) {
         return {
           success: false,
@@ -954,11 +1089,12 @@ export class DataForgeEntityManager {
   /**
    * Validate data against archetype business logic
    */
-  private validateArchetypeData(
+  private async validateArchetypeData(
     archetype: string,
-    data: Record<string, any>
-  ): { valid: boolean; data: Record<string, any>; errors: string[] } {
-    return this.archetypeOperations.validateArchetypeData(archetype, data);
+    data: Record<string, any>,
+    orgId?: string
+  ): Promise<{ valid: boolean; data: Record<string, any>; errors: string[] }> {
+    return await this.archetypeOperations.validateArchetypeData(archetype, data, orgId);
   }
 
   // ===== WEEK 3 DAY 1-2: DEBOUNCED MIGRATION MANAGEMENT METHODS =====
@@ -1090,15 +1226,12 @@ export class DataForgeEntityManager {
         baseFieldsForTable[name] = field;
       }
       
-      // Add custom_fields JSONB column for custom fields storage
-      baseFieldsForTable['custom_fields'] = {
-        name: 'custom_fields',
-        type: 'json',
-        required: false,
-        defaultValue: {}
-      };
+      // Add custom fields as real database columns (not JSONB)
+      for (const [name, field] of mergedFields.customFields) {
+        baseFieldsForTable[name] = field;
+      }
       
-      console.log('[DataForgeEntityManager] Creating table with base fields + custom_fields column');
+      console.log('[DataForgeEntityManager] Creating table with base fields + custom fields as real columns');
       console.log('[DataForgeEntityManager] Base fields count:', mergedFields.baseFields.size);
       console.log('[DataForgeEntityManager] Custom fields count:', mergedFields.customFields.size);
       
@@ -1197,6 +1330,25 @@ export class DataForgeEntityManager {
       } catch (error) {
         console.warn(`[DataForgeEntityManager] Failed to auto-copy system options for archetype ${archetype}:`, error);
         // Don't fail entity creation if option copying fails
+      }
+      
+      // Register rollup fields for automatic calculation
+      try {
+        const { RollupEngine } = await import('../services/RollupEngine');
+        const rollupEngine = new RollupEngine(this);
+        
+        const rollupConfigs = await rollupEngine.registerRollupFields(
+          orgId, 
+          normalizedEntityName, 
+          mergedFields.allFields
+        );
+        
+        if (rollupConfigs.length > 0) {
+          console.log(`[DataForgeEntityManager] Registered ${rollupConfigs.length} rollup fields for entity: ${normalizedEntityName}`);
+        }
+      } catch (error) {
+        console.warn(`[DataForgeEntityManager] Failed to register rollup fields for entity ${normalizedEntityName}:`, error);
+        // Don't fail entity creation if rollup registration fails
       }
       
       return {
