@@ -157,12 +157,17 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
     if ((column.type === 'text' || column.type === 'json') && shouldDetectOptions(field.name)) {
       const detectedOptions = detectColumnOptions(entityName, field.name);
       if (detectedOptions && detectedOptions.length > 0) {
-        column.type = 'select';
+        // Determine if this should be a multi-select tags field
+        const isTagsField = isTagsFieldName(field.name);
+        column.type = isTagsField ? 'tags' : 'select';
+        column.cellType = isTagsField ? 'tags' : 'select'; // Ensure cellType is set for editor selection
         column.options = detectedOptions;
-        log.info(`🎯 Auto-detected select field: ${field.name}`, {
+        
+        log.info(`🎯 Auto-detected ${isTagsField ? 'tags' : 'select'} field: ${field.name}`, {
           entityName,
           columnId: column.id,
-          detectedOptions: detectedOptions.slice(0, 3)
+          detectedOptions: detectedOptions.slice(0, 3),
+          isTagsField
         });
       }
     }
@@ -328,6 +333,19 @@ function shouldDetectOptions(fieldName: string): boolean {
   
   const lowerFieldName = fieldName.toLowerCase();
   return selectFieldPatterns.some(pattern => 
+    lowerFieldName.includes(pattern)
+  );
+}
+
+/**
+ * Determine if a field should be treated as a tags/multi-select field
+ */
+function isTagsFieldName(fieldName: string): boolean {
+  // Fields that should be multi-select tags rather than single select
+  const tagsFieldPatterns = ['tags', 'tag', 'labels', 'keywords', 'categories'];
+  const lowerFieldName = fieldName.toLowerCase();
+  
+  return tagsFieldPatterns.some(pattern => 
     lowerFieldName.includes(pattern)
   );
 }

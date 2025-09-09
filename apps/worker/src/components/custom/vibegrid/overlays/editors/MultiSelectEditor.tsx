@@ -29,9 +29,21 @@ export function MultiSelectEditor({
 }: MultiSelectEditorProps) {
   const [hasCommitted, setHasCommitted] = React.useState(false);
 
-  // Convert column options to MultiSelect format
+  // Convert column options to MultiSelect format, or generate from current value for tags
   const options = React.useMemo(() => {
-    const rawOptions = column.options || column.enumOptions || [];
+    let rawOptions = column.options || column.enumOptions || [];
+    
+    // For tags fields with no predefined options, generate from current value
+    if (rawOptions.length === 0 && initialValue && typeof initialValue === 'string') {
+      const currentTags = initialValue.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+      rawOptions = currentTags.map(tag => ({ value: tag, label: tag }));
+      
+      console.log('🏷️ MultiSelectEditor: Generated options from current tags', {
+        initialValue,
+        currentTags,
+        generatedOptions: rawOptions
+      });
+    }
     
     return rawOptions.map(option => {
       if (typeof option === 'string') {
@@ -45,7 +57,7 @@ export function MultiSelectEditor({
         disabled: option.disabled
       };
     });
-  }, [column.options, column.enumOptions]);
+  }, [column.options, column.enumOptions, initialValue]);
 
   const handleValueChange = (values: string[]) => {
     if (hasCommitted) return;

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZGea4o2CfgJufJsz1VEVA5b06WfAOaigtjgzoCn8uO2epUa1uUQEz6ze9XZt1gg
+\restrict QC7b4cEHDMsoJNQD4bhTk8A35tAgmPbcbYBDl8oWkZAAhcSiJdklA0bERJm4NqM
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -928,10 +928,10 @@ dc0e450d-7a03-449b-8573-04a5c83c5c8f	01920000-1000-7000-8000-000000000001	0198b0
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_taskv2 (id, organization_id, created_at, updated_at, title, description, priority, status, due_date, custom_fields, label, tags, start_date) FROM stdin;
-9b551adb-c7e8-4a30-b3e4-968bf6731c41	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.34	2025-09-09 14:16:32.318	Implement contact form with spam protection	Build secure contact form with reCAPTCHA, email notifications, and CRM integration	medium	blocked	2025-09-22 21:00:00	{"tags": "frontend,backend", "label": "feature", "start_date": "2025-09-16T09:00:00Z"}	\N	[]	\N
-6db6824d-f9a9-4179-91e7-dfd73acbc206	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:04.18	2025-09-09 12:55:26.099	Conduct user acceptance testing	Run comprehensive UAT sessions with key stakeholders to validate the new design meets requirements	high	not_started	2025-09-30 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-13T09:00:00Z"}	\N	[]	\N
+6db6824d-f9a9-4179-91e7-dfd73acbc206	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:04.18	2025-09-09 14:46:13.259	Conduct user acceptance testing	Run comprehensive UAT sessions with key stakeholders to validate the new design meets requirements	high	not_started	2025-09-30 21:00:00	{"tags": "frontend", "label": "feature", "start_date": "2025-09-13T09:00:00Z"}	\N	[]	\N
 1fc89bdc-84ff-4b9c-b4c2-b64fc5355855	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:04.481	2025-09-09 12:55:26.344	Update SEO meta tags and schema markup	Implement proper SEO optimization including meta descriptions, structured data, and Open Graph tags	medium	not_started	2025-10-05 17:00:00	{"tags": ["database"], "label": "enhancement", "start_date": "2025-09-14T09:00:00Z"}	\N	[]	\N
 650d122c-00a4-4d0f-88df-5ebb0156907a	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.059	2025-09-09 12:55:26.584	Create content migration strategy	Plan and execute migration of existing content to new site structure with proper URL redirects	critical	active	2025-09-18 17:00:00	{"tags": ["database"], "label": "feature", "start_date": "2025-09-15T09:00:00Z"}	\N	[]	\N
+9b551adb-c7e8-4a30-b3e4-968bf6731c41	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.34	2025-09-09 14:43:06.032	Implement contact form with spam protection	Build secure contact form with reCAPTCHA, email notifications, and CRM integration	medium	blocked	2025-09-23 01:00:00	{"tags": "frontend,backend", "label": "feature", "start_date": "2025-09-16T09:00:00Z"}	\N	[]	\N
 47b0e358-9b36-4132-a714-8c12eb04c93c	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.639	2025-09-09 12:55:27.073	Launch website to production environment	Deploy new website to production with proper monitoring, rollback plan, and performance verification	critical	not_started	2025-10-15 17:00:00	{"tags": ["backend"], "label": "feature", "start_date": "2025-09-17T09:00:00Z"}	\N	[]	\N
 812fc56a-edac-43f0-a1ed-1727d98f42a5	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:05.931	2025-09-09 12:55:27.324	Research and select cross-platform framework	Evaluate React Native vs Flutter for cross-platform development, considering team skills and project requirements	critical	done	2025-08-30 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-18T09:00:00Z"}	\N	[]	\N
 51c66282-c6fa-4e12-a2cd-2588627565e7	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:06.231	2025-09-09 12:55:27.601	Design mobile app user interface mockups	Create detailed UI/UX mockups for all app screens with focus on mobile-first design principles	high	active	2025-09-25 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-19T09:00:00Z"}	\N	[]	\N
@@ -964,7 +964,6 @@ c9a26cbf-cb38-4da8-a766-3313ad8c3257	01920000-1000-7000-8000-000000000001	2025-0
 97239c96-f504-4818-99f9-bc62b54202c7	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:09.617	2025-09-09 12:55:32.318	Implement Infrastructure as Code with Terraform	Create Terraform configurations for reproducible infrastructure deployment and management	medium	not_started	2025-10-25 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-18T09:00:00Z"}	\N	[]	\N
 c53efa5e-c4ac-4a1e-b619-3dc0cbad25b7	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:10.956	2025-09-09 12:55:32.56	Conduct performance reviews for engineering team	Complete annual performance evaluations for all engineers including goal setting for next year	medium	active	2025-10-15 17:00:00	{"tags": ["frontend"], "label": "feature", "start_date": "2025-09-19T09:00:00Z"}	\N	[]	\N
 9e420fea-1372-47c0-ace7-dabc47e709ed	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:11.307	2025-09-09 12:55:32.805	Research AI/ML integration opportunities	Investigate potential AI/ML applications for improving product features and operational efficiency	low	not_started	2025-11-30 17:00:00	{"tags": ["backend"], "label": "feature", "start_date": "2025-09-10T09:00:00Z"}	\N	[]	\N
-93a25b17-cff2-41b6-aee9-1971917d1537	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:11.664	2025-09-09 12:55:33.279	Update employee handbook and onboarding process	Revise employee handbook with new policies and streamline the onboarding process for new hires	medium	blocked	2025-10-01 17:00:00	{"tags": ["frontend"], "label": "enhancement", "start_date": "2025-09-11T09:00:00Z"}	\N	[]	\N
 b32b0a6b-cab4-4afc-b8f7-70e3ad40d862	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:12.062	2025-09-09 12:55:33.52	Implement automated testing for critical workflows	Set up end-to-end testing suite for core application workflows using Playwright or Cypress	high	not_started	2025-10-30 17:00:00	{"tags": ["frontend", "backend"], "label": "feature", "start_date": "2025-09-12T09:00:00Z"}	\N	[]	\N
 d7fc9067-e5bc-4cb0-8f62-63cfff3b194d	01920000-1000-7000-8000-000000000001	2025-09-09 13:18:33.457	2025-09-09 13:18:33.457	Test Task with Good Dates	\N	medium	not_started	2025-12-31 00:00:00	{"start_date": "2025-01-01"}	\N	[]	\N
 bf37e117-ae17-4dda-9c3d-7e2d3a7df25f	01920000-1000-7000-8000-000000000001	2025-09-09 13:18:54.731	2025-09-09 13:18:54.731	Debug Validation Test	\N	medium	not_started	2025-01-01 00:00:00	{"start_date": "2025-12-31"}	\N	[]	\N
@@ -973,6 +972,7 @@ bf37e117-ae17-4dda-9c3d-7e2d3a7df25f	01920000-1000-7000-8000-000000000001	2025-0
 11b7ab15-5d34-4a96-8c31-382c1ecaffbc	01920000-1000-7000-8000-000000000001	2025-09-09 13:23:36.198	2025-09-09 13:23:36.198	Date Validation Test 4	\N	critical	blocked	2025-01-15 00:00:00	{"start_date": "2025-12-25"}	\N	[]	\N
 73dd077f-f8c3-4161-9f60-53896499f817	01920000-1000-7000-8000-000000000001	2025-09-09 13:24:38.418	2025-09-09 13:24:38.418	Final Validation Test	\N	high	active	2025-01-15 00:00:00	{"start_date": "2025-12-25"}	\N	[]	\N
 e646ca02-7b78-44c4-be90-855bf7377789	01920000-1000-7000-8000-000000000001	2025-09-09 13:28:44.802	2025-09-09 13:28:44.802	Valid Date Test Task	\N	medium	active	2025-01-15 00:00:00	{}	\N	[]	2025-01-01 00:00:00
+93a25b17-cff2-41b6-aee9-1971917d1537	01920000-1000-7000-8000-000000000001	2025-09-09 12:18:11.664	2025-09-09 14:40:28.195	Update employee handbook and onboarding process	Revise employee handbook with new policies and streamline the onboarding process for new hires	medium	blocked	2025-10-01 21:00:00	{"tags": "frontend", "label": "enhancement", "start_date": "2025-09-11T09:00:00Z"}	\N	[]	\N
 \.
 
 
@@ -1818,5 +1818,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZGea4o2CfgJufJsz1VEVA5b06WfAOaigtjgzoCn8uO2epUa1uUQEz6ze9XZt1gg
+\unrestrict QC7b4cEHDMsoJNQD4bhTk8A35tAgmPbcbYBDl8oWkZAAhcSiJdklA0bERJm4NqM
 

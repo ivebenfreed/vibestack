@@ -1195,7 +1195,7 @@ export class SimplePassiveRenderer {
       contentElement.textContent = this.formatCellValue(value, cellType);
     } else if (this.isTagsField(column.id, value)) {
       // Tags field with comma-separated values - create multiple badges
-      contentElement = this.createTagsElement(value);
+      contentElement = this.createTagsElement(value, row, column);
     } else if (['number', 'integer', 'float'].includes(cellType)) {
       // Number content - only use specific classes, NOT vibegridx-cell-content
       contentElement = this.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
@@ -1967,7 +1967,7 @@ export class SimplePassiveRenderer {
   /**
    * Create a container element with multiple tag badges
    */
-  private createTagsElement(value: string): HTMLElement {
+  private createTagsElement(value: string, row: any, column: any): HTMLElement {
     const container = this.createElement('div', 'vibegridx-tags-container');
     container.style.cssText = `
       display: flex;
@@ -2005,21 +2005,40 @@ export class SimplePassiveRenderer {
       // Add click handler for individual tag editing
       tagBadge.addEventListener('click', (e) => {
         e.stopPropagation();
-        log.info('🏷️ Tag badge clicked', { tag, index, allTags: tags });
-        // TODO: Implement individual tag editing
+        log.info('🏷️ Tag badge clicked - editing entire tags field', { tag, index, allTags: tags });
+        // Edit the entire tags field, not individual tags
+        this.editTagsField(value, row, column);
       });
       
       container.appendChild(tagBadge);
     });
     
-    // Add click handler for the container (for adding new tags)
+    // Add click handler for the container (for editing tags)
     container.addEventListener('click', (e) => {
       if (e.target === container) {
-        log.info('🏷️ Tags container clicked - add new tag', { currentTags: tags });
-        // TODO: Implement add new tag functionality
+        log.info('🏷️ Tags container clicked - editing tags field', { currentTags: tags });
+        this.editTagsField(value, row, column);
       }
     });
     
     return container;
+  }
+
+  /**
+   * Trigger editing mode for tags fields
+   */
+  private editTagsField(currentValue: string, row: any, column: any): void {
+    const cellId = `${row.id}:${column.id}`;
+    log.info('🏷️ Starting tags field edit mode', {
+      cellId,
+      currentValue,
+      rowId: row.id,
+      columnId: column.id,
+      currentTags: currentValue.split(',').map(t => t.trim()).filter(t => t.length > 0)
+    });
+    
+    // Trigger the standard VibeGrid edit mode - the editor selection system
+    // will automatically choose MultiSelectEditor for tags fields
+    this.tableInteraction$.startEdit(cellId, currentValue);
   }
 }
