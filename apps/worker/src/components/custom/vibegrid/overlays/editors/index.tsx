@@ -11,6 +11,38 @@ import { ReferenceSelectEditor } from './ReferenceSelectEditor';
 import { ReferenceMultiEditor } from './ReferenceMultiEditor';
 import type { CellRef, Column } from '../../types';
 
+// Helper function to detect if a field should be treated as tags
+function isTagsLikeField(column: Column, initialValue: any): boolean {
+  // Check column name patterns
+  const columnName = (column.name || column.id || '').toLowerCase();
+  const tagsPatterns = ['tags', 'tag', 'labels', 'keywords', 'categories'];
+  const isTagsName = tagsPatterns.some(pattern => columnName.includes(pattern));
+  
+  // Check if the value looks like comma-separated tags
+  const hasCommaSeperatedValues = typeof initialValue === 'string' && initialValue.includes(',');
+  
+  // Check if column has options (suggesting it's a select-type field)
+  const hasOptions = column.options && Array.isArray(column.options) && column.options.length > 0;
+  
+  // For tags fields, we should use MultiSelectEditor if:
+  // 1. The column name indicates it's a tags field (most important)
+  // 2. OR it has comma-separated values
+  // 3. OR it has predefined options
+  // The tags field should use MultiSelectEditor even without predefined options
+  const result = isTagsName || hasCommaSeperatedValues || hasOptions;
+  
+  console.log('🔍 isTagsLikeField analysis', {
+    columnName,
+    columnId: column.id,
+    isTagsName,
+    hasCommaSeperatedValues,
+    hasOptions: !!hasOptions,
+    result
+  });
+  
+  return result;
+}
+
 // Export all editor components
 export { 
   TextEditor, 
@@ -79,6 +111,30 @@ export function createEditor(props: EditorProps): React.ReactElement {
       
     case 'select-multi':
       return <MultiSelectEditor {...props} />;
+      
+    case 'tags':
+    case 'multiselect':
+      // Tags fields should use MultiSelectEditor with dynamic options
+      console.log('🏷️ createEditor: Creating MultiSelectEditor for tags field');
+      return <MultiSelectEditor {...props} />;
+      
+    case 'json':
+    case 'jsonb':
+      // Check if this is a tags-like field based on column name or data
+      console.log('🔍 createEditor: Checking json field for tags pattern', {
+        columnId: column.id,
+        columnName: column.name,
+        initialValue: props.initialValue
+      });
+      
+      if (isTagsLikeField(column, props.initialValue)) {
+        console.log('🏷️ createEditor: JSON field detected as tags, using MultiSelectEditor');
+        return <MultiSelectEditor {...props} />;
+      }
+      
+      // Fallback to text editor for regular JSON
+      console.log('📝 createEditor: Using TextEditor for JSON field');
+      return <TextEditor {...props} multiline />;
       
     case 'boolean':
     case 'checkbox':

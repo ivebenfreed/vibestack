@@ -64,6 +64,11 @@
   z-index: 1;
 }
 
+/* Hide scrollbars for header viewport when scrolling programmatically */
+.vibegridx-header-viewport::-webkit-scrollbar {
+  display: none;
+}
+
 .vibegridx-header {
   display: inline-flex;
   background: hsl(var(--muted));

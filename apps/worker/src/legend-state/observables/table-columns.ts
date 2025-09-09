@@ -8,6 +8,7 @@
 
 import { observable, computed } from '@legendapp/state';
 import { universeSchema$, universeOrgId$ } from '../observables';
+import { getEntity$ } from '../observables';
 import { stateLog } from '@/logger';
 
 const log = stateLog('legend-state/table-columns');
@@ -45,7 +46,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   const entity = schema.entities[entityName];
   if (!entity) {
     log.debug(`Entity ${entityName} not found in schema`, { 
-      availableEntities: Object.keys(schema.entities) 
+      availableEntities: Object.keys(schema.entities || {}) 
     });
     return [];
   }
@@ -58,7 +59,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   const legacyFields = entity.business_metadata?.fields || entity.fields || [];
   
   // Convert allFields object to array format, accessing Legend State observables with .peek()
-  const fieldsArray = Object.keys(allFields).length > 0 
+  const fieldsArray = Object.keys(allFields || {}).length > 0 
     ? Object.entries(allFields).map(([fieldName, fieldObs]) => {
         // Access Legend State observable properties with .peek()
         const fieldData = fieldObs;
@@ -152,6 +153,25 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
       }
     }
 
+    // Enhanced Option Detection: Analyze data to detect select fields
+    if ((column.type === 'text' || column.type === 'json') && shouldDetectOptions(field.name)) {
+      const detectedOptions = detectColumnOptions(entityName, field.name);
+      if (detectedOptions && detectedOptions.length > 0) {
+        // Determine if this should be a multi-select tags field
+        const isTagsField = isTagsFieldName(field.name);
+        column.type = isTagsField ? 'tags' : 'select';
+        column.cellType = isTagsField ? 'tags' : 'select'; // Ensure cellType is set for editor selection
+        column.options = detectedOptions;
+        
+        log.info(`🎯 Auto-detected ${isTagsField ? 'tags' : 'select'} field: ${field.name}`, {
+          entityName,
+          columnId: column.id,
+          detectedOptions: detectedOptions.slice(0, 3),
+          isTagsField
+        });
+      }
+    }
+
     columns.push(column);
 
     // NOTE: _resolved columns are deprecated as of September 2025
@@ -180,7 +200,7 @@ export const allEntityColumns$ = computed(() => {
 
   const entityColumns: Record<string, TableColumn[]> = {};
   
-  for (const entityName of Object.keys(schema.entities)) {
+  for (const entityName of Object.keys(schema.entities || {})) {
     entityColumns[entityName] = getEntityColumns$(entityName).get();
   }
 
@@ -230,7 +250,7 @@ function mapFieldType(fieldType: string): TableColumn['type'] {
       return 'select';
     case 'json':
     case 'jsonb':
-      return 'text'; // JSON fields rendered as text for now
+      return 'json'; // JSON fields that may be auto-detected as select
     default:
       return 'text';
   }
@@ -299,6 +319,82 @@ function inferTargetEntity(fieldName: string, archetype?: string): string | unde
   }
   
   return undefined;
+}
+
+/**
+ * Determine if a field should have its options auto-detected from data
+ */
+function shouldDetectOptions(fieldName: string): boolean {
+  // Known fields that should be select fields based on common patterns
+  const selectFieldPatterns = [
+    'label', 'labels', 'category', 'type', 'kind', 'tag', 'tags', 
+    'status', 'state', 'priority', 'level', 'grade', 'class'
+  ];
+  
+  const lowerFieldName = fieldName.toLowerCase();
+  return selectFieldPatterns.some(pattern => 
+    lowerFieldName.includes(pattern)
+  );
+}
+
+/**
+ * Determine if a field should be treated as a tags/multi-select field
+ */
+function isTagsFieldName(fieldName: string): boolean {
+  // Fields that should be multi-select tags rather than single select
+  const tagsFieldPatterns = ['tags', 'tag', 'labels', 'keywords', 'categories'];
+  const lowerFieldName = fieldName.toLowerCase();
+  
+  return tagsFieldPatterns.some(pattern => 
+    lowerFieldName.includes(pattern)
+  );
+}
+
+/**
+ * Detect select options by analyzing actual data values
+ */
+function detectColumnOptions(entityName: string, fieldName: string): Array<{ value: string; label: string }> | null {
+  try {
+    // Get the entity data from Legend State
+    const entityObs = getEntity$(entityName);
+    if (!entityObs) {
+      log.debug(`Entity observable not available for ${entityName}`);
+      return null;
+    }
+    
+    const entityData = entityObs.peek();
+    if (!entityData || typeof entityData !== 'object') {
+      log.debug(`No data available for ${entityName}`);
+      return null;
+    }
+    
+    // Extract unique values from the field
+    const uniqueValues = new Set<string>();
+    const records = Object.values(entityData);
+    
+    for (const record of records) {
+      if (record && typeof record === 'object' && fieldName in record) {
+        const value = record[fieldName as keyof typeof record];
+        if (value && typeof value === 'string' && value.trim()) {
+          uniqueValues.add(value.trim());
+        }
+      }
+    }
+    
+    // Convert to options if we have reasonable values (2-20 unique options)
+    const values = Array.from(uniqueValues).sort();
+    if (values.length >= 2 && values.length <= 20) {
+      return values.map(value => ({
+        value,
+        label: value.charAt(0).toUpperCase() + value.slice(1) // Capitalize first letter
+      }));
+    }
+    
+    return null;
+  } catch (error) {
+    log.warn(`Failed to detect options for ${entityName}.${fieldName}:`, error);
+    return null;
+  }
 }
 
 // Export helper for backward compatibility

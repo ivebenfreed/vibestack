@@ -39,6 +39,7 @@ export class SimplePassiveRenderer {
   private container: HTMLElement;
   private viewport: HTMLElement | null = null;
   private headerContainer: HTMLElement | null = null;
+  private headerViewport: HTMLElement | null = null;
   private bodyContainer: HTMLElement | null = null;
   private disposers: (() => void)[] = [];
   
@@ -173,9 +174,9 @@ export class SimplePassiveRenderer {
     // Create main table container
     const table = this.createElement('div', 'vibegridx-table');
     
-    // Header container
-    this.headerContainer = this.createElement('div', 'vibegridx-header');
-    this.headerContainer.style.cssText = `
+    // Header viewport wrapper (for proper horizontal scrolling sync)
+    this.headerViewport = this.createElement('div', 'vibegridx-header-viewport');
+    this.headerViewport.style.cssText = `
       position: absolute;
       top: 0;
       left: 0;
@@ -183,8 +184,22 @@ export class SimplePassiveRenderer {
       height: ${HEADER_HEIGHT}px;
       background: #f8f9fa;
       border-bottom: 1px solid #e9ecef;
-      overflow: hidden;
+      overflow-x: scroll;
+      overflow-y: hidden;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
       z-index: 10;
+    `;
+    
+    // Hide webkit scrollbars for header viewport
+    this.headerViewport.style.setProperty('-webkit-overflow-scrolling', 'touch');
+    
+    // Header container (scrollable content inside viewport)
+    this.headerContainer = this.createElement('div', 'vibegridx-header');
+    this.headerContainer.style.cssText = `
+      position: relative;
+      white-space: nowrap;
+      height: 100%;
     `;
     
     // Viewport (scrollable area)
@@ -205,9 +220,10 @@ export class SimplePassiveRenderer {
       width: 100%;
     `;
     
-    // Assemble structure like UnifiedTableRenderer
+    // Assemble structure with header viewport wrapper
+    this.headerViewport.appendChild(this.headerContainer);
     this.viewport.appendChild(this.bodyContainer);
-    table.appendChild(this.headerContainer);
+    table.appendChild(this.headerViewport);
     table.appendChild(this.viewport);
     this.container.appendChild(table);
     
@@ -384,6 +400,11 @@ export class SimplePassiveRenderer {
     const resizeDisposer = observe(() => {
       const resizeState = this.tableInteraction$.columnResize.get();
       
+      // Update header cell width during resize
+      if (resizeState && resizeState.isResizing && resizeState.columnId && resizeState.newWidth) {
+        this.updateHeaderCellWidth(resizeState.columnId, resizeState.newWidth);
+      }
+      
       if (this.canvasOverlay) {
         // Update coordinate mapping and column resize preview via CanvasOverlayDOM
         this.canvasOverlay.updateCoordinateMapping(this.coordinateMapping);
@@ -427,6 +448,18 @@ export class SimplePassiveRenderer {
       }
     });
     this.disposers.push(dragDisposer);
+    
+    // Sort observer - updates sort indicators when sort state changes
+    const sortDisposer = observe(() => {
+      const sortBy = this.tableCore$.sortBy.get();
+      log.debug('🔄 Sort state changed, updating indicators', { sortBy });
+      
+      // Update sort indicators after a small delay to ensure header is rendered
+      requestAnimationFrame(() => {
+        this.updateSortIndicators();
+      });
+    });
+    this.disposers.push(sortDisposer);
     
     // Setup context menu event handler
     this.setupContextMenu();
@@ -678,20 +711,48 @@ export class SimplePassiveRenderer {
     
     headerRow.appendChild(cornerCell);
     
-    // Filter columns by visibility (using cached columnVisibility)
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    // Get virtual column range for horizontal scrolling
+    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
+    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
-    log.info('🎨 Rendering header with visible columns', { 
-      totalColumns: columns.length, 
-      visibleColumns: visibleColumns.length 
+    // Apply horizontal virtual scrolling - only render columns in visible range
+    const startColIndex = Math.max(0, visibleColumnRange.start);
+    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
+    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
+    
+    log.info('🎨 Rendering header with column virtual scrolling', { 
+      totalColumns: columns.length,
+      allVisibleColumns: allVisibleColumns.length,
+      virtualRange: `${startColIndex}-${endColIndex}`,
+      renderingColumns: virtualColumns.length
     });
     
     // Update column coordinate mapping (account for 40px row header)
     this.coordinateMapping.columns = [];
     let xOffset = 40; // Start after row header
     
-    visibleColumns.forEach((column, index) => {
+    // Build complete coordinate mapping for all visible columns (for overlays)
+    allVisibleColumns.forEach((column, index) => {
+      this.coordinateMapping.columns.push({
+        columnId: column.id,
+        x: xOffset,
+        width: column.width,
+        index: index,
+        offset: xOffset
+      });
+      xOffset += column.width;
+    });
+    
+    // Reset xOffset for virtual column rendering
+    xOffset = 40;
+    for (let i = 0; i < startColIndex; i++) {
+      xOffset += allVisibleColumns[i].width;
+    }
+    
+    virtualColumns.forEach((column, virtualIndex) => {
+      const actualIndex = startColIndex + virtualIndex;
       const headerCell = this.createElement('div', 'vibegridx-header-cell');
+      headerCell.dataset.field = column.id; // Add field ID for sort updates
       headerCell.style.cssText = `
         flex: 0 0 ${column.width}px;
         height: 100%;
@@ -705,7 +766,25 @@ export class SimplePassiveRenderer {
         position: relative;
       `;
       
-      headerCell.textContent = column.label;
+      // Create header content with text and sort icon (like HeaderEngine)
+      const textGroup = this.createElement('div', 'vibegridx-header-text-group');
+      textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+      
+      // Header text
+      const headerText = this.createElement('span', 'vibegridx-header-text');
+      headerText.textContent = column.label;
+      
+      // Sort icon (if column is sortable)
+      if (column.sortable !== false) {
+        const sortIcon = this.createElement('span', 'vibegridx-sort-icon');
+        sortIcon.innerHTML = this.createSortIconSVG(null); // No sort initially
+        textGroup.appendChild(headerText);
+        textGroup.appendChild(sortIcon);
+      } else {
+        textGroup.appendChild(headerText);
+      }
+      
+      headerCell.appendChild(textGroup);
       
       // Add resize handle
       const resizeHandle = this.createElement('div', 'vibegridx-resize-handle');
@@ -779,35 +858,41 @@ export class SimplePassiveRenderer {
       
       headerCell.appendChild(resizeHandle);
       
-      // Add to coordinate mapping
-      this.coordinateMapping.columns.push({
-        columnId: column.id,
-        x: xOffset,
-        width: column.width,
-        index: index,
-        offset: xOffset
-      });
+      // Update xOffset for next column positioning
       xOffset += column.width;
       
       // Add click handler for sorting and column selection
       headerCell.style.cursor = 'pointer';
       headerCell.addEventListener('click', (e) => {
         // Don't sort if clicking on resize handle
-        if ((e.target as HTMLElement).classList.contains('vibegrid-resize-handle')) {
+        if ((e.target as HTMLElement).classList.contains('vibegridx-resize-handle')) {
           return;
         }
         
         const isCtrlKey = e.ctrlKey || e.metaKey;
+        const isShiftKey = e.shiftKey;
         
-        if (isCtrlKey) {
+        if (isCtrlKey && !isShiftKey) {
           // Ctrl+Click on header - select entire column
           e.preventDefault();
           this.selectColumn(column.id);
           log.info('🎯 Column selected', { columnId: column.id });
         } else {
-          // Regular click - toggle sort
-          log.info('🔄 Column header clicked for sort', { columnId: column.id });
-          this.tableCore$.toggleSort(column.id);
+          // Regular click or Shift+click - toggle sort
+          // Shift+click enables multi-column sorting
+          const isMultiSort = isShiftKey;
+          
+          log.info('🔄 Column header clicked for sort', { 
+            columnId: column.id, 
+            field: column.field,
+            usingField: column.field || column.id,
+            isMultiSort,
+            isShiftKey
+          });
+          
+          // Use column.field for sorting (data field), not column.id (display identifier)
+          // Pass isMultiSort parameter to enable/disable multi-column sorting
+          this.tableCore$.toggleSort(column.field || column.id, isMultiSort);
         }
       });
       
@@ -855,8 +940,14 @@ export class SimplePassiveRenderer {
       rendering: visibleRows.length
     });
     
-    // Filter columns by visibility (using cached columnVisibility)
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    // Get virtual column range for horizontal scrolling (same as header)
+    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
+    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    
+    // Apply horizontal virtual scrolling - only render columns in visible range
+    const startColIndex = Math.max(0, visibleColumnRange.start);
+    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
+    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
     
     // Render only visible rows with proper positioning
     visibleRows.forEach((row, visibleIndex) => {
@@ -868,7 +959,7 @@ export class SimplePassiveRenderer {
       if (row.type === 'group') {
         rowElement = this.createGroupHeaderElement(row, actualRowIndex);
       } else {
-        rowElement = this.createRowElement(row.data || row, actualRowIndex, visibleColumns, columnVisibility);
+        rowElement = this.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility);
       }
       
       this.bodyContainer.appendChild(rowElement);
@@ -1002,13 +1093,15 @@ export class SimplePassiveRenderer {
       `;
       checkbox.dataset.rowId = row.id;
       
-      // Check if this row is currently selected (use the visible columns passed in)
-      const visibleColumns = columns; // columns parameter is now already filtered
+      // Check if this row is currently selected (use ALL visible columns, not just virtual ones)
+      const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
+        this.tableCore$.columnVisibility.get()[col.id] !== false
+      );
       
       const selectedCells = this.tableInteraction$.selectedCells.get();
-      const isRowSelected = visibleColumns.every(col => 
+      const isRowSelected = allVisibleColumns.every(col => 
         selectedCells.has(`${row.id}:${col.id}`)
-      ) && visibleColumns.length > 0;
+      ) && allVisibleColumns.length > 0;
       
       checkbox.checked = isRowSelected;
       
@@ -1113,6 +1206,9 @@ export class SimplePassiveRenderer {
       // Badge/enum content - only use specific classes, NOT vibegridx-cell-content
       contentElement = this.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
       contentElement.textContent = this.formatCellValue(value, cellType);
+    } else if (this.isTagsField(column.id, value)) {
+      // Tags field with comma-separated values - create multiple badges
+      contentElement = this.createTagsElement(value, row, column);
     } else if (['number', 'integer', 'float'].includes(cellType)) {
       // Number content - only use specific classes, NOT vibegridx-cell-content
       contentElement = this.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
@@ -1337,6 +1433,7 @@ export class SimplePassiveRenderer {
     this.activeRows.clear();
     this.viewport = null;
     this.headerContainer = null;
+    this.headerViewport = null;
     this.bodyContainer = null;
     this.selectionManager = null;
     this.canvasOverlay = null;
@@ -1770,17 +1867,191 @@ export class SimplePassiveRenderer {
   
   /**
    * Synchronize header horizontal scroll with viewport
-   * Reused from UnifiedTableRenderer.syncHeaderScroll() - 100% compatible
+   * Now properly syncs header scroll position instead of using transforms
    */
   private syncHeaderScroll(scrollLeft: number): void {
-    if (!this._scrollRAF && this.headerContainer) {
+    if (!this._scrollRAF && this.headerViewport) {
       this._scrollRAF = requestAnimationFrame(() => {
-        if (this.headerContainer) {
-          this.headerContainer.style.transform = `translateX(-${scrollLeft}px)`;
+        if (this.headerViewport) {
+          this.headerViewport.scrollLeft = scrollLeft;
           log.debug('📜 Header scroll synced', { scrollLeft });
         }
         this._scrollRAF = null;
       });
     }
+  }
+
+  /**
+   * Update sort indicators in header cells based on current sort state
+   * Similar to HeaderEngine.updateSortIndicators()
+   */
+  private updateSortIndicators(): void {
+    if (!this.headerContainer) return;
+    
+    const sortBy = this.tableCore$.sortBy.get();
+    const sortLookup = new Map<string, { direction: 'asc' | 'desc'; index: number }>();
+    
+    // Build lookup map from current sort state
+    sortBy.forEach((sort, index) => {
+      sortLookup.set(sort.field, { direction: sort.direction, index });
+    });
+    
+    // Update all header cells
+    this.headerContainer.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
+      const field = (cell as HTMLElement).dataset.field;
+      if (!field) return;
+      
+      const sortInfo = sortLookup.get(field);
+      
+      // Update classes for CSS styling
+      cell.classList.remove('sort-asc', 'sort-desc');
+      if (sortInfo) {
+        cell.classList.add(sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+      }
+      
+      // Update sort icon SVG
+      const sortIcon = cell.querySelector('.vibegridx-sort-icon');
+      if (sortIcon) {
+        sortIcon.innerHTML = this.createSortIconSVG(sortInfo);
+      }
+    });
+    
+    log.debug('🔄 Sort indicators updated', { 
+      sortBy: sortBy.map(s => `${s.field}:${s.direction}`)
+    });
+  }
+
+  /**
+   * Create SVG sort icon with proper opacity for current sort state
+   * Copied from HeaderEngine.createSortIconSVG() for consistency
+   */
+  private createSortIconSVG(sortInfo?: { direction: 'asc' | 'desc'; index: number } | null): string {
+    const ascOpacity = sortInfo?.direction === 'asc' ? '1' : '0.3';
+    const descOpacity = sortInfo?.direction === 'desc' ? '1' : '0.3';
+    
+    return `<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${ascOpacity}"/>
+      <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${descOpacity}"/>
+    </svg>`;
+  }
+
+  /**
+   * Update header cell width to keep in sync with column resize
+   */
+  private updateHeaderCellWidth(columnId: string, newWidth: number): void {
+    const headerCell = this.headerContainer.querySelector(`[data-field="${columnId}"]`) as HTMLElement;
+    if (headerCell) {
+      // Update the flex-basis style to match new width
+      const currentStyle = headerCell.style.cssText;
+      const updatedStyle = currentStyle.replace(
+        /flex:\s*0\s+0\s+\d+px/,
+        `flex: 0 0 ${newWidth}px`
+      );
+      headerCell.style.cssText = updatedStyle;
+      
+      log.debug('📏 Updated header cell width', {
+        columnId,
+        newWidth,
+        previousStyle: currentStyle.match(/flex:\s*0\s+0\s+\d+px/)?.[0],
+        updatedStyle: `flex: 0 0 ${newWidth}px`
+      });
+    } else {
+      log.warn('⚠️ Header cell not found for width update', { columnId });
+    }
+  }
+
+  /**
+   * Determine if a field should be treated as a tags field
+   */
+  private isTagsField(columnId: string, value: any): boolean {
+    if (!value || typeof value !== 'string') return false;
+    
+    // Check if column name suggests it's a tags field
+    const tagsFieldPatterns = ['tags', 'tag', 'labels', 'categories', 'keywords'];
+    const lowerColumnId = columnId.toLowerCase();
+    const isTagsColumn = tagsFieldPatterns.some(pattern => lowerColumnId.includes(pattern));
+    
+    // Check if value contains commas (suggesting multiple tags)
+    const hasMultipleValues = value.includes(',');
+    
+    return isTagsColumn && hasMultipleValues;
+  }
+
+  /**
+   * Create a container element with multiple tag badges
+   */
+  private createTagsElement(value: string, row: any, column: any): HTMLElement {
+    const container = this.createElement('div', 'vibegridx-tags-container');
+    container.style.cssText = `
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    `;
+    
+    // Split comma-separated values and create individual badges
+    const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    
+    tags.forEach((tag, index) => {
+      const tagBadge = this.createElement('span', 'vibegridx-tag-badge');
+      tagBadge.textContent = tag;
+      tagBadge.style.cssText = `
+        background: oklch(0.95 0.02 220);
+        color: oklch(0.45 0.06 220);
+        border: 1px solid oklch(0.88 0.04 220);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+      `;
+      
+      // Add hover effect
+      tagBadge.addEventListener('mouseenter', () => {
+        tagBadge.style.background = 'oklch(0.92 0.04 220)';
+      });
+      tagBadge.addEventListener('mouseleave', () => {
+        tagBadge.style.background = 'oklch(0.95 0.02 220)';
+      });
+      
+      // Add click handler for individual tag editing
+      tagBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        log.info('🏷️ Tag badge clicked - editing entire tags field', { tag, index, allTags: tags });
+        // Edit the entire tags field, not individual tags
+        this.editTagsField(value, row, column);
+      });
+      
+      container.appendChild(tagBadge);
+    });
+    
+    // Add click handler for the container (for editing tags)
+    container.addEventListener('click', (e) => {
+      if (e.target === container) {
+        log.info('🏷️ Tags container clicked - editing tags field', { currentTags: tags });
+        this.editTagsField(value, row, column);
+      }
+    });
+    
+    return container;
+  }
+
+  /**
+   * Trigger editing mode for tags fields
+   */
+  private editTagsField(currentValue: string, row: any, column: any): void {
+    const cellId = `${row.id}:${column.id}`;
+    log.info('🏷️ Starting tags field edit mode', {
+      cellId,
+      currentValue,
+      rowId: row.id,
+      columnId: column.id,
+      currentTags: currentValue.split(',').map(t => t.trim()).filter(t => t.length > 0)
+    });
+    
+    // Trigger the standard VibeGrid edit mode - the editor selection system
+    // will automatically choose MultiSelectEditor for tags fields
+    this.tableInteraction$.startEdit(cellId, currentValue);
   }
 }
