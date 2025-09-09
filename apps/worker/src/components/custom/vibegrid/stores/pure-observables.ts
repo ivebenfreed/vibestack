@@ -1129,7 +1129,7 @@ export function createTableInteraction$(tableCore$?: any) {
 // LAYER 3: TABLE VIEWPORT (Scroll State - Completely Independent)
 // ====================================
 
-export function createTableViewport$() {
+export function createTableViewport$(tableCore$?: any) {
   log.info('🎯 Creating tableViewport$ observable');
   
   const tableViewport$ = observable({
@@ -1165,10 +1165,68 @@ export function createTableViewport$() {
       const left = tableViewport$.scrollLeft.get();
       const width = tableViewport$.viewportWidth.get();
       
-      // TODO: Calculate based on column widths
+      // Safety check - if no tableCore$ available, return default range
+      if (!tableCore$) {
+        return { start: 0, end: 0 };
+      }
+      
+      const columns = tableCore$.columns.get();
+      const columnVisibility = tableCore$.columnVisibility.get();
+      const ROW_HEADER_WIDTH = 40; // Fixed width of row header column
+      
+      if (!columns || columns.length === 0 || width === 0) {
+        return { start: 0, end: 0 };
+      }
+      
+      // Get visible columns only (filtered by visibility)
+      const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+      
+      if (visibleColumns.length === 0) {
+        return { start: 0, end: 0 };
+      }
+      
+      // Calculate column positions (account for row header width)
+      let currentX = ROW_HEADER_WIDTH;
+      const columnPositions = visibleColumns.map((col, index) => {
+        const colX = currentX;
+        currentX += col.width || 150; // Default column width 150px
+        return {
+          index,
+          x: colX,
+          width: col.width || 150,
+          right: currentX
+        };
+      });
+      
+      // Find visible range based on scroll position
+      let startIndex = 0;
+      let endIndex = visibleColumns.length;
+      
+      // Find start index - first column that intersects with visible area
+      for (let i = 0; i < columnPositions.length; i++) {
+        if (columnPositions[i].right > left) {
+          startIndex = i;
+          break;
+        }
+      }
+      
+      // Find end index - last column that intersects with visible area
+      const rightBound = left + width;
+      for (let i = columnPositions.length - 1; i >= 0; i--) {
+        if (columnPositions[i].x < rightBound) {
+          endIndex = i + 1;
+          break;
+        }
+      }
+      
+      // Add buffer for smooth scrolling (2 columns on each side)
+      const bufferSize = 2;
+      const bufferedStart = Math.max(0, startIndex - bufferSize);
+      const bufferedEnd = Math.min(visibleColumns.length, endIndex + bufferSize);
+      
       return {
-        start: 0,
-        end: 20 // Show all columns for now
+        start: bufferedStart,
+        end: bufferedEnd
       };
     }),
     
@@ -1270,7 +1328,7 @@ export function createPureObservables(entityType: string, columns: Column[]) {
   return {
     tableCore$,
     tableInteraction$: createTableInteraction$(tableCore$),
-    tableViewport$: createTableViewport$()
+    tableViewport$: createTableViewport$(tableCore$)
   };
 }
 
