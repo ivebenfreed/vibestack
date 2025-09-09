@@ -396,8 +396,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         if (index === -1) {
           tableCore$.sortBy.set([...current, { field, direction: 'asc' }]);
         } else if (current[index].direction === 'asc') {
-          current[index].direction = 'desc';
-          tableCore$.sortBy.set([...current]);
+          const newSort = [...current];
+          newSort[index] = { ...current[index], direction: 'desc' };
+          tableCore$.sortBy.set(newSort);
         } else {
           tableCore$.sortBy.set(current.filter((_, i) => i !== index));
         }
