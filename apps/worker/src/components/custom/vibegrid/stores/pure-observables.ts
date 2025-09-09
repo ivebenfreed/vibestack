@@ -149,14 +149,163 @@ function applySorting(rows: any[], sortBy: SortConfig[]): any[] {
   });
 }
 
-async function applyGrouping(rows: any[], groupConfig: GroupConfig): Promise<any[]> {
+function applyGrouping(rows: any[], groupConfig: GroupConfig): any[] {
   if (!groupConfig || !groupConfig.fields || groupConfig.fields.length === 0) {
     return rows;
   }
   
-  // For now, return rows as-is until we implement grouping
-  // This will be replaced with actual grouping logic
-  return rows;
+  log.info('🎯 Applying grouping', { 
+    rowCount: rows.length, 
+    groupFields: groupConfig.fields.map(f => f.field) 
+  });
+  
+  // Create hierarchical groups based on multiple grouping fields
+  const groupTree = createGroupTree(rows, groupConfig.fields);
+  
+  // Flatten the tree into a virtual row array with group headers and data rows
+  const virtualRows = flattenGroupTree(groupTree, groupConfig.expandedGroups);
+  
+  log.info('🎯 Grouping applied', {
+    originalRows: rows.length,
+    virtualRows: virtualRows.length,
+    groupCount: countGroups(groupTree)
+  });
+  
+  return virtualRows;
+}
+
+function createGroupTree(rows: any[], groupFields: GroupField[]): GroupNode[] {
+  if (groupFields.length === 0) {
+    return rows; // Return raw rows when no grouping
+  }
+  
+  // Group by the first field
+  const firstField = groupFields[0];
+  const groups: Map<any, any[]> = new Map();
+  
+  for (const row of rows) {
+    const groupValue = row[firstField.field] || 'Ungrouped';
+    
+    if (!groups.has(groupValue)) {
+      groups.set(groupValue, []);
+    }
+    groups.get(groupValue)!.push(row);
+  }
+  
+  // Create group nodes
+  const groupNodes: GroupNode[] = [];
+  
+  for (const [groupValue, groupRows] of groups.entries()) {
+    const displayValue = formatGroupValue(groupValue, firstField.field);
+    const groupId = `group-${firstField.field}-${String(groupValue).replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
+    // Recursively create subgroups if there are more grouping fields
+    const children = groupFields.length > 1 
+      ? createGroupTree(groupRows, groupFields.slice(1))
+      : groupRows;
+    
+    const groupNode: GroupNode = {
+      id: groupId,
+      field: firstField.field,
+      value: groupValue,
+      displayValue: displayValue,
+      level: 0, // Will be set during flattening
+      rowCount: groupRows.length,
+      totalCount: groupRows.length,
+      children: children,
+      isCollapsed: false,
+      summary: {
+        count: groupRows.length,
+        field: firstField.field,
+        value: groupValue
+      }
+    };
+    
+    groupNodes.push(groupNode);
+  }
+  
+  // Sort groups if needed
+  groupNodes.sort((a, b) => {
+    return a.displayValue.localeCompare(b.displayValue);
+  });
+  
+  return groupNodes;
+}
+
+function flattenGroupTree(groupTree: GroupNode[], expandedGroups: Set<string>, level: number = 0): any[] {
+  const result: any[] = [];
+  
+  for (const node of groupTree) {
+    if (node.field && node.displayValue) { // This is a GroupNode
+      // Add the group header row
+      const groupHeaderRow = {
+        type: 'group',
+        id: node.id,
+        level: level,
+        data: node,
+        isExpandable: true,
+        isExpanded: expandedGroups.has(node.id)
+      };
+      
+      result.push(groupHeaderRow);
+      
+      // Add children if group is expanded
+      if (expandedGroups.has(node.id)) {
+        if (Array.isArray(node.children)) {
+          for (const child of node.children) {
+            if (child.field && child.displayValue) { // Another GroupNode
+              // Recursive group
+              result.push(...flattenGroupTree([child], expandedGroups, level + 1));
+            } else {
+              // Data row
+              result.push({
+                type: 'data',
+                id: child.id,
+                data: child,
+                level: level + 1,
+                parentGroupId: node.id
+              });
+            }
+          }
+        }
+      }
+    } else {
+      // Data row at root level (shouldn't happen with proper grouping)
+      result.push({
+        type: 'data',
+        id: node.id,
+        data: node,
+        level: level
+      });
+    }
+  }
+  
+  return result;
+}
+
+function formatGroupValue(value: any, field: string): string {
+  if (value === null || value === undefined) {
+    return 'Ungrouped';
+  }
+  
+  if (typeof value === 'string' && value.trim() === '') {
+    return 'Empty';
+  }
+  
+  return String(value);
+}
+
+function countGroups(groupTree: GroupNode[]): number {
+  let count = 0;
+  for (const node of groupTree) {
+    if (node.field && node.displayValue) { // This is a GroupNode
+      count++;
+      if (Array.isArray(node.children)) {
+        count += countGroups(node.children.filter(child => child.field && child.displayValue));
+      }
+    }
+  }
+  return count;
 }
 
 // ====================================
@@ -221,10 +370,10 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
       
-      // Skip async grouping in computed for now
-      // if (groupConfig) {
-      //   rows = applyGrouping(rows, groupConfig);
-      // }
+      // Apply grouping if configured
+      if (groupConfig) {
+        rows = applyGrouping(rows, groupConfig);
+      }
       
       log.info('🎯 Processed rows computed', {
         entityObservable: !!entityObs,
@@ -322,6 +471,48 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     setGroupConfig(config: GroupConfig | null) {
       tableCore$.groupConfig.set(config);
       log.info('🎯 Group config set', { config });
+    },
+    
+    toggleGroupExpansion(groupId: string) {
+      const groupConfig = tableCore$.groupConfig.get();
+      if (!groupConfig) return;
+      
+      const expandedGroups = new Set(groupConfig.expandedGroups);
+      
+      if (expandedGroups.has(groupId)) {
+        expandedGroups.delete(groupId);
+        log.info('🎯 Group collapsed', { groupId });
+      } else {
+        expandedGroups.add(groupId);
+        log.info('🎯 Group expanded', { groupId });
+      }
+      
+      tableCore$.groupConfig.set({
+        ...groupConfig,
+        expandedGroups
+      });
+    },
+    
+    expandAllGroups() {
+      const groupConfig = tableCore$.groupConfig.get();
+      if (!groupConfig) return;
+      
+      // This would require getting all group IDs from the processed rows
+      // For now, just log the intent
+      log.info('🎯 Expand all groups requested');
+      // TODO: Implement when we have access to all group IDs
+    },
+    
+    collapseAllGroups() {
+      const groupConfig = tableCore$.groupConfig.get();
+      if (!groupConfig) return;
+      
+      tableCore$.groupConfig.set({
+        ...groupConfig,
+        expandedGroups: new Set()
+      });
+      
+      log.info('🎯 All groups collapsed');
     },
     
     // Column visibility methods

@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict Eb4HAEAv5beOwoPZqyH6UZg16kh9d0erwJaUVEKcYvX5M6IclzPj27dN4NyosPH
+\restrict cC8D1B8loTYV0QvSYdJkRBdnkE8zSGD2ltlhGL5oFvvFgLvx89LW0qj2iCbUWr8
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict Eb4HAEAv5beOwoPZqyH6UZg16kh9d0erwJaUVEKcYvX5M6IclzPj27dN4NyosPH
+\unrestrict cC8D1B8loTYV0QvSYdJkRBdnkE8zSGD2ltlhGL5oFvvFgLvx89LW0qj2iCbUWr8
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict YPateRXhUP7hxeHqqzixWusQLW7FanqAeUHEsxeKRrPhouB1Us11wNzf1thm8F2
+\restrict 8LQiyk5sLA4s7gJlxiNr7Zj5LMLDMR5UVmSv5rIpH6jxGSFrsNNB02h9xixed43
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YPateRXhUP7hxeHqqzixWusQLW7FanqAeUHEsxeKRrPhouB1Us11wNzf1thm8F2
+\unrestrict 8LQiyk5sLA4s7gJlxiNr7Zj5LMLDMR5UVmSv5rIpH6jxGSFrsNNB02h9xixed43
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict SQge5V1N6BVzQwB0ADteVQHLytDoeew1yq8D61c1v0iruoEGey2uRfeszNhvtdG
+\restrict OvsvF81Wa6FwQNa3lHe6Uq41NFQ2JLdrXbndavfCdffhMoRfPKzFxnNuwdcTZ59
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SQge5V1N6BVzQwB0ADteVQHLytDoeew1yq8D61c1v0iruoEGey2uRfeszNhvtdG
+\unrestrict OvsvF81Wa6FwQNa3lHe6Uq41NFQ2JLdrXbndavfCdffhMoRfPKzFxnNuwdcTZ59
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict dcZSeEEvbfJ7wisq2qzfbJmMxRtbXgLMt4jhW7kkotyaJlLULvrFyXRRbQDt4wW
+\restrict Ky7dlzT7PLbNp9emsfLZ6USK6YosxNHLWPNlp72caj207AwIb5JNBhOzYYUlS2X
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict dcZSeEEvbfJ7wisq2qzfbJmMxRtbXgLMt4jhW7kkotyaJlLULvrFyXRRbQDt4wW
+\unrestrict Ky7dlzT7PLbNp9emsfLZ6USK6YosxNHLWPNlp72caj207AwIb5JNBhOzYYUlS2X
 \connect vibestack_dev
-\restrict dcZSeEEvbfJ7wisq2qzfbJmMxRtbXgLMt4jhW7kkotyaJlLULvrFyXRRbQDt4wW
+\restrict Ky7dlzT7PLbNp9emsfLZ6USK6YosxNHLWPNlp72caj207AwIb5JNBhOzYYUlS2X
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -4109,6 +4109,29 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testrecord17571
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testrecord175718572488 OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_testtask; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testtask (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_by text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    due_date timestamp without time zone,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_testtask1757185633070; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -6899,7 +6922,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dcZSeEEvbfJ7wisq2qzfbJmMxRtbXgLMt4jhW7kkotyaJlLULvrFyXRRbQDt4wW
+\unrestrict Ky7dlzT7PLbNp9emsfLZ6USK6YosxNHLWPNlp72caj207AwIb5JNBhOzYYUlS2X
 
 --
 -- PostgreSQL database cluster dump complete

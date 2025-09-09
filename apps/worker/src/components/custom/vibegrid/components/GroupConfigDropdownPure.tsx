@@ -63,8 +63,7 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
 
     const newField: GroupField = {
       field: column.field || column.id,
-      label: column.name || column.id,
-      sortDirection: 'asc'
+      displayName: column.name || column.id
     };
 
     const newConfig: GroupConfig = {
@@ -72,7 +71,7 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
       sortBy: 'name',
       sortDirection: 'asc',
       aggregations: groupConfig?.aggregations || [],
-      expandedGroups: groupConfig?.expandedGroups || new Set(),
+      expandedGroups: new Set(), // Start with all groups collapsed, user can expand as needed
       colorScheme: 'auto'
     };
 
@@ -139,10 +138,7 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
                 className="flex items-center justify-between p-2"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-sm truncate">{field.label}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {field.sortDirection === 'asc' ? 'A-Z' : 'Z-A'}
-                  </Badge>
+                  <span className="text-sm truncate">{field.displayName}</span>
                 </div>
                 <Button
                   variant="ghost"

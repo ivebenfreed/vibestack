@@ -444,6 +444,97 @@ export class SimplePassiveRenderer {
   }
   
   /**
+   * Create group header element with expand/collapse functionality
+   */
+  private createGroupHeaderElement(groupRow: any, rowIndex: number): HTMLElement {
+    const groupData = groupRow.data;
+    const level = groupRow.level || 0;
+    const isExpanded = groupRow.isExpanded;
+    
+    const rowElement = this.createElement('div', 'vibegridx-row vibegridx-group-header');
+    rowElement.dataset.rowId = groupRow.id;
+    rowElement.dataset.groupId = groupRow.id;
+    rowElement.style.cssText = `
+      position: absolute;
+      top: ${rowIndex * ROW_HEIGHT}px;
+      left: 0;
+      right: 0;
+      height: ${ROW_HEIGHT}px;
+      display: flex;
+      align-items: center;
+      background: ${level === 0 ? '#e3f2fd' : '#f5f5f5'};
+      border-bottom: 2px solid ${level === 0 ? '#2196f3' : '#9e9e9e'};
+      font-weight: ${level === 0 ? '600' : '500'};
+      cursor: pointer;
+      user-select: none;
+    `;
+    
+    // Add expand/collapse button with proper indentation
+    const expandButton = this.createElement('div', 'vibegridx-group-expand');
+    expandButton.style.cssText = `
+      width: ${40 + level * 20}px;
+      min-width: ${40 + level * 20}px;
+      height: ${ROW_HEIGHT}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #666;
+      padding-left: ${level * 20}px;
+    `;
+    
+    // Triangle icon for expand/collapse
+    const triangle = this.createElement('span', 'triangle-icon');
+    triangle.innerHTML = isExpanded ? '▼' : '▶';
+    triangle.style.cssText = `
+      font-size: 12px;
+      transition: transform 0.2s;
+      margin-right: 8px;
+    `;
+    expandButton.appendChild(triangle);
+    
+    // Group label with count
+    const groupLabel = this.createElement('div', 'vibegridx-group-label');
+    groupLabel.style.cssText = `
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 14px;
+      color: #333;
+    `;
+    
+    const fieldName = groupData.field.charAt(0).toUpperCase() + groupData.field.slice(1);
+    const displayValue = groupData.displayValue;
+    const count = groupData.rowCount;
+    
+    groupLabel.innerHTML = `
+      <strong>${fieldName}:</strong> 
+      <span style="margin: 0 8px;">${displayValue}</span>
+      <span style="color: #666; font-size: 12px;">(${count} ${count === 1 ? 'item' : 'items'})</span>
+    `;
+    
+    rowElement.appendChild(expandButton);
+    rowElement.appendChild(groupLabel);
+    
+    // Add click handler for expand/collapse
+    rowElement.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      log.info('🎯 Group header clicked', { 
+        groupId: groupRow.id, 
+        currentlyExpanded: isExpanded 
+      });
+      
+      // Toggle group expansion via tableCore$
+      this.tableCore$.toggleGroupExpansion(groupRow.id);
+    });
+    
+    return rowElement;
+  }
+  
+  /**
    * Setup context menu handling
    */
   private setupContextMenu(): void {
@@ -770,7 +861,16 @@ export class SimplePassiveRenderer {
     // Render only visible rows with proper positioning
     visibleRows.forEach((row, visibleIndex) => {
       const actualRowIndex = startIndex + visibleIndex;
-      const rowElement = this.createRowElement(row, actualRowIndex, visibleColumns, columnVisibility);
+      
+      let rowElement: HTMLElement;
+      
+      // Check if this is a group header or data row
+      if (row.type === 'group') {
+        rowElement = this.createGroupHeaderElement(row, actualRowIndex);
+      } else {
+        rowElement = this.createRowElement(row.data || row, actualRowIndex, visibleColumns, columnVisibility);
+      }
+      
       this.bodyContainer.appendChild(rowElement);
       
       // Add to coordinate mapping (all rows for overlay positioning)
