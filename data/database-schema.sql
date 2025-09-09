@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict Fux9EdgN8kho3kh1VMcnYTYBxSHGlGIS8jfLhgjeOMHIddKBk6wK3tXW0anEx3v
+\restrict Glm8FcwmKUP6G6TODCoB0lKyFQzJggeRf9TmPDutR2C8QN4lAvEpEsSgpWCPGwJ
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict Fux9EdgN8kho3kh1VMcnYTYBxSHGlGIS8jfLhgjeOMHIddKBk6wK3tXW0anEx3v
+\unrestrict Glm8FcwmKUP6G6TODCoB0lKyFQzJggeRf9TmPDutR2C8QN4lAvEpEsSgpWCPGwJ
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict vIgdkWwzCahyvtQ9Ns4nfT24fWAR6pRsGe0EuEcrvbhjDtDl8lrqA7zaSmiJrXu
+\restrict jo5avh45MJTH1cB1iJx9zwBVATg2FkzKHpryUNmnhAopIXKOifieoPYtkhDwIkN
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vIgdkWwzCahyvtQ9Ns4nfT24fWAR6pRsGe0EuEcrvbhjDtDl8lrqA7zaSmiJrXu
+\unrestrict jo5avh45MJTH1cB1iJx9zwBVATg2FkzKHpryUNmnhAopIXKOifieoPYtkhDwIkN
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict QfMTWkDYIIkJxVSGojLr1Qnb3zAEOGr8W8estSpqw9itJ0sc7ILDAiU8ban7VRw
+\restrict HkyeJ4nT1zQpVUpfdzhoYtzSAPxoLfy4gwabxGepdugoH8l1sIyghuwnqNBmGfc
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QfMTWkDYIIkJxVSGojLr1Qnb3zAEOGr8W8estSpqw9itJ0sc7ILDAiU8ban7VRw
+\unrestrict HkyeJ4nT1zQpVUpfdzhoYtzSAPxoLfy4gwabxGepdugoH8l1sIyghuwnqNBmGfc
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
+\restrict Yvrpf6AAoiKzKx3jPfBMZgr41ZY82F44Cfedy0IgWCTn5PB1YwdrqJjuYHUV5n8
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
+\unrestrict Yvrpf6AAoiKzKx3jPfBMZgr41ZY82F44Cfedy0IgWCTn5PB1YwdrqJjuYHUV5n8
 \connect vibestack_dev
-\restrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
+\restrict Yvrpf6AAoiKzKx3jPfBMZgr41ZY82F44Cfedy0IgWCTn5PB1YwdrqJjuYHUV5n8
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2306,6 +2306,26 @@ CREATE TABLE public.dataforge_relationship_fields (
 
 
 ALTER TABLE public.dataforge_relationship_fields OWNER TO postgres;
+
+--
+-- Name: fields_trash; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.fields_trash (
+    id text DEFAULT (gen_random_uuid())::text NOT NULL,
+    org_id text NOT NULL,
+    entity_name text NOT NULL,
+    field_name text NOT NULL,
+    field_definition jsonb,
+    table_name text NOT NULL,
+    deleted_by text,
+    deleted_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.fields_trash OWNER TO postgres;
 
 --
 -- Name: file_imports; Type: TABLE; Schema: public; Owner: postgres
@@ -4697,6 +4717,27 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask1757185
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask1757185725218 OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_testwithrelationships; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testwithrelationships (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    regular_field text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testwithrelationships REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testwithrelationships OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_time_sheet; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5900,6 +5941,22 @@ ALTER TABLE ONLY public.entity_schemas
 
 
 --
+-- Name: fields_trash fields_trash_org_id_entity_name_field_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.fields_trash
+    ADD CONSTRAINT fields_trash_org_id_entity_name_field_name_key UNIQUE (org_id, entity_name, field_name);
+
+
+--
+-- Name: fields_trash fields_trash_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.fields_trash
+    ADD CONSTRAINT fields_trash_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: file_imports file_imports_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6481,6 +6538,20 @@ CREATE INDEX idx_entity_schemas_org_id ON public.entity_schemas USING btree (org
 --
 
 CREATE INDEX idx_entity_schemas_table_name ON public.entity_schemas USING btree (table_name);
+
+
+--
+-- Name: idx_fields_trash_deleted_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_fields_trash_deleted_at ON public.fields_trash USING btree (deleted_at);
+
+
+--
+-- Name: idx_fields_trash_org_entity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_fields_trash_org_entity ON public.fields_trash USING btree (org_id, entity_name);
 
 
 --
@@ -7545,7 +7616,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
+\unrestrict Yvrpf6AAoiKzKx3jPfBMZgr41ZY82F44Cfedy0IgWCTn5PB1YwdrqJjuYHUV5n8
 
 --
 -- PostgreSQL database cluster dump complete

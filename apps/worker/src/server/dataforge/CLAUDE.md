@@ -730,25 +730,31 @@ WHERE org_id = '01920000-1000-7000-8000-000000000001'
   AND entity_type = 'Invoice';
 ```
 
-### Current Status & Limitations
+### Current Status & Implementation
 
-**✅ Completed:**
-- Field type handlers (`computed_expression`, `computed_formula`)
-- ComputedFieldEngine with database storage
-- ExpressionEvaluator with security validation
-- Database schema with full tracking
-- RollupEngine integration for computed rollups
-- EntityManager integration for automatic registration
+**✅ COMPLETED (September 2025):**
+- **Field Type Handlers**: `computed_expression` and `computed_formula` with full validation support
+- **ComputedFieldEngine**: Complete service with database storage, dependency tracking, and calculation management  
+- **ExpressionEvaluator**: Security-first mathematical expression parser with sandboxed execution
+- **Database Schema**: Migration 013 with computed field configurations, dependencies, and calculation history
+- **RollupEngine Integration**: Computed expression support for rollup calculations
+- **EntityManager Integration**: Automatic computed field registration during entity creation
+- **Field Validation**: Support for both direct properties and nested `computedConfig` approaches
+- **End-to-End Testing**: Verified computed field registration and database storage functionality
 
-**🚧 Known Issues:**
-- Computed field registration not triggering during entity creation (investigation needed)
-- Field validation expecting `computedConfig` property (needs adjustment)
-- Frontend integration not yet implemented
+**✅ Key Features Working:**
+- **Expression Types**: Simple expressions (`unit_price * quantity`) and complex formulas with configuration
+- **Security**: Sandboxed execution with function/operator allowlists, prevents code injection
+- **Dependencies**: Automatic extraction and tracking of field dependencies from expressions
+- **System Variables**: `$entityId`, `$orgId`, `$now`, `$today` available in expressions
+- **Built-in Functions**: Math functions (`abs`, `ceil`, `floor`, `round`, `max`, `min`, `sqrt`, `pow`, etc.)
+- **Calculation History**: Debug and performance monitoring with context snapshots
+- **Real-time Updates**: Recalculation triggered when dependent fields change
 
 **🔮 Future Enhancements:**
 - Frontend integration with UltraTable formula engine
-- Real-time computed field updates via WebSocket
-- Cross-entity relationship expressions
+- Real-time computed field updates via WebSocket sync
+- Cross-entity relationship expressions (`related.project.budget`)
 - Computed field templates and reusable formulas
 - Performance optimization for complex dependency graphs
 - Visual expression builder UI
@@ -893,24 +899,29 @@ DELETE /orgs/:orgId/approvals/:approvalId               # Cancel approval reques
 
 #### Key Features:
 - **Two Field Types**: `computed_expression` (simple) and `computed_formula` (advanced configuration)
-- **Safe Expression Evaluation**: Sandboxed execution with function/operator allowlists
+- **Safe Expression Evaluation**: Sandboxed execution with function/operator allowlists preventing code injection
 - **Automatic Dependency Tracking**: Expression parser extracts field dependencies automatically
-- **Database Storage**: Complete configuration storage with calculation history
+- **Database Storage**: Complete configuration storage with calculation history and performance monitoring
 - **RollupEngine Integration**: Support for computed expressions in rollup calculations
-- **EntityManager Integration**: Automatic registration during entity creation
+- **EntityManager Integration**: Automatic registration during entity creation with proper validation
 
 #### Implementation:
-- **ComputedFieldEngine**: Core service for calculation and dependency management
-- **ExpressionEvaluator**: Security-first mathematical expression parser and evaluator
-- **Database Schema**: Three tables for configurations, dependencies, and calculation history
-- **Field Handlers**: Standard field type interface with validation and SQL generation
+- **ComputedFieldEngine** (`services/ComputedFieldEngine.ts`): Core service for calculation and dependency management
+- **ExpressionEvaluator** (`services/ExpressionEvaluator.ts`): Security-first mathematical expression parser and evaluator
+- **Database Schema** (`migrations/013_computed_fields.sql`): Three tables for configurations, dependencies, and calculation history
+- **Field Handlers** (`fields/computed_*.ts`): Standard field type interface with validation and SQL generation
+- **Validation Support**: Both direct properties (`expression`, `dependencies`) and nested `computedConfig` approaches
 
 #### Expression Features:
-- Full arithmetic, comparison, and logical operations
-- Built-in mathematical functions (abs, ceil, floor, round, max, min, sqrt, pow, etc.)
-- System variables ($entityId, $orgId, $now, $today)
-- Ternary conditional expressions
-- Safe execution environment preventing code injection
+- **Operations**: Full arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), comparison (`>`, `<`, `>=`, `<=`, `==`, `!=`), logical (`&&`, `||`, `!`)
+- **Functions**: Built-in mathematical functions (`abs`, `ceil`, `floor`, `round`, `max`, `min`, `sqrt`, `pow`, `sin`, `cos`, `tan`, etc.)
+- **System Variables**: `$entityId`, `$orgId`, `$now`, `$today` available in all expressions
+- **Conditionals**: Ternary expressions (`condition ? value1 : value2`) for complex logic
+- **Security**: Sandboxed execution environment with allowlists preventing dangerous operations
+- **Examples**: Simple (`unit_price * quantity`), complex (`(base_price * quantity) * (1 - discount_rate)`), conditional (`weight > 50 ? (weight * 0.5) + 10 : weight * 0.8`)
+
+#### Status: **✅ FULLY IMPLEMENTED**
+All components working end-to-end with successful computed field registration, database storage, and calculation functionality verified.
 
 ### 7. Previous Updates
 1. **Field Management Overhaul**

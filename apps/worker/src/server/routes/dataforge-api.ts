@@ -904,6 +904,112 @@ dataforgeRouter.delete('/orgs/:orgId/trash/:entityName/permanent',
 );
 
 // =============================================================================
+// FIELD TRASH MANAGEMENT ENDPOINTS - Soft delete with recovery for custom fields
+// =============================================================================
+
+// List deleted fields (field trash)
+dataforgeRouter.get('/orgs/:orgId/entities/:entityName/fields/trash',
+  requirePermission('entities:read'),
+  async (c) => {
+    const { orgId, entityName } = c.req.param();
+    const security = c.get('security');
+    
+    if (orgId !== security.organizationId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+    
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
+    
+    const kysely = createKyselyForPersistentUse();
+    const rulesEngine = new JsonRulesEngine();
+    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+    
+    const result = await entityManager.listFieldTrash(orgId, entityName);
+    
+    if (!result.success) {
+      return c.json({ 
+        error: result.error, 
+        details: result.details 
+      }, result.error?.includes('not found') ? 404 : 500);
+    }
+    
+    return c.json(result);
+  }
+);
+
+// Restore field from trash
+dataforgeRouter.post('/orgs/:orgId/entities/:entityName/fields/:fieldName/restore',
+  requirePermission('entities:admin'),
+  async (c) => {
+    const { orgId, entityName, fieldName } = c.req.param();
+    const security = c.get('security');
+    const user = c.get('user');
+    
+    if (orgId !== security.organizationId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+    
+    console.log(`[DataForge] User ${user?.email} restoring field ${fieldName} from trash in entity ${entityName}`);
+    
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
+    
+    const kysely = createKyselyForPersistentUse();
+    const rulesEngine = new JsonRulesEngine();
+    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+    
+    const result = await entityManager.restoreField(orgId, entityName, fieldName);
+    
+    if (!result.success) {
+      return c.json({ 
+        error: result.error, 
+        details: result.details 
+      }, result.error?.includes('not found') ? 404 : 500);
+    }
+    
+    return c.json(result);
+  }
+);
+
+// Permanently delete field (empty field from trash)
+dataforgeRouter.delete('/orgs/:orgId/entities/:entityName/fields/:fieldName/permanent',
+  requirePermission('entities:admin'),
+  async (c) => {
+    const { orgId, entityName, fieldName } = c.req.param();
+    const security = c.get('security');
+    const user = c.get('user');
+    
+    if (orgId !== security.organizationId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+    
+    console.log(`[DataForge] User ${user?.email} permanently deleting field ${fieldName} from entity ${entityName}`);
+    
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
+    
+    const kysely = createKyselyForPersistentUse();
+    const rulesEngine = new JsonRulesEngine();
+    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+    
+    const result = await entityManager.permanentDeleteField(orgId, entityName, fieldName);
+    
+    if (!result.success) {
+      return c.json({ 
+        error: result.error, 
+        details: result.details 
+      }, result.error?.includes('not found') ? 404 : 500);
+    }
+    
+    return c.json(result);
+  }
+);
+
+// =============================================================================
 // SYSTEM OPTIONS ENDPOINTS - Reference data for field types
 // =============================================================================
 
