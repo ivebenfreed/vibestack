@@ -400,6 +400,11 @@ export class SimplePassiveRenderer {
     const resizeDisposer = observe(() => {
       const resizeState = this.tableInteraction$.columnResize.get();
       
+      // Update header cell width during resize
+      if (resizeState && resizeState.isResizing && resizeState.columnId && resizeState.newWidth) {
+        this.updateHeaderCellWidth(resizeState.columnId, resizeState.newWidth);
+      }
+      
       if (this.canvasOverlay) {
         // Update coordinate mapping and column resize preview via CanvasOverlayDOM
         this.canvasOverlay.updateCoordinateMapping(this.coordinateMapping);
@@ -443,6 +448,18 @@ export class SimplePassiveRenderer {
       }
     });
     this.disposers.push(dragDisposer);
+    
+    // Sort observer - updates sort indicators when sort state changes
+    const sortDisposer = observe(() => {
+      const sortBy = this.tableCore$.sortBy.get();
+      log.debug('🔄 Sort state changed, updating indicators', { sortBy });
+      
+      // Update sort indicators after a small delay to ensure header is rendered
+      requestAnimationFrame(() => {
+        this.updateSortIndicators();
+      });
+    });
+    this.disposers.push(sortDisposer);
     
     // Setup context menu event handler
     this.setupContextMenu();
@@ -735,6 +752,7 @@ export class SimplePassiveRenderer {
     virtualColumns.forEach((column, virtualIndex) => {
       const actualIndex = startColIndex + virtualIndex;
       const headerCell = this.createElement('div', 'vibegridx-header-cell');
+      headerCell.dataset.field = column.id; // Add field ID for sort updates
       headerCell.style.cssText = `
         flex: 0 0 ${column.width}px;
         height: 100%;
@@ -748,7 +766,25 @@ export class SimplePassiveRenderer {
         position: relative;
       `;
       
-      headerCell.textContent = column.label;
+      // Create header content with text and sort icon (like HeaderEngine)
+      const textGroup = this.createElement('div', 'vibegridx-header-text-group');
+      textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+      
+      // Header text
+      const headerText = this.createElement('span', 'vibegridx-header-text');
+      headerText.textContent = column.label;
+      
+      // Sort icon (if column is sortable)
+      if (column.sortable !== false) {
+        const sortIcon = this.createElement('span', 'vibegridx-sort-icon');
+        sortIcon.innerHTML = this.createSortIconSVG(null); // No sort initially
+        textGroup.appendChild(headerText);
+        textGroup.appendChild(sortIcon);
+      } else {
+        textGroup.appendChild(headerText);
+      }
+      
+      headerCell.appendChild(textGroup);
       
       // Add resize handle
       const resizeHandle = this.createElement('div', 'vibegridx-resize-handle');
@@ -829,7 +865,7 @@ export class SimplePassiveRenderer {
       headerCell.style.cursor = 'pointer';
       headerCell.addEventListener('click', (e) => {
         // Don't sort if clicking on resize handle
-        if ((e.target as HTMLElement).classList.contains('vibegrid-resize-handle')) {
+        if ((e.target as HTMLElement).classList.contains('vibegridx-resize-handle')) {
           return;
         }
         
@@ -1826,6 +1862,85 @@ export class SimplePassiveRenderer {
         }
         this._scrollRAF = null;
       });
+    }
+  }
+
+  /**
+   * Update sort indicators in header cells based on current sort state
+   * Similar to HeaderEngine.updateSortIndicators()
+   */
+  private updateSortIndicators(): void {
+    if (!this.headerContainer) return;
+    
+    const sortBy = this.tableCore$.sortBy.get();
+    const sortLookup = new Map<string, { direction: 'asc' | 'desc'; index: number }>();
+    
+    // Build lookup map from current sort state
+    sortBy.forEach((sort, index) => {
+      sortLookup.set(sort.field, { direction: sort.direction, index });
+    });
+    
+    // Update all header cells
+    this.headerContainer.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
+      const field = (cell as HTMLElement).dataset.field;
+      if (!field) return;
+      
+      const sortInfo = sortLookup.get(field);
+      
+      // Update classes for CSS styling
+      cell.classList.remove('sort-asc', 'sort-desc');
+      if (sortInfo) {
+        cell.classList.add(sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+      }
+      
+      // Update sort icon SVG
+      const sortIcon = cell.querySelector('.vibegridx-sort-icon');
+      if (sortIcon) {
+        sortIcon.innerHTML = this.createSortIconSVG(sortInfo);
+      }
+    });
+    
+    log.debug('🔄 Sort indicators updated', { 
+      sortBy: sortBy.map(s => `${s.field}:${s.direction}`)
+    });
+  }
+
+  /**
+   * Create SVG sort icon with proper opacity for current sort state
+   * Copied from HeaderEngine.createSortIconSVG() for consistency
+   */
+  private createSortIconSVG(sortInfo?: { direction: 'asc' | 'desc'; index: number } | null): string {
+    const ascOpacity = sortInfo?.direction === 'asc' ? '1' : '0.3';
+    const descOpacity = sortInfo?.direction === 'desc' ? '1' : '0.3';
+    
+    return `<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${ascOpacity}"/>
+      <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${descOpacity}"/>
+    </svg>`;
+  }
+
+  /**
+   * Update header cell width to keep in sync with column resize
+   */
+  private updateHeaderCellWidth(columnId: string, newWidth: number): void {
+    const headerCell = this.headerContainer.querySelector(`[data-field="${columnId}"]`) as HTMLElement;
+    if (headerCell) {
+      // Update the flex-basis style to match new width
+      const currentStyle = headerCell.style.cssText;
+      const updatedStyle = currentStyle.replace(
+        /flex:\s*0\s+0\s+\d+px/,
+        `flex: 0 0 ${newWidth}px`
+      );
+      headerCell.style.cssText = updatedStyle;
+      
+      log.debug('📏 Updated header cell width', {
+        columnId,
+        newWidth,
+        previousStyle: currentStyle.match(/flex:\s*0\s+0\s+\d+px/)?.[0],
+        updatedStyle: `flex: 0 0 ${newWidth}px`
+      });
+    } else {
+      log.warn('⚠️ Header cell not found for width update', { columnId });
     }
   }
 }
