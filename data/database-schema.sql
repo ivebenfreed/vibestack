@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict BUFIasJ3AASa1CPc3IXYM95gRNH7RyaSDdKWPEGnZgMDviRJrjcc3AoKRzcLVl2
+\restrict UhmkVZfeYX5J8cHWnILnBeqS7dNUkXYK17L0hS7yfClJcCe5WmfHeXEMyW4gkNq
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict BUFIasJ3AASa1CPc3IXYM95gRNH7RyaSDdKWPEGnZgMDviRJrjcc3AoKRzcLVl2
+\unrestrict UhmkVZfeYX5J8cHWnILnBeqS7dNUkXYK17L0hS7yfClJcCe5WmfHeXEMyW4gkNq
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict QjaIBJ94q6oYGsYFiVoAJtaUXUhV6nWDIj1LLTd8ba5kIYrCGhde9Q2uxjhCev2
+\restrict Az5eJbWa25itAN36AyDUnnLlFIfUad0QPtPOISR1nnIq4LT5NgX8avR2IfaWnC0
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QjaIBJ94q6oYGsYFiVoAJtaUXUhV6nWDIj1LLTd8ba5kIYrCGhde9Q2uxjhCev2
+\unrestrict Az5eJbWa25itAN36AyDUnnLlFIfUad0QPtPOISR1nnIq4LT5NgX8avR2IfaWnC0
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict 7rS1lRVYL7QxSVxfZWjQO81IW9BLyYMERw67R9sKehyCXzLav0jYeUPZ65NvdKe
+\restrict h59l174HzKSv20syYenFC48fQfIFtzO4zKkzNyghhlWUXQw0fjeYlduqKBl6vSk
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7rS1lRVYL7QxSVxfZWjQO81IW9BLyYMERw67R9sKehyCXzLav0jYeUPZ65NvdKe
+\unrestrict h59l174HzKSv20syYenFC48fQfIFtzO4zKkzNyghhlWUXQw0fjeYlduqKBl6vSk
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict dkm04J9oSYdA7Lf93Zzhd72I46bLKvWkdZf0iexjdTfdu2uLzsBdv8ARfRtJlXO
+\restrict jncr75svCh6OWfOl7MMUpYUs7gi9HdfqCnNHiBdbxCnUUech5SWGsnlaLzxjiwK
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict dkm04J9oSYdA7Lf93Zzhd72I46bLKvWkdZf0iexjdTfdu2uLzsBdv8ARfRtJlXO
+\unrestrict jncr75svCh6OWfOl7MMUpYUs7gi9HdfqCnNHiBdbxCnUUech5SWGsnlaLzxjiwK
 \connect vibestack_dev
-\restrict dkm04J9oSYdA7Lf93Zzhd72I46bLKvWkdZf0iexjdTfdu2uLzsBdv8ARfRtJlXO
+\restrict jncr75svCh6OWfOl7MMUpYUs7gi9HdfqCnNHiBdbxCnUUech5SWGsnlaLzxjiwK
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -3193,6 +3193,28 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task REPLICA ID
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_taskv2; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_taskv2 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    due_date timestamp without time zone,
+    custom_fields jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_taskv2 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_taskv2 OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_teamtask; Type: TABLE; Schema: public; Owner: postgres
@@ -6922,7 +6944,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dkm04J9oSYdA7Lf93Zzhd72I46bLKvWkdZf0iexjdTfdu2uLzsBdv8ARfRtJlXO
+\unrestrict jncr75svCh6OWfOl7MMUpYUs7gi9HdfqCnNHiBdbxCnUUech5SWGsnlaLzxjiwK
 
 --
 -- PostgreSQL database cluster dump complete

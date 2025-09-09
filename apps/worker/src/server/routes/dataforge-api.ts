@@ -984,7 +984,7 @@ dataforgeRouter.post('/orgs/:orgId/options/:optionType',
       }
 
       const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse(c.env);
+      const kysely = createKyselyForPersistentUse();
 
       // Get the custom option set ID
       const optionSet = await kysely
@@ -1072,7 +1072,7 @@ dataforgeRouter.put('/orgs/:orgId/options/:optionType/:optionValue',
       const { label, description, color, icon, sort_order, is_active } = body;
 
       const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse(c.env);
+      const kysely = createKyselyForPersistentUse();
 
       // CRITICAL: Prevent modification of system option values
       const systemOptionExists = await kysely
@@ -1160,7 +1160,7 @@ dataforgeRouter.delete('/orgs/:orgId/options/:optionType/:optionValue',
       const { orgId, optionType, optionValue } = c.req.param();
 
       const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse(c.env);
+      const kysely = createKyselyForPersistentUse();
 
       // CRITICAL: Prevent deletion of system option values
       // This is the key protection you requested
@@ -1260,6 +1260,52 @@ dataforgeRouter.get('/system-options',
         .execute()
       
       console.log(`[SystemOptions] Retrieved ${options.length} system options`)
+      return c.json({ success: true, data: options })
+      
+    } catch (error) {
+      console.error('[SystemOptions] Error:', error)
+      return c.json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }, 500)
+    }
+  }
+)
+
+// Virtual SystemOption entity endpoint - GET system options filtered by type and archetype
+dataforgeRouter.get('/system-options/:optionType/:archetype',
+  async (c) => {
+    const optionType = c.req.param('optionType')
+    const archetype = c.req.param('archetype')
+    
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const kysely = createKyselyForPersistentUse();
+    
+    try {
+      const options = await kysely
+        .selectFrom('system_option_sets')
+        .innerJoin('system_options', 'system_option_sets.id', 'system_options.option_set_id')
+        .select([
+          'system_options.id',
+          'system_option_sets.option_set_type as option_type',
+          'system_option_sets.archetype',
+          'system_options.value',
+          'system_options.label',
+          'system_options.color',
+          'system_options.icon',
+          'system_options.sort_order as order',
+          'system_options.is_active',
+          'system_options.created_at',
+          'system_options.updated_at'
+        ])
+        .where('system_option_sets.option_set_type', '=', optionType)
+        .where('system_option_sets.archetype', '=', archetype)
+        .where('system_option_sets.is_active', '=', true)
+        .where('system_options.is_active', '=', true)
+        .orderBy('system_options.sort_order', 'asc')
+        .execute()
+      
+      console.log(`[SystemOptions] Retrieved ${options.length} system options for ${optionType}/${archetype}`)
       return c.json({ success: true, data: options })
       
     } catch (error) {

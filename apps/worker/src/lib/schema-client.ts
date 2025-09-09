@@ -182,7 +182,16 @@ export class OrgSchemaClient {
         const businessMetadata = entity.businessMetadata || {};
         
         // Process fields from the actual server response structure
-        const fields = businessMetadata.fields || [];
+        // Handle both .fields (legacy format) and .allFields (new unified format)
+        const fields = businessMetadata.fields || businessMetadata.allFields || [];
+        
+        log.info('🔍 Schema processing debug:', {
+          entityName: entity.entityName,
+          hasFields: !!businessMetadata.fields,
+          hasAllFields: !!businessMetadata.allFields,
+          fieldCount: fields.length,
+          firstFewFields: fields.slice(0, 3).map(f => ({ name: f?.name, type: f?.type }))
+        });
         
         // Separate fields by category based on field type for enhanced schema structure
         const syncableFields: Record<string, FieldDefinition> = {};
@@ -204,9 +213,30 @@ export class OrgSchemaClient {
             
             relationshipFieldsMap[field.name] = relationshipDef;
           } else {
+            // Map unified field types to standard types for compatibility
+            let mappedType = field.type;
+            switch (field.type) {
+              case 'longtext':
+                mappedType = 'text';
+                break;
+              case 'priority_set':
+                mappedType = 'priority_option';
+                break;
+              case 'status_set':
+                mappedType = 'status_option';
+                break;
+              case 'category_set':
+                mappedType = 'category_option';
+                break;
+              // Keep other types as-is
+              default:
+                mappedType = field.type;
+                break;
+            }
+            
             // Regular syncable field
             const fieldDef: FieldDefinition = {
-              type: field.type,
+              type: mappedType,
               required: field.required || false,
               syncable: field.syncable !== false,
               enum: field.enum || field.enumOptions?.map((opt: any) => opt.value) || undefined,

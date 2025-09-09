@@ -19,7 +19,7 @@ const TestVibeGridPure = observer(() => {
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
 
   // Get columns from dynamic schema-driven generation
-  const columnsObservable = createEntityColumnsObservable(`${orgId}_Task`);
+  const columnsObservable = createEntityColumnsObservable(`${orgId}_TaskV2`);
   const columns = columnsObservable.get();
 
   const handleSelectionChange = (cells: Set<string>) => {
@@ -47,7 +47,7 @@ const TestVibeGridPure = observer(() => {
       <div className="p-4 border-b">
         <h1 className="text-2xl font-bold">VibeGridPure Test</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Testing pure observable architecture with Task entity (XState-free)
+          Testing pure observable architecture with TaskV2 entity (Unified Options System)
         </p>
         
         {/* Status indicators */}
@@ -72,7 +72,7 @@ const TestVibeGridPure = observer(() => {
         <div className="border rounded-lg bg-white" style={{ height: '500px' }}>
           <VibeGridPure
             tableId="test-pure-vibegrid"
-            entityType={`${orgId}_Task`}
+            entityType={`${orgId}_TaskV2`}
             columns={columns}
             height="100%"
             width="100%"

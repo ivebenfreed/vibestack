@@ -120,7 +120,7 @@ export class DDLGenerator {
         // For entity references, we need to determine the target entity from field naming
         const targetEntity = this.inferTargetEntityFromFieldName(fieldName);
         if (targetEntity && orgId) {
-          const targetTable = this.generateTableName(orgId, targetEntity);
+          const targetTable = DDLGenerator.generateTableName(orgId, targetEntity);
           return `ALTER TABLE ${tableName} ADD CONSTRAINT fk_${tableName}_${fieldName} FOREIGN KEY (${fieldName}) REFERENCES ${targetTable}(id) ON DELETE SET NULL`;
         }
         break;
@@ -153,12 +153,6 @@ export class DDLGenerator {
     return null;
   }
 
-  /**
-   * Generate table name for organization entity
-   */
-  private static generateTableName(orgId: string, entityName: string): string {
-    return `org_${orgId.replace(/-/g, '_')}_${entityName.toLowerCase()}`;
-  }
 
   /**
    * Convert field type to SQL type with proper foreign key handling

@@ -118,12 +118,33 @@ export class DataForgeEntityManager {
         return { success: false, errors: [`Entity ${entityName} not found for org ${orgId}`] };
       }
 
+      // Get archetype definition to understand field types
+      const { ArchetypeRegistry } = await import('../ArchetypeRegistry');
+      const archetypeClass = ArchetypeRegistry.getArchetypeClass(config.archetype);
+      
       // Get entity definition to understand custom fields
       const { getEntityDefinition } = await import('./entity-storage');
       const entityDef = await getEntityDefinition(this.config.kysely, orgId, entityName);
       
       let baseData: any;
       let customData: any = {};
+      let relationshipData: any = {};
+      
+      // Separate relationship fields from data fields
+      if (archetypeClass && archetypeClass.fields) {
+        Object.entries(data).forEach(([fieldName, value]) => {
+          const fieldDef = archetypeClass.fields[fieldName];
+          if (fieldDef && (fieldDef.type === 'user_reference' || fieldDef.type === 'entity_reference')) {
+            // This is a relationship field - store for later processing
+            relationshipData[fieldName] = value;
+          }
+        });
+        
+        // Remove relationship fields from data to prevent column errors
+        Object.keys(relationshipData).forEach(fieldName => {
+          delete data[fieldName];
+        });
+      }
       
       if (entityDef && entityDef.customFields && entityDef.customFields.length > 0) {
         // Use FieldManager to separate base and custom fields
@@ -145,15 +166,17 @@ export class DataForgeEntityManager {
         baseData = { ...data };
       }
 
+      // Generate record ID
+      const recordId = crypto.randomUUID();
+
       // Add system fields and archetype defaults to base data
+      // NOTE: Don't add created_by here - it's a relationship field
       const saveData = {
         ...baseData,
-        id: crypto.randomUUID(),
+        id: recordId,
         organization_id: orgId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        // Add creator/owner information if user is provided
-        ...(userId && { created_by: userId }),
         // Add custom fields as JSONB if any
         ...(Object.keys(customData).length > 0 && { custom_fields: customData })
       };
@@ -181,6 +204,42 @@ export class DataForgeEntityManager {
 
       if (!result) {
         return { success: false, errors: ['Failed to create record'] };
+      }
+
+      // Create relationship records for any relationship fields
+      if (Object.keys(relationshipData).length > 0 || userId) {
+        const { RelationshipFieldHandler } = await import('../services/RelationshipFieldHandler');
+        
+        // Add created_by relationship if userId provided
+        if (userId) {
+          relationshipData.created_by = userId;
+        }
+        
+        for (const [fieldName, targetId] of Object.entries(relationshipData)) {
+          if (targetId) { // Only create relationship if target ID is provided
+            try {
+              const fieldDef = archetypeClass?.fields[fieldName];
+              const relationshipDef = RelationshipFieldHandler.convertToRelationshipMetadata(
+                fieldName,
+                fieldDef?.type || 'user_reference',
+                entityName
+              );
+              
+              await RelationshipFieldHandler.createRelationship(
+                this.config.kysely,
+                orgId,
+                entityName,
+                recordId,
+                relationshipDef,
+                targetId,
+                userId || 'system'
+              );
+            } catch (error) {
+              console.warn(`Failed to create relationship ${fieldName}:`, error);
+              // Don't fail the entire operation if relationship creation fails
+            }
+          }
+        }
       }
 
       // Merge custom fields back into the response
