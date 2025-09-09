@@ -9,7 +9,9 @@
  */
 
 import { observable, computed, batch } from '@legendapp/state';
-import { getEntity$, entityOperations, universeSchema$, universeLoading$ } from '@/legend-state/observables';
+import { syncObservable } from '@legendapp/state/sync';
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
+import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { uiLog } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 
@@ -18,6 +20,29 @@ const log = uiLog('components/custom/vibegrid/stores/pure-observables.ts');
 // ====================================
 // TYPES
 // ====================================
+
+/**
+ * Persistent table state interface - only configuration data that should be saved
+ * Excludes transient UI state like selection, editing, hover, etc.
+ */
+export interface PersistedTableState {
+  // Column configuration (persisted)
+  columnWidths: Record<string, number>;
+  columnVisibility: Record<string, boolean>;
+  columnOrder: string[];
+  
+  // Data transformation configuration (persisted)
+  sortBy: SortConfig[];
+  filters: FilterConfig[];
+  groupConfig: GroupConfig | null;
+  
+  // Metadata
+  version: string;
+  lastUpdated: string;
+  entityType: string;
+  orgId: string;
+  userId: string;
+}
 
 export interface TableCoreState {
   entityType: string;
@@ -309,26 +334,179 @@ function countGroups(groupTree: GroupNode[]): number {
 }
 
 // ====================================
-// LAYER 1: TABLE CORE (Data & Configuration)
+// PERSISTENCE HELPERS
 // ====================================
 
-export function createTableCore$(entityType: string, columns: Column[]) {
-  log.info('🎯 Creating tableCore$ observable', { entityType, columnCount: columns.length });
-  
-  const tableCore$ = observable({
-    // Don't use computed - just store the entity type and access it dynamically
-    entityType,
+/**
+ * Generate storage key for table state persistence
+ * Format: vibestack_table_state_{orgId}_{entityName}_{userId}
+ */
+function generateTableStateKey(entityType: string): string | null {
+  try {
+    const orgId = universeOrgId$.peek();
+    const userId = universeUserId$.peek();
     
-    // Table configuration
-    columns,
+    if (!orgId || !userId || orgId === 'universe') {
+      log.debug('🔧 Cannot generate storage key - missing context', { orgId, userId });
+      return null;
+    }
+    
+    // Extract clean entity name without org prefix
+    const cleanEntityName = entityType.includes('_') 
+      ? entityType.split('_').slice(1).join('_')
+      : entityType;
+    
+    const storageKey = `vibestack_table_state_${orgId}_${cleanEntityName}_${userId}`;
+    log.debug('🔧 Generated table state storage key', { storageKey, entityType, orgId, userId });
+    
+    return storageKey;
+  } catch (error) {
+    log.error('❌ Error generating storage key', { error: error.message, entityType });
+    return null;
+  }
+}
+
+/**
+ * Create default table state from columns
+ */
+function createDefaultTableState(entityType: string, columns: Column[]): Partial<PersistedTableState> {
+  const orgId = universeOrgId$.peek();
+  const userId = universeUserId$.peek();
+  
+  return {
     columnOrder: columns.map(col => col.id),
     columnWidths: Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
     columnVisibility: Object.fromEntries(columns.map(col => [col.id, true])),
+    sortBy: [],
+    filters: [],
+    groupConfig: null,
+    version: '1.0',
+    lastUpdated: new Date().toISOString(),
+    entityType,
+    orgId: orgId || 'unknown',
+    userId: userId || 'unknown'
+  };
+}
+
+/**
+ * Transform function to handle data migration between versions
+ */
+function transformTableState(loaded: any, defaultState: Partial<PersistedTableState>): PersistedTableState {
+  if (!loaded || typeof loaded !== 'object') {
+    log.info('🔧 No saved state found, using defaults');
+    return defaultState as PersistedTableState;
+  }
+  
+  // Handle version migrations
+  if (loaded.version !== '1.0') {
+    log.info('🔧 Migrating table state from version', loaded.version, 'to 1.0');
+    // Add migration logic here for future versions
+  }
+  
+  // Merge loaded state with defaults to handle missing fields
+  const merged = {
+    ...defaultState,
+    ...loaded,
+    version: '1.0',
+    lastUpdated: new Date().toISOString()
+  };
+  
+  log.info('🔧 Restored table state with', {
+    columns: Object.keys(merged.columnWidths || {}).length,
+    sorts: merged.sortBy.length,
+    filters: merged.filters.length,
+    hasGrouping: !!merged.groupConfig
+  });
+  
+  return merged as PersistedTableState;
+}
+
+/**
+ * Load display state from localStorage using VibeGrid compatible key format
+ * Uses vibegridx_display_{entityName} format for compatibility
+ */
+function loadDisplayState(entityType: string): Partial<PersistedTableState> | null {
+  try {
+    // Extract entity name from org-prefixed entityType (e.g., "01920000-1000-7000-8000-000000000001_TaskV2" -> "TaskV2")
+    const entityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
+    const storageKey = `vibegridx_display_${entityName}`;
     
-    // Data transformations
-    sortBy: [] as SortConfig[],
-    filters: [] as FilterConfig[],
-    groupConfig: null as GroupConfig | null,
+    log.debug('🔧 Loading display state', { entityType, entityName, storageKey });
+    
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) {
+      log.debug('🔧 No stored display state found', { storageKey });
+      return null;
+    }
+    
+    const parsed = JSON.parse(stored);
+    log.info('🔧 Loaded display state from localStorage', { storageKey, state: parsed });
+    return parsed;
+    
+  } catch (error) {
+    log.error('❌ Error loading display state', { entityType, error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Save display state to localStorage using VibeGrid compatible key format
+ * Uses vibegridx_display_{entityName} format for compatibility
+ */
+function saveDisplayState(entityType: string, tableState: any): void {
+  try {
+    // Extract entity name from org-prefixed entityType (e.g., "01920000-1000-7000-8000-000000000001_TaskV2" -> "TaskV2")
+    const entityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
+    const storageKey = `vibegridx_display_${entityName}`;
+    
+    // Create state object matching VibeGrid format
+    const displayState = {
+      columnOrder: tableState.columnOrder,
+      columnWidths: tableState.columnWidths,
+      columnVisibility: tableState.columnVisibility,
+      sortBy: tableState.sortBy,
+      filters: tableState.filters,
+      groupBy: tableState.groupConfig, // Note: using groupBy for compatibility
+      version: '1.0',
+      lastUpdated: new Date().toISOString()
+    };
+    
+    localStorage.setItem(storageKey, JSON.stringify(displayState));
+    log.info('🎯 TableCore: Saved persistent display state', { storageKey, displayState });
+    
+  } catch (error) {
+    log.error('❌ Error saving display state', { entityType, error: error.message });
+  }
+}
+
+// ====================================
+// LAYER 1: TABLE CORE (Data & Configuration) - WITH PERSISTENCE
+// ====================================
+
+export function createTableCore$(entityType: string, columns: Column[]) {
+  log.info('🎯 Creating tableCore$ observable with Legend State localStorage persistence', { entityType, columnCount: columns.length });
+  
+  // Create default state structure
+  const defaultState = createDefaultTableState(entityType, columns);
+  log.info('🎯 Default state created', { entityType, defaultSortBy: defaultState.sortBy });
+  
+  // Extract clean entity name for storage key (remove org prefix)
+  const cleanEntityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
+  const storageKey = `vibegridx_display_${cleanEntityName}`;
+  
+  // Create the core observable with default values
+  const tableCore$ = observable({
+    // Entity metadata
+    entityType,
+    columns,
+    
+    // Persistent configuration state (will be synchronized with localStorage)
+    columnOrder: defaultState.columnOrder,
+    columnWidths: defaultState.columnWidths,
+    columnVisibility: defaultState.columnVisibility,
+    sortBy: defaultState.sortBy,
+    filters: defaultState.filters,
+    groupConfig: defaultState.groupConfig,
     
     // Computed processed data (lazy)
     get processedRows() {
@@ -355,7 +533,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
           data = entityObs.get() || {};
           log.debug('✅ Got entity data', {
             entityType,
-            recordCount: Object.keys(data).length
+            recordCount: Object.keys(data || {}).length
           });
         } catch (error) {
           log.error('❌ Failed to get entity data', { entityType, error: error.message });
@@ -387,24 +565,68 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       return rows;
     },
     
-    // Direct manipulation methods
-    toggleSort(field: string) {
+    // Direct manipulation methods with automatic persistence
+    toggleSort(field: string, isMultiSort: boolean = false) {
       const current = tableCore$.sortBy.get();
       const index = current.findIndex(s => s.field === field);
       
-      batch(() => {
-        if (index === -1) {
-          tableCore$.sortBy.set([...current, { field, direction: 'asc' }]);
-        } else if (current[index].direction === 'asc') {
-          const newSort = [...current];
-          newSort[index] = { ...current[index], direction: 'desc' };
-          tableCore$.sortBy.set(newSort);
-        } else {
-          tableCore$.sortBy.set(current.filter((_, i) => i !== index));
-        }
+      log.debug('toggleSort called', { 
+        field, 
+        isMultiSort, 
+        currentSort: current, 
+        fieldIndex: index,
+        beforeSort: JSON.stringify(current)
       });
       
-      log.info('🎯 Sort toggled', { field, sortBy: tableCore$.sortBy.get() });
+      batch(() => {
+        if (index === -1) {
+          // Add new sort - either replace all or add to existing based on multi-sort mode
+          if (isMultiSort) {
+            const newSort = [...current, { field, direction: 'asc' }];
+            log.debug('Adding new sort field to multi-sort', { newSort });
+            tableCore$.sortBy.set(newSort);
+          } else {
+            const newSort = [{ field, direction: 'asc' }];
+            log.debug('Setting single sort field', { newSort });
+            tableCore$.sortBy.set(newSort);
+          }
+        } else if (current[index].direction === 'asc') {
+          // Change to desc
+          const newSort = [...current];
+          newSort[index] = { ...current[index], direction: 'desc' };
+          log.debug('Changing sort direction to desc', { field, newSort });
+          tableCore$.sortBy.set(newSort);
+        } else {
+          // Third click: remove this sort field entirely (allow unsorted state)
+          const newSort = current.filter((_, i) => i !== index);
+          log.debug('Removing sort field', { field, newSort });
+          tableCore$.sortBy.set(newSort);
+        }
+        
+        // Save to localStorage using Legend State syncObservable
+        // The persistence should happen automatically through syncObservable
+      });
+      
+      const finalSort = tableCore$.sortBy.get();
+      log.info('Sort toggled - checking persistence', { 
+        field, 
+        isMultiSort, 
+        finalSort, 
+        afterSort: JSON.stringify(finalSort),
+        storageKey: `vibestack-table-${entityType}`
+      });
+      
+      // Check what's actually in localStorage
+      try {
+        const stored = localStorage.getItem(`vibestack-table-${entityType}`);
+        log.debug('Current localStorage content after sort change', {
+          storageKey: `vibestack-table-${entityType}`,
+          storedValue: stored,
+          parsedValue: stored ? JSON.parse(stored) : null
+        });
+      } catch (e) {
+        log.error('Failed to read localStorage after sort change', { error: e.message });
+      }
     },
     
     setFilter(field: string, value: any, operator: string = 'contains') {
@@ -419,15 +641,17 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         }
         
         tableCore$.filters.set([...filters]);
+        // persistObservable will automatically persist changes
       });
       
-      log.info('🎯 Filter set', { field, value, operator });
+      log.info('🎯 Filter set (auto-persistent)', { field, value, operator });
     },
     
     clearFilter(field: string) {
       const filters = tableCore$.filters.get();
       tableCore$.filters.set(filters.filter(f => f.field !== field));
-      log.info('🎯 Filter cleared', { field });
+      // persistObservable automatically persists changes
+      log.info('🎯 Filter cleared (auto-persistent)', { field });
     },
     
     toggleColumn(columnId: string) {
@@ -436,8 +660,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         ...visibility,
         [columnId]: !visibility[columnId]
       });
+      // persistObservable automatically persists changes
       
-      log.info('🎯 Column toggled', { columnId, visible: !visibility[columnId] });
+      log.info('🎯 Column toggled (auto-persistent)', { columnId, visible: !visibility[columnId] });
     },
     
     setColumnWidth(columnId: string, width: number) {
@@ -446,8 +671,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         ...widths,
         [columnId]: width
       });
+      // persistObservable automatically persists changes
       
-      log.info('🎯 Column width set', { columnId, width });
+      log.info('🎯 Column width set (auto-persistent)', { columnId, width });
     },
     
     // Update column width (for resize overlay)
@@ -458,20 +684,23 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         tableCore$.columnWidths.set(widths);
         
         // Update columns array
-        const columns = [...tableCore$.columns.get()];
+        const columns = [...tableCore$.columns];
         const colIndex = columns.findIndex(c => c.id === columnId);
         if (colIndex >= 0) {
           columns[colIndex] = { ...columns[colIndex], width };
-          tableCore$.columns.set(columns);
+          tableCore$.columns = columns;
         }
+        
+        // syncObservable automatically persists changes to localStorage
       });
       
-      log.info('🎯 Column width updated', { columnId, width });
+      log.info('🎯 Column width updated (auto-persistent)', { columnId, width });
     },
     
     setGroupConfig(config: GroupConfig | null) {
       tableCore$.groupConfig.set(config);
-      log.info('🎯 Group config set', { config });
+      // persistObservable automatically persists changes
+      log.info('🎯 Group config set (auto-persistent)', { config });
     },
     
     toggleGroupExpansion(groupId: string) {
@@ -492,6 +721,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         ...groupConfig,
         expandedGroups
       });
+      // persistObservable automatically persists changes
     },
     
     expandAllGroups() {
@@ -512,27 +742,29 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         ...groupConfig,
         expandedGroups: new Set()
       });
+      // persistObservable automatically persists changes
       
-      log.info('🎯 All groups collapsed');
+      log.info('🎯 All groups collapsed (auto-persistent)');
     },
     
     // Column visibility methods
     showAllColumns() {
       const visibility = tableCore$.columnVisibility.get();
       const allVisible = Object.fromEntries(
-        Object.keys(visibility).map(key => [key, true])
+        Object.keys(visibility || {}).map(key => [key, true])
       );
       tableCore$.columnVisibility.set(allVisible);
-      log.info('🎯 All columns shown');
+      // persistObservable automatically persists changes
+      log.info('🎯 All columns shown (auto-persistent)');
     },
     
     hideAllColumns() {
-      const columns = tableCore$.columns.get();
+      const columns = tableCore$.columns;
       const visibility = tableCore$.columnVisibility.get();
       
       // Only hide columns that are hideable (not required)
       const newVisibility = Object.fromEntries(
-        Object.keys(visibility).map(key => {
+        Object.keys(visibility || {}).map(key => {
           const column = columns.find(col => col.id === key);
           const canHide = column?.hideable !== false;
           return [key, canHide ? false : visibility[key]];
@@ -540,7 +772,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       );
       
       tableCore$.columnVisibility.set(newVisibility);
-      log.info('🎯 All hideable columns hidden');
+      // persistObservable automatically persists changes
+      log.info('🎯 All hideable columns hidden (auto-persistent)');
     },
     
     // Helper getters
@@ -555,7 +788,40 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     }
   });
   
-  return tableCore$;
+  // Configure simplified localStorage persistence using syncObservable without complex transforms
+  let tableCoreSync$ = null;
+  try {
+    log.debug('Configuring syncObservable for localStorage persistence', { entityType, storageKey });
+    
+    tableCoreSync$ = syncObservable(tableCore$, {
+      persist: {
+        name: storageKey,
+        plugin: ObservablePersistLocalStorage
+      }
+    });
+    
+    log.debug('syncObservable configured successfully', { 
+      entityType,
+      storageKey,
+      hasSyncObservable: !!tableCoreSync$,
+      currentSortByAfterInit: tableCore$.sortBy.get()
+    });
+    
+    log.info('🎯 Simplified Legend State localStorage persistence configured', { 
+      entityType,
+      storageKey,
+      currentSortByAfterInit: tableCore$.sortBy.get()
+    });
+  } catch (error) {
+    console.error('🔧 PERSISTENCE DEBUG: Failed to configure syncObservable', { entityType, error });
+    log.error('❌ Failed to configure Legend State persistence', { entityType, error: error.message });
+  }
+  
+  // Return the observable with sync state
+  return {
+    tableCore$,
+    tableCoreSync$ // syncObservable returns the sync state observable
+  };
 }
 
 // ====================================
@@ -902,7 +1168,7 @@ export function createTableInteraction$(tableCore$?: any) {
       // If valueOverride is provided, use it; otherwise use the current edit value
       const value = valueOverride !== undefined ? valueOverride : tableInteraction$.editValue.get();
       
-      console.log('🔍 saveEdit parameters:', { 
+      log.debug('saveEdit called', { 
         cellId, 
         valueOverride, 
         editValueFromObservable: tableInteraction$.editValue.get(),
@@ -1324,10 +1590,11 @@ export function createTableViewport$(tableCore$?: any) {
 export function createPureObservables(entityType: string, columns: Column[]) {
   log.info('🎯 Creating pure observables for table', { entityType, columns: columns.length });
   
-  const tableCore$ = createTableCore$(entityType, columns);
+  const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns);
   
   return {
     tableCore$,
+    tableCoreSync$,
     tableInteraction$: createTableInteraction$(tableCore$),
     tableViewport$: createTableViewport$(tableCore$)
   };

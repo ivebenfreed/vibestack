@@ -870,16 +870,29 @@ export class SimplePassiveRenderer {
         }
         
         const isCtrlKey = e.ctrlKey || e.metaKey;
+        const isShiftKey = e.shiftKey;
         
-        if (isCtrlKey) {
+        if (isCtrlKey && !isShiftKey) {
           // Ctrl+Click on header - select entire column
           e.preventDefault();
           this.selectColumn(column.id);
           log.info('🎯 Column selected', { columnId: column.id });
         } else {
-          // Regular click - toggle sort
-          log.info('🔄 Column header clicked for sort', { columnId: column.id });
-          this.tableCore$.toggleSort(column.id);
+          // Regular click or Shift+click - toggle sort
+          // Shift+click enables multi-column sorting
+          const isMultiSort = isShiftKey;
+          
+          log.info('🔄 Column header clicked for sort', { 
+            columnId: column.id, 
+            field: column.field,
+            usingField: column.field || column.id,
+            isMultiSort,
+            isShiftKey
+          });
+          
+          // Use column.field for sorting (data field), not column.id (display identifier)
+          // Pass isMultiSort parameter to enable/disable multi-column sorting
+          this.tableCore$.toggleSort(column.field || column.id, isMultiSort);
         }
       });
       

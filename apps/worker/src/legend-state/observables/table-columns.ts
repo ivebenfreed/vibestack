@@ -46,7 +46,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   const entity = schema.entities[entityName];
   if (!entity) {
     log.debug(`Entity ${entityName} not found in schema`, { 
-      availableEntities: Object.keys(schema.entities) 
+      availableEntities: Object.keys(schema.entities || {}) 
     });
     return [];
   }
@@ -59,7 +59,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   const legacyFields = entity.business_metadata?.fields || entity.fields || [];
   
   // Convert allFields object to array format, accessing Legend State observables with .peek()
-  const fieldsArray = Object.keys(allFields).length > 0 
+  const fieldsArray = Object.keys(allFields || {}).length > 0 
     ? Object.entries(allFields).map(([fieldName, fieldObs]) => {
         // Access Legend State observable properties with .peek()
         const fieldData = fieldObs;
@@ -200,7 +200,7 @@ export const allEntityColumns$ = computed(() => {
 
   const entityColumns: Record<string, TableColumn[]> = {};
   
-  for (const entityName of Object.keys(schema.entities)) {
+  for (const entityName of Object.keys(schema.entities || {})) {
     entityColumns[entityName] = getEntityColumns$(entityName).get();
   }
 
