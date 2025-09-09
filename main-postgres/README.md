@@ -1,6 +1,6 @@
 # Main PostgreSQL Database
 
-**Isolated, conflict-free PostgreSQL setup for VibeStack main development.**
+**Isolated, conflict-free PostgreSQL setup for Elevra main development.**
 
 ## Features
 
@@ -31,25 +31,25 @@ cd main-postgres
 ## Connection Details
 
 - **Host**: localhost:5432
-- **Database**: vibestack_dev
+- **Database**: elevra_dev
 - **User**: postgres
 - **Password**: postgres
-- **Connection String**: `postgresql://postgres:postgres@localhost:5432/vibestack_dev`
+- **Connection String**: `postgresql://postgres:postgres@localhost:5432/elevra_dev`
 
 ## Container Details
 
-- **Container Name**: `vibestack-main-postgres`
-- **Network**: `vibestack-main-network` (isolated)
-- **Volume**: `vibestack_main_postgres_data` (external, persistent)
+- **Container Name**: `elevra-main-postgres`
+- **Network**: `elevra-main-network` (isolated)
+- **Volume**: `elevra_main_postgres_data` (external, persistent)
 - **Image**: Custom built with wal2json extension
 
 ## Isolation Strategy
 
 This setup is completely isolated from dev environments:
 
-1. **Unique container names** - `vibestack-main-postgres` vs `vibestack-dev1-postgres`
-2. **Separate networks** - `vibestack-main-network` vs environment-specific networks  
-3. **Different volumes** - `vibestack_main_postgres_data` vs dev environment volumes
+1. **Unique container names** - `elevra-main-postgres` vs `elevra-dev1-postgres`
+2. **Separate networks** - `elevra-main-network` vs environment-specific networks  
+3. **Different volumes** - `elevra_main_postgres_data` vs dev environment volumes
 4. **Port management** - Main uses 5432, dev environments use 5433+
 5. **Conflict detection** - Start script checks for port conflicts
 
@@ -66,7 +66,7 @@ docker compose down
 cd ../main-postgres  
 ./start.sh
 
-# Data should automatically migrate from vibestack_postgres_data volume
+# Data should automatically migrate from elevra_postgres_data volume
 ```
 
 ## Troubleshooting

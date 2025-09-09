@@ -13,7 +13,7 @@ cd main-postgres
 
 ```bash
 # 1. Check PostgreSQL is running
-docker ps | grep vibestack-main-postgres
+docker ps | grep elevra-main-postgres
 
 # 2. Test database connection
 ./psql.sh
@@ -33,9 +33,9 @@ pnpm dev
 
 ## 🔒 Isolation Features
 
-✅ **Unique container name**: `vibestack-main-postgres` (no conflicts)  
-✅ **Dedicated network**: `vibestack-main-network` (isolated)  
-✅ **External volume**: `vibestack_main_postgres_data` (persistent)  
+✅ **Unique container name**: `elevra-main-postgres` (no conflicts)  
+✅ **Dedicated network**: `elevra-main-network` (isolated)  
+✅ **External volume**: `elevra_main_postgres_data` (persistent)  
 ✅ **Port management**: Main uses 5432, dev environments use 5433+  
 ✅ **wal2json enabled**: Full logical replication support  
 ✅ **Conflict detection**: Start script checks for port conflicts  
@@ -43,10 +43,10 @@ pnpm dev
 ## 🌐 Connection Details
 
 - **Host**: localhost:5432
-- **Database**: vibestack_dev  
+- **Database**: elevra_dev  
 - **User**: postgres
 - **Password**: postgres
-- **Connection String**: `postgresql://postgres:postgres@localhost:5432/vibestack_dev`
+- **Connection String**: `postgresql://postgres:postgres@localhost:5432/elevra_dev`
 
 ## 🎯 Development Workflow
 

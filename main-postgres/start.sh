@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Start Main VibeStack PostgreSQL Database
+# Start Main Elevra PostgreSQL Database
 # Simple, isolated, conflict-free startup
 
 set -e
 
-echo "🐘 VibeStack Main PostgreSQL"
+echo "🐘 Elevra Main PostgreSQL"
 echo "============================"
 echo ""
 
@@ -13,17 +13,17 @@ echo ""
 cd "$(dirname "$0")"
 
 # Check if already running
-if docker ps | grep -q "vibestack-main-postgres"; then
+if docker ps | grep -q "elevra-main-postgres"; then
     echo "✅ Main PostgreSQL already running"
     echo ""
     echo "🌐 Connection Details:"
     echo "   Host: localhost:5432"
-    echo "   Database: vibestack_dev"
+    echo "   Database: elevra_dev"
     echo "   User: postgres"
     echo "   Password: postgres"
     echo ""
     echo "🔗 Connection String:"
-    echo "   postgresql://postgres:postgres@localhost:5432/vibestack_dev"
+    echo "   postgresql://postgres:postgres@localhost:5432/elevra_dev"
     exit 0
 fi
 
@@ -40,7 +40,7 @@ docker compose up -d --build
 
 echo "⏳ Waiting for PostgreSQL to be ready..."
 for i in {1..30}; do
-    if docker exec vibestack-main-postgres pg_isready -U postgres >/dev/null 2>&1; then
+    if docker exec elevra-main-postgres pg_isready -U postgres >/dev/null 2>&1; then
         echo "✅ PostgreSQL is ready!"
         break
     fi
@@ -49,32 +49,32 @@ for i in {1..30}; do
 done
 
 # Verify health
-if ! docker exec vibestack-main-postgres pg_isready -U postgres >/dev/null 2>&1; then
+if ! docker exec elevra-main-postgres pg_isready -U postgres >/dev/null 2>&1; then
     echo "❌ PostgreSQL failed to start properly"
     echo "Check logs: docker compose logs postgres"
     exit 1
 fi
 
 # Check if database exists and has tables
-TABLE_COUNT=$(docker exec vibestack-main-postgres psql -U postgres -d vibestack_dev -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs || echo "0")
+TABLE_COUNT=$(docker exec elevra-main-postgres psql -U postgres -d elevra_dev -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs || echo "0")
 
 echo ""
 echo "🎉 MAIN POSTGRESQL READY!"
 echo "========================="
 echo ""
 echo "📊 Database Status:"
-echo "   Container: vibestack-main-postgres"
-echo "   Status: $(docker ps --filter "name=vibestack-main-postgres" --format "{{.Status}}")"
+echo "   Container: elevra-main-postgres"
+echo "   Status: $(docker ps --filter "name=elevra-main-postgres" --format "{{.Status}}")"
 echo "   Tables: $TABLE_COUNT"
 echo ""
 echo "🌐 Connection Details:"
 echo "   Host: localhost:5432"
-echo "   Database: vibestack_dev"
+echo "   Database: elevra_dev"
 echo "   User: postgres"
 echo "   Password: postgres"
 echo ""
 echo "🔗 Connection String:"
-echo "   postgresql://postgres:postgres@localhost:5432/vibestack_dev"
+echo "   postgresql://postgres:postgres@localhost:5432/elevra_dev"
 echo ""
 echo "🛠️ Management Commands:"
 echo "   ./stop.sh     - Stop PostgreSQL"
