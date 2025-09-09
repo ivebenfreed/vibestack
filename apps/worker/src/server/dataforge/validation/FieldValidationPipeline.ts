@@ -531,53 +531,58 @@ export class ReferenceValidator implements IFieldValidator {
 }
 
 /**
- * Business rule validator - applies custom business logic
+ * Field Type Validator - uses simple field-based validation system
  */
-export class BusinessRuleValidator implements IFieldValidator {
-  name = 'BusinessRuleValidator';
+export class FieldTypeValidator implements IFieldValidator {
+  name = 'FieldTypeValidator';
   order = 5;
-
-  constructor(private rules?: any[]) {}
 
   async validate(context: ValidationContext): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
+    const warnings: ValidationError[] = [];
 
-    // Example business rules
-    const data = context.data;
+    // Import the simple field system
+    const { getFieldHandler } = await import('../fields');
 
-    // Rule: Due date must be in the future
-    if (data.due_date && new Date(data.due_date) < new Date()) {
-      errors.push({
-        field: 'due_date',
-        code: 'PAST_DUE_DATE',
-        message: 'Due date must be in the future',
-        value: data.due_date
-      });
-    }
-
-    // Rule: If status is completed, actual_hours should be set
-    if (data.status === 'completed' && !data.actual_hours) {
-      errors.push({
-        field: 'actual_hours',
-        code: 'MISSING_ACTUAL_HOURS',
-        message: 'Actual hours must be set when status is completed',
-        value: data.actual_hours
-      });
-    }
-
-    // Rule: Priority critical requires assignee
-    if (data.priority === 'critical' && !data.assignee_id) {
-      errors.push({
-        field: 'assignee_id',
-        code: 'CRITICAL_NEEDS_ASSIGNEE',
-        message: 'Critical priority items must have an assignee',
-        value: data.assignee_id
-      });
+    // Validate each field using field handlers
+    console.log(`🔍 [FieldValidationPipeline] Starting validation for ${context.fields.size} fields`);
+    for (const [fieldName, fieldDef] of context.fields) {
+      const value = context.data[fieldName];
+      console.log(`🔍 [FieldValidationPipeline] Field: ${fieldName}, Type: ${fieldDef.type}, Value: ${value}`);
+      
+      const fieldHandler = getFieldHandler(fieldDef.type);
+      console.log(`🔍 [FieldValidationPipeline] Field handler found: ${!!fieldHandler}`);
+      if (fieldHandler) {
+        console.log(`🔍 [FieldValidationPipeline] Calling validation for ${fieldName}`);
+        const result = await fieldHandler.validate(value, fieldDef, context);
+        console.log(`🔍 [FieldValidationPipeline] Validation result for ${fieldName}:`, result);
+        
+        if (!result.valid) {
+          console.log(`❌ [FieldValidationPipeline] Field ${fieldName} has errors:`, result.errors);
+          errors.push(...result.errors);
+        } else {
+          console.log(`✅ [FieldValidationPipeline] Field ${fieldName} passed validation`);
+        }
+        
+        // Handle transformed values
+        if (result.transformedValue !== undefined && result.transformedValue !== value) {
+          context.data[fieldName] = result.transformedValue;
+        }
+      } else {
+        // Warn about unknown field types
+        warnings.push({
+          field: fieldName,
+          code: 'UNKNOWN_FIELD_TYPE',
+          message: `No handler found for field type '${fieldDef.type}'`,
+          value: fieldDef.type
+        });
+      }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
+      warnings: warnings.length > 0 ? warnings : undefined
     };
   }
 }
@@ -600,7 +605,7 @@ export class FieldValidationPipeline {
       new RequiredFieldValidator(),
       new ConstraintValidator(),
       new ReferenceValidator(),
-      new BusinessRuleValidator()
+      new FieldTypeValidator()  // Replace BusinessRuleValidator with FieldTypeValidator
     ];
   }
 

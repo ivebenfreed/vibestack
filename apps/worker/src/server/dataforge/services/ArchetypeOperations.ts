@@ -96,74 +96,72 @@ export class ArchetypeOperations {
   }
 
   /**
-   * Validate data against archetype business logic
+   * Validate data against archetype business logic using the field validation system
    */
-  validateArchetypeData(
+  async validateArchetypeData(
     archetype: string,
-    data: Record<string, any>
-  ): { valid: boolean; data: Record<string, any>; errors: string[] } {
-    const errors: string[] = [];
-
-    // Basic validation - ensure we have some data and no empty required fields
-    if (!data || Object.keys(data).length === 0) {
-      errors.push('Data cannot be empty');
-    }
-
-    // Ensure organization_id is present for multi-org isolation
-    if (!data.organization_id) {
-      errors.push('organization_id is required');
-    }
-
-    // Basic archetype-specific validation
+    data: Record<string, any>,
+    orgId?: string
+  ): Promise<{ valid: boolean; data: Record<string, any>; errors: string[] }> {
+    console.log(`🔍 [ArchetypeOperations] validateArchetypeData called:`, { archetype, dataKeys: Object.keys(data), orgId });
+    console.log(`🔍 [ArchetypeOperations] Full data:`, data);
     try {
-      switch (archetype) {
-        case 'record':
-        case 'project':
-        case 'task':
-          // These archetypes typically require a name
-          if (!data.name || data.name.trim() === '') {
-            errors.push('name is required');
+      // Get archetype field definitions
+      const archetypeFields = await this.getArchetypeFields(archetype);
+      
+      // Convert to FieldDefinition format for validation
+      const fieldEntries = Object.entries(archetypeFields).map(([name, config]: [string, any]) => [
+        name,
+        {
+          name,
+          type: config.type || 'text',
+          required: config.required || false,
+          defaultValue: config.defaultValue,
+          unique: config.unique || false,
+          indexed: config.indexed || false,
+          min: config.min,
+          max: config.max,
+          enum: config.enum,
+          regex: config.regex
+        }
+      ]);
+
+      // Use the field validation pipeline
+      const { FieldValidationPipeline } = await import('../validation/FieldValidationPipeline');
+      const pipeline = new FieldValidationPipeline();
+      
+      const validationResult = await pipeline.validate({
+        data,
+        fields: new Map(fieldEntries),
+        orgId,
+        archetype
+      });
+
+      // Convert validation result format
+      const errors: string[] = [];
+      
+      if (!validationResult.isValid) {
+        for (const error of validationResult.errors) {
+          if (typeof error === 'string') {
+            errors.push(error);
+          } else if (error.message) {
+            errors.push(`${error.field || 'Field'}: ${error.message}`);
           }
-          break;
-        case 'document':
-          // Documents might require content
-          if (!data.content && !data.title) {
-            errors.push('Document must have either content or title');
-          }
-          break;
-        case 'file':
-          // Files require a URL
-          if (!data.file_url) {
-            errors.push('file_url is required for file archetype');
-          }
-          break;
-        case 'activity':
-          // Activities require an action type
-          if (!data.action_type) {
-            errors.push('action_type is required for activity archetype');
-          }
-          break;
-        case 'discussion':
-          // Discussions require a title or initial message
-          if (!data.title && !data.message) {
-            errors.push('Discussion must have either title or message');
-          }
-          break;
-        case 'collection':
-          // Collections require a collection type
-          if (!data.collection_type) {
-            errors.push('collection_type is required for collection archetype');
-          }
-          break;
-        default:
-          // Generic validation for unknown archetypes
-          console.log(`[ArchetypeOperations] No specific validation for archetype: ${archetype}`);
-          break;
+        }
+      }
+
+      // Basic required field validation (organization_id is system-critical)
+      if (!data.organization_id && orgId) {
+        data.organization_id = orgId; // Auto-set if provided
+      }
+      
+      if (!data.organization_id) {
+        errors.push('organization_id is required');
       }
 
       return {
         valid: errors.length === 0,
-        data: { ...data }, // Return validated data
+        data: validationResult.transformedData || data,
         errors
       };
     } catch (error) {
@@ -204,12 +202,14 @@ export class ArchetypeOperations {
         progress: { type: 'number', required: false }
       },
       task: {
-        name: { type: 'text', required: true },
+        title: { type: 'text', required: true },
         description: { type: 'text', required: false },
-        status: { type: 'text', required: false },
-        priority: { type: 'text', required: false },
-        assignee: { type: 'text', required: false },
-        due_date: { type: 'date', required: false }
+        status: { type: 'text', required: true },
+        priority: { type: 'text', required: true },
+        due_date: { type: 'date', required: false },
+        start_date: { type: 'date', required: false },
+        label: { type: 'text', required: false },
+        tags: { type: 'jsonb', required: false }
       },
       document: {
         title: { type: 'text', required: true },

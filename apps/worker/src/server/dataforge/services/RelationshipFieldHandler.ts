@@ -25,7 +25,10 @@ export class RelationshipFieldHandler {
    * Check if a field type is a relationship field
    */
   static isRelationshipField(fieldType: string): boolean {
-    return fieldType === 'user_reference' || fieldType === 'entity_reference';
+    return fieldType === 'user_reference' || 
+           fieldType === 'entity_reference' ||
+           fieldType === 'custom_user_reference' ||
+           fieldType === 'custom_entity_reference';
   }
 
   /**
@@ -43,7 +46,7 @@ export class RelationshipFieldHandler {
 
     return {
       name: fieldName,
-      type: fieldType as 'user_reference' | 'entity_reference',
+      type: fieldType as 'user_reference' | 'entity_reference' | 'custom_user_reference' | 'custom_entity_reference',
       relationshipType,
       targetEntityType,
       cardinality,
@@ -87,7 +90,7 @@ export class RelationshipFieldHandler {
    * Infer target entity type from field name
    */
   private static inferTargetEntityType(fieldName: string, fieldType: string): string {
-    if (fieldType === 'user_reference') {
+    if (fieldType === 'user_reference' || fieldType === 'custom_user_reference') {
       return 'User';
     }
 
