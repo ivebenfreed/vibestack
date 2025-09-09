@@ -24,14 +24,14 @@ export function ReferenceSelectCell({ value, column }: { value: string | null, c
   }
     
   return (
-    <div className="flex items-center gap-2">
+    <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-md text-sm border">
       {option.color && (
         <div 
-          className="w-3 h-3 rounded-full flex-shrink-0"
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: option.color }}
         />
       )}
-      <span>{option.label}</span>
+      <span className="text-gray-800 font-medium">{option.label}</span>
     </div>
   );
 }
@@ -58,15 +58,15 @@ export function ReferenceMultiCell({ value, column }: { value: string[] | null, 
         return (
           <div 
             key={index}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-sm"
+            className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-md text-sm border"
           >
             {option?.color && (
               <div 
-                className="w-2 h-2 rounded-full"
+                className="w-2.5 h-2.5 rounded-full"
                 style={{ backgroundColor: option.color }}
               />
             )}
-            <span>{option?.label || val}</span>
+            <span className="text-gray-800 font-medium">{option?.label || val}</span>
           </div>
         );
       })}

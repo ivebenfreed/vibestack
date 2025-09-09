@@ -1,5 +1,4 @@
-// Core types for VibeGridX XState v5 architecture
-import type { ActorRefFrom } from 'xstate';
+// Core types for VibeGridX Pure Observable architecture
 
 // View state management types
 export type SortConfig = {
@@ -16,7 +15,6 @@ export type FilterConfig = {
 };
 // Import our local column types
 import type { Column as BaseColumn, CellType } from './column-types';
-import type { TableStoreActor } from './stores/types';
 
 // EnumOption for backwards compatibility
 export interface EnumOption {
@@ -368,15 +366,7 @@ export interface TableContext {
   selectedCells: Set<string>;
   
   // Actor references
-  actors: {
-    rendererActor: ActorRefFrom<any> | null;
-    canvasActor: ActorRefFrom<any> | null;
-    selectionCoordinator: ActorRefFrom<any> | null;
-    // viewCoordinator removed - view state now managed directly in TableMachine
-    dragCoordinator: ActorRefFrom<any> | null;
-    rowActors: Map<string, ActorRefFrom<any>>;
-    storeActor?: TableStoreActor | null; // Pure reactive store actor
-  };
+  // Legacy actors section removed - Pure Observable architecture uses no actors
   
   // Performance tracking
   performance: {
