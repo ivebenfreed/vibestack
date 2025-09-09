@@ -131,8 +131,11 @@ export class SimplePassiveRenderer {
     
     // Create editing overlay
     this.editingOverlay = new EditingOverlay(this.container, {
+      // Pass tableInteraction$ for direct observable commit (new architecture)
+      tableInteraction$: this.tableInteraction$,
+      // Fallback callbacks for old architecture compatibility
       onCommit: async (value) => {
-        await this.tableInteraction$.saveEdit();
+        await this.tableInteraction$.saveEdit(value);
       },
       onCancel: () => {
         this.tableInteraction$.cancelEdit();

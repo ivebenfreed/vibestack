@@ -621,9 +621,18 @@ export function createTableInteraction$(tableCore$?: any) {
       tableInteraction$.editValidation.set({ isValid, message });
     },
     
-    async saveEdit() {
+    async saveEdit(valueOverride?: any) {
       const cellId = tableInteraction$.editingCell.get();
-      const value = tableInteraction$.editValue.get();
+      // If valueOverride is provided, use it; otherwise use the current edit value
+      const value = valueOverride !== undefined ? valueOverride : tableInteraction$.editValue.get();
+      
+      console.log('🔍 saveEdit parameters:', { 
+        cellId, 
+        valueOverride, 
+        editValueFromObservable: tableInteraction$.editValue.get(),
+        finalValue: value,
+        usingOverride: valueOverride !== undefined
+      });
       
       if (cellId) {
         const [rowId, columnId] = cellId.split(':');
