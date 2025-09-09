@@ -70,7 +70,14 @@ export class RelationshipFieldHandler {
       'parent_discussion_id': 'reply_to',
       'project_id': 'belongs_to',
       'manager_id': 'managed_by',
-      'reporter_id': 'reported_by'
+      'reporter_id': 'reported_by',
+      'depends_on_id': 'depends_on',
+      'dependency_id': 'depends_on',
+      'predecessor_id': 'depends_on',
+      'successor_id': 'successor_of',
+      'approver_id': 'requires_approval_from',
+      'approval_request_id': 'requires_approval_from',
+      'approved_by_id': 'approved_by'
     };
 
     return patterns[fieldName] || 'relates_to';

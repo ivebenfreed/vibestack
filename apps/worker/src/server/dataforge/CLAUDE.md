@@ -311,8 +311,119 @@ curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-0
   }'
 ```
 
-## Recent Updates (September 2025)
+## Recent Major Updates (September 2025)
 
+### 1. System Options Architecture Overhaul
+**Complete redesign of the options system for better semantic separation and organizational flexibility.**
+
+#### Key Changes:
+- **Thoughtful System Protection**: Only semantic values that app logic depends on are system-protected
+- **Removed Organizational Defaults**: Categories removed from all archetypes since they vary by organization
+- **Clean Semantic States**: Status options use clear semantic workflow states
+- **Unified Endpoint Structure**: All live UI data comes from custom options (auto-copied from system templates)
+
+#### System Options by Archetype:
+- **Task**: Priority (`low`/`medium`/`high`/`critical`) + Status (`not_started`/`active`/`done`/`blocked`)
+- **Project**: Priority + Status (`not_started`/`active`/`paused`/`done`/`cancelled`)
+- **Record**: Status only (`draft`/`active`/`inactive`/`archived`) - no priority needed for data entities
+- **Document**: Status (`draft`/`review`/`published`/`archived`)
+- **File**: Status (`uploading`/`available`/`processing`/`archived`)
+- **Activity**: Status (`scheduled`/`active`/`completed`/`cancelled`)
+- **Discussion**: Status (`open`/`active`/`resolved`/`closed`)
+- **Collection**: Status (`draft`/`active`/`complete`/`archived`)
+
+#### Implementation:
+- **Auto-Copy System**: System option templates auto-copied to custom options during entity creation
+- **API Simplification**: Single `/api/dataforge/orgs/:orgId/options/:optionType` endpoint
+- **System Protection**: Prevents deletion of system option values, allows editing display properties
+- **Migration Path**: Clean backend system with updated archetypes and migration files
+
+### 2. Universal Relationship System Enhancements
+**Enhanced relationship system with universal audit trails and workflow support.**
+
+#### Universal `created_by` Field:
+- **Added to All Archetypes**: Every entity now has `created_by` user_reference field
+- **Semantic Consistency**: Uses `created_by` → `created_by` relationship semantic  
+- **Audit Trail**: Complete user tracking across all entity operations
+
+#### Relationship Field Mapping:
+```typescript
+// Current relationship semantics across archetypes:
+Task: assignee_id → assigned_to, parent_task_id → subtask_of, project_id → belongs_to
+Project: owner_id → owned_by
+Record: owner_id → owned_by, parent_record_id → child_of  
+Document: author_id → authored_by, parent_document_id → child_of
+Discussion: author_id → authored_by, parent_discussion_id → reply_to
+Collection: owner_id → owned_by
+Activity: actor_id → performed_by, entity_id → relates_to
+File: uploaded_by → uploaded_by
+```
+
+### 3. Dependency System for Gantt Charts
+**Complete project management dependency system with 4 classic dependency types.**
+
+#### Features:
+- **4 Dependency Types**: `finish_to_start`, `start_to_start`, `finish_to_finish`, `start_to_finish`
+- **Entity Restriction**: Only Project, Task, and Activity entities (temporal entities)
+- **Lead/Lag Support**: Optional offset days for dependencies
+- **Constraint Types**: Hard vs soft constraints
+- **Circular Prevention**: Basic validation to prevent dependency cycles
+
+#### Implementation:
+- **DependencyManager Service** (`services/DependencyManager.ts`)
+- **Relationship Integration**: Uses `depends_on` relationship semantic with rich metadata
+- **API Endpoints**: Full CRUD operations for dependency management
+- **Validation**: Comprehensive entity type and relationship validation
+
+#### API Endpoints:
+```bash
+POST   /orgs/:orgId/dependencies              # Create dependency
+GET    /orgs/:orgId/dependencies/:entityId    # Get all dependencies
+GET    /orgs/:orgId/dependencies/:entityId/predecessors  # Get predecessors
+GET    /orgs/:orgId/dependencies/:entityId/successors    # Get successors  
+PUT    /orgs/:orgId/dependencies/:dependencyId          # Update dependency
+DELETE /orgs/:orgId/dependencies/:dependencyId          # Remove dependency
+GET    /orgs/:orgId/projects/:projectId/critical-path   # Critical path (placeholder)
+GET    /dependency-types                                 # Get dependency type info
+```
+
+### 4. Simple Approval Workflow System
+**Basic approval system designed for simplicity now, extensibility later.**
+
+#### Core Features:
+- **Request Approval**: Any entity can request approval from any user
+- **Respond to Approvals**: Approve/reject with optional reasons
+- **Approval Status Tracking**: Check if entity is fully approved
+- **Cancel Requests**: Requesters can cancel pending approvals
+- **User Dashboard**: Users can see all pending approvals
+
+#### Implementation:
+- **ApprovalManager Service** (`services/ApprovalManager.ts`)
+- **Relationship-Based**: Uses `requires_approval_from` relationship semantic
+- **Simple State Machine**: `pending` → `approved`/`rejected`/`expired`
+- **Rich Metadata**: Stores reasons, due dates, timestamps in relationship properties
+
+#### API Endpoints:
+```bash
+POST   /orgs/:orgId/approvals                           # Request approval
+POST   /orgs/:orgId/approvals/:approvalId/respond       # Approve/reject
+GET    /orgs/:orgId/approvals/pending                   # Get pending approvals
+GET    /orgs/:orgId/approvals/:entityType/:entityId     # Get entity approval status
+DELETE /orgs/:orgId/approvals/:approvalId               # Cancel approval request
+```
+
+#### Extension Points (Future):
+- Multi-step workflows, approval types (sequential/parallel/majority)
+- Conditional logic, escalation, delegation, templates
+
+### 5. Relationship System Implementation (September 2025)
+   - **NEW**: Complete relationship system using per-organization relationship tables
+   - **NEW**: RelationshipFieldHandler service for processing archetype reference fields
+   - **BREAKING**: Reference fields (`user_reference`, `entity_reference`) no longer create table columns
+   - **NEW**: Per-org relationship tables with temporal support and rich metadata
+   - **INTEGRATION**: Full integration with custom options system for relationship configuration
+
+### 6. Previous Updates
 1. **Field Management Overhaul**
    - Added FieldManager service for centralized validation
    - Implemented 5-stage validation pipeline
@@ -332,13 +443,6 @@ curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-0
    - Created entity-storage helper functions
    - Entity definitions stored in business_metadata JSONB
    - Clean separation between base columns and custom JSONB
-
-5. **Relationship System Implementation (September 2025)**
-   - **NEW**: Complete relationship system using per-organization relationship tables
-   - **NEW**: RelationshipFieldHandler service for processing archetype reference fields
-   - **BREAKING**: Reference fields (`user_reference`, `entity_reference`) no longer create table columns
-   - **NEW**: Per-org relationship tables with temporal support and rich metadata
-   - **INTEGRATION**: Full integration with custom options system for relationship configuration
 
 ## Relationship System Architecture
 

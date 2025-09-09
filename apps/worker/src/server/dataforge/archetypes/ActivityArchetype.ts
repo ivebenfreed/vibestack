@@ -62,6 +62,12 @@ export class ActivityArchetype {
       required: false, 
       syncable: true,
       serverOnly: false
+    },
+    created_by: { 
+      type: 'user_reference', 
+      required: false, 
+      syncable: true,
+      serverOnly: false
     }
   } as const;
 

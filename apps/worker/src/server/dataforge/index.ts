@@ -63,6 +63,18 @@ export { DDLGenerator } from './DDLGenerator';
 export { ArchetypeService } from './ArchetypeService';
 export { BulkOperationsService } from './BulkOperationsService';
 export { SchemaModificationService } from './SchemaModificationService';
+export { DependencyManager } from './services/DependencyManager';
+export type { 
+  DependencyType, 
+  DependencyDefinition, 
+  DependencyMetadata 
+} from './services/DependencyManager';
+export { ApprovalManager } from './services/ApprovalManager';
+export type { 
+  ApprovalStatus, 
+  ApprovalRequest, 
+  ApprovalResponse 
+} from './services/ApprovalManager';
 
 // =============================================================================
 // Foundation Entities (Base Archetypes)

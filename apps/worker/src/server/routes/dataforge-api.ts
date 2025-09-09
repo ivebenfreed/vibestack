@@ -887,59 +887,15 @@ dataforgeRouter.delete('/orgs/:orgId/trash/:entityName/permanent',
 // =============================================================================
 
 // Get system options for a specific archetype and option type
-dataforgeRouter.get('/system-options/:optionType/:archetype',
-  async (c) => {
-    const { optionType, archetype } = c.req.param();
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-    const kysely = createKyselyForPersistentUse();
-    
-    try {
-      const systemOptions = await kysely
-        .selectFrom('system_options')
-        .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
-        .select([
-          'system_options.value as option_key',
-          'system_options.label', 
-          'system_options.description',
-          'system_options.color',
-          'system_options.icon',
-          'system_options.sort_order',
-          'system_options.is_active'
-        ])
-        .where('system_option_sets.option_set_type', '=', optionType)
-        .where('system_option_sets.archetype', '=', archetype)
-        .where('system_options.is_active', '=', true)
-        .orderBy('system_options.sort_order', 'asc')
-        .orderBy('system_options.label', 'asc')
-        .execute();
-        
-      return c.json({
-        success: true,
-        data: systemOptions,
-        metadata: {
-          optionType,
-          archetype,
-          count: systemOptions.length
-        }
-      });
-      
-    } catch (error) {
-      console.error('[System Options] Failed to fetch system options:', error);
-      return c.json({
-        success: false,
-        error: 'Failed to fetch system options',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 500);
-    }
-  }
-);
+// REMOVED: System options endpoint - system options are templates only
+// Use /orgs/:orgId/options/:optionType instead
 
 // Get custom options for an organization
-dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
+// Unified options endpoint - all live dropdown data comes from custom options
+dataforgeRouter.get('/orgs/:orgId/options/:optionType',
   requirePermission('entities:read'),
   async (c) => {
-    const { orgId, optionSetName } = c.req.param();
+    const { orgId, optionType } = c.req.param();
     const security = c.get('security');
     
     if (orgId !== security.organizationId) {
@@ -950,7 +906,7 @@ dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
     const kysely = createKyselyForPersistentUse();
     
     try {
-      const customOptions = await kysely
+      const options = await kysely
         .selectFrom('custom_options')
         .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
         .select([
@@ -963,7 +919,7 @@ dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
           'custom_options.is_active'
         ])
         .where('custom_option_sets.org_id', '=', orgId)
-        .where('custom_option_sets.name', '=', optionSetName)
+        .where('custom_option_sets.option_set_type', '=', optionType)
         .where('custom_options.is_active', '=', true)
         .orderBy('custom_options.sort_order', 'asc')
         .orderBy('custom_options.label', 'asc')
@@ -971,19 +927,280 @@ dataforgeRouter.get('/orgs/:orgId/custom-options/:optionSetName',
         
       return c.json({
         success: true,
-        data: customOptions,
+        data: options,
         metadata: {
           organizationId: orgId,
-          optionSetName,
-          count: customOptions.length
+          optionType,
+          count: options.length
         }
       });
       
     } catch (error) {
-      console.error('[Custom Options] Failed to fetch custom options:', error);
+      console.error('[Options] Failed to fetch options:', error);
       return c.json({
         success: false,
-        error: 'Failed to fetch custom options',
+        error: 'Failed to fetch options',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// Create a new custom option in an option set
+dataforgeRouter.post('/orgs/:orgId/options/:optionType',
+  requirePermission('entities:write'),
+  async (c) => {
+    try {
+      const { orgId, optionType } = c.req.param();
+      const body = await c.req.json();
+      const { value, label, description, color, icon, sort_order } = body;
+
+      if (!value || !label) {
+        return c.json({
+          success: false,
+          error: 'Missing required fields: value and label'
+        }, 400);
+      }
+
+      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+      const kysely = createKyselyForPersistentUse(c.env);
+
+      // Get the custom option set ID
+      const optionSet = await kysely
+        .selectFrom('custom_option_sets')
+        .select('id')
+        .where('org_id', '=', orgId)
+        .where('option_set_type', '=', optionType)
+        .executeTakeFirst();
+
+      if (!optionSet) {
+        return c.json({
+          success: false,
+          error: `Option set '${optionType}' not found for organization`
+        }, 404);
+      }
+
+      // Check if value already exists
+      const existing = await kysely
+        .selectFrom('custom_options')
+        .select('id')
+        .where('option_set_id', '=', optionSet.id)
+        .where('value', '=', value)
+        .executeTakeFirst();
+
+      if (existing) {
+        return c.json({
+          success: false,
+          error: `Option with value '${value}' already exists`
+        }, 409);
+      }
+
+      // Create the new custom option
+      const newOption = await kysely
+        .insertInto('custom_options')
+        .values({
+          option_set_id: optionSet.id,
+          value,
+          label,
+          description: description || null,
+          color: color || null,
+          icon: icon || null,
+          sort_order: sort_order || 0,
+          is_active: true,
+          metadata: {},
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+        .returning([
+          'value as option_key',
+          'label',
+          'description',
+          'color',
+          'icon',
+          'sort_order',
+          'is_active'
+        ])
+        .executeTakeFirst();
+
+      console.log(`[Options] Created custom option '${value}' in ${optionType} set for org ${orgId}`);
+
+      return c.json({
+        success: true,
+        data: newOption,
+        message: `Option '${label}' created successfully`
+      });
+
+    } catch (error) {
+      console.error('[Options] Failed to create option:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to create option',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// Update a custom option
+dataforgeRouter.put('/orgs/:orgId/options/:optionType/:optionValue',
+  requirePermission('entities:write'),
+  async (c) => {
+    try {
+      const { orgId, optionType, optionValue } = c.req.param();
+      const body = await c.req.json();
+      const { label, description, color, icon, sort_order, is_active } = body;
+
+      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+      const kysely = createKyselyForPersistentUse(c.env);
+
+      // CRITICAL: Prevent modification of system option values
+      const systemOptionExists = await kysely
+        .selectFrom('system_options')
+        .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
+        .select('system_options.id')
+        .where('system_option_sets.option_set_type', '=', optionType)
+        .where('system_options.value', '=', optionValue)
+        .executeTakeFirst();
+
+      if (systemOptionExists) {
+        return c.json({
+          success: false,
+          error: 'Cannot modify system option values',
+          details: `The option value '${optionValue}' is a system template and cannot be modified. System options serve as templates for all organizations.`,
+          systemProtection: true
+        }, 403);
+      }
+
+      // Get the custom option to update
+      const option = await kysely
+        .selectFrom('custom_options')
+        .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+        .select(['custom_options.id', 'custom_options.value'])
+        .where('custom_option_sets.org_id', '=', orgId)
+        .where('custom_option_sets.option_set_type', '=', optionType)
+        .where('custom_options.value', '=', optionValue)
+        .executeTakeFirst();
+
+      if (!option) {
+        return c.json({
+          success: false,
+          error: `Option '${optionValue}' not found in '${optionType}' set`
+        }, 404);
+      }
+
+      // Update the custom option
+      const updatedOption = await kysely
+        .updateTable('custom_options')
+        .set({
+          ...(label && { label }),
+          ...(description !== undefined && { description }),
+          ...(color !== undefined && { color }),
+          ...(icon !== undefined && { icon }),
+          ...(sort_order !== undefined && { sort_order }),
+          ...(is_active !== undefined && { is_active }),
+          updated_at: new Date()
+        })
+        .where('id', '=', option.id)
+        .returning([
+          'value as option_key',
+          'label',
+          'description',
+          'color',
+          'icon',
+          'sort_order',
+          'is_active'
+        ])
+        .executeTakeFirst();
+
+      console.log(`[Options] Updated custom option '${optionValue}' in ${optionType} set for org ${orgId}`);
+
+      return c.json({
+        success: true,
+        data: updatedOption,
+        message: `Option '${optionValue}' updated successfully`
+      });
+
+    } catch (error) {
+      console.error('[Options] Failed to update option:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to update option',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// Delete a custom option (with system option protection)
+dataforgeRouter.delete('/orgs/:orgId/options/:optionType/:optionValue',
+  requirePermission('entities:write'),
+  async (c) => {
+    try {
+      const { orgId, optionType, optionValue } = c.req.param();
+
+      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+      const kysely = createKyselyForPersistentUse(c.env);
+
+      // CRITICAL: Prevent deletion of system option values
+      // This is the key protection you requested
+      const systemOptionExists = await kysely
+        .selectFrom('system_options')
+        .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
+        .select(['system_options.id', 'system_option_sets.archetype'])
+        .where('system_option_sets.option_set_type', '=', optionType)
+        .where('system_options.value', '=', optionValue)
+        .executeTakeFirst();
+
+      if (systemOptionExists) {
+        return c.json({
+          success: false,
+          error: 'Cannot delete system option values',
+          details: `The option value '${optionValue}' is a system template and cannot be deleted. System options serve as templates for all organizations and are required for the application to function properly.`,
+          systemProtection: true,
+          archetype: systemOptionExists.archetype
+        }, 403);
+      }
+
+      // Get the custom option to delete
+      const option = await kysely
+        .selectFrom('custom_options')
+        .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+        .select(['custom_options.id', 'custom_options.value', 'custom_options.label'])
+        .where('custom_option_sets.org_id', '=', orgId)
+        .where('custom_option_sets.option_set_type', '=', optionType)
+        .where('custom_options.value', '=', optionValue)
+        .executeTakeFirst();
+
+      if (!option) {
+        return c.json({
+          success: false,
+          error: `Option '${optionValue}' not found in '${optionType}' set`
+        }, 404);
+      }
+
+      // TODO: Add usage check to prevent orphaned references
+      // This would require checking each entity table's schema for columns that reference this option type
+      let usageWarning = false;
+
+      // Delete the custom option
+      await kysely
+        .deleteFrom('custom_options')
+        .where('id', '=', option.id)
+        .execute();
+
+      console.log(`[Options] Deleted custom option '${optionValue}' from ${optionType} set for org ${orgId}`);
+
+      return c.json({
+        success: true,
+        message: `Option '${option.label}' deleted successfully`,
+        warning: usageWarning ? 'This option may have been referenced by existing records. Those records will need to be updated.' : undefined
+      });
+
+    } catch (error) {
+      console.error('[Options] Failed to delete option:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to delete option',
         details: error instanceof Error ? error.message : 'Unknown error'
       }, 500);
     }

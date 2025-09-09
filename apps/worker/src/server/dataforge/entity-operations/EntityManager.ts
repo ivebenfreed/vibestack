@@ -1098,6 +1098,16 @@ export class DataForgeEntityManager {
       
       console.log(`[DataForgeEntityManager] Successfully created entity: ${fullTableName}`);
       
+      // Auto-copy system option templates to custom options for new archetype
+      try {
+        const { ArchetypeOptionsManager } = await import('../services/ArchetypeOptionsManager');
+        await ArchetypeOptionsManager.ensureArchetypeOptions(this.config.kysely, orgId, archetype);
+        console.log(`[DataForgeEntityManager] Auto-copied system option templates for archetype: ${archetype}`);
+      } catch (error) {
+        console.warn(`[DataForgeEntityManager] Failed to auto-copy system options for archetype ${archetype}:`, error);
+        // Don't fail entity creation if option copying fails
+      }
+      
       return {
         success: true,
         data: {

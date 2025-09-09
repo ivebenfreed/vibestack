@@ -15,7 +15,6 @@ export interface DocumentFields {
   title: string;
   content?: string; // Rich text content
   status: 'draft' | 'review' | 'published' | 'archived';
-  category?: string;
   author_id?: string;
   parent_document_id?: string;
   created_at: Date;
@@ -41,12 +40,6 @@ export class DocumentArchetype {
       serverOnly: false
     },
     status: FieldSetManager.convertFieldToFieldSet('status', 'document'),
-    category: { 
-      type: 'category_option', 
-      required: false, 
-      syncable: true,
-      serverOnly: false
-    },
     author_id: { 
       type: 'user_reference', 
       required: false, 
@@ -55,6 +48,12 @@ export class DocumentArchetype {
     },
     parent_document_id: { 
       type: 'entity_reference', 
+      required: false, 
+      syncable: true,
+      serverOnly: false
+    },
+    created_by: { 
+      type: 'user_reference', 
       required: false, 
       syncable: true,
       serverOnly: false

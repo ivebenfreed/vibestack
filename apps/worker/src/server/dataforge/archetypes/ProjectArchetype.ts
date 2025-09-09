@@ -15,7 +15,7 @@ export interface ProjectFields {
   name: string;
   description?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+  status: 'not_started' | 'active' | 'paused' | 'done' | 'cancelled';
   start_date?: Date;
   end_date?: Date;
   owner_id?: string;
@@ -75,6 +75,12 @@ export class ProjectArchetype {
       syncable: true,
       serverOnly: false,
       defaultValue: 0
+    },
+    created_by: { 
+      type: 'user_reference', 
+      required: false, 
+      syncable: true,
+      serverOnly: false
     }
   } as const;
 
@@ -86,7 +92,7 @@ export class ProjectArchetype {
     displayName: 'Project',
     description: 'Manages projects, initiatives, and long-term efforts',
     icon: 'folder',
-    defaultStatus: 'planning',
+    defaultStatus: 'not_started',
     supportsSoftDelete: true,
     supportsVersioning: false,
     supportsAttachments: true,

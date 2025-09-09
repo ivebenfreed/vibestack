@@ -76,45 +76,36 @@ CREATE INDEX IF NOT EXISTS idx_custom_options_value ON custom_options(value);
 -- Project archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
 ('priority', 'project', 'Project Priority', 'Standard priority levels for projects'),
-('status', 'project', 'Project Status', 'Standard status workflow for projects'),
-('category', 'project', 'Project Category', 'Standard project categories');
+('status', 'project', 'Project Status', 'Standard status workflow for projects');
 
 -- Task archetype system options  
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
 ('priority', 'task', 'Task Priority', 'Standard priority levels for tasks'),
-('status', 'task', 'Task Status', 'Standard status workflow for tasks'),
-('category', 'task', 'Task Category', 'Standard task categories');
+('status', 'task', 'Task Status', 'Standard status workflow for tasks');
 
 -- Record archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
-('priority', 'record', 'Record Priority', 'Standard priority levels for records'),
-('status', 'record', 'Record Status', 'Standard status workflow for records'),
-('category', 'record', 'Record Category', 'Standard record categories');
+('status', 'record', 'Record Status', 'Standard status workflow for records');
 
 -- Document archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
-('status', 'document', 'Document Status', 'Standard status workflow for documents'),
-('category', 'document', 'Document Category', 'Standard document categories');
+('status', 'document', 'Document Status', 'Standard status workflow for documents');
 
 -- File archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
-('status', 'file', 'File Status', 'Standard status workflow for files'),
-('category', 'file', 'File Category', 'Standard file categories');
+('status', 'file', 'File Status', 'Standard status workflow for files');
 
 -- Activity archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
-('status', 'activity', 'Activity Status', 'Standard status workflow for activities'),
-('category', 'activity', 'Activity Category', 'Standard activity categories');
+('status', 'activity', 'Activity Status', 'Standard status workflow for activities');
 
 -- Discussion archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
-('status', 'discussion', 'Discussion Status', 'Standard status workflow for discussions'),
-('category', 'discussion', 'Discussion Category', 'Standard discussion categories');
+('status', 'discussion', 'Discussion Status', 'Standard status workflow for discussions');
 
 -- Collection archetype system options
 INSERT INTO system_option_sets (option_set_type, archetype, name, description) VALUES
-('status', 'collection', 'Collection Status', 'Standard status workflow for collections'),
-('category', 'collection', 'Collection Category', 'Standard collection categories');
+('status', 'collection', 'Collection Status', 'Standard status workflow for collections');
 
 -- Insert system option values
 -- Project Priority Options
@@ -131,39 +122,24 @@ UNION ALL
 SELECT id, 'critical', 'Critical Priority', 'Critical priority projects', '#dc2626', 4
 FROM system_option_sets WHERE option_set_type = 'priority' AND archetype = 'project';
 
--- Project Status Options
+-- Project Status Options (semantic states)
 INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
-SELECT id, 'planning', 'Planning', 'Project in planning phase', '#6b7280', 1
+SELECT id, 'not_started', 'Not Started', 'Project has not begun yet', '#6b7280', 1
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'project'
 UNION ALL
 SELECT id, 'active', 'Active', 'Project is actively being worked on', '#22c55e', 2
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'project'
 UNION ALL
-SELECT id, 'on_hold', 'On Hold', 'Project is temporarily paused', '#f59e0b', 3
+SELECT id, 'paused', 'Paused', 'Project is temporarily paused', '#f59e0b', 3
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'project'
 UNION ALL
-SELECT id, 'completed', 'Completed', 'Project has been completed', '#10b981', 4
+SELECT id, 'done', 'Done', 'Project has been completed', '#10b981', 4
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'project'
 UNION ALL
 SELECT id, 'cancelled', 'Cancelled', 'Project has been cancelled', '#ef4444', 5
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'project';
 
--- Project Category Options  
-INSERT INTO system_options (option_set_id, value, label, description, sort_order)
-SELECT id, 'software', 'Software Development', 'Software development projects', 1
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'project'
-UNION ALL
-SELECT id, 'research', 'Research', 'Research and development projects', 2
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'project'
-UNION ALL
-SELECT id, 'marketing', 'Marketing', 'Marketing and promotional projects', 3
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'project'
-UNION ALL
-SELECT id, 'operational', 'Operational', 'Operational improvement projects', 4
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'project'
-UNION ALL
-SELECT id, 'strategic', 'Strategic', 'Strategic business projects', 5
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'project';
+-- Project category options removed - now org-specific only since categories vary by organization
 
 -- Task Priority Options (same as project)
 INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
@@ -179,51 +155,105 @@ UNION ALL
 SELECT id, 'critical', 'Critical Priority', 'Critical priority tasks', '#dc2626', 4
 FROM system_option_sets WHERE option_set_type = 'priority' AND archetype = 'task';
 
--- Task Status Options
+-- Task Status Options (semantic workflow states)
 INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
-SELECT id, 'backlog', 'Backlog', 'Task is in backlog', '#6b7280', 1
+SELECT id, 'not_started', 'Not Started', 'Task has not been started yet', '#6b7280', 1
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task'
 UNION ALL
-SELECT id, 'todo', 'To Do', 'Task is ready to start', '#3b82f6', 2
+SELECT id, 'active', 'Active', 'Task is actively being worked on', '#f59e0b', 2
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task'
 UNION ALL
-SELECT id, 'in_progress', 'In Progress', 'Task is being worked on', '#f59e0b', 3
+SELECT id, 'done', 'Done', 'Task is completed', '#10b981', 3
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task'
 UNION ALL
-SELECT id, 'review', 'In Review', 'Task is under review', '#8b5cf6', 4
-FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task'
-UNION ALL
-SELECT id, 'testing', 'Testing', 'Task is being tested', '#06b6d4', 5
-FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task'
-UNION ALL
-SELECT id, 'done', 'Done', 'Task is completed', '#10b981', 6
-FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task'
-UNION ALL
-SELECT id, 'blocked', 'Blocked', 'Task is blocked', '#ef4444', 7
+SELECT id, 'blocked', 'Blocked', 'Task is blocked by dependencies', '#ef4444', 4
 FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'task';
 
--- Task Category Options
-INSERT INTO system_options (option_set_id, value, label, description, sort_order)
-SELECT id, 'feature', 'Feature', 'New feature development', 1
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task'
+-- Task category options removed - now org-specific only since categories vary by organization
+
+-- Record Status Options (data lifecycle states)
+INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
+SELECT id, 'draft', 'Draft', 'Record is in draft state', '#6b7280', 1
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'record'
 UNION ALL
-SELECT id, 'bug_fix', 'Bug Fix', 'Bug fixes and corrections', 2
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task'
+SELECT id, 'active', 'Active', 'Record is active and in use', '#10b981', 2
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'record'
 UNION ALL
-SELECT id, 'research', 'Research', 'Research and investigation tasks', 3
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task'
+SELECT id, 'inactive', 'Inactive', 'Record is inactive but preserved', '#f59e0b', 3
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'record'
 UNION ALL
-SELECT id, 'documentation', 'Documentation', 'Documentation tasks', 4
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task'
+SELECT id, 'archived', 'Archived', 'Record is archived for historical reference', '#6b7280', 4
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'record';
+
+-- Document Status Options (publishing workflow states)
+INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
+SELECT id, 'draft', 'Draft', 'Document is in draft state', '#6b7280', 1
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'document'
 UNION ALL
-SELECT id, 'testing', 'Testing', 'Testing and QA tasks', 5
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task'
+SELECT id, 'review', 'Under Review', 'Document is under review', '#f59e0b', 2
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'document'
 UNION ALL
-SELECT id, 'deployment', 'Deployment', 'Deployment and release tasks', 6
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task'
+SELECT id, 'published', 'Published', 'Document is published and available', '#10b981', 3
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'document'
 UNION ALL
-SELECT id, 'meeting', 'Meeting', 'Meeting and discussion tasks', 7
-FROM system_option_sets WHERE option_set_type = 'category' AND archetype = 'task';
+SELECT id, 'archived', 'Archived', 'Document is archived', '#6b7280', 4
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'document';
+
+-- File Status Options (file lifecycle states)
+INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
+SELECT id, 'uploading', 'Uploading', 'File is being uploaded', '#3b82f6', 1
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'file'
+UNION ALL
+SELECT id, 'available', 'Available', 'File is available for use', '#10b981', 2
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'file'
+UNION ALL
+SELECT id, 'processing', 'Processing', 'File is being processed', '#f59e0b', 3
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'file'
+UNION ALL
+SELECT id, 'archived', 'Archived', 'File is archived', '#6b7280', 4
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'file';
+
+-- Activity Status Options (activity lifecycle states)
+INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
+SELECT id, 'scheduled', 'Scheduled', 'Activity is scheduled', '#6b7280', 1
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'activity'
+UNION ALL
+SELECT id, 'active', 'Active', 'Activity is currently active', '#10b981', 2
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'activity'
+UNION ALL
+SELECT id, 'completed', 'Completed', 'Activity is completed', '#10b981', 3
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'activity'
+UNION ALL
+SELECT id, 'cancelled', 'Cancelled', 'Activity was cancelled', '#ef4444', 4
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'activity';
+
+-- Discussion Status Options (discussion lifecycle states)
+INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
+SELECT id, 'open', 'Open', 'Discussion is open for participation', '#10b981', 1
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'discussion'
+UNION ALL
+SELECT id, 'active', 'Active', 'Discussion is actively ongoing', '#3b82f6', 2
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'discussion'
+UNION ALL
+SELECT id, 'resolved', 'Resolved', 'Discussion has been resolved', '#10b981', 3
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'discussion'
+UNION ALL
+SELECT id, 'closed', 'Closed', 'Discussion is closed', '#6b7280', 4
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'discussion';
+
+-- Collection Status Options (collection lifecycle states)
+INSERT INTO system_options (option_set_id, value, label, description, color, sort_order)
+SELECT id, 'draft', 'Draft', 'Collection is in draft state', '#6b7280', 1
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'collection'
+UNION ALL
+SELECT id, 'active', 'Active', 'Collection is active', '#10b981', 2
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'collection'
+UNION ALL
+SELECT id, 'complete', 'Complete', 'Collection is complete', '#10b981', 3
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'collection'
+UNION ALL
+SELECT id, 'archived', 'Archived', 'Collection is archived', '#6b7280', 4
+FROM system_option_sets WHERE option_set_type = 'status' AND archetype = 'collection';
 
 -- Comments for documentation
 COMMENT ON TABLE system_option_sets IS 'System-wide option sets shared across all organizations for each archetype';

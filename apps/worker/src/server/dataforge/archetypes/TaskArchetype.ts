@@ -15,7 +15,7 @@ export interface TaskFields {
   title: string;
   description?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'todo' | 'in_progress' | 'review' | 'blocked' | 'completed' | 'cancelled';
+  status: 'not_started' | 'active' | 'done' | 'blocked';
   assignee_id?: string;
   due_date?: Date;
   parent_task_id?: string;
@@ -68,6 +68,12 @@ export class TaskArchetype {
       syncable: true,
       serverOnly: false
     },
+    created_by: { 
+      type: 'user_reference', 
+      required: false, 
+      syncable: true,
+      serverOnly: false
+    },
   } as const;
 
   /**
@@ -78,7 +84,7 @@ export class TaskArchetype {
     displayName: 'Task',
     description: 'Individual work items and action items',
     icon: 'check-square',
-    defaultStatus: 'todo',
+    defaultStatus: 'not_started',
     supportsSoftDelete: true,
     supportsVersioning: false,
     supportsAttachments: true,
