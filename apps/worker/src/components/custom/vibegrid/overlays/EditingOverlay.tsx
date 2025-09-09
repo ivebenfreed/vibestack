@@ -2,8 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import type { CellRef, Column } from '../types';
 import type { VisualCellPosition } from './OverlayTypes';
-import type { ActorRefFrom } from 'xstate';
-import type { tableBaseMachine } from '../machines/table-machine';
+// Pure Observable architecture - no XState dependencies
 import { createEditor, type EditorProps } from './editors';
 
 // ====================================

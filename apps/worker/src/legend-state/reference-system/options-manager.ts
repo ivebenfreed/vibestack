@@ -4,7 +4,7 @@
  */
 
 import { observable, computed } from '@legendapp/state'
-import { universeOrgId$, universeSchema$ } from '../observables'
+import { universeOrgId$, universeSchema$, universeContext$ } from '../observables'
 import { stateLog } from '@/logger';
 const log = stateLog('legend-state/reference-system/options-manager.ts');
 
@@ -52,6 +52,33 @@ const optionsStore$ = observable({
 })
 
 /**
+ * Helper function to get a real organization ID instead of "universe"
+ */
+function getValidOrgId(preferredOrgId?: string): string | null {
+  // First try provided org ID
+  if (preferredOrgId && preferredOrgId !== 'universe') {
+    return preferredOrgId
+  }
+  
+  // Try URL-based orgId
+  let orgId = universeOrgId$.peek()
+  if (orgId && orgId !== 'universe') {
+    return orgId
+  }
+  
+  // Fall back to first available organization from universe context
+  const universeContext = universeContext$.peek()
+  const organizations = universeContext?.organizations || {}
+  const orgIds = Object.keys(organizations)
+  
+  if (orgIds.length === 0) {
+    return null
+  }
+  
+  return orgIds[0]
+}
+
+/**
  * Get or create system options observable for a specific type/archetype
  */
 function getSystemOptionsObservable(optionType: string, archetype: string) {
@@ -75,33 +102,52 @@ function getSystemOptionsObservable(optionType: string, archetype: string) {
 }
 
 /**
- * Async function to load system options
+ * Async function to load system options (now using unified options API)
  */
 async function loadSystemOptions(optionType: string, archetype: string, key: string) {
   try {
     optionsStore$.loading.set(prev => new Set([...prev, key]))
     
-    const response = await fetch(`/api/dataforge/system-options/${optionType}/${archetype}`)
+    // Get a real organization ID from universe context instead of "universe"
+    const orgId = getValidOrgId()
+    if (!orgId) {
+      throw new Error('No organizations available for loading options')
+    }
+    
+    log.debug(`[OptionsManager] Using organization ${orgId} for options loading`)
+    
+    // Use unified options API endpoint
+    const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionType}`)
     if (!response.ok) {
-      throw new Error(`Failed to fetch system options: ${response.status}`)
+      throw new Error(`Failed to fetch options: ${response.status}`)
     }
     
     const data = await response.json()
     
-    // Transform API response to our format
+    // Transform unified API response to our format
+    // The API returns option_key but we need value in our interface
+    const transformedOptions = (data.data || []).map((option: any) => ({
+      value: option.option_key || option.value,
+      label: option.label,
+      color: option.color,
+      icon: option.icon,
+      description: option.description,
+      order: option.sort_order || 0
+    }))
+    
     const optionSet: SystemOptionSet = {
       id: key,
       name: `${optionType} (${archetype})`,
       archetype,
       optionType,
-      options: data.data || []
+      options: transformedOptions
     }
     
-    log.info(`[OptionsManager] Loaded system options for ${key}:`, optionSet)
+    log.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
     optionsStore$.systemOptions[key].set(optionSet)
     
   } catch (error) {
-    log.error(`[OptionsManager] Error loading system options for ${key}:`, error)
+    log.error(`[OptionsManager] Error loading options for ${key}:`, error)
     optionsStore$.errors[key].set(error.message)
     optionsStore$.systemOptions[key].set({
       id: key,
@@ -123,7 +169,10 @@ async function loadSystemOptions(optionType: string, archetype: string, key: str
  * Get or create custom options observable for an organization option set
  */
 function getCustomOptionsObservable(optionSetName: string, organizationId?: string) {
-  const orgId = organizationId || universeOrgId$.peek()
+  const orgId = getValidOrgId(organizationId)
+  if (!orgId) {
+    throw new Error(`No valid organization ID available for custom options: ${optionSetName}`)
+  }
   const key = `${optionSetName}_${orgId}`
   
   if (!optionsStore$.customOptions[key].peek()) {
@@ -143,31 +192,44 @@ function getCustomOptionsObservable(optionSetName: string, organizationId?: stri
 }
 
 /**
- * Async function to load custom options
+ * Async function to load custom options (now using unified options API)
  */
 async function loadCustomOptions(optionSetName: string, orgId: string, key: string) {
   try {
     optionsStore$.loading.set(prev => new Set([...prev, key]))
     
-    const response = await fetch(`/api/dataforge/custom-options/${orgId}/${optionSetName}`)
+    // Use unified options API endpoint
+    const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionSetName}`)
     if (!response.ok) {
-      throw new Error(`Failed to fetch custom options: ${response.status}`)
+      throw new Error(`Failed to fetch options: ${response.status}`)
     }
     
     const data = await response.json()
+    
+    // Transform unified API response to our format
+    // The API returns option_key but we need value in our interface
+    const transformedOptions = (data.data || []).map((option: any) => ({
+      value: option.option_key || option.value,
+      label: option.label,
+      color: option.color,
+      icon: option.icon,
+      description: option.description,
+      order: option.sort_order || 0,
+      organizationId: orgId
+    }))
     
     const optionSet: CustomOptionSet = {
       id: key,
       name: optionSetName,
       organizationId: orgId,
-      options: data.data || []
+      options: transformedOptions
     }
     
-    log.info(`[OptionsManager] Loaded custom options for ${key}:`, optionSet)
+    log.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
     optionsStore$.customOptions[key].set(optionSet)
     
   } catch (error) {
-    log.error(`[OptionsManager] Error loading custom options for ${key}:`, error)
+    log.error(`[OptionsManager] Error loading options for ${key}:`, error)
     optionsStore$.errors[key].set(error.message)
     optionsStore$.customOptions[key].set({
       id: key,
@@ -243,7 +305,11 @@ export const OptionsManager = {
    * Resolve a custom option value to its full option object
    */
   resolveCustomOption(optionSetName: string, value: string, organizationId?: string) {
-    const orgId = organizationId || universeOrgId$.peek()
+    const orgId = getValidOrgId(organizationId)
+    if (!orgId) {
+      log.warn(`[OptionsManager] No valid organization ID for resolveCustomOption: ${optionSetName}`)
+      return null
+    }
     const key = `custom:${optionSetName}_${orgId}`
     const resolvers = optionResolvers$.peek()
     const resolver = resolvers.get(key)

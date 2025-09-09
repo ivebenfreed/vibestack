@@ -1202,10 +1202,32 @@ export class SimplePassiveRenderer {
     // The content element should only take up the space it needs, not flex: 1
     let contentElement: HTMLElement;
     
-    if (cellType === 'enum' || cellType === 'select') {
+    if (cellType === 'enum' || cellType === 'select' || cellType === 'tags') {
       // Badge/enum content - only use specific classes, NOT vibegridx-cell-content
       contentElement = this.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType);
+      const displayValue = this.formatCellValue(value, cellType);
+      contentElement.textContent = displayValue;
+      
+      // Apply specific badge color class based on the value
+      const colorClass = this.getBadgeColorClass(displayValue, column.id);
+      if (colorClass) {
+        contentElement.classList.add(colorClass);
+      } else {
+        // Default styling for select values that don't have predefined colors
+        contentElement.style.cssText = `
+          background-color: rgb(243, 244, 246);
+          color: rgb(75, 85, 99);
+          border: 1px solid rgb(209, 213, 219);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 500;
+          white-space: nowrap;
+        `;
+      }
     } else if (this.isTagsField(column.id, value)) {
       // Tags field with comma-separated values - create multiple badges
       contentElement = this.createTagsElement(value, row, column);
@@ -2184,27 +2206,40 @@ export class SimplePassiveRenderer {
     const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
     
     tags.forEach((tag, index) => {
-      const tagBadge = this.createElement('span', 'vibegridx-tag-badge');
+      const tagBadge = this.createElement('span', 'vibegridx-tag-badge vibegridx-enum-badge');
       tagBadge.textContent = tag;
-      tagBadge.style.cssText = `
-        background: oklch(0.95 0.02 220);
-        color: oklch(0.45 0.06 220);
-        border: 1px solid oklch(0.88 0.04 220);
-        border-radius: 4px;
-        padding: 2px 6px;
-        font-size: 12px;
-        font-weight: 500;
-        white-space: nowrap;
-        cursor: pointer;
-      `;
       
-      // Add hover effect
-      tagBadge.addEventListener('mouseenter', () => {
-        tagBadge.style.background = 'oklch(0.92 0.04 220)';
-      });
-      tagBadge.addEventListener('mouseleave', () => {
-        tagBadge.style.background = 'oklch(0.95 0.02 220)';
-      });
+      // Apply specific color class if available, otherwise use default styling
+      const colorClass = this.getBadgeColorClass(tag, columnId);
+      if (colorClass) {
+        tagBadge.classList.add(colorClass);
+      } else {
+        // Consistent badge styling matching the single-select default
+        tagBadge.style.cssText = `
+          background-color: rgb(243, 244, 246);
+          color: rgb(75, 85, 99);
+          border: 1px solid rgb(209, 213, 219);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 500;
+          white-space: nowrap;
+          cursor: pointer;
+        `;
+      }
+      
+      // Add hover effect (only for badges with custom inline styles)
+      if (!colorClass) {
+        tagBadge.addEventListener('mouseenter', () => {
+          tagBadge.style.backgroundColor = 'rgb(229, 231, 235)';
+        });
+        tagBadge.addEventListener('mouseleave', () => {
+          tagBadge.style.backgroundColor = 'rgb(243, 244, 246)';
+        });
+      }
       
       // Add click handler for individual tag editing
       tagBadge.addEventListener('click', (e) => {
@@ -2244,5 +2279,62 @@ export class SimplePassiveRenderer {
     // Trigger the standard VibeGrid edit mode - the editor selection system
     // will automatically choose MultiSelectEditor for tags fields
     this.tableInteraction$.startEdit(cellId, currentValue);
+  }
+
+  /**
+   * Get the appropriate CSS badge color class for a given value and column
+   */
+  private getBadgeColorClass(value: string, columnId: string): string | null {
+    if (!value) return null;
+    
+    const normalizedValue = value.toLowerCase().trim();
+    
+    // Status-related mappings
+    if (normalizedValue === 'open' || normalizedValue === 'new' || normalizedValue === 'todo' || normalizedValue === 'pending') {
+      return 'vibegridx-enum-badge-open';
+    }
+    if (normalizedValue === 'in-progress' || normalizedValue === 'in_progress' || normalizedValue === 'working' || normalizedValue === 'active') {
+      return 'vibegridx-enum-badge-in-progress';
+    }
+    if (normalizedValue === 'completed' || normalizedValue === 'done' || normalizedValue === 'finished' || normalizedValue === 'closed') {
+      return 'vibegridx-enum-badge-completed';
+    }
+    if (normalizedValue === 'approved') {
+      return 'vibegridx-enum-badge-approved';
+    }
+    if (normalizedValue === 'rejected') {
+      return 'vibegridx-enum-badge-rejected';
+    }
+    
+    // Priority-related mappings
+    if (normalizedValue === 'low') {
+      return 'vibegridx-enum-badge-low';
+    }
+    if (normalizedValue === 'medium' || normalizedValue === 'med' || normalizedValue === 'normal') {
+      return 'vibegridx-enum-badge-medium';
+    }
+    if (normalizedValue === 'high' || normalizedValue === 'urgent' || normalizedValue === 'critical') {
+      return 'vibegridx-enum-badge-high';
+    }
+    
+    // Type/category mappings  
+    if (normalizedValue === 'bug' || normalizedValue === 'issue' || normalizedValue === 'error') {
+      return 'vibegridx-enum-badge-rejected'; // Red color for bugs/issues
+    }
+    if (normalizedValue === 'feature' || normalizedValue === 'enhancement' || normalizedValue === 'improvement') {
+      return 'vibegridx-enum-badge-open'; // Blue color for features
+    }
+    if (normalizedValue === 'backend' || normalizedValue === 'api' || normalizedValue === 'server') {
+      return 'vibegridx-enum-badge-medium'; // Yellow/orange for backend
+    }
+    if (normalizedValue === 'frontend' || normalizedValue === 'ui' || normalizedValue === 'client') {
+      return 'vibegridx-enum-badge-active'; // Green color for frontend
+    }
+    if (normalizedValue === 'database' || normalizedValue === 'data' || normalizedValue === 'db') {
+      return 'vibegridx-enum-badge-pending'; // Yellow for database
+    }
+    
+    // Default: no specific color class (will use inline styles)
+    return null;
   }
 }
