@@ -141,20 +141,96 @@ function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: s
     const safeFieldDef = fieldDef && typeof fieldDef === 'object' ? fieldDef : {}
     const fieldType = String(safeFieldDef.type || 'text').toLowerCase()
     
-    // Map schema field types to VibeGrid cell types
-    const getCellType = (type: string) => {
-      switch (type) {
+    // Map DataForge field types to VibeGrid cell types
+    const getCellType = (type: string): string => {
+      switch (type.toLowerCase()) {
+        // Date types
         case 'timestamp': 
         case 'date': 
-        case 'datetime': 
           return 'date'
+        case 'datetime':
+          return 'datetime'
+        
+        // Number types
         case 'number': 
-        case 'integer': 
-        case 'float': 
+        case 'float':
           return 'number'
+        case 'integer':
+          return 'integer'
+        case 'decimal':
+          return 'decimal'
+        
+        // Text types
+        case 'text':
+          return 'text'
+        case 'longtext':
+          return 'longtext'
+        case 'rich-text':
+        case 'rich_text':
+          return 'rich-text'
+        
+        // Boolean types
         case 'boolean': 
         case 'bool': 
           return 'boolean'
+        
+        // Communication types
+        case 'email':
+          return 'email'
+        case 'url':
+          return 'url'
+        case 'phone':
+          return 'phone'
+        
+        // Rich data types
+        case 'file':
+          return 'file'
+        case 'currency':
+          return 'currency'
+        case 'color':
+          return 'color'
+        
+        // Selection types
+        case 'single-select':
+        case 'single_select':
+          return 'single-select'
+        case 'multi-select':
+        case 'multi_select':
+          return 'multi-select'
+        
+        // Reference types (stored as relationships)
+        case 'user_reference':
+          return 'user_reference'
+        case 'entity_reference':
+          return 'entity_reference'
+        case 'custom_user_reference':
+          return 'custom_user_reference'
+        case 'custom_entity_reference':
+          return 'custom_entity_reference'
+        
+        // Rollup types
+        case 'rollup_count':
+          return 'rollup_count'
+        case 'rollup_sum':
+          return 'rollup_sum'
+        case 'rollup_average':
+          return 'rollup_average'
+        case 'rollup_concat':
+          return 'rollup_concat'
+        
+        // Computed types
+        case 'computed_expression':
+          return 'computed_expression'
+        case 'computed_formula':
+          return 'computed_formula'
+        
+        // Legacy/compatibility
+        case 'select':
+          return 'select'
+        case 'reference-select':
+        case 'reference_select':
+          return 'reference-select'
+        
         default: 
           return 'text'
       }
@@ -162,11 +238,40 @@ function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: s
     
     // Determine column width based on field type and name
     const getWidth = (type: string, name: string) => {
+      // Boolean fields are narrow
       if (type === 'boolean') return 80
-      if (type.includes('timestamp') || type.includes('date')) return 150
+      
+      // Date/time fields
+      if (type.includes('timestamp') || type.includes('date') || type === 'datetime') return 150
+      
+      // ID fields
       if (name === 'id') return 200
-      if (name.includes('email')) return 250
-      if (name.includes('description')) return 300
+      
+      // Communication fields
+      if (type === 'email' || name.includes('email')) return 250
+      if (type === 'url' || name.includes('url') || name.includes('website')) return 250
+      if (type === 'phone' || name.includes('phone')) return 150
+      
+      // Rich content fields
+      if (name.includes('description') || type === 'longtext' || type === 'rich-text') return 300
+      
+      // Numeric fields
+      if (type === 'number' || type === 'integer' || type === 'decimal') return 120
+      if (type === 'currency') return 150
+      
+      // Color fields
+      if (type === 'color') return 100
+      
+      // File fields
+      if (type === 'file') return 200
+      
+      // Reference and relationship fields
+      if (type.includes('reference') || type.includes('rollup') || type.includes('relationship')) return 180
+      
+      // Selection fields
+      if (type.includes('select')) return 150
+      
+      // Default
       return 200
     }
     

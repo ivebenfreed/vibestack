@@ -1354,20 +1354,211 @@ export class SimplePassiveRenderer {
   }
   
   /**
-   * Format cell value based on type
+   * Format cell value using the new renderer system
    */
   private formatCellValue(value: any, type?: string): string {
     if (value === null || value === undefined) return '';
     
+    // Import and use the fast renderers for proper formatting
     switch (type) {
+      case 'email':
+        return this.formatEmail(value);
+      case 'url':
+        return this.formatUrl(value);
+      case 'phone':
+        return this.formatPhone(value);
+      case 'currency':
+        return this.formatCurrency(value);
+      case 'color':
+        return String(value);
+      case 'file':
+        return this.formatFile(value);
+      case 'rollup_count':
+      case 'rollup_sum':
+      case 'rollup_average':
+      case 'rollup_concat':
+        return this.formatRollup(value, type);
+      case 'computed_expression':
+      case 'computed_formula':
+        return this.formatComputed(value);
+      case 'user_reference':
+      case 'custom_user_reference':
+      case 'entity_reference':
+      case 'custom_entity_reference':
+      case 'relationship-single':
+      case 'relationship-multi':
+      case 'relationship-collection':
+        return this.formatRelationship(value, type);
       case 'date':
       case 'datetime':
         return value instanceof Date ? value.toLocaleDateString() : String(value);
       case 'number':
+      case 'integer':
+      case 'decimal':
         return typeof value === 'number' ? value.toString() : String(value);
+      case 'boolean':
+        return typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
       default:
         return String(value);
     }
+  }
+  
+  /**
+   * Format email values
+   */
+  private formatEmail(value: any): string {
+    if (!value) return '';
+    const email = String(value);
+    return email.includes('@') && email.includes('.') ? email : email;
+  }
+  
+  /**
+   * Format URL values (show domain only)
+   */
+  private formatUrl(value: any): string {
+    if (!value) return '';
+    const url = String(value);
+    try {
+      const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+      return urlObj.hostname;
+    } catch {
+      return url;
+    }
+  }
+  
+  /**
+   * Format phone values
+   */
+  private formatPhone(value: any): string {
+    if (!value) return '';
+    const phone = String(value);
+    const digits = phone.replace(/\D/g, '');
+    
+    // US format
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length === 11 && digits[0] === '1') {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    
+    return phone;
+  }
+  
+  /**
+   * Format currency values
+   */
+  private formatCurrency(value: any): string {
+    if (!value) return '';
+    
+    // Handle JSONB format
+    if (typeof value === 'object' && value.amount !== undefined) {
+      const { amount, currency = 'USD' } = value;
+      if (amount === null || amount === undefined) return '';
+      
+      try {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: currency.toUpperCase()
+        }).format(Number(amount));
+      } catch {
+        return `${currency} ${Number(amount).toFixed(2)}`;
+      }
+    }
+    
+    // Handle numeric values
+    const numValue = Number(value);
+    if (isNaN(numValue)) return String(value);
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(numValue);
+  }
+  
+  /**
+   * Format file values
+   */
+  private formatFile(value: any): string {
+    if (!value) return '';
+    
+    // Handle JSONB format
+    if (typeof value === 'object' && value.url) {
+      const { url, size } = value;
+      const filename = url.split('/').pop() || 'file';
+      
+      if (size) {
+        const sizeInKB = Math.round(size / 1024);
+        return `${filename} (${sizeInKB}KB)`;
+      }
+      
+      return filename;
+    }
+    
+    // Handle URL strings
+    if (typeof value === 'string' && value.startsWith('http')) {
+      return value.split('/').pop() || 'file';
+    }
+    
+    return String(value);
+  }
+  
+  /**
+   * Format rollup field values
+   */
+  private formatRollup(value: any, type: string): string {
+    if (value === null || value === undefined) return '0';
+    
+    switch (type) {
+      case 'rollup_count':
+        return Number(value).toString();
+      case 'rollup_sum':
+        const sum = Number(value);
+        return sum % 1 === 0 ? sum.toString() : sum.toFixed(2);
+      case 'rollup_average':
+        return Number(value).toFixed(2);
+      case 'rollup_concat':
+        return String(value);
+      default:
+        return String(value);
+    }
+  }
+  
+  /**
+   * Format computed field values
+   */
+  private formatComputed(value: any): string {
+    if (value === null || value === undefined) return '';
+    
+    const computed = Number(value);
+    if (!isNaN(computed)) {
+      return computed % 1 === 0 ? computed.toString() : computed.toFixed(2);
+    }
+    
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    
+    return String(value);
+  }
+  
+  /**
+   * Format relationship field values
+   */
+  private formatRelationship(value: any, type: string): string {
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    // For now, show the ID or array length until relationship data is loaded
+    if (Array.isArray(value)) {
+      return value.length === 0 ? '' : 
+             value.length === 1 ? String(value[0]) : 
+             `${value[0]} +${value.length - 1} more`;
+    }
+    
+    // Single relationship - show the ID for now
+    return String(value);
   }
   
   /**

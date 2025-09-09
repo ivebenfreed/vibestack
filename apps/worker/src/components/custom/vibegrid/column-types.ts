@@ -43,12 +43,39 @@ export type ColumnDef<T> = {
   [K in keyof T]: Column<T, K>;
 }[keyof T];
 
-// Export cell type union for use elsewhere
+// Export cell type union for use elsewhere - aligned with DataForge field types
 export type CellType = 
+  // Basic types
   | 'text' 
-  | 'number' 
+  | 'longtext'
+  | 'rich-text'
+  | 'number'
+  | 'integer'
+  | 'decimal'
   | 'boolean' 
-  | 'date' 
+  | 'date'
+  | 'datetime'
+  // Selection types
   | 'select'
+  | 'single-select'
   | 'select-multi'
-  | 'reference-select';
+  | 'multi-select'
+  // Communication types
+  | 'email'
+  | 'url'
+  | 'phone'
+  // Rich data types
+  | 'file'
+  | 'currency'
+  | 'color'
+  // Reference types
+  | 'reference-select'
+  | 'custom_user_reference'
+  | 'custom_entity_reference'
+  // Computed/rollup types
+  | 'rollup_count'
+  | 'rollup_sum'
+  | 'rollup_average'
+  | 'rollup_concat'
+  | 'computed_expression'
+  | 'computed_formula';

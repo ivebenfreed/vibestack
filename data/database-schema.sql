@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict BtZHgwLrRqddPxbG6YFiYXonXxc4LhZmhu8v7RSs5DILxx9zd9irPQZO7cIhjiy
+\restrict NjnfZBabExPqtSq52XJgkY2XiktdhRtqEGz71qxfsSvU8onpeDBmDqFYdW3FSi1
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict BtZHgwLrRqddPxbG6YFiYXonXxc4LhZmhu8v7RSs5DILxx9zd9irPQZO7cIhjiy
+\unrestrict NjnfZBabExPqtSq52XJgkY2XiktdhRtqEGz71qxfsSvU8onpeDBmDqFYdW3FSi1
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict m0WkbNM7CrlfLdSYjNEtJeInGdloBXNCLixAU6uMInfdbZzI9A5XfGa5FkJB2v1
+\restrict qKu3CkqK7DKbdmdlH5N3ehytzZbIJzedFn9SMeu1ANc7Nlfo1Zqh1OvBSzcds72
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict m0WkbNM7CrlfLdSYjNEtJeInGdloBXNCLixAU6uMInfdbZzI9A5XfGa5FkJB2v1
+\unrestrict qKu3CkqK7DKbdmdlH5N3ehytzZbIJzedFn9SMeu1ANc7Nlfo1Zqh1OvBSzcds72
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict unmR1Anp6CcmxivZwMn5L79JdRO6QDKm48kdAAYVpYoPiqgyyCcVj7pHf8kNgch
+\restrict UoIVAdUgKZ2jjhCRoRJ8UhHlQDJe76AbrP0WzagfmZhDt8uVjJ6rR30bHNsZEuT
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict unmR1Anp6CcmxivZwMn5L79JdRO6QDKm48kdAAYVpYoPiqgyyCcVj7pHf8kNgch
+\unrestrict UoIVAdUgKZ2jjhCRoRJ8UhHlQDJe76AbrP0WzagfmZhDt8uVjJ6rR30bHNsZEuT
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict Yd7s78eNOEgNnhn4DSOU2ANnEwTkTBbKnSllGN5BRIrNwklFqG7e8kdgrDV9Umi
+\restrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict Yd7s78eNOEgNnhn4DSOU2ANnEwTkTBbKnSllGN5BRIrNwklFqG7e8kdgrDV9Umi
+\unrestrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
 \connect vibestack_dev
-\restrict Yd7s78eNOEgNnhn4DSOU2ANnEwTkTBbKnSllGN5BRIrNwklFqG7e8kdgrDV9Umi
+\restrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -3412,6 +3412,27 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projectdashboar
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projectdashboardv2 OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_projecttask; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projecttask (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    due_date timestamp without time zone
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projecttask REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projecttask OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_projectteam; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4191,6 +4212,38 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testentitys REP
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testentitys OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testfieldtypes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testfieldtypes (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    contact_email text NOT NULL,
+    website_url text,
+    phone_number text,
+    brand_color text,
+    budget jsonb,
+    document_file jsonb,
+    priority_level text,
+    tags text,
+    is_active boolean DEFAULT true,
+    score numeric,
+    created_date date,
+    notes text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testfieldtypes REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testfieldtypes OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testfile1757185633585; Type: TABLE; Schema: public; Owner: postgres
@@ -7616,7 +7669,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Yd7s78eNOEgNnhn4DSOU2ANnEwTkTBbKnSllGN5BRIrNwklFqG7e8kdgrDV9Umi
+\unrestrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
 
 --
 -- PostgreSQL database cluster dump complete
