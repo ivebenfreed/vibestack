@@ -61,7 +61,8 @@ export class ProjectArchetype {
       type: 'user_reference', 
       required: false, 
       syncable: true,
-      serverOnly: false
+      serverOnly: false,
+      systemField: true  // 🔒 System-protected - required for project business logic
     },
     budget: { 
       type: 'decimal', 
@@ -80,7 +81,8 @@ export class ProjectArchetype {
       type: 'user_reference', 
       required: false, 
       syncable: true,
-      serverOnly: false
+      serverOnly: false,
+      systemField: true  // 🔒 System-protected - required for audit trail
     }
   } as const;
 
