@@ -41,6 +41,16 @@ export const LegendStateIntegrationDemo = observer(() => {
             orgName: entitySchema._orgName,
             recordCount: 0 // We'll update this when we load data
           })
+        } else if (entityKey.includes('_') && entitySchema._isVirtual) {
+          // **NEW: Virtual entities (SystemOption, CustomOption, VirtualUser, etc.)**
+          const orgName = entitySchema._orgName || 'Virtual Entity'
+          const displayName = entitySchema._originalName || entityKey.split('_').slice(1).join('_')
+          entities.push({
+            value: entityKey,
+            label: `🔹 ${displayName} (${orgName})`,  // 🔹 indicates virtual entity
+            orgName: orgName,
+            recordCount: 0
+          })
         } else if (!entityKey.includes('_')) {
           // Regular entity (when not in universe mode)
           entities.push({

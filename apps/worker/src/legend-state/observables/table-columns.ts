@@ -51,15 +51,8 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   }
 
   const columns: TableColumn[] = [];
-  
-  // Add base system columns (always present)
-  columns.push(
-    { id: 'id', label: 'ID', width: 300, type: 'text', sortable: true, editable: false },
-    { id: 'created_at', label: 'Created', width: 180, type: 'datetime', sortable: true, editable: false },
-    { id: 'updated_at', label: 'Updated', width: 180, type: 'datetime', sortable: true, editable: false }
-  );
 
-  // Process entity fields from schema
+  // Process entity fields from schema - PURE DYNAMIC APPROACH
   // NEW: Handle Legend State observables - check allFields first, then fallback to legacy paths
   const allFields = entity.allFields || {};
   const legacyFields = entity.business_metadata?.fields || entity.fields || [];
@@ -79,7 +72,11 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
       })
     : legacyFields;
   
+  // No filtering - process ALL fields from schema (including system fields)
+  
   for (const field of fieldsArray) {
+    const isSystemField = ['id', 'created_at', 'updated_at'].includes(field.name);
+    
     const column: TableColumn = {
       id: field.name,
       label: field.label || formatFieldLabel(field.name),
@@ -87,7 +84,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
       type: mapFieldType(field.type),
       required: field.required || false,
       sortable: true,
-      editable: true
+      editable: !isSystemField  // System fields are not editable
     };
 
     // Handle reference fields

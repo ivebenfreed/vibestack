@@ -63,6 +63,29 @@ export interface TableInteractionState {
   resizingColumn: string | null;
   resizeStartX: number;
   resizeStartWidth: number;
+  
+  // UI Menu/Dropdown State
+  headerMenuState: {
+    openMenu: string | null; // columnId of open menu
+    position: { x: number; y: number };
+    menuType: 'filter' | 'sort' | 'settings' | null;
+  };
+  
+  contextMenuState: {
+    isOpen: boolean;
+    position: { x: number; y: number };
+    context: 'cell' | 'row' | 'column' | 'header' | null;
+    targetId: string | null; // cellId, rowId, or columnId
+  };
+  
+  columnVisibilityMenuState: {
+    isOpen: boolean;
+    searchValue: string;
+  };
+  
+  groupConfigMenuState: {
+    isOpen: boolean;
+  };
 }
 
 export interface TableViewportState {
@@ -299,6 +322,44 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     setGroupConfig(config: GroupConfig | null) {
       tableCore$.groupConfig.set(config);
       log.info('🎯 Group config set', { config });
+    },
+    
+    // Column visibility methods
+    showAllColumns() {
+      const visibility = tableCore$.columnVisibility.get();
+      const allVisible = Object.fromEntries(
+        Object.keys(visibility).map(key => [key, true])
+      );
+      tableCore$.columnVisibility.set(allVisible);
+      log.info('🎯 All columns shown');
+    },
+    
+    hideAllColumns() {
+      const columns = tableCore$.columns.get();
+      const visibility = tableCore$.columnVisibility.get();
+      
+      // Only hide columns that are hideable (not required)
+      const newVisibility = Object.fromEntries(
+        Object.keys(visibility).map(key => {
+          const column = columns.find(col => col.id === key);
+          const canHide = column?.hideable !== false;
+          return [key, canHide ? false : visibility[key]];
+        })
+      );
+      
+      tableCore$.columnVisibility.set(newVisibility);
+      log.info('🎯 All hideable columns hidden');
+    },
+    
+    // Helper getters
+    get hiddenColumnCount() {
+      const visibility = tableCore$.columnVisibility.get();
+      return Object.values(visibility).filter(visible => visible === false).length;
+    },
+    
+    get visibleColumnCount() {
+      const visibility = tableCore$.columnVisibility.get();
+      return Object.values(visibility).filter(visible => visible !== false).length;
     }
   });
   
@@ -378,6 +439,29 @@ export function createTableInteraction$(tableCore$?: any) {
       startWidth: number;
       newWidth: number;
     } | null,
+    
+    // UI Menu/Dropdown State
+    headerMenuState: {
+      openMenu: null as string | null, // columnId of open menu
+      position: { x: 0, y: 0 },
+      menuType: null as 'filter' | 'sort' | 'settings' | null
+    },
+    
+    contextMenuState: {
+      isOpen: false,
+      position: { x: 0, y: 0 },
+      context: null as 'cell' | 'row' | 'column' | 'header' | null,
+      targetId: null as string | null // cellId, rowId, or columnId
+    },
+    
+    columnVisibilityMenuState: {
+      isOpen: false,
+      searchValue: ''
+    },
+    
+    groupConfigMenuState: {
+      isOpen: false
+    },
     
     // Direct manipulation methods
     selectCell(cellId: string, isMulti: boolean = false) {
@@ -756,6 +840,94 @@ export function createTableInteraction$(tableCore$?: any) {
     endColumnResize() {
       tableInteraction$.resizingColumn.set(null);
       log.info('🎯 Column resize ended');
+    },
+    
+    // Header Menu Methods
+    openHeaderMenu(columnId: string, position: { x: number; y: number }, menuType: 'filter' | 'sort' | 'settings') {
+      batch(() => {
+        tableInteraction$.headerMenuState.set({
+          openMenu: columnId,
+          position,
+          menuType
+        });
+      });
+      
+      log.info('🎯 Header menu opened', { columnId, position, menuType });
+    },
+    
+    closeHeaderMenu() {
+      tableInteraction$.headerMenuState.set({
+        openMenu: null,
+        position: { x: 0, y: 0 },
+        menuType: null
+      });
+      
+      log.info('🎯 Header menu closed');
+    },
+    
+    // Context Menu Methods
+    openContextMenu(context: 'cell' | 'row' | 'column' | 'header', targetId: string, position: { x: number; y: number }) {
+      batch(() => {
+        tableInteraction$.contextMenuState.set({
+          isOpen: true,
+          position,
+          context,
+          targetId
+        });
+      });
+      
+      log.info('🎯 Context menu opened', { context, targetId, position });
+    },
+    
+    closeContextMenu() {
+      tableInteraction$.contextMenuState.set({
+        isOpen: false,
+        position: { x: 0, y: 0 },
+        context: null,
+        targetId: null
+      });
+      
+      log.info('🎯 Context menu closed');
+    },
+    
+    // Column Visibility Menu Methods
+    openColumnVisibilityMenu() {
+      tableInteraction$.columnVisibilityMenuState.set({
+        isOpen: true,
+        searchValue: ''
+      });
+      
+      log.info('🎯 Column visibility menu opened');
+    },
+    
+    closeColumnVisibilityMenu() {
+      tableInteraction$.columnVisibilityMenuState.set({
+        isOpen: false,
+        searchValue: ''
+      });
+      
+      log.info('🎯 Column visibility menu closed');
+    },
+    
+    setColumnVisibilitySearch(searchValue: string) {
+      tableInteraction$.columnVisibilityMenuState.searchValue.set(searchValue);
+    },
+    
+    // Group Config Menu Methods
+    openGroupConfigMenu() {
+      tableInteraction$.groupConfigMenuState.set({
+        isOpen: true
+      });
+      
+      log.info('🎯 Group config menu opened');
+    },
+    
+    closeGroupConfigMenu() {
+      tableInteraction$.groupConfigMenuState.set({
+        isOpen: false
+      });
+      
+      log.info('🎯 Group config menu closed');
     }
   });
   
@@ -783,7 +955,7 @@ export function createTableViewport$() {
     contentHeight: 0,
     
     // Visible range (computed from scroll)
-    visibleRange: function() {
+    visibleRange: computed(() => {
       const top = tableViewport$.scrollTop.get();
       const height = tableViewport$.viewportHeight.get();
       const rowHeight = 40; // TODO: Make this configurable
@@ -795,10 +967,10 @@ export function createTableViewport$() {
         start: Math.max(0, start - 5), // 5 row buffer
         end: end + 5 // 5 row buffer
       };
-    },
+    }),
     
     // Visible columns (computed from horizontal scroll)
-    visibleColumns: function() {
+    visibleColumns: computed(() => {
       const left = tableViewport$.scrollLeft.get();
       const width = tableViewport$.viewportWidth.get();
       
@@ -807,7 +979,7 @@ export function createTableViewport$() {
         start: 0,
         end: 20 // Show all columns for now
       };
-    },
+    }),
     
     // Direct manipulation methods
     updateScroll(top: number, left: number) {

@@ -237,6 +237,17 @@ export class SimplePassiveRenderer {
     });
     this.disposers.push(columnsDisposer);
     
+    // Observe column visibility changes
+    const columnVisibilityDisposer = observe(() => {
+      const columnVisibility = this.tableCore$.columnVisibility.get();
+      const hiddenCount = Object.values(columnVisibility).filter(visible => visible === false).length;
+      log.info('👁️ Column visibility changed', { hiddenCount });
+      // Only re-render header and body - both need to filter columns
+      this.renderHeader();
+      this.renderBody();
+    });
+    this.disposers.push(columnVisibilityDisposer);
+    
     // Observe processed rows changes
     const rowsDisposer = observe(() => {
       const rows = this.tableCore$.processedRows.get();
@@ -501,6 +512,7 @@ export class SimplePassiveRenderer {
     if (!this.headerContainer) return;
     
     const columns = this.tableCore$.columns.get();
+    const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
     log.info('🎨 Rendering header', { columnCount: columns.length });
     
     this.headerContainer.innerHTML = '';
@@ -549,8 +561,7 @@ export class SimplePassiveRenderer {
         const processedRows = this.tableCore$.processedRows.get();
         const columns = this.tableCore$.columns.get();
         const visibleColumns = columns.filter(col => {
-          const visibility = this.tableCore$.columnVisibility.get();
-          return visibility[col.id] !== false;
+          return columnVisibility[col.id] !== false;
         });
         const totalCells = processedRows.length * visibleColumns.length;
         
@@ -576,11 +587,19 @@ export class SimplePassiveRenderer {
     
     headerRow.appendChild(cornerCell);
     
+    // Filter columns by visibility (using cached columnVisibility)
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    
+    log.info('🎨 Rendering header with visible columns', { 
+      totalColumns: columns.length, 
+      visibleColumns: visibleColumns.length 
+    });
+    
     // Update column coordinate mapping (account for 40px row header)
     this.coordinateMapping.columns = [];
     let xOffset = 40; // Start after row header
     
-    columns.forEach((column, index) => {
+    visibleColumns.forEach((column, index) => {
       const headerCell = this.createElement('div', 'vibegridx-header-cell');
       headerCell.style.cssText = `
         flex: 0 0 ${column.width}px;
@@ -717,6 +736,7 @@ export class SimplePassiveRenderer {
     
     const rows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
+    const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
     
     log.info('🎨 Rendering body', { 
       rowCount: rows.length, 
@@ -744,10 +764,13 @@ export class SimplePassiveRenderer {
       rendering: visibleRows.length
     });
     
+    // Filter columns by visibility (using cached columnVisibility)
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
+    
     // Render only visible rows with proper positioning
     visibleRows.forEach((row, visibleIndex) => {
       const actualRowIndex = startIndex + visibleIndex;
-      const rowElement = this.createRowElement(row, actualRowIndex, columns);
+      const rowElement = this.createRowElement(row, actualRowIndex, visibleColumns, columnVisibility);
       this.bodyContainer.appendChild(rowElement);
       
       // Add to coordinate mapping (all rows for overlay positioning)
@@ -831,7 +854,8 @@ export class SimplePassiveRenderer {
   private createRowElement(
     row: any, 
     rowIndex: number, 
-    columns: any[]
+    columns: any[],
+    columnVisibility: Record<string, boolean>
   ): HTMLElement {
     const rowElement = this.createElement('div', 'vibegridx-row');
     rowElement.dataset.rowId = row.id;
@@ -878,12 +902,8 @@ export class SimplePassiveRenderer {
       `;
       checkbox.dataset.rowId = row.id;
       
-      // Check if this row is currently selected
-      const columns = this.tableCore$.columns.get();
-      const visibleColumns = columns.filter(col => {
-        const visibility = this.tableCore$.columnVisibility.get();
-        return visibility[col.id] !== false;
-      });
+      // Check if this row is currently selected (use the visible columns passed in)
+      const visibleColumns = columns; // columns parameter is now already filtered
       
       const selectedCells = this.tableInteraction$.selectedCells.get();
       const isRowSelected = visibleColumns.every(col => 
@@ -1232,10 +1252,8 @@ export class SimplePassiveRenderer {
   private selectAllCells(): void {
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
-    const visibleColumns = columns.filter(col => {
-      const visibility = this.tableCore$.columnVisibility.get();
-      return visibility[col.id] !== false;
-    });
+    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
     const allCells = new Set<string>();
     
@@ -1281,10 +1299,8 @@ export class SimplePassiveRenderer {
    */
   private selectRow(rowId: string): void {
     const columns = this.tableCore$.columns.get();
-    const visibleColumns = columns.filter(col => {
-      const visibility = this.tableCore$.columnVisibility.get();
-      return visibility[col.id] !== false;
-    });
+    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
     const rowCells = new Set<string>();
     
@@ -1307,10 +1323,8 @@ export class SimplePassiveRenderer {
    */
   private toggleRowSelection(rowId: string): void {
     const columns = this.tableCore$.columns.get();
-    const visibleColumns = columns.filter(col => {
-      const visibility = this.tableCore$.columnVisibility.get();
-      return visibility[col.id] !== false;
-    });
+    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
     const currentSelection = new Set(this.tableInteraction$.selectedCells.get());
     const rowCells = new Set<string>();
@@ -1356,10 +1370,8 @@ export class SimplePassiveRenderer {
     
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
-    const visibleColumns = columns.filter(col => {
-      const visibility = this.tableCore$.columnVisibility.get();
-      return visibility[col.id] !== false;
-    });
+    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
     log.debug('🎯 selectRowRange - data retrieved', {
       processedRowsCount: processedRows.length,
@@ -1413,10 +1425,8 @@ export class SimplePassiveRenderer {
 
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
-    const visibleColumns = columns.filter(col => {
-      const visibility = this.tableCore$.columnVisibility.get();
-      return visibility[col.id] !== false;
-    });
+    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
 
     if (processedRows.length === 0 || visibleColumns.length === 0) {
       log.debug('⌨️ No data to navigate');
@@ -1500,10 +1510,8 @@ export class SimplePassiveRenderer {
     
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
-    const visibleColumns = columns.filter(col => {
-      const visibility = this.tableCore$.columnVisibility.get();
-      return visibility[col.id] !== false;
-    });
+    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
 
     // Parse cell coordinates
     const [startRowId, startColId] = startCell.split(':');

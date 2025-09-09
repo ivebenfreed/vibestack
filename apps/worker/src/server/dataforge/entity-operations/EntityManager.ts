@@ -211,6 +211,26 @@ export class DataForgeEntityManager {
       updates: updates
     });
 
+    // Filter out deprecated _resolved fields to prevent database errors
+    // These fields were deprecated in September 2025 but may still exist in client-side data
+    const filteredUpdates = Object.keys(updates).reduce((acc, key) => {
+      if (key.endsWith('_resolved')) {
+        console.log(`⚠️ [EntityManager] Filtering out deprecated _resolved field: ${key}`);
+        return acc;
+      }
+      acc[key] = updates[key];
+      return acc;
+    }, {} as any);
+
+    console.log(`🧹 [EntityManager] Filtered updates:`, {
+      originalKeys: Object.keys(updates),
+      filteredKeys: Object.keys(filteredUpdates),
+      removedCount: Object.keys(updates).length - Object.keys(filteredUpdates).length
+    });
+
+    // Use filtered updates for the rest of the method
+    updates = filteredUpdates;
+
     try {
       const config = await this.getEntityConfig(orgId, entityName);
       console.log(`⚙️ [EntityManager] Entity config:`, {
@@ -491,6 +511,18 @@ export class DataForgeEntityManager {
       // if (options.resolveReferences !== false) {
       //   resolvedResults = await this.referenceResolver.resolveReferences(orgId, entityName, mergedResults);
       // }
+
+      // DEBUG: Check if _resolved fields are somehow present
+      if (resolvedResults && resolvedResults.length > 0) {
+        const sample = resolvedResults[0];
+        const resolvedFields = Object.keys(sample).filter(key => key.endsWith('_resolved'));
+        if (resolvedFields.length > 0) {
+          console.log(`🚨 [EntityManager] Found _resolved fields in queryRecords result: ${resolvedFields.join(', ')}`);
+          console.log(`🚨 [EntityManager] Sample resolved field data:`, sample[resolvedFields[0]]);
+        } else {
+          console.log(`✅ [EntityManager] No _resolved fields found in queryRecords result`);
+        }
+      }
 
       return {
         success: true,

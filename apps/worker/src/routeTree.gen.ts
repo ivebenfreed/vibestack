@@ -55,6 +55,7 @@ import { Route as AuthenticatedDebugUltraTableTestRouteImport } from './routes/_
 import { Route as AuthenticatedDebugTestVibegridPureRouteImport } from './routes/_authenticated/debug/test-vibegrid-pure'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
+import { Route as AuthenticatedDebugResolvedFieldsDebugRouteImport } from './routes/_authenticated/debug/resolved-fields-debug'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugLegendTableRouteImport } from './routes/_authenticated/debug/legend-table'
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
@@ -379,6 +380,12 @@ const AuthenticatedDebugStateMachineTestRoute =
     path: '/state-machine-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugResolvedFieldsDebugRoute =
+  AuthenticatedDebugResolvedFieldsDebugRouteImport.update({
+    id: '/resolved-fields-debug',
+    path: '/resolved-fields-debug',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugReactflowPositioningRoute =
   AuthenticatedDebugReactflowPositioningRouteImport.update({
     id: '/reactflow-positioning',
@@ -459,6 +466,7 @@ export interface FileRoutesByFullPath {
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
   '/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
+  '/debug/resolved-fields-debug': typeof AuthenticatedDebugResolvedFieldsDebugRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/test-vibegrid-pure': typeof AuthenticatedDebugTestVibegridPureRoute
@@ -517,6 +525,7 @@ export interface FileRoutesByTo {
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
   '/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
+  '/debug/resolved-fields-debug': typeof AuthenticatedDebugResolvedFieldsDebugRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/test-vibegrid-pure': typeof AuthenticatedDebugTestVibegridPureRoute
@@ -579,6 +588,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
   '/_authenticated/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
+  '/_authenticated/debug/resolved-fields-debug': typeof AuthenticatedDebugResolvedFieldsDebugRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/_authenticated/debug/test-vibegrid-pure': typeof AuthenticatedDebugTestVibegridPureRoute
@@ -641,6 +651,7 @@ export interface FileRouteTypes {
     | '/debug/legend-state-test'
     | '/debug/legend-table'
     | '/debug/reactflow-positioning'
+    | '/debug/resolved-fields-debug'
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/test-vibegrid-pure'
@@ -699,6 +710,7 @@ export interface FileRouteTypes {
     | '/debug/legend-state-test'
     | '/debug/legend-table'
     | '/debug/reactflow-positioning'
+    | '/debug/resolved-fields-debug'
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/test-vibegrid-pure'
@@ -760,6 +772,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/legend-state-test'
     | '/_authenticated/debug/legend-table'
     | '/_authenticated/debug/reactflow-positioning'
+    | '/_authenticated/debug/resolved-fields-debug'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
     | '/_authenticated/debug/test-vibegrid-pure'
@@ -1169,6 +1182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugStateMachineTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/resolved-fields-debug': {
+      id: '/_authenticated/debug/resolved-fields-debug'
+      path: '/resolved-fields-debug'
+      fullPath: '/debug/resolved-fields-debug'
+      preLoaderRoute: typeof AuthenticatedDebugResolvedFieldsDebugRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/reactflow-positioning': {
       id: '/_authenticated/debug/reactflow-positioning'
       path: '/reactflow-positioning'
@@ -1240,6 +1260,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugLegendStateTestRoute: typeof AuthenticatedDebugLegendStateTestRoute
   AuthenticatedDebugLegendTableRoute: typeof AuthenticatedDebugLegendTableRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
+  AuthenticatedDebugResolvedFieldsDebugRoute: typeof AuthenticatedDebugResolvedFieldsDebugRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
   AuthenticatedDebugTestVibegridPureRoute: typeof AuthenticatedDebugTestVibegridPureRoute
@@ -1263,6 +1284,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugLegendTableRoute: AuthenticatedDebugLegendTableRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
+    AuthenticatedDebugResolvedFieldsDebugRoute:
+      AuthenticatedDebugResolvedFieldsDebugRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,
