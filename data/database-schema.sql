@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict NjnfZBabExPqtSq52XJgkY2XiktdhRtqEGz71qxfsSvU8onpeDBmDqFYdW3FSi1
+\restrict sIEukLy2b0QFgEWjMWgK3HjdYy3z4bQbTcymEoLTQ3fCS60UqxqyHmKP6kdIQA9
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict NjnfZBabExPqtSq52XJgkY2XiktdhRtqEGz71qxfsSvU8onpeDBmDqFYdW3FSi1
+\unrestrict sIEukLy2b0QFgEWjMWgK3HjdYy3z4bQbTcymEoLTQ3fCS60UqxqyHmKP6kdIQA9
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict qKu3CkqK7DKbdmdlH5N3ehytzZbIJzedFn9SMeu1ANc7Nlfo1Zqh1OvBSzcds72
+\restrict QeXwz2x415IJDwXdwQZ5hqeXLLdGc0UKKZqXqEy1odMyPQcdfIa27qfYeVQjY88
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,19 +72,17 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qKu3CkqK7DKbdmdlH5N3ehytzZbIJzedFn9SMeu1ANc7Nlfo1Zqh1OvBSzcds72
+\unrestrict QeXwz2x415IJDwXdwQZ5hqeXLLdGc0UKKZqXqEy1odMyPQcdfIa27qfYeVQjY88
 
 --
--- Database "postgres" dump
+-- Database "elevra_dev" dump
 --
-
-\connect postgres
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict UoIVAdUgKZ2jjhCRoRJ8UhHlQDJe76AbrP0WzagfmZhDt8uVjJ6rR30bHNsZEuT
+\restrict POkNHVcosUOOoz1X5Em7IuDynW5asdgcCJVPHSrfgSCxcQwXVei58lFi8MhNs87
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -102,48 +100,17 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- PostgreSQL database dump complete
+-- Name: elevra_dev; Type: DATABASE; Schema: -; Owner: postgres
 --
 
-\unrestrict UoIVAdUgKZ2jjhCRoRJ8UhHlQDJe76AbrP0WzagfmZhDt8uVjJ6rR30bHNsZEuT
-
---
--- Database "vibestack_dev" dump
---
-
---
--- PostgreSQL database dump
---
-
-\restrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
-
--- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
--- Name: vibestack_dev; Type: DATABASE; Schema: -; Owner: postgres
---
-
-CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'en_US.utf8';
+CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'en_US.utf8';
 
 
-ALTER DATABASE vibestack_dev OWNER TO postgres;
+ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
-\connect vibestack_dev
-\restrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
+\unrestrict POkNHVcosUOOoz1X5Em7IuDynW5asdgcCJVPHSrfgSCxcQwXVei58lFi8MhNs87
+\connect elevra_dev
+\restrict POkNHVcosUOOoz1X5Em7IuDynW5asdgcCJVPHSrfgSCxcQwXVei58lFi8MhNs87
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -7503,12 +7470,12 @@ CREATE PUBLICATION vibestack_pub FOR ALL TABLES WITH (publish = 'insert, update,
 ALTER PUBLICATION vibestack_pub OWNER TO postgres;
 
 --
--- Name: DATABASE vibestack_dev; Type: ACL; Schema: -; Owner: postgres
+-- Name: DATABASE elevra_dev; Type: ACL; Schema: -; Owner: postgres
 --
 
-GRANT CONNECT ON DATABASE vibestack_dev TO vibestack_app;
-GRANT CONNECT ON DATABASE vibestack_dev TO rls_test_user;
-GRANT CONNECT ON DATABASE vibestack_dev TO vibestack_app_user;
+GRANT CONNECT ON DATABASE elevra_dev TO vibestack_app;
+GRANT CONNECT ON DATABASE elevra_dev TO rls_test_user;
+GRANT CONNECT ON DATABASE elevra_dev TO vibestack_app_user;
 
 
 --
@@ -7669,7 +7636,40 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict W1y4NE4QrnY4N2HgvOLG9ESxrybC6n4CVDuLhVv7ozRgBcaZGbbob9H7kcviTxl
+\unrestrict POkNHVcosUOOoz1X5Em7IuDynW5asdgcCJVPHSrfgSCxcQwXVei58lFi8MhNs87
+
+--
+-- Database "postgres" dump
+--
+
+\connect postgres
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict MyYYgqBtmXe79JtbmNYd5cVLMMxhVF3EKrTCrraHOt6ZugDmdiMfvy9x4wIdxb7
+
+-- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict MyYYgqBtmXe79JtbmNYd5cVLMMxhVF3EKrTCrraHOt6ZugDmdiMfvy9x4wIdxb7
 
 --
 -- PostgreSQL database cluster dump complete
