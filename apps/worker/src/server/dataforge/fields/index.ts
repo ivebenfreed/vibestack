@@ -27,6 +27,8 @@ import * as rollupCount from './rollup_count';
 import * as rollupSum from './rollup_sum';
 import * as rollupAverage from './rollup_average';
 import * as rollupConcat from './rollup_concat';
+import * as computedFormula from './computed_formula';
+import * as computedExpression from './computed_expression';
 
 export const fieldTypes = {
   text,
@@ -54,7 +56,9 @@ export const fieldTypes = {
   'rollup_count': rollupCount,
   'rollup_sum': rollupSum,
   'rollup_average': rollupAverage,
-  'rollup_concat': rollupConcat
+  'rollup_concat': rollupConcat,
+  'computed_formula': computedFormula,
+  'computed_expression': computedExpression
 };
 
 export function getFieldHandler(type: string) {

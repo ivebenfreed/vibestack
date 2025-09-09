@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict Kuf60CumWzufwgQSbgLFabBfiDeeudLQ0h54MSpMvI17cDuS4gX9Q6sUDFa9Eyf
+\restrict Fux9EdgN8kho3kh1VMcnYTYBxSHGlGIS8jfLhgjeOMHIddKBk6wK3tXW0anEx3v
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict Kuf60CumWzufwgQSbgLFabBfiDeeudLQ0h54MSpMvI17cDuS4gX9Q6sUDFa9Eyf
+\unrestrict Fux9EdgN8kho3kh1VMcnYTYBxSHGlGIS8jfLhgjeOMHIddKBk6wK3tXW0anEx3v
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict jaKL9QEqee0egz0NFaE5cyI41kQy3FVuQFCansuh8oOL65rFiGLDWrkDfiGtOy5
+\restrict vIgdkWwzCahyvtQ9Ns4nfT24fWAR6pRsGe0EuEcrvbhjDtDl8lrqA7zaSmiJrXu
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jaKL9QEqee0egz0NFaE5cyI41kQy3FVuQFCansuh8oOL65rFiGLDWrkDfiGtOy5
+\unrestrict vIgdkWwzCahyvtQ9Ns4nfT24fWAR6pRsGe0EuEcrvbhjDtDl8lrqA7zaSmiJrXu
 
 --
 -- Database "postgres" dump
@@ -84,7 +84,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict hrBE64YG5SS2ajaQG2bMwXzirJm4fHJCCjTbMESkyaAq0xJzbUGAY1POxyTT3GQ
+\restrict QfMTWkDYIIkJxVSGojLr1Qnb3zAEOGr8W8estSpqw9itJ0sc7ILDAiU8ban7VRw
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -105,7 +105,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hrBE64YG5SS2ajaQG2bMwXzirJm4fHJCCjTbMESkyaAq0xJzbUGAY1POxyTT3GQ
+\unrestrict QfMTWkDYIIkJxVSGojLr1Qnb3zAEOGr8W8estSpqw9itJ0sc7ILDAiU8ban7VRw
 
 --
 -- Database "vibestack_dev" dump
@@ -115,7 +115,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict OLjjHmWoFC1PC0m6gcUrhVrWEaD3K4oFuZUvPeTal0aGK5NEsVZXpzHNAi6ieVL
+\restrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -141,9 +141,9 @@ CREATE DATABASE vibestack_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE
 
 ALTER DATABASE vibestack_dev OWNER TO postgres;
 
-\unrestrict OLjjHmWoFC1PC0m6gcUrhVrWEaD3K4oFuZUvPeTal0aGK5NEsVZXpzHNAi6ieVL
+\unrestrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
 \connect vibestack_dev
-\restrict OLjjHmWoFC1PC0m6gcUrhVrWEaD3K4oFuZUvPeTal0aGK5NEsVZXpzHNAi6ieVL
+\restrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1446,6 +1446,22 @@ $$;
 ALTER FUNCTION public.test_simplified_rls() OWNER TO postgres;
 
 --
+-- Name: update_dataforge_computed_fields_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.update_dataforge_computed_fields_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.update_dataforge_computed_fields_updated_at() OWNER TO postgres;
+
+--
 -- Name: update_organization_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -2083,6 +2099,193 @@ COMMENT ON TABLE public.custom_options IS 'Organization-specific option values w
 
 
 --
+-- Name: dataforge_computed_field_calculations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_computed_field_calculations (
+    id integer NOT NULL,
+    computed_field_id integer,
+    entity_id uuid NOT NULL,
+    calculated_value jsonb,
+    calculation_error text,
+    calculation_duration_ms integer,
+    context_snapshot jsonb,
+    created_at timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.dataforge_computed_field_calculations OWNER TO postgres;
+
+--
+-- Name: TABLE dataforge_computed_field_calculations; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.dataforge_computed_field_calculations IS 'Optional calculation history for monitoring and debugging';
+
+
+--
+-- Name: dataforge_computed_field_calculations_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.dataforge_computed_field_calculations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.dataforge_computed_field_calculations_id_seq OWNER TO postgres;
+
+--
+-- Name: dataforge_computed_field_calculations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.dataforge_computed_field_calculations_id_seq OWNED BY public.dataforge_computed_field_calculations.id;
+
+
+--
+-- Name: dataforge_computed_field_dependencies; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_computed_field_dependencies (
+    id integer NOT NULL,
+    computed_field_id integer,
+    depends_on_org_id uuid NOT NULL,
+    depends_on_entity_type text NOT NULL,
+    depends_on_field_name text NOT NULL,
+    dependency_type text DEFAULT 'field'::text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT dataforge_computed_field_dependencies_dependency_type_check CHECK ((dependency_type = ANY (ARRAY['field'::text, 'relationship'::text, 'computed'::text])))
+);
+
+
+ALTER TABLE public.dataforge_computed_field_dependencies OWNER TO postgres;
+
+--
+-- Name: TABLE dataforge_computed_field_dependencies; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.dataforge_computed_field_dependencies IS 'Tracks dependencies between computed fields and other fields';
+
+
+--
+-- Name: dataforge_computed_field_dependencies_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.dataforge_computed_field_dependencies_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.dataforge_computed_field_dependencies_id_seq OWNER TO postgres;
+
+--
+-- Name: dataforge_computed_field_dependencies_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.dataforge_computed_field_dependencies_id_seq OWNED BY public.dataforge_computed_field_dependencies.id;
+
+
+--
+-- Name: dataforge_computed_fields; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_computed_fields (
+    id integer NOT NULL,
+    org_id uuid NOT NULL,
+    entity_type text NOT NULL,
+    field_name text NOT NULL,
+    field_type text NOT NULL,
+    expression text NOT NULL,
+    dependencies jsonb DEFAULT '[]'::jsonb,
+    compute_location text DEFAULT 'backend'::text NOT NULL,
+    result_type text DEFAULT 'number'::text NOT NULL,
+    refresh_triggers jsonb DEFAULT '[]'::jsonb,
+    cache_results boolean DEFAULT true,
+    last_calculated timestamp without time zone,
+    calculation_error text,
+    is_active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT dataforge_computed_fields_compute_location_check CHECK ((compute_location = ANY (ARRAY['backend'::text, 'frontend'::text, 'hybrid'::text]))),
+    CONSTRAINT dataforge_computed_fields_field_type_check CHECK ((field_type = ANY (ARRAY['computed_formula'::text, 'computed_expression'::text]))),
+    CONSTRAINT dataforge_computed_fields_result_type_check CHECK ((result_type = ANY (ARRAY['number'::text, 'text'::text, 'boolean'::text, 'date'::text, 'json'::text])))
+);
+
+
+ALTER TABLE public.dataforge_computed_fields OWNER TO postgres;
+
+--
+-- Name: TABLE dataforge_computed_fields; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.dataforge_computed_fields IS 'Stores configuration for computed fields including expressions and dependencies';
+
+
+--
+-- Name: COLUMN dataforge_computed_fields.expression; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.dataforge_computed_fields.expression IS 'The mathematical or logical expression to evaluate';
+
+
+--
+-- Name: COLUMN dataforge_computed_fields.dependencies; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.dataforge_computed_fields.dependencies IS 'JSONB array of field names this computed field depends on';
+
+
+--
+-- Name: COLUMN dataforge_computed_fields.compute_location; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.dataforge_computed_fields.compute_location IS 'Whether computation happens on backend, frontend, or hybrid';
+
+
+--
+-- Name: COLUMN dataforge_computed_fields.refresh_triggers; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.dataforge_computed_fields.refresh_triggers IS 'JSONB array of events that trigger recalculation';
+
+
+--
+-- Name: COLUMN dataforge_computed_fields.cache_results; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.dataforge_computed_fields.cache_results IS 'Whether to store calculated values in the entity table';
+
+
+--
+-- Name: dataforge_computed_fields_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.dataforge_computed_fields_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.dataforge_computed_fields_id_seq OWNER TO postgres;
+
+--
+-- Name: dataforge_computed_fields_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.dataforge_computed_fields_id_seq OWNED BY public.dataforge_computed_fields.id;
+
+
+--
 -- Name: dataforge_relationship_fields; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2575,6 +2778,81 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_client REPLICA 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_client OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_computedorder; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_computedorder (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    item_price numeric NOT NULL,
+    quantity numeric DEFAULT 1 NOT NULL,
+    tax_rate numeric DEFAULT 0.1,
+    total_amount text,
+    total_with_tax text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_computedorder REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_computedorder OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_computedorderfixed; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_computedorderfixed (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    unit_price numeric NOT NULL,
+    quantity numeric DEFAULT 1 NOT NULL,
+    tax_rate numeric DEFAULT 0.08,
+    subtotal text,
+    total_with_tax text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_computedorderfixed REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_computedorderfixed OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_computedtestorder; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_computedtestorder (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    base_price numeric NOT NULL,
+    quantity numeric DEFAULT 1 NOT NULL,
+    discount_rate numeric DEFAULT 0.05,
+    subtotal text,
+    discounted_total text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_computedtestorder REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_computedtestorder OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_contract; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2805,6 +3083,36 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_expense REPLICA
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_expense OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_fieldtestentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_fieldtestentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    contact_email text NOT NULL,
+    website_url text,
+    phone_number text,
+    brand_color text,
+    budget_amount jsonb,
+    team_size numeric,
+    is_active boolean DEFAULT true,
+    description_rich text,
+    skill_tags text,
+    priority_level text DEFAULT 'medium'::text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_fieldtestentity REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_fieldtestentity OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_fieldvalidationtest; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2953,6 +3261,31 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_morningworkouts
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_morningworkouts OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_portfolio; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_portfolio (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    collection_type text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb,
+    active_project_count integer DEFAULT 0,
+    total_budget_amount numeric(15,2) DEFAULT 0,
+    average_progress numeric(15,4),
+    project_names_list text,
+    portfolio_description text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_portfolio REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_portfolio OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_productcatalog; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3057,6 +3390,31 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projectdashboar
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projectdashboardv2 OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_projectteam; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projectteam (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    start_date date,
+    end_date date,
+    budget numeric,
+    progress_percentage integer DEFAULT 0,
+    team_name text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projectteam REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projectteam OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_records; Type: TABLE; Schema: public; Owner: postgres
@@ -5377,6 +5735,27 @@ CREATE VIEW public.wide_corp_task_watchers AS
 ALTER VIEW public.wide_corp_task_watchers OWNER TO postgres;
 
 --
+-- Name: dataforge_computed_field_calculations id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_calculations ALTER COLUMN id SET DEFAULT nextval('public.dataforge_computed_field_calculations_id_seq'::regclass);
+
+
+--
+-- Name: dataforge_computed_field_dependencies id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_dependencies ALTER COLUMN id SET DEFAULT nextval('public.dataforge_computed_field_dependencies_id_seq'::regclass);
+
+
+--
+-- Name: dataforge_computed_fields id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_fields ALTER COLUMN id SET DEFAULT nextval('public.dataforge_computed_fields_id_seq'::regclass);
+
+
+--
 -- Name: endpoints endpoints_pkey; Type: CONSTRAINT; Schema: neon_control_plane; Owner: postgres
 --
 
@@ -5446,6 +5825,54 @@ ALTER TABLE ONLY public.custom_options
 
 ALTER TABLE ONLY public.custom_options
     ADD CONSTRAINT custom_options_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dataforge_computed_field_calculations dataforge_computed_field_calc_computed_field_id_entity_id_c_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_calculations
+    ADD CONSTRAINT dataforge_computed_field_calc_computed_field_id_entity_id_c_key UNIQUE (computed_field_id, entity_id, created_at);
+
+
+--
+-- Name: dataforge_computed_field_calculations dataforge_computed_field_calculations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_calculations
+    ADD CONSTRAINT dataforge_computed_field_calculations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dataforge_computed_field_dependencies dataforge_computed_field_depe_computed_field_id_depends_on__key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_dependencies
+    ADD CONSTRAINT dataforge_computed_field_depe_computed_field_id_depends_on__key UNIQUE (computed_field_id, depends_on_org_id, depends_on_entity_type, depends_on_field_name);
+
+
+--
+-- Name: dataforge_computed_field_dependencies dataforge_computed_field_dependencies_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_dependencies
+    ADD CONSTRAINT dataforge_computed_field_dependencies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dataforge_computed_fields dataforge_computed_fields_org_id_entity_type_field_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_fields
+    ADD CONSTRAINT dataforge_computed_fields_org_id_entity_type_field_name_key UNIQUE (org_id, entity_type, field_name);
+
+
+--
+-- Name: dataforge_computed_fields dataforge_computed_fields_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_fields
+    ADD CONSTRAINT dataforge_computed_fields_pkey PRIMARY KEY (id);
 
 
 --
@@ -5977,6 +6404,55 @@ CREATE INDEX idx_custom_options_set_id ON public.custom_options USING btree (opt
 --
 
 CREATE INDEX idx_custom_options_value ON public.custom_options USING btree (value);
+
+
+--
+-- Name: idx_dataforge_computed_field_calculations_cleanup; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_field_calculations_cleanup ON public.dataforge_computed_field_calculations USING btree (created_at);
+
+
+--
+-- Name: idx_dataforge_computed_field_dependencies_computed; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_field_dependencies_computed ON public.dataforge_computed_field_dependencies USING btree (computed_field_id);
+
+
+--
+-- Name: idx_dataforge_computed_field_dependencies_source; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_field_dependencies_source ON public.dataforge_computed_field_dependencies USING btree (depends_on_org_id, depends_on_entity_type, depends_on_field_name);
+
+
+--
+-- Name: idx_dataforge_computed_fields_active; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_fields_active ON public.dataforge_computed_fields USING btree (is_active) WHERE (is_active = true);
+
+
+--
+-- Name: idx_dataforge_computed_fields_dependencies; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_fields_dependencies ON public.dataforge_computed_fields USING gin (dependencies);
+
+
+--
+-- Name: idx_dataforge_computed_fields_org_entity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_fields_org_entity ON public.dataforge_computed_fields USING btree (org_id, entity_type);
+
+
+--
+-- Name: idx_dataforge_computed_fields_triggers; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dataforge_computed_fields_triggers ON public.dataforge_computed_fields USING gin (refresh_triggers);
 
 
 --
@@ -6575,6 +7051,13 @@ CREATE TRIGGER trigger_set_default_organization_for_new_member AFTER INSERT ON p
 
 
 --
+-- Name: dataforge_computed_fields update_dataforge_computed_fields_updated_at_trigger; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER update_dataforge_computed_fields_updated_at_trigger BEFORE UPDATE ON public.dataforge_computed_fields FOR EACH ROW EXECUTE FUNCTION public.update_dataforge_computed_fields_updated_at();
+
+
+--
 -- Name: import_mappings update_import_mappings_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -6627,6 +7110,22 @@ ALTER TABLE ONLY public.container_permission
 
 ALTER TABLE ONLY public.custom_options
     ADD CONSTRAINT custom_options_option_set_id_fkey FOREIGN KEY (option_set_id) REFERENCES public.custom_option_sets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dataforge_computed_field_calculations dataforge_computed_field_calculations_computed_field_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_calculations
+    ADD CONSTRAINT dataforge_computed_field_calculations_computed_field_id_fkey FOREIGN KEY (computed_field_id) REFERENCES public.dataforge_computed_fields(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dataforge_computed_field_dependencies dataforge_computed_field_dependencies_computed_field_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_computed_field_dependencies
+    ADD CONSTRAINT dataforge_computed_field_dependencies_computed_field_id_fkey FOREIGN KEY (computed_field_id) REFERENCES public.dataforge_computed_fields(id) ON DELETE CASCADE;
 
 
 --
@@ -7046,7 +7545,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OLjjHmWoFC1PC0m6gcUrhVrWEaD3K4oFuZUvPeTal0aGK5NEsVZXpzHNAi6ieVL
+\unrestrict OJmhJjYuNdUxNsrHgXMDCcPzuOnBUlhTckipECYMLltMtsTJGtVXd4FdTGK1IMj
 
 --
 -- PostgreSQL database cluster dump complete

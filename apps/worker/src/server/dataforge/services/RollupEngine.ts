@@ -10,23 +10,28 @@ import { sql } from 'kysely';
 import { getFieldHandler } from '../fields';
 import type { FieldDefinition } from '../types';
 import { EntityManager } from '../entity-operations/EntityManager';
+import { ExpressionEvaluator } from './ExpressionEvaluator';
 
 export interface RollupFieldConfig {
   entityName: string;
   fieldName: string;
-  type: 'count' | 'sum' | 'average' | 'concat';
+  type: 'count' | 'sum' | 'average' | 'concat' | 'computed_expression';
   relationshipType: string;
   targetEntityType: string;
   targetField?: string; // For sum, average, concat
   separator?: string; // For concat
   conditions?: Record<string, any>; // Additional filters
+  expression?: string; // For computed_expression rollups
+  computationContext?: Record<string, any>; // Additional context for expressions
 }
 
 export class RollupEngine {
   private entityManager: EntityManager;
+  private expressionEvaluator: ExpressionEvaluator;
   
   constructor(entityManager: EntityManager) {
     this.entityManager = entityManager;
+    this.expressionEvaluator = new ExpressionEvaluator();
   }
 
   /**
@@ -90,6 +95,9 @@ export class RollupEngine {
         
         case 'concat':
           return await this.calculateConcat(kysely, relationshipTable, targetTable, config, sourceEntityId);
+        
+        case 'computed_expression':
+          return await this.calculateComputedExpression(kysely, relationshipTable, targetTable, config, sourceEntityId);
         
         default:
           console.warn(`Unknown rollup type: ${config.type}`);
@@ -311,6 +319,71 @@ export class RollupEngine {
 
     const result = await query.executeTakeFirst();
     return String(result?.concatenated || '');
+  }
+
+  private async calculateComputedExpression(
+    kysely: Kysely<any>,
+    relationshipTable: string,
+    targetTable: string,
+    config: RollupFieldConfig,
+    sourceEntityId: string
+  ): Promise<any> {
+    if (!config.expression) {
+      console.warn(`No expression provided for computed rollup ${config.fieldName}`);
+      return null;
+    }
+
+    try {
+      // Get all related target entities
+      const relatedEntities = await kysely
+        .selectFrom(relationshipTable)
+        .innerJoin(targetTable, `${targetTable}.id`, `${relationshipTable}.target_entity_id`)
+        .selectAll(targetTable)
+        .where(`${relationshipTable}.source_entity_type`, '=', config.entityName)
+        .where(`${relationshipTable}.source_entity_id`, '=', sourceEntityId)
+        .where(`${relationshipTable}.relationship_type`, '=', config.relationshipType)
+        .where(`${relationshipTable}.target_entity_type`, '=', config.targetEntityType)
+        .where(`${relationshipTable}.valid_until`, 'is', null)
+        .execute();
+
+      // Build computation context with aggregated data
+      const context: Record<string, any> = {
+        // Related entities data
+        entities: relatedEntities,
+        count: relatedEntities.length,
+        
+        // Common aggregations for easy access
+        sum: (field: string) => relatedEntities.reduce((total, entity) => total + (Number(entity[field]) || 0), 0),
+        avg: (field: string) => {
+          const sum = relatedEntities.reduce((total, entity) => total + (Number(entity[field]) || 0), 0);
+          return relatedEntities.length > 0 ? sum / relatedEntities.length : 0;
+        },
+        max: (field: string) => Math.max(...relatedEntities.map(entity => Number(entity[field]) || 0)),
+        min: (field: string) => Math.min(...relatedEntities.map(entity => Number(entity[field]) || 0)),
+        
+        // Source entity context
+        $sourceEntityId: sourceEntityId,
+        $entityCount: relatedEntities.length,
+        $now: new Date(),
+        $today: new Date().toDateString(),
+        
+        // Additional computation context if provided
+        ...config.computationContext
+      };
+
+      // Evaluate the expression
+      const result = this.expressionEvaluator.evaluate(config.expression, context);
+      
+      if (result.error) {
+        console.error(`Computed rollup expression error for ${config.fieldName}:`, result.error);
+        return null;
+      }
+
+      return result.value;
+    } catch (error) {
+      console.error(`Error in computed rollup calculation for ${config.fieldName}:`, error);
+      return null;
+    }
   }
 
   // Private helper methods

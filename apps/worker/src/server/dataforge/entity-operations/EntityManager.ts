@@ -11,6 +11,8 @@ import { DDLGenerator } from '../DDLGenerator';
 import { BulkOperationsService, type BulkCreateOptions, type BulkCreateResult, type BulkUpdateResult, type BulkDeleteResult } from '../BulkOperationsService';
 import { ReferenceResolver } from '../services/ReferenceResolver';
 import { ArchetypeOperations } from '../services/ArchetypeOperations';
+import { ComputedFieldEngine } from '../services/ComputedFieldEngine';
+import { RollupEngine } from '../services/RollupEngine';
 
 export interface DataForgeEntityManagerConfig {
   kysely: any; // Kysely instance
@@ -49,6 +51,8 @@ export class DataForgeEntityManager {
   private bulkOperationsService: BulkOperationsService;
   private referenceResolver: ReferenceResolver;
   private archetypeOperations: ArchetypeOperations;
+  private computedFieldEngine: ComputedFieldEngine;
+  private rollupEngine: RollupEngine;
 
   constructor(config: DataForgeEntityManagerConfig) {
     this.config = config;
@@ -66,6 +70,19 @@ export class DataForgeEntityManager {
     
     // Initialize archetype operations
     this.archetypeOperations = new ArchetypeOperations({ env: config.env });
+    
+    // Initialize computed field engine 
+    this.computedFieldEngine = new ComputedFieldEngine(this);
+    
+    // Initialize rollup engine
+    this.rollupEngine = new RollupEngine(this);
+  }
+
+  /**
+   * Get Kysely instance for database operations
+   */
+  getKysely() {
+    return this.config.kysely;
   }
 
   /**
@@ -1351,6 +1368,22 @@ export class DataForgeEntityManager {
         // Don't fail entity creation if rollup registration fails
       }
       
+      // Register computed fields for automatic calculation
+      try {
+        const computedConfigs = await this.computedFieldEngine.registerComputedFields(
+          orgId, 
+          normalizedEntityName, 
+          mergedFields.allFields
+        );
+        
+        if (computedConfigs.length > 0) {
+          console.log(`[DataForgeEntityManager] Registered ${computedConfigs.length} computed fields for entity: ${normalizedEntityName}`);
+        }
+      } catch (error) {
+        console.warn(`[DataForgeEntityManager] Failed to register computed fields for entity ${normalizedEntityName}:`, error);
+        // Don't fail entity creation if computed field registration fails
+      }
+      
       return {
         success: true,
         data: {
@@ -2011,6 +2044,58 @@ export class DataForgeEntityManager {
     }
   }
 
+
+  /**
+   * Computed Field Integration Methods
+   */
+
+  /**
+   * Refresh computed fields for a specific entity record
+   */
+  async refreshComputedFields(orgId: string, entityName: string, entityId: string): Promise<void> {
+    try {
+      console.log(`[DataForgeEntityManager] Refreshing computed fields for ${entityName}:${entityId}`);
+      
+      // Refresh both computed fields and rollup fields
+      await Promise.all([
+        this.computedFieldEngine.refreshEntityComputedFields(this.config.kysely, orgId, entityName, entityId),
+        this.rollupEngine.refreshEntityRollups(this.config.kysely, orgId, entityName, entityId)
+      ]);
+      
+      console.log(`[DataForgeEntityManager] Completed computed field refresh for ${entityName}:${entityId}`);
+    } catch (error) {
+      console.error(`[DataForgeEntityManager] Error refreshing computed fields:`, error);
+    }
+  }
+
+  /**
+   * Handle field changes that may affect computed fields
+   */
+  async onFieldChange(orgId: string, entityType: string, entityId: string, changedField: string, newValue: any): Promise<void> {
+    try {
+      // Notify both engines of the field change
+      await Promise.all([
+        this.computedFieldEngine.onFieldChange(this.config.kysely, orgId, entityType, entityId, changedField, newValue),
+        this.rollupEngine.onTargetFieldChange(this.config.kysely, orgId, entityType, entityId, changedField)
+      ]);
+    } catch (error) {
+      console.error(`[DataForgeEntityManager] Error handling field change:`, error);
+    }
+  }
+
+  /**
+   * Get computed field engine for advanced operations
+   */
+  getComputedFieldEngine(): ComputedFieldEngine {
+    return this.computedFieldEngine;
+  }
+
+  /**
+   * Get rollup engine for advanced operations
+   */
+  getRollupEngine(): RollupEngine {
+    return this.rollupEngine;
+  }
 
   /**
    * Notify Legend State of schema changes to ensure proper synchronization
