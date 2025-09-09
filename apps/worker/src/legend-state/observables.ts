@@ -261,29 +261,67 @@ function createEntityObservable(entityName: string, schema?: any) {
   // This follows Session 17 plan: remove context switching, use schema metadata
   let actualOrgId: string
   let actualEntityName: string
+  let baseUrl: string
+  let isVirtual = schema?._isVirtual || false
   
-  if (entityName.includes('_')) {
-    // For prefixed entity names like "01920000-1000-7000-8000-000000000001_Task"
-    // extract the organization ID and base entity name for API calls
-    const parts = entityName.split('_')
-    if (parts.length === 2) {
-      actualOrgId = parts[0]
-      actualEntityName = parts[1]
-      
-      log.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
+  // **NEW: Handle virtual entities with different API patterns**
+  if (isVirtual) {
+    log.info(`[Observable] Creating virtual entity observable: ${entityName}`, {
+      isVirtual,
+      backendTables: schema._backendTables,
+      originalName: schema._originalName
+    })
+    
+    // Virtual entities use different API endpoints
+    if (entityName === 'SystemOption' || entityName.endsWith('_SystemOption')) {
+      // Global system options virtual entity
+      baseUrl = `/api/dataforge/system-options`
+      actualOrgId = schema._orgId || 'global'
+      actualEntityName = 'SystemOption'
+    } else if (entityName.includes('_') && entityName.endsWith('_CustomOption')) {
+      // Per-org custom options virtual entity
+      const parts = entityName.split('_')
+      actualOrgId = parts.slice(0, -1).join('_') // Handle UUIDs with dashes
+      actualEntityName = 'CustomOption'
+      baseUrl = `/api/dataforge/orgs/${actualOrgId}/custom-options`
+    } else if (entityName.startsWith('Virtual') && schema._entityReference) {
+      // Entity reference virtual entities (VirtualUser, VirtualProject, etc.)
+      // These map to existing business entity endpoints for dropdown data
+      actualOrgId = schema._orgId
+      actualEntityName = schema._targetEntityType  // Original business entity name
+      baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
     } else {
-      log.error(`[Observable] Invalid entity name format: ${entityName} - expected orgId_entityName`)
-      actualOrgId = 'unknown'
-      actualEntityName = entityName
+      // Fallback for other virtual entities
+      actualOrgId = schema._orgId || 'unknown'
+      actualEntityName = schema._originalName || entityName
+      baseUrl = `/api/dataforge/virtual/${actualEntityName.toLowerCase()}`
     }
   } else {
-    // Fallback for non-prefixed entities (shouldn't happen in universe schema)
-    log.warn(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
-    actualOrgId = schema?._organizationId || 'unknown'
-    actualEntityName = entityName
+    // Regular business entities
+    if (entityName.includes('_')) {
+      // For prefixed entity names like "01920000-1000-7000-8000-000000000001_Task"
+      // extract the organization ID and base entity name for API calls
+      const parts = entityName.split('_')
+      if (parts.length === 2) {
+        actualOrgId = parts[0]
+        actualEntityName = parts[1]
+        
+        log.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
+      } else {
+        log.error(`[Observable] Invalid entity name format: ${entityName} - expected orgId_entityName`)
+        actualOrgId = 'unknown'
+        actualEntityName = entityName
+      }
+    } else {
+      // Fallback for non-prefixed entities (shouldn't happen in universe schema)
+      log.warn(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
+      actualOrgId = schema?._organizationId || 'unknown'
+      actualEntityName = entityName
+    }
+    
+    baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
   }
   
-  const baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
   
   log.info(`[Observable] Creating entity observable for ${entityName}`, {
@@ -595,16 +633,31 @@ function createEntityObservable(entityName: string, schema?: any) {
           log.info(`[Observable] ${entityName} received test notification:`, notification)
         }
         
-        // Check if notification is for this entity
-        const isRelevantNotification = notification?.tables?.some((tableName: string) => {
-          const expectedTableName = entityName.toLowerCase() + 's'
-          return tableName === expectedTableName
-        })
+        // **NEW: Enhanced notification handling for virtual entities**
+        let isRelevantNotification = false
         
-        if (isRelevantNotification) {
-          if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+        if (isVirtual && schema._backendTables) {
+          // Virtual entities listen to their backend tables
+          isRelevantNotification = notification?.tables?.some((tableName: string) => {
+            return schema._backendTables.includes(tableName)
+          })
+          
+          if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+            log.info(`[Observable] Virtual entity ${entityName} sync triggered by backend table change:`, notification.tables)
+          }
+        } else {
+          // Regular entities use original logic
+          isRelevantNotification = notification?.tables?.some((tableName: string) => {
+            const expectedTableName = entityName.toLowerCase() + 's'
+            return tableName === expectedTableName
+          })
+          
+          if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
             log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
           }
+        }
+        
+        if (isRelevantNotification) {
           refresh()
         }
       }
@@ -758,6 +811,9 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     
     log.info(`[Observable] Universe context loaded with ${totalEntities} total entities across ${organizationIds.length} organizations`)
     
+    // **NEW: Add virtual entities for options system**
+    await addVirtualOptionsEntities(organizationIds)
+    
     // Initialize persistence configuration after schemas are loaded
     await initializePersistence(userId, organizationIds, totalEntities)
     
@@ -768,6 +824,123 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
       error: error instanceof Error ? error.message : 'Failed to load universe context'
     })
     throw error
+  }
+}
+
+/**
+ * Add virtual entities for system and custom options
+ * These expose existing database tables as synced observables
+ */
+async function addVirtualOptionsEntities(organizationIds: string[]) {
+  try {
+    log.info(`[Observable] Adding virtual options entities for ${organizationIds.length} organizations`)
+    
+    const currentUniverse = universeContext$.peek()
+    const existingOrganizations = { ...currentUniverse.organizations }
+    
+    // Add global SystemOption virtual entity to all organizations
+    organizationIds.forEach(orgId => {
+      const orgData = existingOrganizations[orgId]
+      if (orgData?.schema?.entities) {
+        // Add SystemOption virtual entity
+        orgData.schema.entities['SystemOption'] = {
+          archetype: 'record',
+          tableName: 'virtual_system_options',
+          syncableFields: {
+            id: { type: 'text', required: true },
+            option_type: { type: 'text', required: true }, // priority, status, category
+            archetype: { type: 'text', required: true },   // task, project, record
+            value: { type: 'text', required: true },        // high, medium, low
+            label: { type: 'text', required: true },        // "High Priority"
+            color: { type: 'text' },
+            icon: { type: 'text' },
+            order: { type: 'number', defaultValue: 0 },
+            is_active: { type: 'boolean', defaultValue: true },
+            created_at: { type: 'datetime' },
+            updated_at: { type: 'datetime' }
+          },
+          _isVirtual: true,
+          _backendTables: ['system_option_sets', 'system_options'],
+          _orgId: orgId,
+          _originalName: 'SystemOption'
+        }
+        
+        // Add CustomOption virtual entity per organization
+        orgData.schema.entities[`${orgId}_CustomOption`] = {
+          archetype: 'record',
+          tableName: `virtual_custom_options_${orgId}`,
+          syncableFields: {
+            id: { type: 'text', required: true },
+            option_set_name: { type: 'text', required: true }, // departments, teams
+            value: { type: 'text', required: true },
+            label: { type: 'text', required: true },
+            color: { type: 'text' },
+            icon: { type: 'text' },
+            order: { type: 'number', defaultValue: 0 },
+            is_active: { type: 'boolean', defaultValue: true },
+            created_at: { type: 'datetime' },
+            updated_at: { type: 'datetime' }
+          },
+          _isVirtual: true,
+          _backendTables: ['custom_option_sets', 'custom_options'],
+          _orgId: orgId,
+          _originalName: 'CustomOption'
+        }
+        
+        // **NEW: Add entity reference virtual entities for dropdowns**
+        // These expose existing business entities as reference options
+        const existingBusinessEntities = Object.keys(orgData.schema.entities)
+          .filter(entityName => !entityName.startsWith('System') && !entityName.endsWith('_CustomOption'))
+        
+        existingBusinessEntities.forEach(businessEntityName => {
+          // Create virtual reference entity (e.g., VirtualUser, VirtualTask, VirtualProject)
+          const virtualEntityName = `Virtual${businessEntityName}`
+          orgData.schema.entities[virtualEntityName] = {
+            archetype: 'record',
+            tableName: `virtual_${businessEntityName.toLowerCase()}_reference_${orgId}`,
+            syncableFields: {
+              id: { type: 'text', required: true },
+              title: { type: 'text', required: true },        // Main display field
+              name: { type: 'text' },                         // Alternative display field
+              email: { type: 'text' },                        // For users
+              status: { type: 'text' },                       // Current status
+              created_at: { type: 'datetime' },
+              updated_at: { type: 'datetime' }
+            },
+            _isVirtual: true,
+            _backendTables: [`org_${orgId.replace(/-/g, '_')}_${businessEntityName.toLowerCase()}`],
+            _orgId: orgId,
+            _originalName: businessEntityName,
+            _entityReference: true,                          // Mark as entity reference
+            _targetEntityType: businessEntityName           // What entity this references
+          }
+        })
+        
+        const businessEntityCount = existingBusinessEntities.length
+        log.info(`[Observable] Added SystemOption, CustomOption, and ${businessEntityCount} entity reference virtual entities for org ${orgId}`)
+      }
+    })
+    
+    // Update universe context with virtual entities
+    universeContext$.organizations.set(existingOrganizations)
+    
+    // Calculate total virtual entities: SystemOption + CustomOption + entity references per org
+    let totalVirtualEntities = 0
+    organizationIds.forEach(orgId => {
+      const orgData = existingOrganizations[orgId]
+      if (orgData?.schema?.entities) {
+        const businessEntityCount = Object.keys(orgData.schema.entities)
+          .filter(entityName => !entityName.startsWith('System') && !entityName.endsWith('_CustomOption') && !entityName.startsWith('Virtual'))
+          .length
+        totalVirtualEntities += 2 + businessEntityCount // SystemOption + CustomOption + entity references
+      }
+    })
+    
+    log.info(`[Observable] Added ${totalVirtualEntities} total virtual entities to universe schema`)
+    
+  } catch (error) {
+    log.error('[Observable] Failed to add virtual options entities:', error)
+    // Don't throw - this is not critical for basic functionality
   }
 }
 

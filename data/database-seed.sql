@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aQbZboaQJU3CCxs4IHbEKpvj0GHcOMaHhFjz5kkm21rad01aT3jOW5Dc3YUWBSN
+\restrict CadXatugb7NCZu9yuW7jRNIC3lWk9pMnwwaalxtgHVwDsaJieb4SmtLehgSZVRe
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -1563,5 +1563,5 @@ COPY public.verification (id, identifier, value, "expiresAt", "createdAt", "upda
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aQbZboaQJU3CCxs4IHbEKpvj0GHcOMaHhFjz5kkm21rad01aT3jOW5Dc3YUWBSN
+\unrestrict CadXatugb7NCZu9yuW7jRNIC3lWk9pMnwwaalxtgHVwDsaJieb4SmtLehgSZVRe
 

@@ -131,13 +131,21 @@ export class PassiveTableRenderer {
   private initializeReusableComponents() {
     log.info('🎯 PassiveTableRenderer: Initializing reusable components');
     
-    // REUSE: EditingOverlay with observable callbacks
+    // REUSE: EditingOverlay with direct observable access (new architecture)
     this.overlays.editing = new EditingOverlay(this.container, {
+      tableInteraction$: this.tableInteraction$,  // Direct access for self-contained commits
       onCommit: (value) => {
+        // Legacy fallback - should not be used with tableInteraction$ present
+        console.log('🔍 PassiveTableRenderer onCommit fallback received value:', value);
         this.tableInteraction$.updateEditValue(value);
-        this.tableInteraction$.saveEdit();
+        this.tableInteraction$.saveEdit(value);
       },
       onCancel: () => this.tableInteraction$.cancelEdit(),
+      onUpdate: (value) => {
+        // Update the observable on every keystroke so the current value is tracked
+        console.log('🔍 PassiveTableRenderer onUpdate received value:', value);
+        this.tableInteraction$.updateEditValue(value);
+      },
       onValidate: (value) => {
         // Custom validation logic can go here
         return { isValid: true };

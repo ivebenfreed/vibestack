@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { createPureObservables } from './stores/pure-observables';
 import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
+import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
 import type { Column } from './types';
 import { uiLog } from '@/logger';
 
@@ -293,6 +294,15 @@ export function VibeGridPure<T extends Record<string, any> = any>(
         <div className="p-2 mb-2 bg-green-100 text-green-700 rounded text-sm">
           ✅ Pure Observable VibeGrid initialized ({entityType})
         </div>
+      )}
+
+      {/* Header with menu components */}
+      {isInitialized && !error && observablesRef.current && (
+        <VibeGridXHeaderPure
+          tableCore$={observablesRef.current.tableCore$}
+          tableInteraction$={observablesRef.current.tableInteraction$}
+          enableGrouping={enableGrouping}
+        />
       )}
 
       {/* Main table container */}

@@ -15,6 +15,8 @@ interface EditingOverlayConfig {
   onCommit: (value: any) => void;
   onCancel: () => void;
   zIndex?: number;
+  // Direct access to table interactions for self-contained commits
+  tableInteraction$?: any;
   // Relationship context for dropdown editors
   relationshipContext?: {
     relationshipResolvers?: Record<string, (id: string | string[]) => string>;
@@ -198,7 +200,9 @@ export class EditingOverlay {
         onCommit: !!this.config.onCommit,
         onCancel: !!this.config.onCancel,
         onUpdate: !!this.config.onUpdate
-      }
+      },
+      hasTableInteraction: !!this.config.tableInteraction$,
+      useDirectCommit: !!this.config.tableInteraction$
     });
     
     // Get current row data for relationship context
@@ -221,9 +225,24 @@ export class EditingOverlay {
       cell,
       column,
       initialValue: value,
-      onCommit: this.config.onCommit,
+      onCommit: this.config.tableInteraction$ ? 
+        // Direct commit to observables (new architecture)
+        (value) => {
+          console.log('🔍 EditingOverlay direct commit with value:', value);
+          // Don't call updateEditValue here - saveEdit should use the passed value directly
+          this.config.tableInteraction$.saveEdit(value);
+        } :
+        // Fallback to renderer callback (old architecture)
+        this.config.onCommit,
       onCancel: this.config.onCancel,
-      onUpdate: this.config.onUpdate,
+      onUpdate: this.config.tableInteraction$ ?
+        // Direct update to observables (new architecture)
+        (value) => {
+          console.log('🔍 EditingOverlay direct onUpdate with value:', value);
+          this.config.tableInteraction$.updateEditValue(value);
+        } :
+        // Fallback to renderer callback (old architecture)
+        this.config.onUpdate,
       relationshipContext: enhancedRelationshipContext
     });
     

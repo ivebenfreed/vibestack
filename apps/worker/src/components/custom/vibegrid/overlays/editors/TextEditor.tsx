@@ -89,10 +89,14 @@ function TextEditorComponent({
   };
 
   const handleChange = (newValue: string) => {
+    console.log('🔍 TextEditor handleChange called with:', newValue);
     setValue(newValue);
     // Only call onUpdate if it's provided
     if (onUpdate) {
+      console.log('🔍 TextEditor calling onUpdate with:', newValue);
       onUpdate(newValue);
+    } else {
+      console.log('🔍 TextEditor onUpdate is not provided!');
     }
   };
 

@@ -2,6 +2,7 @@
  * Reactive hooks for the centralized options system
  */
 
+import React from 'react'
 import { use$ } from '@legendapp/state/react'
 import { OptionsManager, type SystemOption, type CustomOption } from './options-manager'
 import { stateLog } from '@/logger';
@@ -67,16 +68,17 @@ export function useCustomOptions(optionSetName: string, organizationId?: string)
 }
 
 /**
- * Universal hook that works with both system and custom options
+ * Universal hook that works with system, custom, and entity reference options
  */
 export function useReferenceOptions(config: {
-  referenceType: 'system' | 'custom'
+  referenceType: 'system' | 'custom' | 'user_reference' | 'entity_reference'
   systemOptionType?: string
   systemArchetype?: string
   customOptionSet?: string
+  referenceEntity?: string  // For entity references (e.g., 'User', 'Project')
   organizationId?: string
 }) {
-  const { referenceType, systemOptionType, systemArchetype, customOptionSet, organizationId } = config
+  const { referenceType, systemOptionType, systemArchetype, customOptionSet, referenceEntity, organizationId } = config
   
   if (referenceType === 'system' && systemOptionType && systemArchetype) {
     return useSystemOptions(systemOptionType, systemArchetype)
@@ -84,6 +86,11 @@ export function useReferenceOptions(config: {
   
   if (referenceType === 'custom' && customOptionSet) {
     return useCustomOptions(customOptionSet, organizationId)
+  }
+  
+  // **NEW: Handle entity reference types using virtual entities**
+  if ((referenceType === 'user_reference' || referenceType === 'entity_reference') && referenceEntity) {
+    return useEntityReferenceOptions(referenceEntity, organizationId)
   }
   
   // Fallback for invalid configuration
@@ -95,6 +102,51 @@ export function useReferenceOptions(config: {
     getOptionByValue: () => null,
     getOptionsByValues: () => [],
     resolveValue: () => null
+  }
+}
+
+/**
+ * Hook for entity reference options using virtual entities
+ */
+export function useEntityReferenceOptions(referenceEntity: string, organizationId?: string) {
+  const { getEntity$ } = require('../observables')
+  
+  // Use the virtual entity for the reference (e.g., VirtualUser, VirtualProject)  
+  const virtualEntityName = `Virtual${referenceEntity}`
+  const entityObs$ = getEntity$(virtualEntityName)
+  const entityData = use$(entityObs$)
+  
+  // Convert entity records to dropdown options
+  const options = React.useMemo(() => {
+    if (!entityData) return []
+    
+    const records = Object.values(entityData)
+    return records.map(record => ({
+      value: record.id,
+      label: record.title || record.name || record.email || record.id, // Fallback display field
+      record // Include full record for additional metadata
+    }))
+  }, [entityData])
+  
+  return {
+    options,
+    isLoading: !entityObs$, // Loading if entity observable not yet available
+    error: entityObs$ ? null : `Entity ${referenceEntity} not found`,
+    
+    // Helper functions
+    getOptionByValue: (value: string) => {
+      return options.find(opt => opt.value === value) || null
+    },
+    
+    getOptionsByValues: (values: string[]) => {
+      const optionMap = new Map(options.map(opt => [opt.value, opt]))
+      return values.map(value => optionMap.get(value)).filter(Boolean)
+    },
+    
+    resolveValue: (value: string) => {
+      const option = options.find(opt => opt.value === value)
+      return option ? option.label : value
+    }
   }
 }
 

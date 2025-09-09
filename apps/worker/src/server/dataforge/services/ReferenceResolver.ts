@@ -24,6 +24,8 @@ export class ReferenceResolver {
    * Resolve reference fields in query results
    */
   async resolveReferences(orgId: string, entityName: string, results: any[]): Promise<any[]> {
+    console.log(`🚨 [ReferenceResolver] resolveReferences called for ${entityName} with ${results?.length || 0} results - THIS SHOULD BE DISABLED!`);
+    
     if (!results || results.length === 0) {
       return results;
     }

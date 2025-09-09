@@ -63,6 +63,29 @@ export interface TableInteractionState {
   resizingColumn: string | null;
   resizeStartX: number;
   resizeStartWidth: number;
+  
+  // UI Menu/Dropdown State
+  headerMenuState: {
+    openMenu: string | null; // columnId of open menu
+    position: { x: number; y: number };
+    menuType: 'filter' | 'sort' | 'settings' | null;
+  };
+  
+  contextMenuState: {
+    isOpen: boolean;
+    position: { x: number; y: number };
+    context: 'cell' | 'row' | 'column' | 'header' | null;
+    targetId: string | null; // cellId, rowId, or columnId
+  };
+  
+  columnVisibilityMenuState: {
+    isOpen: boolean;
+    searchValue: string;
+  };
+  
+  groupConfigMenuState: {
+    isOpen: boolean;
+  };
 }
 
 export interface TableViewportState {
@@ -126,14 +149,163 @@ function applySorting(rows: any[], sortBy: SortConfig[]): any[] {
   });
 }
 
-async function applyGrouping(rows: any[], groupConfig: GroupConfig): Promise<any[]> {
+function applyGrouping(rows: any[], groupConfig: GroupConfig): any[] {
   if (!groupConfig || !groupConfig.fields || groupConfig.fields.length === 0) {
     return rows;
   }
   
-  // For now, return rows as-is until we implement grouping
-  // This will be replaced with actual grouping logic
-  return rows;
+  log.info('🎯 Applying grouping', { 
+    rowCount: rows.length, 
+    groupFields: groupConfig.fields.map(f => f.field) 
+  });
+  
+  // Create hierarchical groups based on multiple grouping fields
+  const groupTree = createGroupTree(rows, groupConfig.fields);
+  
+  // Flatten the tree into a virtual row array with group headers and data rows
+  const virtualRows = flattenGroupTree(groupTree, groupConfig.expandedGroups);
+  
+  log.info('🎯 Grouping applied', {
+    originalRows: rows.length,
+    virtualRows: virtualRows.length,
+    groupCount: countGroups(groupTree)
+  });
+  
+  return virtualRows;
+}
+
+function createGroupTree(rows: any[], groupFields: GroupField[]): GroupNode[] {
+  if (groupFields.length === 0) {
+    return rows; // Return raw rows when no grouping
+  }
+  
+  // Group by the first field
+  const firstField = groupFields[0];
+  const groups: Map<any, any[]> = new Map();
+  
+  for (const row of rows) {
+    const groupValue = row[firstField.field] || 'Ungrouped';
+    
+    if (!groups.has(groupValue)) {
+      groups.set(groupValue, []);
+    }
+    groups.get(groupValue)!.push(row);
+  }
+  
+  // Create group nodes
+  const groupNodes: GroupNode[] = [];
+  
+  for (const [groupValue, groupRows] of groups.entries()) {
+    const displayValue = formatGroupValue(groupValue, firstField.field);
+    const groupId = `group-${firstField.field}-${String(groupValue).replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
+    // Recursively create subgroups if there are more grouping fields
+    const children = groupFields.length > 1 
+      ? createGroupTree(groupRows, groupFields.slice(1))
+      : groupRows;
+    
+    const groupNode: GroupNode = {
+      id: groupId,
+      field: firstField.field,
+      value: groupValue,
+      displayValue: displayValue,
+      level: 0, // Will be set during flattening
+      rowCount: groupRows.length,
+      totalCount: groupRows.length,
+      children: children,
+      isCollapsed: false,
+      summary: {
+        count: groupRows.length,
+        field: firstField.field,
+        value: groupValue
+      }
+    };
+    
+    groupNodes.push(groupNode);
+  }
+  
+  // Sort groups if needed
+  groupNodes.sort((a, b) => {
+    return a.displayValue.localeCompare(b.displayValue);
+  });
+  
+  return groupNodes;
+}
+
+function flattenGroupTree(groupTree: GroupNode[], expandedGroups: Set<string>, level: number = 0): any[] {
+  const result: any[] = [];
+  
+  for (const node of groupTree) {
+    if (node.field && node.displayValue) { // This is a GroupNode
+      // Add the group header row
+      const groupHeaderRow = {
+        type: 'group',
+        id: node.id,
+        level: level,
+        data: node,
+        isExpandable: true,
+        isExpanded: expandedGroups.has(node.id)
+      };
+      
+      result.push(groupHeaderRow);
+      
+      // Add children if group is expanded
+      if (expandedGroups.has(node.id)) {
+        if (Array.isArray(node.children)) {
+          for (const child of node.children) {
+            if (child.field && child.displayValue) { // Another GroupNode
+              // Recursive group
+              result.push(...flattenGroupTree([child], expandedGroups, level + 1));
+            } else {
+              // Data row
+              result.push({
+                type: 'data',
+                id: child.id,
+                data: child,
+                level: level + 1,
+                parentGroupId: node.id
+              });
+            }
+          }
+        }
+      }
+    } else {
+      // Data row at root level (shouldn't happen with proper grouping)
+      result.push({
+        type: 'data',
+        id: node.id,
+        data: node,
+        level: level
+      });
+    }
+  }
+  
+  return result;
+}
+
+function formatGroupValue(value: any, field: string): string {
+  if (value === null || value === undefined) {
+    return 'Ungrouped';
+  }
+  
+  if (typeof value === 'string' && value.trim() === '') {
+    return 'Empty';
+  }
+  
+  return String(value);
+}
+
+function countGroups(groupTree: GroupNode[]): number {
+  let count = 0;
+  for (const node of groupTree) {
+    if (node.field && node.displayValue) { // This is a GroupNode
+      count++;
+      if (Array.isArray(node.children)) {
+        count += countGroups(node.children.filter(child => child.field && child.displayValue));
+      }
+    }
+  }
+  return count;
 }
 
 // ====================================
@@ -198,10 +370,10 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
       
-      // Skip async grouping in computed for now
-      // if (groupConfig) {
-      //   rows = applyGrouping(rows, groupConfig);
-      // }
+      // Apply grouping if configured
+      if (groupConfig) {
+        rows = applyGrouping(rows, groupConfig);
+      }
       
       log.info('🎯 Processed rows computed', {
         entityObservable: !!entityObs,
@@ -299,6 +471,86 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     setGroupConfig(config: GroupConfig | null) {
       tableCore$.groupConfig.set(config);
       log.info('🎯 Group config set', { config });
+    },
+    
+    toggleGroupExpansion(groupId: string) {
+      const groupConfig = tableCore$.groupConfig.get();
+      if (!groupConfig) return;
+      
+      const expandedGroups = new Set(groupConfig.expandedGroups);
+      
+      if (expandedGroups.has(groupId)) {
+        expandedGroups.delete(groupId);
+        log.info('🎯 Group collapsed', { groupId });
+      } else {
+        expandedGroups.add(groupId);
+        log.info('🎯 Group expanded', { groupId });
+      }
+      
+      tableCore$.groupConfig.set({
+        ...groupConfig,
+        expandedGroups
+      });
+    },
+    
+    expandAllGroups() {
+      const groupConfig = tableCore$.groupConfig.get();
+      if (!groupConfig) return;
+      
+      // This would require getting all group IDs from the processed rows
+      // For now, just log the intent
+      log.info('🎯 Expand all groups requested');
+      // TODO: Implement when we have access to all group IDs
+    },
+    
+    collapseAllGroups() {
+      const groupConfig = tableCore$.groupConfig.get();
+      if (!groupConfig) return;
+      
+      tableCore$.groupConfig.set({
+        ...groupConfig,
+        expandedGroups: new Set()
+      });
+      
+      log.info('🎯 All groups collapsed');
+    },
+    
+    // Column visibility methods
+    showAllColumns() {
+      const visibility = tableCore$.columnVisibility.get();
+      const allVisible = Object.fromEntries(
+        Object.keys(visibility).map(key => [key, true])
+      );
+      tableCore$.columnVisibility.set(allVisible);
+      log.info('🎯 All columns shown');
+    },
+    
+    hideAllColumns() {
+      const columns = tableCore$.columns.get();
+      const visibility = tableCore$.columnVisibility.get();
+      
+      // Only hide columns that are hideable (not required)
+      const newVisibility = Object.fromEntries(
+        Object.keys(visibility).map(key => {
+          const column = columns.find(col => col.id === key);
+          const canHide = column?.hideable !== false;
+          return [key, canHide ? false : visibility[key]];
+        })
+      );
+      
+      tableCore$.columnVisibility.set(newVisibility);
+      log.info('🎯 All hideable columns hidden');
+    },
+    
+    // Helper getters
+    get hiddenColumnCount() {
+      const visibility = tableCore$.columnVisibility.get();
+      return Object.values(visibility).filter(visible => visible === false).length;
+    },
+    
+    get visibleColumnCount() {
+      const visibility = tableCore$.columnVisibility.get();
+      return Object.values(visibility).filter(visible => visible !== false).length;
     }
   });
   
@@ -378,6 +630,29 @@ export function createTableInteraction$(tableCore$?: any) {
       startWidth: number;
       newWidth: number;
     } | null,
+    
+    // UI Menu/Dropdown State
+    headerMenuState: {
+      openMenu: null as string | null, // columnId of open menu
+      position: { x: 0, y: 0 },
+      menuType: null as 'filter' | 'sort' | 'settings' | null
+    },
+    
+    contextMenuState: {
+      isOpen: false,
+      position: { x: 0, y: 0 },
+      context: null as 'cell' | 'row' | 'column' | 'header' | null,
+      targetId: null as string | null // cellId, rowId, or columnId
+    },
+    
+    columnVisibilityMenuState: {
+      isOpen: false,
+      searchValue: ''
+    },
+    
+    groupConfigMenuState: {
+      isOpen: false
+    },
     
     // Direct manipulation methods
     selectCell(cellId: string, isMulti: boolean = false) {
@@ -621,9 +896,18 @@ export function createTableInteraction$(tableCore$?: any) {
       tableInteraction$.editValidation.set({ isValid, message });
     },
     
-    async saveEdit() {
+    async saveEdit(valueOverride?: any) {
       const cellId = tableInteraction$.editingCell.get();
-      const value = tableInteraction$.editValue.get();
+      // If valueOverride is provided, use it; otherwise use the current edit value
+      const value = valueOverride !== undefined ? valueOverride : tableInteraction$.editValue.get();
+      
+      console.log('🔍 saveEdit parameters:', { 
+        cellId, 
+        valueOverride, 
+        editValueFromObservable: tableInteraction$.editValue.get(),
+        finalValue: value,
+        usingOverride: valueOverride !== undefined
+      });
       
       if (cellId) {
         const [rowId, columnId] = cellId.split(':');
@@ -747,6 +1031,94 @@ export function createTableInteraction$(tableCore$?: any) {
     endColumnResize() {
       tableInteraction$.resizingColumn.set(null);
       log.info('🎯 Column resize ended');
+    },
+    
+    // Header Menu Methods
+    openHeaderMenu(columnId: string, position: { x: number; y: number }, menuType: 'filter' | 'sort' | 'settings') {
+      batch(() => {
+        tableInteraction$.headerMenuState.set({
+          openMenu: columnId,
+          position,
+          menuType
+        });
+      });
+      
+      log.info('🎯 Header menu opened', { columnId, position, menuType });
+    },
+    
+    closeHeaderMenu() {
+      tableInteraction$.headerMenuState.set({
+        openMenu: null,
+        position: { x: 0, y: 0 },
+        menuType: null
+      });
+      
+      log.info('🎯 Header menu closed');
+    },
+    
+    // Context Menu Methods
+    openContextMenu(context: 'cell' | 'row' | 'column' | 'header', targetId: string, position: { x: number; y: number }) {
+      batch(() => {
+        tableInteraction$.contextMenuState.set({
+          isOpen: true,
+          position,
+          context,
+          targetId
+        });
+      });
+      
+      log.info('🎯 Context menu opened', { context, targetId, position });
+    },
+    
+    closeContextMenu() {
+      tableInteraction$.contextMenuState.set({
+        isOpen: false,
+        position: { x: 0, y: 0 },
+        context: null,
+        targetId: null
+      });
+      
+      log.info('🎯 Context menu closed');
+    },
+    
+    // Column Visibility Menu Methods
+    openColumnVisibilityMenu() {
+      tableInteraction$.columnVisibilityMenuState.set({
+        isOpen: true,
+        searchValue: ''
+      });
+      
+      log.info('🎯 Column visibility menu opened');
+    },
+    
+    closeColumnVisibilityMenu() {
+      tableInteraction$.columnVisibilityMenuState.set({
+        isOpen: false,
+        searchValue: ''
+      });
+      
+      log.info('🎯 Column visibility menu closed');
+    },
+    
+    setColumnVisibilitySearch(searchValue: string) {
+      tableInteraction$.columnVisibilityMenuState.searchValue.set(searchValue);
+    },
+    
+    // Group Config Menu Methods
+    openGroupConfigMenu() {
+      tableInteraction$.groupConfigMenuState.set({
+        isOpen: true
+      });
+      
+      log.info('🎯 Group config menu opened');
+    },
+    
+    closeGroupConfigMenu() {
+      tableInteraction$.groupConfigMenuState.set({
+        isOpen: false
+      });
+      
+      log.info('🎯 Group config menu closed');
     }
   });
   
@@ -774,7 +1146,7 @@ export function createTableViewport$() {
     contentHeight: 0,
     
     // Visible range (computed from scroll)
-    visibleRange: function() {
+    visibleRange: computed(() => {
       const top = tableViewport$.scrollTop.get();
       const height = tableViewport$.viewportHeight.get();
       const rowHeight = 40; // TODO: Make this configurable
@@ -786,10 +1158,10 @@ export function createTableViewport$() {
         start: Math.max(0, start - 5), // 5 row buffer
         end: end + 5 // 5 row buffer
       };
-    },
+    }),
     
     // Visible columns (computed from horizontal scroll)
-    visibleColumns: function() {
+    visibleColumns: computed(() => {
       const left = tableViewport$.scrollLeft.get();
       const width = tableViewport$.viewportWidth.get();
       
@@ -798,7 +1170,7 @@ export function createTableViewport$() {
         start: 0,
         end: 20 // Show all columns for now
       };
-    },
+    }),
     
     // Direct manipulation methods
     updateScroll(top: number, left: number) {

@@ -23,7 +23,8 @@ export function ReferenceSelectEditor({
     referenceType: column.referenceType || 'system',
     systemOptionType: column.systemOptionType,
     systemArchetype: column.systemArchetype,
-    customOptionSet: column.customOptionSet
+    customOptionSet: column.customOptionSet,
+    referenceEntity: column.referenceEntity  // NEW: Pass entity reference info
   });
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function ReferenceSelectEditor({
       systemOptionType: column.systemOptionType,
       systemArchetype: column.systemArchetype,
       customOptionSet: column.customOptionSet,
+      referenceEntity: column.referenceEntity,  // NEW: Log entity reference
       optionsCount: options.length,
       isLoading,
       error,
