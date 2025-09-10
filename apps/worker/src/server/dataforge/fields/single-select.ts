@@ -77,3 +77,68 @@ export function getSqlDefault(definition: FieldDefinition): string | null {
   }
   return `'${String(defaultValue).replace(/'/g, "''")}'`;
 }
+
+// Enhanced metadata methods for UI integration
+export function getEditorMetadata(definition: FieldDefinition): any {
+  const options = (definition.enum || []).map(value => ({
+    value: value,
+    label: value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ')
+  }));
+
+  return {
+    type: 'select',
+    searchable: false,
+    clearable: !definition.required,
+    showValidationOnBlur: true,
+    options
+  };
+}
+
+export function getValidationMetadata(definition: FieldDefinition): any {
+  return {
+    messages: {
+      required: `${definition.name} is required`
+    },
+    enum: definition.enum || []
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): any {
+  return {
+    width: 200,
+    textAlign: 'left' as const
+  };
+}
+
+export function getCapabilities(): any {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: false,
+    supportsAggregation: false,
+    requiresSpecialEditor: false,
+    hasRichDisplay: false,
+    supportsValidation: true,
+    supportsFormatting: false
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): any {
+  return {
+    ariaLabel: `${definition.name} input`,
+    role: 'textbox'
+  };
+}
+
+// Export as enhanced field handler
+export const handler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata
+};
