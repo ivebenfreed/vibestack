@@ -1,12 +1,21 @@
 /**
- * Field Types - Simple file-based field system
+ * Field Types - Enhanced file-based field system
  * 
  * Each field type has its own file with all logic:
  * - getDefaultValue()
  * - validate() 
  * - getSqlType()
  * - getSqlDefault()
+ * 
+ * NEW: Enhanced metadata methods:
+ * - getValidationMetadata()
+ * - getDisplayMetadata() 
+ * - getEditorMetadata()
+ * - getCapabilities()
+ * - getAccessibilityMetadata()
  */
+
+export type { EnhancedFieldHandler, ValidationMetadata, DisplayMetadata, EditorMetadata, FieldCapabilities, AccessibilityMetadata } from './types';
 
 import * as text from './text';
 import * as richText from './rich-text';
@@ -29,6 +38,12 @@ import * as rollupAverage from './rollup_average';
 import * as rollupConcat from './rollup_concat';
 import * as computedFormula from './computed_formula';
 import * as computedExpression from './computed_expression';
+import * as priority from './priority';
+import * as status from './status';
+import * as json from './json';
+
+// Import types for enhanced handlers
+import type { EnhancedFieldHandler } from './types';
 
 export const fieldTypes = {
   text,
@@ -37,6 +52,7 @@ export const fieldTypes = {
   'rich_text': richText,  // alias
   date,
   datetime: date,  // alias
+  select: singleSelect,  // alias for generic select type
   'single-select': singleSelect,
   'single_select': singleSelect,  // alias
   'multi-select': multiSelect, 
@@ -58,9 +74,98 @@ export const fieldTypes = {
   'rollup_average': rollupAverage,
   'rollup_concat': rollupConcat,
   'computed_formula': computedFormula,
-  'computed_expression': computedExpression
+  'computed_expression': computedExpression,
+  priority,
+  'priority_set': priority,  // alias for archetype fields
+  status,
+  'status_set': status,  // alias for archetype fields
+  json,
+  jsonb: json  // alias
 };
 
 export function getFieldHandler(type: string) {
   return fieldTypes[type as keyof typeof fieldTypes] || null;
+}
+
+/**
+ * Get enhanced field handler with rich metadata support
+ * Checks if the field handler implements the enhanced interface
+ */
+export function getEnhancedFieldHandler(type: string): EnhancedFieldHandler | null {
+  const handler = getFieldHandler(type);
+  if (!handler) return null;
+  
+  // Check if handler implements enhanced interface
+  if (handler.getValidationMetadata && handler.getDisplayMetadata && handler.getEditorMetadata) {
+    return handler as EnhancedFieldHandler;
+  }
+  
+  // Return legacy handler wrapped with default metadata
+  return createLegacyWrapper(handler, type);
+}
+
+/**
+ * Wrap legacy handlers with default metadata implementations
+ */
+function createLegacyWrapper(handler: any, type: string): EnhancedFieldHandler {
+  return {
+    ...handler,
+    
+    getValidationMetadata: (definition: any) => ({
+      messages: {
+        required: `${definition.name} is required`
+      }
+    }),
+    
+    getDisplayMetadata: (definition: any) => ({
+      width: 200,
+      textAlign: 'left' as const
+    }),
+    
+    getEditorMetadata: (definition: any) => ({
+      type: mapTypeToEditor(type)
+    }),
+    
+    getCapabilities: () => ({
+      supportsSorting: true,
+      supportsFiltering: true,
+      supportsGrouping: false,
+      supportsAggregation: false,
+      requiresSpecialEditor: false,
+      hasRichDisplay: false,
+      supportsValidation: true,
+      supportsFormatting: false
+    }),
+    
+    getAccessibilityMetadata: (definition: any) => ({
+      ariaLabel: `${definition.name} input`,
+      role: 'textbox'
+    })
+  };
+}
+
+function mapTypeToEditor(type: string): 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'date' {
+  switch (type) {
+    case 'number':
+    case 'integer':
+    case 'decimal':
+      return 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'date':
+    case 'datetime':
+      return 'date';
+    case 'select':
+    case 'single-select':
+    case 'single_select':
+    case 'multi-select':
+    case 'multi_select':
+      return 'select';
+    case 'longtext':
+    case 'rich-text':
+    case 'rich_text':
+      return 'textarea';
+    default:
+      return 'text';
+  }
 }

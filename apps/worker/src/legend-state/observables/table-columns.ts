@@ -17,7 +17,9 @@ export interface TableColumn {
   id: string;
   label: string;
   width: number;
-  type: 'text' | 'number' | 'boolean' | 'date' | 'datetime' | 'select' | 'multiselect' | 'reference';
+  type: 'text' | 'number' | 'boolean' | 'date' | 'datetime' | 'currency' | 'select' | 'multiselect' | 'reference';
+  cellType?: string; // Original field type from schema for rendering
+  fieldSchema?: any; // Complete field schema for enhanced formatting
   required?: boolean;
   sortable?: boolean;
   editable?: boolean;
@@ -85,7 +87,11 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
       type: mapFieldType(field.type),
       required: field.required || false,
       sortable: true,
-      editable: !isSystemField  // System fields are not editable
+      editable: !isSystemField,  // System fields are not editable
+      // Add cellType to pass through the original field type for rendering
+      cellType: field.type,
+      // Attach field schema for enhanced formatting (colors, badges, etc.)
+      fieldSchema: field
     };
 
     // Handle reference fields
@@ -240,6 +246,8 @@ function mapFieldType(fieldType: string): TableColumn['type'] {
     case 'datetime':
     case 'timestamp':
       return 'datetime';
+    case 'currency':
+      return 'currency'; // Add currency type mapping
     case 'priority_option':
     case 'status_option':
     case 'task_type_option':
@@ -263,6 +271,8 @@ function getDefaultWidth(fieldType: string): number {
     case 'number':
     case 'integer':
       return 100;
+    case 'currency':
+      return 120; // Add currency width
     case 'date':
       return 120;
     case 'datetime':

@@ -1,14 +1,23 @@
 /**
- * Rollup Count Field Handler
+ * Rollup Count Field Handler - Frontend Calculation
  * 
- * Counts related records via relationships. Stores count as integer in database,
- * updated automatically when relationships change.
+ * Provides configuration for frontend calculation of count aggregations.
+ * Values are calculated in real-time from related records, not stored in database.
  */
 
 import type { FieldDefinition } from '../types';
+import type {
+  ValidationMetadata,
+  DisplayMetadata,
+  EditorMetadata,
+  FieldCapabilities,
+  AccessibilityMetadata,
+  EnhancedFieldHandler
+} from './types';
+import type { CalculationMetadata } from './rollup_sum';
 
 export function getDefaultValue(definition: FieldDefinition): any {
-  return definition.defaultValue || 0;
+  return 0; // Default count is always 0
 }
 
 export function validate(value: any, definition: FieldDefinition, context: any): { 
@@ -16,95 +25,101 @@ export function validate(value: any, definition: FieldDefinition, context: any):
   errors: any[]; 
   transformedValue?: any; 
 } {
-  const errors: any[] = [];
-  
-  // Handle null/undefined - use default
-  if (value == null || value === '') {
-    return {
-      valid: true,
-      errors: [],
-      transformedValue: 0
-    };
-  }
-
-  // Convert to integer
-  let count: number;
-  if (typeof value === 'string') {
-    count = parseInt(value, 10);
-    if (isNaN(count)) {
-      errors.push({
-        field: definition.name,
-        code: 'INVALID_COUNT',
-        message: `${definition.name} must be a valid number`,
-        value
-      });
-      return { valid: false, errors };
-    }
-  } else if (typeof value === 'number') {
-    count = Math.floor(value); // Ensure integer
-  } else {
-    errors.push({
-      field: definition.name,
-      code: 'INVALID_TYPE',
-      message: `${definition.name} must be a number`,
-      value
-    });
-    return { valid: false, errors };
-  }
-
-  // Validate non-negative
-  if (count < 0) {
-    errors.push({
-      field: definition.name,
-      code: 'NEGATIVE_COUNT',
-      message: `${definition.name} cannot be negative`,
-      value: count
-    });
-  }
-
-  // Validate rollup configuration
-  if (!definition.rollupConfig) {
-    errors.push({
-      field: definition.name,
-      code: 'MISSING_ROLLUP_CONFIG',
-      message: `Rollup field ${definition.name} requires rollupConfig`,
-      value
-    });
-  } else {
-    const config = definition.rollupConfig;
-    if (!config.relationshipType) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_RELATIONSHIP_TYPE',
-        message: `Rollup field ${definition.name} requires relationshipType in rollupConfig`,
-        value: config
-      });
-    }
-    
-    if (!config.targetEntityType) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_TARGET_ENTITY',
-        message: `Rollup field ${definition.name} requires targetEntityType in rollupConfig`,
-        value: config
-      });
-    }
-  }
-
+  // Rollup fields are read-only calculated values
   return {
-    valid: errors.length === 0,
-    errors,
-    transformedValue: count
+    valid: true,
+    errors: [],
+    transformedValue: typeof value === 'number' ? Math.max(0, Math.floor(value)) : 0
   };
 }
 
-export function getSqlType(definition: FieldDefinition): string {
-  return 'INTEGER';
+// Rollup fields don't create database columns - they're calculated frontend values
+export function getSqlType(definition: FieldDefinition): string | null {
+  return null; // No database storage
 }
 
 export function getSqlDefault(definition: FieldDefinition): string | null {
-  const defaultValue = definition.defaultValue || 0;
-  return String(defaultValue);
+  return null; // No database storage
+}
+
+// Frontend calculation metadata
+export function getCalculationMetadata(definition: FieldDefinition): CalculationMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    calculationType: 'count',
+    sourceRelationship: config.relationshipType || 'relates_to',
+    sourceEntityType: config.targetEntityType || 'Unknown',
+    sourceField: 'id', // Count records, not a specific field
+    conditions: config.conditions || {},
+    aggregationFunction: 'count',
+    realTimeUpdates: true
+  };
+}
+
+// Enhanced metadata methods for UI integration
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata {
+  return {
+    readOnly: true,
+    calculatedField: true,
+    messages: {
+      readOnly: `${definition.name} is automatically calculated and cannot be edited`,
+      calculation: 'This field shows the count of related records'
+    }
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    width: 100,
+    minWidth: 80,
+    textAlign: 'center',
+    format: 'integer',
+    showCalculationIndicator: true,
+    isReadOnly: true,
+    refreshOnDependencyChange: true,
+    placeholder: '0',
+    showTooltip: true,
+    tooltipContent: `Count of related ${config.targetEntityType || 'records'}`
+  };
+}
+
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
+  return {
+    type: 'calculated-display',
+    readOnly: true,
+    showCalculationStatus: true,
+    showRefreshButton: false, // Auto-refreshes
+    calculationIndicator: 'count'
+  };
+}
+
+export function getCapabilities(): FieldCapabilities {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: true, // Count fields are good for grouping
+    supportsAggregation: true, // Can aggregate counts (sum of counts)
+    requiresSpecialEditor: true, // Needs read-only calculated display
+    hasRichDisplay: true, // Shows calculation status
+    supportsValidation: false, // No user input validation
+    supportsFormatting: true,
+    isCalculatedField: true,
+    isRollupField: true
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    ariaLabel: `${definition.name} calculated count field`,
+    ariaDescription: `Automatically calculated count of related ${config.targetEntityType || 'records'}. This field is read-only.`,
+    role: 'status',
+    ariaLive: 'polite' // Announces when value changes
+  };
 }
 
 /**
@@ -115,14 +130,25 @@ export function isRollupField(): boolean {
 }
 
 /**
- * Get rollup configuration for this field
+ * Get rollup configuration for frontend calculation
  */
 export function getRollupConfig(definition: FieldDefinition): any {
-  return {
-    type: 'count',
-    relationshipType: definition.rollupConfig?.relationshipType || 'relates_to',
-    targetEntityType: definition.rollupConfig?.targetEntityType,
-    conditions: definition.rollupConfig?.conditions || {},
-    refreshTriggers: ['relationship_created', 'relationship_deleted']
-  };
+  return getCalculationMetadata(definition);
 }
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata,
+  // Rollup-specific methods
+  isRollupField,
+  getRollupConfig,
+  getCalculationMetadata
+};

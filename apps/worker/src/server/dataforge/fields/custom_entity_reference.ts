@@ -6,6 +6,14 @@
  */
 
 import type { FieldDefinition } from '../types';
+import type {
+  ValidationMetadata,
+  DisplayMetadata,
+  EditorMetadata,
+  FieldCapabilities,
+  AccessibilityMetadata,
+  EnhancedFieldHandler
+} from './types';
 import { RelationshipFieldHandler } from '../services/RelationshipFieldHandler';
 
 export function getDefaultValue(definition: FieldDefinition): any {
@@ -137,3 +145,100 @@ export function getRelationshipMetadata(fieldName: string, definition: FieldDefi
     entityName
   );
 }
+
+// NEW: Enhanced metadata methods for UI integration
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata {
+  const targetType = definition.targetEntityType || 'Entity';
+  const relationshipType = definition.relationshipType || 'relates_to';
+  
+  return {
+    entityReference: true,
+    targetEntityType: targetType,
+    relationshipType: relationshipType,
+    cardinality: definition.cardinality || 'many-to-one',
+    messages: {
+      required: `${definition.name} is required`,
+      invalid: `Please select a valid ${targetType}`,
+      custom: {
+        INVALID_ENTITY_ID: `${definition.name} must be a valid entity ID`,
+        INVALID_TARGET_TYPE: `Target entity type must be specified for ${definition.name}`,
+        INVALID_RELATIONSHIP_TYPE: `Invalid relationship type for ${definition.name}`,
+        INVALID_CARDINALITY: `Invalid cardinality for ${definition.name}`
+      }
+    }
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata {
+  const targetType = definition.targetEntityType || 'Entity';
+  
+  return {
+    width: 200,
+    minWidth: 150,
+    textAlign: 'left',
+    showTooltip: true,
+    placeholder: `Select ${targetType}`,
+    format: 'entity-reference',
+    entityType: targetType,
+    relationshipType: definition.relationshipType || 'relates_to'
+  };
+}
+
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
+  const targetType = definition.targetEntityType || 'Entity';
+  const isMultiple = definition.cardinality === 'one-to-many' || definition.cardinality === 'many-to-many';
+  
+  return {
+    type: 'entity-selector',
+    targetEntityType: targetType,
+    multiple: isMultiple,
+    searchable: true,
+    clearable: !definition.required,
+    showValidationOnBlur: true,
+    relationshipContext: {
+      relationshipType: definition.relationshipType || 'relates_to',
+      cardinality: definition.cardinality || 'many-to-one'
+    }
+  };
+}
+
+export function getCapabilities(): FieldCapabilities {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: true,
+    supportsAggregation: false, // No aggregation for relationships
+    requiresSpecialEditor: true, // Needs entity selector
+    hasRichDisplay: true, // Shows entity names, not IDs
+    supportsValidation: true,
+    supportsFormatting: false,
+    isRelationshipField: true
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
+  const targetType = definition.targetEntityType || 'Entity';
+  const relationshipType = definition.relationshipType || 'relates_to';
+  
+  return {
+    ariaLabel: `${definition.name} - select ${targetType} for ${relationshipType} relationship`,
+    ariaDescription: `Choose one or more ${targetType} entities to establish ${relationshipType} relationship`,
+    role: 'combobox'
+  };
+}
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata,
+  // Relationship-specific methods
+  isRelationshipField,
+  getRelationshipMetadata
+};

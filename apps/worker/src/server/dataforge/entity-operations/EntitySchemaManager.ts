@@ -25,6 +25,28 @@ export class EntitySchemaManager {
   }
 
   /**
+   * Generate background color from foreground color for badges
+   */
+  private getBackgroundColor(color: string): string {
+    if (!color) return '#f3f4f6'; // Default gray background
+    
+    // Convert hex colors to light background variants
+    const colorMap: Record<string, string> = {
+      '#22c55e': '#dcfce7', // green
+      '#10b981': '#d1fae5', // emerald  
+      '#f59e0b': '#fef3c7', // yellow
+      '#ef4444': '#fee2e2', // red
+      '#dc2626': '#fee2e2', // dark red
+      '#3b82f6': '#dbeafe', // blue
+      '#8b5cf6': '#e5e7eb', // purple
+      '#06b6d4': '#cffafe', // cyan
+      '#6b7280': '#f3f4f6', // gray
+    };
+    
+    return colorMap[color] || '#f3f4f6';
+  }
+
+  /**
    * Get entity configuration for rules engine (with caching)
    */
   async getEntityConfig(orgId: string, entityName: string): Promise<any> {
@@ -641,7 +663,7 @@ export class EntitySchemaManager {
    */
   async getSchema(orgId: string): Promise<any> {
     try {
-      console.log(`[EntitySchemaManager] Getting schema for org: ${orgId}`);
+      console.log(`[EntitySchemaManager] Getting enhanced schema for org: ${orgId}`);
       
       const entities = await this.config.kysely
         .selectFrom('entity_schemas')
@@ -653,21 +675,140 @@ export class EntitySchemaManager {
       console.log(`[EntitySchemaManager] Found ${entities.length} entities from database`);
       console.log(`[EntitySchemaManager] Entity names:`, entities.map((e: any) => e.entity_name).sort());
 
-      const schema = entities.map((entity: any) => ({
-        entityName: entity.entity_name,
-        archetype: entity.archetype,
-        tableName: entity.table_name,
-        businessMetadata: entity.business_metadata,
-        createdAt: entity.created_at,
-        updatedAt: entity.updated_at
+      // Import field handler for enhanced processing
+      const { getEnhancedFieldHandler } = await import('../fields');
+
+      const enhancedSchema = await Promise.all(entities.map(async (entity: any) => {
+        try {
+          // Get the stored entity definition
+          let storedFields: any[] = [];
+          if (entity.business_metadata?.allFields) {
+            storedFields = entity.business_metadata.allFields;
+          } else if (entity.business_metadata?.baseFields && entity.business_metadata?.customFields) {
+            storedFields = [...entity.business_metadata.baseFields, ...entity.business_metadata.customFields];
+          } else {
+            // Fallback: get archetype fields for older entities
+            const archetypeFields = await this.getArchetypeFields(entity.archetype);
+            storedFields = Object.values(archetypeFields);
+          }
+
+          // Process each field through enhanced field handlers
+          const enhancedFields = await Promise.all(storedFields.map(async (field: any) => {
+            try {
+              const handler = getEnhancedFieldHandler(field.type);
+              
+              // Extract all enhanced metadata
+              let enhancedField = {
+                name: field.name,
+                type: field.type,
+                required: field.required || false,
+                defaultValue: handler.getDefaultValue ? handler.getDefaultValue(field) : field.defaultValue,
+                
+                // Enhanced metadata from handlers
+                validation: handler.getValidationMetadata ? handler.getValidationMetadata(field) : {},
+                display: handler.getDisplayMetadata ? handler.getDisplayMetadata(field) : {},
+                editor: handler.getEditorMetadata ? handler.getEditorMetadata(field) : {},
+                capabilities: handler.getCapabilities ? handler.getCapabilities() : {},
+                accessibility: handler.getAccessibilityMetadata ? handler.getAccessibilityMetadata(field) : {},
+                
+                // Include original field definition
+                ...field
+              };
+
+              // Special handling for field set fields (priority, status, etc.)
+              if (field.isFieldSet && field.fieldSetType && field.fieldSetRef) {
+                try {
+                  // Load options from the options API (using same query as options endpoint)
+                  const options = await this.config.kysely
+                    .selectFrom('custom_options')
+                    .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+                    .select([
+                      'custom_options.value as option_key', 
+                      'custom_options.label', 
+                      'custom_options.description', 
+                      'custom_options.color', 
+                      'custom_options.icon', 
+                      'custom_options.sort_order'
+                    ])
+                    .where('custom_option_sets.org_id', '=', orgId)
+                    .where('custom_option_sets.option_set_type', '=', field.fieldSetType)
+                    .where('custom_options.is_active', '=', true)
+                    .orderBy('custom_options.sort_order', 'asc')
+                    .orderBy('custom_options.label', 'asc')
+                    .execute();
+
+                  if (options.length > 0) {
+                    // Populate editor metadata with options and colors
+                    enhancedField.editor = {
+                      type: 'select',
+                      searchable: false,
+                      clearable: false,
+                      showValidationOnBlur: true,
+                      options: options.map((opt: any) => ({
+                        value: opt.option_key,
+                        label: opt.label,
+                        color: opt.color,
+                        backgroundColor: this.getBackgroundColor(opt.color),
+                        icon: opt.icon,
+                        description: opt.description
+                      }))
+                    };
+
+                    // Also populate validation enum values
+                    enhancedField.validation = {
+                      ...enhancedField.validation,
+                      enum: options.map((opt: any) => opt.option_key)
+                    };
+                  }
+                } catch (optionsError) {
+                  console.warn(`[EntitySchemaManager] Failed to load options for field ${field.name}:`, optionsError);
+                }
+              }
+
+              return enhancedField;
+            } catch (fieldError) {
+              console.warn(`[EntitySchemaManager] Failed to enhance field ${field.name}:`, fieldError);
+              // Return original field if enhancement fails
+              return field;
+            }
+          }));
+
+          return {
+            entityName: entity.entity_name,
+            archetype: entity.archetype,
+            tableName: entity.table_name,
+            businessMetadata: entity.business_metadata,
+            createdAt: entity.created_at,
+            updatedAt: entity.updated_at,
+            
+            // Enhanced field definitions with metadata
+            fields: enhancedFields,
+            fieldCount: enhancedFields.length
+          };
+        } catch (entityError) {
+          console.error(`[EntitySchemaManager] Failed to enhance entity ${entity.entity_name}:`, entityError);
+          // Return basic entity info if enhancement fails
+          return {
+            entityName: entity.entity_name,
+            archetype: entity.archetype,
+            tableName: entity.table_name,
+            businessMetadata: entity.business_metadata,
+            createdAt: entity.created_at,
+            updatedAt: entity.updated_at,
+            fields: [],
+            fieldCount: 0
+          };
+        }
       }));
 
-      return { success: true, data: schema };
+      console.log(`[EntitySchemaManager] Enhanced schema with field metadata for ${enhancedSchema.length} entities`);
+
+      return { success: true, data: enhancedSchema };
     } catch (error) {
-      console.error(`[EntitySchemaManager] Error getting schema:`, error);
+      console.error(`[EntitySchemaManager] Error getting enhanced schema:`, error);
       return {
         success: false,
-        error: 'Failed to get schema',
+        error: 'Failed to get enhanced schema',
         details: error instanceof Error ? error.message : 'Unknown error'
       };
     }

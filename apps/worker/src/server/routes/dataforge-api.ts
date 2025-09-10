@@ -20,6 +20,55 @@ export const dataforgeRouter = new Hono<AppContext>();
 dataforgeRouter.use('/orgs/:orgId/*', hybridRLSOrgActorMiddleware);
 
 // =============================================================================
+// 0. SYSTEM OPTIONS ENDPOINTS - Global field type options
+// =============================================================================
+
+// Get system options for field types (used by frontend components)
+dataforgeRouter.get('/system-options/:optionType', async (c) => {
+  const { optionType } = c.req.param();
+  
+  try {
+    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const kysely = createKyselyForPersistentUse();
+    
+    // Get system options for the specified type
+    const options = await kysely
+      .selectFrom('system_options')
+      .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
+      .select([
+        'system_options.value as option_key',
+        'system_options.label',
+        'system_options.description',
+        'system_options.color',
+        'system_options.icon',
+        'system_options.sort_order',
+        'system_options.is_active'
+      ])
+      .where('system_option_sets.option_set_type', '=', optionType)
+      .where('system_options.is_active', '=', true)
+      .orderBy('system_options.sort_order', 'asc')
+      .execute();
+    
+    return c.json({
+      success: true,
+      data: options,
+      metadata: {
+        optionType,
+        count: options.length,
+        source: 'system'
+      }
+    });
+  } catch (error) {
+    console.error(`[SystemOptions] Failed to fetch system options for ${optionType}:`, error);
+    return c.json({ 
+      success: false, 
+      error: 'Failed to fetch system options',
+      optionType 
+    }, 500);
+  }
+});
+
+// =============================================================================
 // 1. ARCHETYPES ENDPOINTS - Discover available entity types
 // =============================================================================
 

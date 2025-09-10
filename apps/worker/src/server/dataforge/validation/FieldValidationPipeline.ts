@@ -349,14 +349,43 @@ export class ConstraintValidator implements IFieldValidator {
 
       // Enum validation
       if (fieldDef.enum && fieldDef.enum.length > 0) {
-        if (!fieldDef.enum.includes(value)) {
-          errors.push({
-            field: fieldName,
-            code: 'INVALID_ENUM',
-            message: `Field '${fieldName}' must be one of: ${fieldDef.enum.join(', ')}`,
-            value,
-            constraint: fieldDef.enum
-          });
+        // Handle multi-select fields (arrays)
+        if (fieldDef.type === 'multi-select' || fieldDef.type === 'multi_select') {
+          if (Array.isArray(value)) {
+            const invalidValues = value.filter(val => !fieldDef.enum!.includes(String(val)));
+            if (invalidValues.length > 0) {
+              errors.push({
+                field: fieldName,
+                code: 'INVALID_ENUM',
+                message: `Field '${fieldName}' contains invalid options: ${invalidValues.join(', ')}. Must be from: ${fieldDef.enum.join(', ')}`,
+                value: invalidValues,
+                constraint: fieldDef.enum
+              });
+            }
+          } else {
+            // Single value for multi-select field - convert to array and validate
+            const singleValue = String(value);
+            if (!fieldDef.enum.includes(singleValue)) {
+              errors.push({
+                field: fieldName,
+                code: 'INVALID_ENUM',
+                message: `Field '${fieldName}' contains invalid options: ${singleValue}. Must be from: ${fieldDef.enum.join(', ')}`,
+                value: [singleValue],
+                constraint: fieldDef.enum
+              });
+            }
+          }
+        } else {
+          // Single-select field validation
+          if (!fieldDef.enum.includes(value)) {
+            errors.push({
+              field: fieldName,
+              code: 'INVALID_ENUM',
+              message: `Field '${fieldName}' must be one of: ${fieldDef.enum.join(', ')}`,
+              value,
+              constraint: fieldDef.enum
+            });
+          }
         }
       }
     }
@@ -541,16 +570,16 @@ export class FieldTypeValidator implements IFieldValidator {
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
 
-    // Import the simple field system
-    const { getFieldHandler } = await import('../fields');
+    // Import the enhanced field system
+    const { getEnhancedFieldHandler } = await import('../fields');
 
-    // Validate each field using field handlers
-    console.log(`🔍 [FieldValidationPipeline] Starting validation for ${context.fields.size} fields`);
+    // Validate each field using enhanced field handlers
+    console.log(`🔍 [FieldValidationPipeline] Starting enhanced validation for ${context.fields.size} fields`);
     for (const [fieldName, fieldDef] of context.fields) {
       const value = context.data[fieldName];
       console.log(`🔍 [FieldValidationPipeline] Field: ${fieldName}, Type: ${fieldDef.type}, Value: ${value}`);
       
-      const fieldHandler = getFieldHandler(fieldDef.type);
+      const fieldHandler = getEnhancedFieldHandler(fieldDef.type);
       console.log(`🔍 [FieldValidationPipeline] Field handler found: ${!!fieldHandler}`);
       if (fieldHandler) {
         console.log(`🔍 [FieldValidationPipeline] Calling validation for ${fieldName}`);

@@ -1,14 +1,23 @@
 /**
- * Rollup Average Field Handler
+ * Rollup Average Field Handler - Frontend Calculation
  * 
- * Calculates average of numeric values from related records via relationships.
- * Stores average as decimal in database, updated automatically when relationships or target field values change.
+ * Provides configuration for frontend calculation of average aggregations.
+ * Values are calculated in real-time from related records, not stored in database.
  */
 
 import type { FieldDefinition } from '../types';
+import type {
+  ValidationMetadata,
+  DisplayMetadata,
+  EditorMetadata,
+  FieldCapabilities,
+  AccessibilityMetadata,
+  EnhancedFieldHandler
+} from './types';
+import type { CalculationMetadata } from './rollup_sum';
 
 export function getDefaultValue(definition: FieldDefinition): any {
-  return definition.defaultValue || 0;
+  return 0; // Default average is always 0
 }
 
 export function validate(value: any, definition: FieldDefinition, context: any): { 
@@ -16,123 +25,103 @@ export function validate(value: any, definition: FieldDefinition, context: any):
   errors: any[]; 
   transformedValue?: any; 
 } {
-  const errors: any[] = [];
-  
-  // Handle null/undefined - use default
-  if (value == null || value === '') {
-    return {
-      valid: true,
-      errors: [],
-      transformedValue: 0
-    };
-  }
-
-  // Convert to number
-  let average: number;
-  if (typeof value === 'string') {
-    average = parseFloat(value);
-    if (isNaN(average)) {
-      errors.push({
-        field: definition.name,
-        code: 'INVALID_AVERAGE',
-        message: `${definition.name} must be a valid number`,
-        value
-      });
-      return { valid: false, errors };
-    }
-  } else if (typeof value === 'number') {
-    average = value;
-  } else {
-    errors.push({
-      field: definition.name,
-      code: 'INVALID_TYPE',
-      message: `${definition.name} must be a number`,
-      value
-    });
-    return { valid: false, errors };
-  }
-
-  // Validate precision if specified
-  if (definition.precision && typeof definition.precision === 'number') {
-    const factor = Math.pow(10, definition.precision);
-    average = Math.round(average * factor) / factor;
-  }
-
-  // Validate range if specified
-  if (definition.min !== undefined && average < definition.min) {
-    errors.push({
-      field: definition.name,
-      code: 'BELOW_MINIMUM',
-      message: `${definition.name} must be at least ${definition.min}`,
-      value: average,
-      constraint: definition.min
-    });
-  }
-
-  if (definition.max !== undefined && average > definition.max) {
-    errors.push({
-      field: definition.name,
-      code: 'ABOVE_MAXIMUM',
-      message: `${definition.name} must be at most ${definition.max}`,
-      value: average,
-      constraint: definition.max
-    });
-  }
-
-  // Validate rollup configuration
-  if (!definition.rollupConfig) {
-    errors.push({
-      field: definition.name,
-      code: 'MISSING_ROLLUP_CONFIG',
-      message: `Rollup field ${definition.name} requires rollupConfig`,
-      value
-    });
-  } else {
-    const config = definition.rollupConfig;
-    if (!config.relationshipType) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_RELATIONSHIP_TYPE',
-        message: `Rollup field ${definition.name} requires relationshipType in rollupConfig`,
-        value: config
-      });
-    }
-    
-    if (!config.targetEntityType) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_TARGET_ENTITY',
-        message: `Rollup field ${definition.name} requires targetEntityType in rollupConfig`,
-        value: config
-      });
-    }
-    
-    if (!config.targetField) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_TARGET_FIELD',
-        message: `Rollup average field ${definition.name} requires targetField in rollupConfig`,
-        value: config
-      });
-    }
-  }
-
+  // Rollup fields are read-only calculated values
   return {
-    valid: errors.length === 0,
-    errors,
-    transformedValue: average
+    valid: true,
+    errors: [],
+    transformedValue: typeof value === 'number' ? value : 0
   };
 }
 
-export function getSqlType(definition: FieldDefinition): string {
-  const precision = definition.precision || 4;
-  const scale = definition.scale || precision;
-  return `DECIMAL(15, ${scale})`; // Support decimal precision for averages
+// Rollup fields don't create database columns - they're calculated frontend values
+export function getSqlType(definition: FieldDefinition): string | null {
+  return null; // No database storage
 }
 
 export function getSqlDefault(definition: FieldDefinition): string | null {
-  const defaultValue = definition.defaultValue || 0;
-  return String(defaultValue);
+  return null; // No database storage
+}
+
+// Frontend calculation metadata
+export function getCalculationMetadata(definition: FieldDefinition): CalculationMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    calculationType: 'average',
+    sourceRelationship: config.relationshipType || 'relates_to',
+    sourceEntityType: config.targetEntityType || 'Unknown',
+    sourceField: config.targetField || 'amount',
+    conditions: config.conditions || {},
+    aggregationFunction: 'average',
+    realTimeUpdates: true,
+    precision: definition.precision || 2
+  };
+}
+
+// Enhanced metadata methods for UI integration
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata {
+  return {
+    readOnly: true,
+    calculatedField: true,
+    messages: {
+      readOnly: `${definition.name} is automatically calculated and cannot be edited`,
+      calculation: 'This field shows the average of related values'
+    }
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    width: 140,
+    minWidth: 100,
+    textAlign: 'right',
+    format: 'number',
+    precision: definition.precision || 2,
+    showCalculationIndicator: true,
+    isReadOnly: true,
+    refreshOnDependencyChange: true,
+    placeholder: '0.00',
+    showTooltip: true,
+    tooltipContent: `Average of ${config.targetField || 'values'} from related ${config.targetEntityType || 'records'}`
+  };
+}
+
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
+  return {
+    type: 'calculated-display',
+    readOnly: true,
+    showCalculationStatus: true,
+    showRefreshButton: false, // Auto-refreshes
+    calculationIndicator: 'average'
+  };
+}
+
+export function getCapabilities(): FieldCapabilities {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: false,
+    supportsAggregation: true, // Can aggregate averages
+    requiresSpecialEditor: true, // Needs read-only calculated display
+    hasRichDisplay: true, // Shows calculation status and formatting
+    supportsValidation: false, // No user input validation
+    supportsFormatting: true,
+    isCalculatedField: true,
+    isRollupField: true
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    ariaLabel: `${definition.name} calculated average field`,
+    ariaDescription: `Automatically calculated average of ${config.targetField || 'values'} from related ${config.targetEntityType || 'records'}. This field is read-only.`,
+    role: 'status',
+    ariaLive: 'polite' // Announces when value changes
+  };
 }
 
 /**
@@ -143,15 +132,25 @@ export function isRollupField(): boolean {
 }
 
 /**
- * Get rollup configuration for this field
+ * Get rollup configuration for frontend calculation
  */
 export function getRollupConfig(definition: FieldDefinition): any {
-  return {
-    type: 'average',
-    relationshipType: definition.rollupConfig?.relationshipType || 'relates_to',
-    targetEntityType: definition.rollupConfig?.targetEntityType,
-    targetField: definition.rollupConfig?.targetField,
-    conditions: definition.rollupConfig?.conditions || {},
-    refreshTriggers: ['relationship_created', 'relationship_deleted', 'target_field_updated']
-  };
+  return getCalculationMetadata(definition);
 }
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata,
+  // Rollup-specific methods
+  isRollupField,
+  getRollupConfig,
+  getCalculationMetadata
+};

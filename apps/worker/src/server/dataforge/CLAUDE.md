@@ -158,10 +158,10 @@ fields/
 
 ### Field Handler Interface
 
-Each field type exports four standard functions:
+Each field type exports enhanced field handler functions with comprehensive UI metadata support:
 
 ```typescript
-// Example: fields/email.ts
+// Example: fields/email.ts - Enhanced field handler
 export function validate(value: any, definition: FieldDefinition, context: any): {
   valid: boolean;
   errors: any[];
@@ -170,9 +170,29 @@ export function validate(value: any, definition: FieldDefinition, context: any):
 
 export function getDefaultValue(definition: FieldDefinition): any
 
-export function getSqlType(definition: FieldDefinition): string
+export function getSqlType(definition: FieldDefinition): string | null  // null for relationship/rollup fields
 
 export function getSqlDefault(definition: FieldDefinition): string | null
+
+// Enhanced metadata methods for UI integration
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata  
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata
+export function getCapabilities(): FieldCapabilities
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata
+};
 ```
 
 ### Available Field Types
@@ -191,10 +211,10 @@ export function getSqlDefault(definition: FieldDefinition): string | null
 | `boolean` | BOOLEAN | Type coercion |
 | `custom_user_reference` | Relationship table | User relationships with config |
 | `custom_entity_reference` | Relationship table | Entity relationships with target type |
-| `rollup_count` | INTEGER | Count aggregation from relationships |
-| `rollup_sum` | DECIMAL | Sum aggregation with precision |
-| `rollup_average` | DECIMAL | Average calculation with precision |
-| `rollup_concat` | TEXT | Text concatenation with separators |
+| `rollup_count` | Frontend Calculated | Count aggregation from relationships |
+| `rollup_sum` | Frontend Calculated | Sum aggregation with precision |
+| `rollup_average` | Frontend Calculated | Average calculation with precision |
+| `rollup_concat` | Frontend Calculated | Text concatenation with separators |
 | `computed_expression` | Computed | Simple mathematical expressions |
 | `computed_formula` | Computed | Complex expressions with full configuration |
 
@@ -234,9 +254,133 @@ const handler = getFieldHandler('coordinate'); // ✅ Works immediately
 "contact_email": "USER@DOMAIN.COM" → "user@domain.com"
 ```
 
+## Rollup Fields Frontend Calculation Architecture
+
+### NEW: Rollup Fields Calculated on Frontend (September 2025)
+
+Rollup fields have been redesigned to use frontend calculation instead of backend storage, eliminating sync brittleness and enabling real-time reactive updates.
+
+#### Key Changes:
+- **No Database Storage**: `getSqlType()` returns `null` - no columns created
+- **Frontend Metadata**: Rich calculation metadata tells frontend how to compute values
+- **Real-time Updates**: Values calculated reactively when relationships change
+- **Enhanced UI Integration**: Complete display, editor, and accessibility metadata
+
+#### Rollup Field Types:
+
+**`rollup_count`** - Count related records:
+```typescript
+{
+  "name": "active_task_count",
+  "type": "rollup_count",
+  "rollupConfig": {
+    "relationshipType": "belongs_to",
+    "targetEntityType": "Task",
+    "conditions": {"status": "active"}
+  }
+}
+
+// Provides calculation metadata for frontend:
+{
+  "calculationType": "count",
+  "sourceRelationship": "belongs_to", 
+  "sourceEntityType": "Task",
+  "sourceField": "id", // Count records, not a specific field
+  "conditions": {"status": "active"},
+  "aggregationFunction": "count",
+  "realTimeUpdates": true
+}
+```
+
+**`rollup_sum`** - Sum numeric values:
+```typescript
+{
+  "name": "total_budget_amount",
+  "type": "rollup_sum", 
+  "rollupConfig": {
+    "relationshipType": "belongs_to",
+    "targetEntityType": "Task",
+    "targetField": "budget_amount"
+  }
+}
+
+// Enhanced display metadata:
+{
+  "width": 140,
+  "textAlign": "right",
+  "format": "number", // or "currency" if currency field
+  "precision": 2,
+  "showCalculationIndicator": true,
+  "isReadOnly": true,
+  "tooltipContent": "Sum of budget_amount from related Task"
+}
+```
+
+**`rollup_average`** - Calculate averages:
+```typescript
+{
+  "name": "average_completion_time",
+  "type": "rollup_average",
+  "precision": 2,
+  "rollupConfig": {
+    "relationshipType": "belongs_to",
+    "targetEntityType": "Task",
+    "targetField": "completion_hours"
+  }
+}
+```
+
+**`rollup_concat`** - Concatenate text values:
+```typescript
+{
+  "name": "team_members_list",
+  "type": "rollup_concat",
+  "rollupConfig": {
+    "relationshipType": "assigned_to",
+    "targetEntityType": "User", 
+    "targetField": "name",
+    "separator": ", "
+  }
+}
+```
+
+#### Frontend Integration Benefits:
+- **No Sync Issues**: Values always reflect current relationship state
+- **Real-time Updates**: Changes propagate immediately to UI
+- **Better Performance**: No backend calculation overhead
+- **Rich Metadata**: Complete UI configuration for data grids and forms
+- **Accessibility**: Full ARIA support with live regions for value changes
+
+#### UI Metadata Example:
+```typescript
+// Complete rollup field metadata in schema API response
+{
+  "validation": {
+    "readOnly": true,
+    "calculatedField": true,
+    "messages": {
+      "readOnly": "total_task_count is automatically calculated and cannot be edited",
+      "calculation": "This field shows the count of related records"
+    }
+  },
+  "editor": {
+    "type": "calculated-display",
+    "readOnly": true,
+    "showCalculationStatus": true,
+    "calculationIndicator": "count"
+  },
+  "accessibility": {
+    "ariaLabel": "total_task_count calculated count field",
+    "ariaDescription": "Automatically calculated count of related Task. This field is read-only.",
+    "role": "status",
+    "ariaLive": "polite" // Announces when value changes
+  }
+}
+```
+
 ## Unified Custom Relationship Field System
 
-### NEW: Custom Relationship Fields with Same UX
+### Custom Relationship Fields with Same UX
 
 DataForge now provides custom relationship fields that follow the exact same UX pattern as other custom fields, while providing powerful relationship and aggregation capabilities.
 
@@ -352,10 +496,11 @@ await rollupEngine.refreshEntityRollups(kysely, orgId, entityName, entityId);
 - Full relationship history and temporal support
 - Rich properties and configuration per relationship
 
-**Rollup Fields**: Stored as real database columns with automatic updates
-- Proper SQL types (INTEGER, DECIMAL, TEXT)  
-- Real-time calculation when dependencies change
-- Efficient querying and indexing support
+**Rollup Fields**: Frontend calculated with no database storage (September 2025 Update)
+- No database columns created - `getSqlType()` returns `null`
+- Values calculated in real-time from relationship data
+- Comprehensive calculation metadata provided to frontend
+- Enhanced UI integration with complete display/editor metadata
 
 ## Archetype System
 
@@ -398,8 +543,12 @@ POST /api/dataforge/orgs/:orgId/entities
   ]
 }
 
-# Get entity schema
+# Get entity schema (basic)
 GET /api/dataforge/orgs/:orgId/entities/:entityName
+
+# Get enhanced schema with comprehensive field metadata (RECOMMENDED)
+GET /api/dataforge/orgs/:orgId/schema
+# Returns all entities with complete UI metadata for frontend consumption
 
 # Delete entity (soft delete)
 DELETE /api/dataforge/orgs/:orgId/entities/:entityName
@@ -521,7 +670,7 @@ return `org_${orgId.replace(/-/g, '_')}_${tableName}`.toLowerCase();
 
 ## Testing
 
-### Create Test Entity
+### Create Test Entity with Enhanced Field Types
 
 ```bash
 # With advanced field types and validation
@@ -548,7 +697,67 @@ curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-0
 # - budget: JSONB (currency amount + code validation)
 ```
 
-### Test Field Validation
+### Create Test Entity with Rollup Fields
+
+```bash
+# Create entity with frontend-calculated rollup fields
+curl -X POST "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/entities" \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "entityName": "ProjectSummary",
+    "archetype": "record",
+    "customFields": [
+      {
+        "name": "total_task_count",
+        "type": "rollup_count",
+        "rollupConfig": {
+          "relationshipType": "belongs_to",
+          "targetEntityType": "Task"
+        }
+      },
+      {
+        "name": "budget_sum",
+        "type": "rollup_sum",
+        "rollupConfig": {
+          "relationshipType": "belongs_to",
+          "targetEntityType": "Task",
+          "targetField": "budget_amount"
+        }
+      },
+      {
+        "name": "team_members_list",
+        "type": "rollup_concat",
+        "rollupConfig": {
+          "relationshipType": "assigned_to",
+          "targetEntityType": "User",
+          "targetField": "name",
+          "separator": ", "
+        }
+      }
+    ]
+  }'
+
+# Rollup fields create NO database columns - they're calculated on frontend
+# Each provides rich calculation metadata for real-time computation
+```
+
+### Test Enhanced Schema API
+
+```bash
+# Get enhanced schema with comprehensive field metadata
+curl -X GET "http://localhost:4000/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/schema" \
+  -b cookies.txt | jq '.schema[0].fields[0]'
+
+# Returns complete field metadata including:
+# - validation: error messages, required status, read-only flags
+# - display: column widths, formatting, tooltips, alignment
+# - editor: input types, validation behaviors, special editors  
+# - capabilities: sorting, filtering, grouping, aggregation support
+# - accessibility: ARIA labels, descriptions, live regions
+```
+
+### Test Enhanced Field Validation
 
 ```bash
 # Test invalid data (will be rejected)
@@ -779,10 +988,11 @@ WHERE org_id = '01920000-1000-7000-8000-000000000001'
 - **Selection**: `single-select`, `multi-select`
 
 #### Implementation:
-- **Field Handlers**: Standard interface (validate, getSqlType, getSqlDefault, getDefaultValue)
-- **SQL Generation**: DDLGenerator uses field handlers for proper SQL types
-- **Validation Pipeline**: FieldValidationPipeline integrated with field system
-- **Entity Creation**: EntityManager validates both archetype AND custom fields together
+- **Enhanced Field Handlers**: Extended interface with 9 methods including comprehensive UI metadata
+- **SQL Generation**: DDLGenerator uses field handlers, with relationship/rollup fields returning null
+- **Validation Pipeline**: FieldValidationPipeline integrated with enhanced field system
+- **Entity Creation**: EntityManager validates both archetype AND custom fields, generates enhanced metadata
+- **Schema API**: EntitySchemaManager processes all fields through enhanced handlers for frontend consumption
 
 ### 2. System Options Architecture Overhaul
 **Complete redesign of the options system for better semantic separation and organizational flexibility.**
@@ -963,7 +1173,112 @@ DELETE /orgs/:orgId/approvals/:approvalId               # Cancel approval reques
    - **NEW**: Per-org relationship tables with temporal support and rich metadata
    - **INTEGRATION**: Full integration with custom options system for relationship configuration
 
-### 6. Computed Fields System Implementation (September 2025)
+### 6. Enhanced Schema Loading with Comprehensive Field Metadata (September 2025)
+**Complete frontend schema loading system with rich field metadata for data grids and UI components.**
+
+#### Key Features:
+- **Enhanced Field Handlers**: All field types now provide comprehensive UI metadata (validation, display, editor, capabilities, accessibility)
+- **Frontend Schema API**: `/api/dataforge/orgs/:orgId/schema` returns complete field metadata for frontend consumption
+- **Data Grid Ready**: Rich metadata includes column widths, formatting, sorting/filtering capabilities
+- **UI Component Integration**: Editor types, validation messages, accessibility labels for form builders
+- **Rollup Fields Frontend Calculation**: Rollup fields provide calculation metadata instead of database storage
+
+#### Enhanced Field Handler Interface:
+```typescript
+export interface EnhancedFieldHandler {
+  // Standard field operations
+  validate: (value: any, definition: FieldDefinition, context: any) => ValidationResult;
+  getDefaultValue: (definition: FieldDefinition) => any;
+  getSqlType: (definition: FieldDefinition) => string | null;
+  getSqlDefault: (definition: FieldDefinition) => string | null;
+  
+  // Enhanced metadata for frontend
+  getValidationMetadata?: (definition: FieldDefinition) => ValidationMetadata;
+  getDisplayMetadata?: (definition: FieldDefinition) => DisplayMetadata;
+  getEditorMetadata?: (definition: FieldDefinition) => EditorMetadata;
+  getCapabilities?: () => FieldCapabilities;
+  getAccessibilityMetadata?: (definition: FieldDefinition) => AccessibilityMetadata;
+}
+```
+
+#### Comprehensive Metadata Types:
+- **ValidationMetadata**: Required fields, format rules, custom error messages, read-only status
+- **DisplayMetadata**: Column widths, text alignment, formatting (currency, date, number), tooltips
+- **EditorMetadata**: Input types (text, select, date, currency), validation behaviors, special editors
+- **FieldCapabilities**: Sorting, filtering, grouping, aggregation support, special requirements
+- **AccessibilityMetadata**: ARIA labels, descriptions, roles, live regions for screen readers
+
+#### Rollup Fields Frontend Architecture:
+```typescript
+// Rollup fields now return null for SQL type (no database columns)
+export function getSqlType(): string | null {
+  return null; // No database storage - calculated on frontend
+}
+
+// Instead, they provide calculation metadata
+export function getCalculationMetadata(definition: FieldDefinition): CalculationMetadata {
+  return {
+    calculationType: 'sum', // or 'count', 'average', 'concat'
+    sourceRelationship: 'belongs_to',
+    sourceEntityType: 'Task',
+    sourceField: 'budget_amount',
+    aggregationFunction: 'sum',
+    realTimeUpdates: true,
+    precision: 2
+  };
+}
+```
+
+#### Frontend Schema Response Example:
+```typescript
+// Each field in the schema includes complete metadata
+{
+  "name": "budget_sum",
+  "type": "rollup_sum",
+  "validation": {
+    "readOnly": true,
+    "calculatedField": true,
+    "messages": {
+      "readOnly": "budget_sum is automatically calculated and cannot be edited",
+      "calculation": "This field shows the sum of related values"
+    }
+  },
+  "display": {
+    "width": 140,
+    "textAlign": "right",
+    "format": "number",
+    "precision": 2,
+    "showCalculationIndicator": true,
+    "tooltipContent": "Sum of budget_amount from related Task"
+  },
+  "editor": {
+    "type": "calculated-display",
+    "readOnly": true,
+    "calculationIndicator": "sum"
+  },
+  "capabilities": {
+    "supportsSorting": true,
+    "supportsFiltering": true,
+    "supportsAggregation": true,
+    "isCalculatedField": true,
+    "isRollupField": true
+  },
+  "accessibility": {
+    "ariaLabel": "budget_sum calculated sum field",
+    "ariaDescription": "Automatically calculated sum of budget_amount from related Task. This field is read-only.",
+    "role": "status",
+    "ariaLive": "polite"
+  }
+}
+```
+
+#### Implementation Status: **✅ FULLY IMPLEMENTED**
+- EntitySchemaManager processes all fields through enhanced field handlers
+- All field types (basic, relationship, rollup) provide complete UI metadata
+- Schema API returns frontend-ready field definitions with comprehensive metadata
+- Rollup fields converted to frontend calculation architecture
+
+### 7. Computed Fields System Implementation (September 2025)
 **Complete backend infrastructure for expression-based computed fields with security-first design.**
 
 #### Key Features:
@@ -1080,7 +1395,30 @@ These fields are automatically:
 9. **NEW: Use RelationshipFieldHandler** for all relationship operations
 10. **NEW: Reference fields in archetypes** (`user_reference`, `entity_reference`) are automatically processed
 
-## Latest Updates (January 2025)
+## Latest Updates (September 2025)
+
+### Enhanced Schema Loading with Frontend Calculation Architecture
+**Major architectural improvements for frontend-first schema loading and real-time rollup calculations.**
+
+#### Schema Loading Enhancements:
+- **Complete Field Metadata**: All field types now provide comprehensive UI metadata (validation, display, editor, capabilities, accessibility)
+- **Frontend Schema API**: Enhanced `/api/dataforge/orgs/:orgId/schema` endpoint returns complete field definitions
+- **Data Grid Integration**: Rich metadata includes column configurations, formatting rules, and interaction capabilities
+- **UI Component Ready**: Editor types, validation messages, and accessibility properties for form builders
+
+#### Rollup Fields Architecture Overhaul:
+- **Frontend Calculation**: Rollup fields no longer create database columns - calculated in real-time on frontend
+- **No Sync Brittleness**: Values always reflect current relationship state without backend synchronization issues
+- **Rich Calculation Metadata**: Complete configuration for frontend computation (relationship types, target fields, aggregation functions)
+- **Enhanced UI Integration**: Read-only display with calculation indicators, tooltips, and accessibility support
+
+#### Implementation Details:
+- **EnhancedFieldHandler Interface**: Extended field handlers with 5 new metadata methods
+- **EntitySchemaManager Integration**: Automatic processing of all fields through enhanced handlers
+- **Rollup Field Conversion**: All rollup types (count, sum, average, concat) converted to frontend calculation
+- **Complete Metadata Coverage**: Every field type provides comprehensive UI configuration
+
+## Previous Updates (January 2025)
 
 ### Dependencies API System Fixes and Gantt Preparation
 **Complete overhaul of the dependency management system with frontend synchronization and Gantt chart preparation.**

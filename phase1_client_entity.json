@@ -1,0 +1,628 @@
+{
+  "entityName": "Client",
+  "archetype": "record",
+  "description": "Comprehensive client management with business metrics, satisfaction tracking, and relationship analytics",
+  "customFields": [
+    {
+      "name": "client_code",
+      "type": "text",
+      "required": true,
+      "unique": true,
+      "regex": "^[A-Z]{2,4}[0-9]{3,5}$",
+      "description": "Unique client identifier (e.g., ACME1234, TECH5678)"
+    },
+    {
+      "name": "legal_name",
+      "type": "text",
+      "required": true,
+      "description": "Official legal company name"
+    },
+    {
+      "name": "display_name",
+      "type": "text",
+      "description": "Preferred display name (defaults to legal_name)"
+    },
+    {
+      "name": "dba_name",
+      "type": "text",
+      "description": "Doing Business As name if different"
+    },
+    {
+      "name": "website",
+      "type": "url",
+      "description": "Primary company website"
+    },
+    {
+      "name": "linkedin_url",
+      "type": "url",
+      "description": "LinkedIn company page"
+    },
+    
+    // COMPANY INFORMATION & CLASSIFICATION
+    {
+      "name": "headquarters_address",
+      "type": "rich-text",
+      "description": "Primary business address"
+    },
+    {
+      "name": "country",
+      "type": "text",
+      "required": true,
+      "description": "Country where client is based"
+    },
+    {
+      "name": "time_zone",
+      "type": "text",
+      "description": "Primary time zone for meetings and communication"
+    },
+    {
+      "name": "annual_revenue",
+      "type": "currency",
+      "description": "Reported annual revenue"
+    },
+    {
+      "name": "employee_count",
+      "type": "number",
+      "min": 1,
+      "description": "Approximate number of employees"
+    },
+    {
+      "name": "industry_sector",
+      "type": "single-select",
+      "required": true,
+      "enum": ["technology", "finance", "healthcare", "manufacturing", "retail", "energy", "government", "education", "media", "consulting", "real_estate", "transportation", "agriculture", "other"],
+      "description": "Primary industry sector"
+    },
+    {
+      "name": "company_size",
+      "type": "single-select",
+      "required": true,
+      "enum": ["startup", "small", "medium", "large", "enterprise"],
+      "defaultValue": "medium",
+      "description": "Company size classification"
+    },
+    {
+      "name": "business_model",
+      "type": "single-select",
+      "enum": ["b2b", "b2c", "b2b2c", "marketplace", "saas", "consulting", "manufacturing", "retail", "other"],
+      "description": "Primary business model"
+    },
+    {
+      "name": "funding_stage",
+      "type": "single-select",
+      "enum": ["bootstrapped", "seed", "series_a", "series_b", "series_c", "public", "private_equity", "established"],
+      "description": "Funding or growth stage"
+    },
+    
+    // CLIENT RELATIONSHIP INFORMATION
+    {
+      "name": "client_type",
+      "type": "single-select",
+      "required": true,
+      "enum": ["prospect", "active", "inactive", "partner", "strategic", "churned"],
+      "defaultValue": "prospect",
+      "description": "Current client relationship status"
+    },
+    {
+      "name": "customer_since",
+      "type": "date",
+      "description": "Date when client first became a customer"
+    },
+    {
+      "name": "last_interaction_date",
+      "type": "date",
+      "description": "Date of most recent interaction"
+    },
+    {
+      "name": "next_scheduled_interaction",
+      "type": "date",
+      "description": "Date of next planned interaction"
+    },
+    {
+      "name": "client_tier",
+      "type": "single-select",
+      "enum": ["platinum", "gold", "silver", "bronze", "standard"],
+      "defaultValue": "standard",
+      "description": "Client service tier classification"
+    },
+    {
+      "name": "payment_terms",
+      "type": "single-select",
+      "enum": ["net_15", "net_30", "net_45", "net_60", "upon_delivery", "prepaid"],
+      "defaultValue": "net_30",
+      "description": "Standard payment terms"
+    },
+    {
+      "name": "credit_limit",
+      "type": "currency",
+      "description": "Approved credit limit"
+    },
+    {
+      "name": "preferred_currency",
+      "type": "text",
+      "defaultValue": "USD",
+      "description": "Preferred currency for billing"
+    },
+    
+    // BUSINESS METRICS - CONTRACT & FINANCIAL ROLLUPS
+    {
+      "name": "total_contract_value",
+      "type": "rollup_sum",
+      "rollupConfig": {
+        "relationshipType": "signed_by",
+        "targetEntityType": "Contract",
+        "targetField": "contract_value"
+      },
+      "description": "Total value of all contracts"
+    },
+    {
+      "name": "active_contract_value",
+      "type": "rollup_sum",
+      "rollupConfig": {
+        "relationshipType": "signed_by",
+        "targetEntityType": "Contract",
+        "targetField": "contract_value",
+        "conditions": {"status": "active"}
+      },
+      "description": "Value of currently active contracts"
+    },
+    {
+      "name": "active_contract_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "signed_by",
+        "targetEntityType": "Contract",
+        "conditions": {"status": "active"}
+      },
+      "description": "Number of active contracts"
+    },
+    {
+      "name": "total_contract_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "signed_by",
+        "targetEntityType": "Contract"
+      },
+      "description": "Total number of contracts signed"
+    },
+    {
+      "name": "total_invoiced_amount",
+      "type": "rollup_sum",
+      "rollupConfig": {
+        "relationshipType": "billed_to",
+        "targetEntityType": "Invoice",
+        "targetField": "total_amount"
+      },
+      "description": "Total amount invoiced to client"
+    },
+    {
+      "name": "total_paid_amount",
+      "type": "rollup_sum",
+      "rollupConfig": {
+        "relationshipType": "billed_to",
+        "targetEntityType": "Invoice",
+        "targetField": "total_amount",
+        "conditions": {"payment_status": "paid"}
+      },
+      "description": "Total amount paid by client"
+    },
+    {
+      "name": "outstanding_invoices_amount",
+      "type": "rollup_sum",
+      "rollupConfig": {
+        "relationshipType": "billed_to",
+        "targetEntityType": "Invoice",
+        "targetField": "total_amount",
+        "conditions": {"payment_status": ["sent", "viewed", "overdue"]}
+      },
+      "description": "Total outstanding invoice amount"
+    },
+    {
+      "name": "overdue_invoices_amount",
+      "type": "rollup_sum",
+      "rollupConfig": {
+        "relationshipType": "billed_to",
+        "targetEntityType": "Invoice",
+        "targetField": "total_amount",
+        "conditions": {"payment_status": "overdue"}
+      },
+      "description": "Total overdue invoice amount"
+    },
+    {
+      "name": "overdue_invoice_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "billed_to",
+        "targetEntityType": "Invoice",
+        "conditions": {"payment_status": "overdue"}
+      },
+      "description": "Number of overdue invoices"
+    },
+    
+    // PROJECT & DELIVERY ROLLUPS  
+    {
+      "name": "active_project_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "delivered_to",
+        "targetEntityType": "Project",
+        "conditions": {"status": "active"}
+      },
+      "description": "Number of active projects"
+    },
+    {
+      "name": "completed_project_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "delivered_to", 
+        "targetEntityType": "Project",
+        "conditions": {"status": "completed"}
+      },
+      "description": "Number of completed projects"
+    },
+    {
+      "name": "total_project_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "delivered_to",
+        "targetEntityType": "Project"
+      },
+      "description": "Total number of projects"
+    },
+    {
+      "name": "average_project_health",
+      "type": "rollup_average",
+      "rollupConfig": {
+        "relationshipType": "delivered_to",
+        "targetEntityType": "Project",
+        "targetField": "project_health_score",
+        "conditions": {"status": "active"}
+      },
+      "description": "Average health score of active projects"
+    },
+    {
+      "name": "projects_on_time_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "delivered_to",
+        "targetEntityType": "Project",
+        "conditions": {"schedule_performance_index": ">=1.0"}
+      },
+      "description": "Number of projects on or ahead of schedule"
+    },
+    {
+      "name": "projects_over_budget_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "delivered_to",
+        "targetEntityType": "Project",
+        "conditions": {"cost_performance_index": "<0.9"}
+      },
+      "description": "Number of projects significantly over budget"
+    },
+    
+    // COMMUNICATION & ENGAGEMENT ROLLUPS
+    {
+      "name": "total_meeting_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "includes",
+        "targetEntityType": "Meeting"
+      },
+      "description": "Total number of meetings with client"
+    },
+    {
+      "name": "meeting_count_last_30_days",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "includes",
+        "targetEntityType": "Meeting",
+        "conditions": {"meeting_date": ">=30_days_ago"}
+      },
+      "description": "Number of meetings in last 30 days"
+    },
+    {
+      "name": "average_meeting_attendance",
+      "type": "rollup_average",
+      "rollupConfig": {
+        "relationshipType": "includes",
+        "targetEntityType": "Meeting",
+        "targetField": "attendance_rate"
+      },
+      "description": "Average attendance rate in client meetings"
+    },
+    {
+      "name": "primary_contact_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "works_for",
+        "targetEntityType": "Contact",
+        "conditions": {"decision_maker": true}
+      },
+      "description": "Number of primary decision-making contacts"
+    },
+    {
+      "name": "total_contact_count",
+      "type": "rollup_count",
+      "rollupConfig": {
+        "relationshipType": "works_for",
+        "targetEntityType": "Contact"
+      },
+      "description": "Total number of contacts at client"
+    },
+    
+    // COMPUTED FINANCIAL METRICS
+    {
+      "name": "payment_reliability_score",
+      "type": "computed_expression",
+      "expression": "total_invoiced_amount > 0 ? (total_paid_amount / total_invoiced_amount) * 100 : 100",
+      "dependencies": ["total_paid_amount", "total_invoiced_amount"],
+      "description": "Payment reliability percentage"
+    },
+    {
+      "name": "collection_risk_score",
+      "type": "computed_expression",
+      "expression": "total_invoiced_amount > 0 ? (overdue_invoices_amount / total_invoiced_amount) * 100 : 0",
+      "dependencies": ["overdue_invoices_amount", "total_invoiced_amount"],
+      "description": "Collection risk percentage"
+    },
+    {
+      "name": "average_payment_days",
+      "type": "rollup_average",
+      "rollupConfig": {
+        "relationshipType": "billed_to",
+        "targetEntityType": "Invoice",
+        "targetField": "days_to_payment",
+        "conditions": {"payment_status": "paid"}
+      },
+      "description": "Average days to payment for paid invoices"
+    },
+    {
+      "name": "contract_renewal_rate",
+      "type": "computed_expression",
+      "expression": "total_contract_count > 1 ? ((total_contract_count - 1) / (total_contract_count - 1)) * 100 : 0",
+      "dependencies": ["total_contract_count"],
+      "description": "Historical contract renewal rate"
+    },
+    {
+      "name": "annual_contract_value",
+      "type": "computed_expression",
+      "expression": "customer_since ? active_contract_value / (($today - customer_since) / 365) : active_contract_value",
+      "dependencies": ["active_contract_value", "customer_since"],
+      "description": "Annualized contract value"
+    },
+    {
+      "name": "customer_lifetime_value",
+      "type": "computed_expression",
+      "expression": "customer_since ? total_paid_amount / (($today - customer_since) / 365) * 3 : total_paid_amount",
+      "dependencies": ["total_paid_amount", "customer_since"],
+      "description": "Estimated customer lifetime value"
+    },
+    
+    // COMPUTED DELIVERY METRICS
+    {
+      "name": "project_success_rate",
+      "type": "computed_expression",
+      "expression": "total_project_count > 0 ? (completed_project_count / total_project_count) * 100 : 100",
+      "dependencies": ["completed_project_count", "total_project_count"],
+      "description": "Percentage of projects successfully completed"
+    },
+    {
+      "name": "delivery_performance_score",
+      "type": "computed_expression",
+      "expression": "total_project_count > 0 ? (projects_on_time_count / total_project_count) * 100 : 100",
+      "dependencies": ["projects_on_time_count", "total_project_count"],
+      "description": "Percentage of projects delivered on time"
+    },
+    {
+      "name": "budget_performance_score",
+      "type": "computed_expression",
+      "expression": "total_project_count > 0 ? ((total_project_count - projects_over_budget_count) / total_project_count) * 100 : 100",
+      "dependencies": ["total_project_count", "projects_over_budget_count"],
+      "description": "Percentage of projects within budget"
+    },
+    
+    // SATISFACTION & ENGAGEMENT METRICS
+    {
+      "name": "satisfaction_score",
+      "type": "number",
+      "min": 1,
+      "max": 10,
+      "description": "Client satisfaction score (1-10, manually updated)"
+    },
+    {
+      "name": "satisfaction_last_updated",
+      "type": "date",
+      "description": "Date satisfaction score was last updated"
+    },
+    {
+      "name": "nps_score",
+      "type": "number",
+      "min": -100,
+      "max": 100,
+      "description": "Net Promoter Score (-100 to 100)"
+    },
+    {
+      "name": "meeting_frequency_target",
+      "type": "single-select",
+      "enum": ["weekly", "biweekly", "monthly", "quarterly", "as_needed"],
+      "defaultValue": "monthly",
+      "description": "Target frequency for client meetings"
+    },
+    {
+      "name": "engagement_level",
+      "type": "computed_formula",
+      "expression": "((satisfaction_score || 7) * 0.3) + (meeting_count_last_30_days * 10 * 0.2) + ((average_project_health || 70) * 0.01 * 0.25) + (payment_reliability_score * 0.01 * 0.25)",
+      "dependencies": ["satisfaction_score", "meeting_count_last_30_days", "average_project_health", "payment_reliability_score"],
+      "resultType": "number",
+      "computeLocation": "backend",
+      "description": "Overall engagement level score (0-100)"
+    },
+    {
+      "name": "communication_responsiveness",
+      "type": "single-select",
+      "enum": ["excellent", "good", "fair", "poor"],
+      "defaultValue": "good",
+      "description": "Client responsiveness to communications"
+    },
+    {
+      "name": "expansion_opportunity_score",
+      "type": "computed_expression",
+      "expression": "((satisfaction_score || 7) * 10) + (engagement_level * 0.5) + (active_contract_count * 20) - (collection_risk_score * 2)",
+      "dependencies": ["satisfaction_score", "engagement_level", "active_contract_count", "collection_risk_score"],
+      "description": "Opportunity score for account expansion"
+    },
+    
+    // CLIENT HEALTH & RISK ASSESSMENT
+    {
+      "name": "client_health_score",
+      "type": "computed_formula",
+      "expression": "((satisfaction_score || 7) * 0.2 * 10) + (payment_reliability_score * 0.25) + (engagement_level * 0.2) + (project_success_rate * 0.15) + (delivery_performance_score * 0.1) + ((communication_responsiveness == 'excellent' ? 100 : communication_responsiveness == 'good' ? 80 : communication_responsiveness == 'fair' ? 60 : 40) * 0.1)",
+      "dependencies": ["satisfaction_score", "payment_reliability_score", "engagement_level", "project_success_rate", "delivery_performance_score", "communication_responsiveness"],
+      "resultType": "number",
+      "computeLocation": "backend",
+      "cacheResults": true,
+      "description": "Overall client health score (0-100)"
+    },
+    {
+      "name": "churn_risk_score",
+      "type": "computed_expression",
+      "expression": "100 - client_health_score + (collection_risk_score * 0.5) + (overdue_invoice_count * 10)",
+      "dependencies": ["client_health_score", "collection_risk_score", "overdue_invoice_count"],
+      "description": "Risk of client churn (0-100, higher = more risk)"
+    },
+    {
+      "name": "days_since_last_interaction", 
+      "type": "computed_expression",
+      "expression": "last_interaction_date ? ($today - last_interaction_date) : ($today - customer_since)",
+      "dependencies": ["last_interaction_date", "customer_since"],
+      "description": "Days since last client interaction"
+    },
+    {
+      "name": "requires_attention",
+      "type": "computed_expression",
+      "expression": "churn_risk_score > 60 || days_since_last_interaction > 60 || overdue_invoice_count > 0 || client_health_score < 70",
+      "dependencies": ["churn_risk_score", "days_since_last_interaction", "overdue_invoice_count", "client_health_score"],
+      "description": "Whether client requires immediate attention"
+    },
+    
+    // RELATIONSHIP FIELDS - Client Management
+    {
+      "name": "account_manager_id",
+      "type": "custom_user_reference",
+      "relationshipType": "managed_by",
+      "required": true,
+      "description": "Primary account manager for the client"
+    },
+    {
+      "name": "technical_lead_id",
+      "type": "custom_user_reference",
+      "relationshipType": "technical_lead",
+      "description": "Primary technical contact for client projects"
+    },
+    {
+      "name": "sales_rep_id",
+      "type": "custom_user_reference", 
+      "relationshipType": "sold_by",
+      "description": "Sales representative who acquired the client"
+    },
+    {
+      "name": "primary_contact_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "primary_contact",
+      "targetEntityType": "Contact",
+      "description": "Primary business contact at the client"
+    },
+    {
+      "name": "billing_contact_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "billing_contact",
+      "targetEntityType": "Contact",
+      "description": "Contact responsible for billing and payments"
+    },
+    {
+      "name": "technical_contact_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "technical_contact",
+      "targetEntityType": "Contact",
+      "description": "Primary technical contact at the client"
+    },
+    {
+      "name": "parent_company_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "subsidiary_of",
+      "targetEntityType": "Client",
+      "description": "Parent company if client is a subsidiary"
+    },
+    {
+      "name": "referral_source_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "referred_by",
+      "targetEntityType": "Client",
+      "description": "Client who referred this prospect"
+    }
+  ],
+  
+  "businessRules": {
+    "validation": [
+      "customer_since must be in the past",
+      "credit_limit should be set for clients with payment_terms > net_30",
+      "satisfaction_score should be updated at least quarterly",
+      "account_manager_id cannot be the same as technical_lead_id",
+      "annual_revenue should align with company_size classification",
+      "active_contract_value should not exceed credit_limit by more than 20%"
+    ],
+    "workflows": [
+      {
+        "name": "new_client_onboarding",
+        "trigger": "entity_create",
+        "approvers": ["account_manager_id", "sales_rep_id"],
+        "sequence": "parallel",
+        "description": "Approval workflow for new client setup"
+      },
+      {
+        "name": "credit_limit_approval",
+        "trigger": "field_change",
+        "field": "credit_limit",
+        "condition": "new_value > 100000",
+        "approvers": ["finance_manager", "sales_director"],
+        "sequence": "sequential",
+        "description": "Executive approval for high credit limits"
+      },
+      {
+        "name": "churn_risk_escalation",
+        "trigger": "computed_field_change",
+        "field": "churn_risk_score",
+        "condition": "new_value > 70 && old_value <= 70",
+        "approvers": ["account_manager_id", "sales_director"],
+        "description": "Escalation for high churn risk clients"
+      },
+      {
+        "name": "collection_escalation",
+        "trigger": "computed_field_change",
+        "field": "overdue_invoices_amount",
+        "condition": "new_value > 10000",
+        "approvers": ["account_manager_id", "finance_manager"],
+        "description": "Escalation for significant overdue amounts"
+      }
+    ],
+    "automations": [
+      {
+        "name": "satisfaction_reminder",
+        "trigger": "computed_field_change",
+        "field": "satisfaction_last_updated",
+        "condition": "$today - satisfaction_last_updated > 90",
+        "action": "notify_account_manager",
+        "description": "Remind to update satisfaction scores quarterly"
+      },
+      {
+        "name": "interaction_reminder",
+        "trigger": "computed_field_change",
+        "field": "days_since_last_interaction",
+        "condition": "new_value > 45",
+        "action": "notify_account_manager",
+        "description": "Remind to schedule client interaction"
+      }
+    ]
+  }
+}

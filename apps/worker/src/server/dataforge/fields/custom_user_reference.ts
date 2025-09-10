@@ -6,6 +6,14 @@
  */
 
 import type { FieldDefinition } from '../types';
+import type {
+  ValidationMetadata,
+  DisplayMetadata,
+  EditorMetadata,
+  FieldCapabilities,
+  AccessibilityMetadata,
+  EnhancedFieldHandler
+} from './types';
 import { RelationshipFieldHandler } from '../services/RelationshipFieldHandler';
 
 export function getDefaultValue(definition: FieldDefinition): any {
@@ -111,3 +119,92 @@ export function getRelationshipMetadata(fieldName: string, definition: FieldDefi
     entityName
   );
 }
+
+// NEW: Enhanced metadata methods for UI integration
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata {
+  const relationshipType = definition.relationshipType || 'assigned_to';
+  
+  return {
+    userReference: true,
+    relationshipType: relationshipType,
+    cardinality: definition.cardinality || 'many-to-one',
+    messages: {
+      required: `${definition.name} is required`,
+      invalid: 'Please select a valid user',
+      custom: {
+        INVALID_USER_ID: `${definition.name} must be a valid user ID`,
+        INVALID_RELATIONSHIP_TYPE: `Invalid relationship type for ${definition.name}`,
+        INVALID_CARDINALITY: `Invalid cardinality for ${definition.name}`
+      }
+    }
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata {
+  return {
+    width: 180,
+    minWidth: 120,
+    textAlign: 'left',
+    showTooltip: true,
+    placeholder: 'Select User',
+    format: 'user-reference',
+    relationshipType: definition.relationshipType || 'assigned_to'
+  };
+}
+
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
+  const isMultiple = definition.cardinality === 'one-to-many' || definition.cardinality === 'many-to-many';
+  
+  return {
+    type: 'user-selector',
+    multiple: isMultiple,
+    searchable: true,
+    clearable: !definition.required,
+    showValidationOnBlur: true,
+    showAvatar: true,
+    relationshipContext: {
+      relationshipType: definition.relationshipType || 'assigned_to',
+      cardinality: definition.cardinality || 'many-to-one'
+    }
+  };
+}
+
+export function getCapabilities(): FieldCapabilities {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: true,
+    supportsAggregation: false, // No aggregation for relationships
+    requiresSpecialEditor: true, // Needs user selector
+    hasRichDisplay: true, // Shows user names/avatars, not IDs
+    supportsValidation: true,
+    supportsFormatting: false,
+    isRelationshipField: true
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
+  const relationshipType = definition.relationshipType || 'assigned_to';
+  
+  return {
+    ariaLabel: `${definition.name} - select user for ${relationshipType} relationship`,
+    ariaDescription: `Choose one or more users to establish ${relationshipType} relationship`,
+    role: 'combobox'
+  };
+}
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata,
+  // Relationship-specific methods
+  isRelationshipField,
+  getRelationshipMetadata
+};

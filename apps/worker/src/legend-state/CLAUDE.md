@@ -4,19 +4,140 @@
 
 ## Overview
 
-VibeStack uses Legend State with `syncedCrud` for reactive state management and automatic server synchronization. This document outlines the correct patterns and common pitfalls.
+VibeStack uses Legend State with `syncedCrud` for reactive state management and automatic server synchronization. The system includes enhanced schema loading with comprehensive field metadata for rich UI integration. This document outlines the correct patterns and common pitfalls.
+
+## Enhanced Schema Loading Architecture (September 2025)
+
+VibeStack now includes a sophisticated schema loading system that provides comprehensive field metadata for frontend consumption:
+
+- **Schema Observable**: Reactive schema loading with Legend State patterns
+- **Enhanced Field Metadata**: Comprehensive UI configuration (validation, display, editor, capabilities, accessibility)
+- **Rollup Fields Frontend Calculation**: Real-time calculation metadata for rollup fields
+- **Data Grid Integration**: Complete column configuration and interaction capabilities
+- **Form Builder Support**: Rich metadata for dynamic form generation
 
 ## Architecture
 
 ```
 UI Components → Legend State Observables → syncedCrud → Server API → Database
-     ↑                                                                    ↓
-     └─────────────← Real-time Updates ←── WebSocket Notifications ←─────┘
+     ↑                    ↑                                             ↓
+     │         Schema Observable (Enhanced)                              │
+     │              ↑                                                    │
+     └─────── Real-time Updates ←── WebSocket Notifications ←───────────┘
+```
+
+### Enhanced Schema Flow
+
+```
+1. Schema Loading:
+   getSchemaObservable$(orgId) → /api/dataforge/orgs/:orgId/schema → EntitySchemaManager
+   
+2. Field Enhancement:
+   Raw Schema → Enhanced Field Handlers → Comprehensive Metadata → Frontend Schema
+   
+3. UI Integration:
+   Schema Observable → React Components → Data Grids/Forms → Rich UI Experiences
 ```
 
 ## Core Patterns
 
-### 1. Getting Entity Observables
+### 1. Schema Loading and Enhanced Metadata
+
+**✅ CORRECT - Use schema observables for field metadata:**
+```typescript
+import { getSchemaObservable$, getSchemaData$, getFieldsByCapability } from '@/legend-state/schema-observable'
+
+// Get schema observable for an organization
+const schemaObs = getSchemaObservable$(orgId)
+
+// Get current schema data (reactive)
+const schema = getSchemaData$(orgId)
+
+// Access entity definition with enhanced metadata
+const clientEntity = schema?.entities?.['Client']
+if (clientEntity) {
+  // All fields have comprehensive metadata
+  const nameField = clientEntity.syncableFields.name
+  console.log('Field display config:', nameField.display)
+  console.log('Field validation rules:', nameField.validation)
+  console.log('Field capabilities:', nameField.capabilities)
+}
+```
+
+**✅ CORRECT - Use enhanced field metadata for data grids:**
+```typescript
+import { getFieldDisplayConfiguration } from '@/legend-state/schema-observable'
+
+// Get complete column configuration for data grid
+const displayConfig = getFieldDisplayConfiguration(orgId, 'Client')
+
+const columns = displayConfig.columns.map(col => ({
+  field: col.field,
+  headerName: col.header,
+  width: col.width,
+  sortable: col.sortable,
+  filterable: col.filterable,
+  type: col.type,
+  align: col.align,
+  // Enhanced metadata provides rich configuration
+  cellRenderer: col.type.includes('rollup') ? 'CalculatedCellRenderer' : 'DefaultCellRenderer',
+  editable: !col.type.includes('rollup') && !col.type.includes('computed')
+}))
+```
+
+**✅ CORRECT - Handle rollup fields with frontend calculation:**
+```typescript
+import { getCalculatedFields } from '@/legend-state/schema-observable'
+
+// Get rollup and computed fields with their calculation metadata
+const { rollupFields, computedFields, calculationMetadata } = getCalculatedFields(orgId, 'Project')
+
+// Rollup fields provide frontend calculation configuration
+rollupFields.forEach(field => {
+  if (field.rollup) {
+    console.log(`Rollup field ${field.name}:`, {
+      type: field.rollup.type,              // 'count', 'sum', 'average', 'concat'
+      targetEntity: field.rollup.targetEntityType,
+      targetField: field.rollup.targetField,
+      relationshipType: field.rollup.relationshipType,
+      realTimeUpdates: field.rollup.realTimeUpdates
+    })
+  }
+})
+```
+
+**✅ CORRECT - Use field capabilities for UI behavior:**
+```typescript
+import { getFieldsByCapability } from '@/legend-state/schema-observable'
+
+// Get fields that support specific capabilities
+const sortableFields = getFieldsByCapability(orgId, 'Client', 'supportsSorting')
+const filterableFields = getFieldsByCapability(orgId, 'Client', 'supportsFiltering') 
+const aggregatableFields = getFieldsByCapability(orgId, 'Client', 'supportsAggregation')
+
+// Configure UI based on field capabilities
+const sortOptions = sortableFields.map(field => ({
+  value: field.name,
+  label: field.display?.label || field.name,
+  type: field.type
+}))
+```
+
+**❌ WRONG - Don't bypass schema loading:**
+```typescript
+// Don't hardcode field configurations
+const columns = [
+  { field: 'name', width: 200, sortable: true },  // Missing enhanced metadata
+  { field: 'total_tasks', width: 100 }              // May be rollup field!
+]
+
+// Don't ignore field capabilities
+if (field.type === 'rollup_count') {  // Use capabilities instead
+  // Handle manually
+}
+```
+
+### 2. Getting Entity Observables
 
 **✅ CORRECT - Use `getEntity$()`:**
 ```typescript
@@ -196,6 +317,208 @@ clientsObs['client-123'] = undefined   // ERROR!
 import { entityOperations } from '@/legend-state'
 
 await entityOperations.deleteEntity('Client', 'client-123')
+```
+
+## Enhanced Schema Patterns
+
+### Schema Validation and Optimization
+
+```typescript
+import { validateSchemaIntegrity } from '@/legend-state/schema-observable'
+
+// Validate schema integrity and get optimization suggestions
+const schema = getSchemaData$(orgId)
+if (schema) {
+  const validation = validateSchemaIntegrity(schema)
+  
+  if (!validation.valid) {
+    console.error('Schema validation errors:', validation.errors)
+  }
+  
+  if (validation.warnings.length > 0) {
+    console.warn('Schema warnings:', validation.warnings)
+  }
+  
+  if (validation.optimizations.length > 0) {
+    console.info('Schema optimization suggestions:', validation.optimizations)
+  }
+}
+```
+
+### Dynamic Form Generation from Schema
+
+```typescript
+const FormGenerator = observer(({ entityName, record }) => {
+  const schema = getSchemaData$(orgId)
+  const entity = schema?.entities?.[entityName]
+  
+  if (!entity) return <div>Loading schema...</div>
+  
+  // Generate form fields from enhanced metadata
+  const formFields = Object.values(entity.allFields || {}).map(field => {
+    const fieldProps = {
+      name: field.name,
+      label: field.display?.label,
+      required: field.required,
+      placeholder: field.display?.placeholder,
+      width: field.display?.width,
+      disabled: field.capabilities?.isCalculatedField,
+      // Enhanced accessibility
+      'aria-label': field.accessibility?.ariaLabel,
+      'aria-description': field.accessibility?.ariaDescription
+    }
+    
+    // Determine input component based on enhanced metadata
+    switch (field.editor?.type) {
+      case 'text':
+        return <TextInput key={field.name} {...fieldProps} />
+      case 'textarea':
+        return <TextArea key={field.name} {...fieldProps} rows={field.editor.rows} />
+      case 'select':
+        return <Select key={field.name} {...fieldProps} options={field.enumOptions} />
+      case 'currency':
+        return <CurrencyInput key={field.name} {...fieldProps} step={field.editor.step} />
+      case 'calculated-display':
+        return <CalculatedDisplay key={field.name} {...fieldProps} indicator={field.editor.calculationIndicator} />
+      case 'entity-selector':
+        return <EntitySelector key={field.name} {...fieldProps} targetEntity={field.editor.targetEntityType} />
+      default:
+        return <TextInput key={field.name} {...fieldProps} />
+    }
+  })
+  
+  return <form>{formFields}</form>
+})
+```
+
+### Data Grid with Enhanced Schema Integration
+
+```typescript
+const EnhancedDataGrid = observer(({ entityName }) => {
+  const displayConfig = getFieldDisplayConfiguration(orgId, entityName)
+  const entityObs = getEntity$(entityName)
+  
+  if (!entityObs || !displayConfig) return <div>Loading...</div>
+  
+  // Enhanced column configuration from schema
+  const columns = displayConfig.columns.map(col => ({
+    field: col.field,
+    headerName: col.header,
+    width: col.width,
+    sortable: col.sortable,
+    filterable: col.filterable,
+    align: col.align,
+    
+    // Enhanced rendering based on field type
+    cellRenderer: (params) => {
+      if (col.type.includes('rollup')) {
+        return <RollupCell value={params.value} format={col.format} indicator={true} />
+      }
+      if (col.type === 'currency') {
+        return <CurrencyCell value={params.value} format={col.format} />
+      }
+      if (col.type.includes('reference')) {
+        return <RelationshipCell value={params.value} entityType={col.targetEntityType} />
+      }
+      return <DefaultCell value={params.value} format={col.format} />
+    },
+    
+    // Enhanced editing based on capabilities
+    editable: !col.type.includes('rollup') && !col.type.includes('computed'),
+    cellEditor: col.type === 'select' ? 'SelectEditor' : 'TextEditor'
+  }))
+  
+  const records = Object.values(entityObs.get())
+  
+  return (
+    <DataGrid 
+      columns={columns}
+      rows={records}
+      defaultSort={displayConfig.defaultSort}
+      primaryField={displayConfig.primaryField}
+    />
+  )
+})
+```
+
+### Rollup Field Calculation Integration
+
+```typescript
+const RollupCalculator = {
+  // Calculate rollup values based on enhanced metadata
+  calculateRollupValue(rollupConfig: any, sourceRecords: any[]) {
+    const { type, targetField, conditions, separator, precision } = rollupConfig
+    
+    // Filter records based on conditions
+    let filteredRecords = sourceRecords
+    if (conditions && Object.keys(conditions).length > 0) {
+      filteredRecords = sourceRecords.filter(record => 
+        Object.entries(conditions).every(([key, value]) => record[key] === value)
+      )
+    }
+    
+    switch (type) {
+      case 'count':
+        return filteredRecords.length
+        
+      case 'sum':
+        return filteredRecords.reduce((sum, record) => 
+          sum + (parseFloat(record[targetField]) || 0), 0
+        ).toFixed(precision || 2)
+        
+      case 'average':
+        if (filteredRecords.length === 0) return 0
+        const total = filteredRecords.reduce((sum, record) => 
+          sum + (parseFloat(record[targetField]) || 0), 0
+        )
+        return (total / filteredRecords.length).toFixed(precision || 2)
+        
+      case 'concat':
+        return filteredRecords
+          .map(record => record[targetField])
+          .filter(Boolean)
+          .join(separator || ', ')
+          
+      default:
+        return null
+    }
+  }
+}
+
+// Use in components to calculate rollup values
+const ProjectSummary = observer(({ projectId }) => {
+  const tasksObs = getEntity$('Task')
+  const { rollupFields } = getCalculatedFields(orgId, 'Project')
+  
+  if (!tasksObs) return <div>Loading...</div>
+  
+  // Calculate rollup values in real-time
+  const allTasks = Object.values(tasksObs.get())
+  const projectTasks = allTasks.filter(task => task.project_id === projectId)
+  
+  const rollupValues = rollupFields.reduce((acc, field) => {
+    if (field.rollup) {
+      acc[field.name] = RollupCalculator.calculateRollupValue(field.rollup, projectTasks)
+    }
+    return acc
+  }, {})
+  
+  return (
+    <div>
+      {rollupFields.map(field => (
+        <div key={field.name}>
+          <label>{field.display?.label}:</label>
+          <span 
+            aria-label={field.accessibility?.ariaLabel}
+            aria-live="polite"
+          >
+            {rollupValues[field.name]}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+})
 ```
 
 ## Advanced Patterns
@@ -429,6 +752,7 @@ Navigate to `/debug/entity-operations` to:
 
 ## Best Practices
 
+### Core Observable Patterns
 1. **Always use `getEntity$()`** for accessing entity observables
 2. **Use `observer()` components** for reactive UI updates  
 3. **Use `peek()`** when you don't need reactivity (e.g., in event handlers)
@@ -439,6 +763,18 @@ Navigate to `/debug/entity-operations` to:
 8. **Use batch operations** for multiple record operations
 9. **Follow the single source of truth** - Legend State observables are authoritative
 10. **Test with the debug tools** - use `/debug/entity-operations` for validation
+
+### Enhanced Schema Patterns  
+11. **Always use schema observables** for field metadata and configuration
+12. **Leverage enhanced field metadata** for dynamic UI generation
+13. **Use field capabilities** to determine UI behavior (sorting, filtering, editing)
+14. **Handle calculated fields appropriately** - rollup fields are read-only with real-time updates
+15. **Implement rollup calculations on frontend** using the provided metadata
+16. **Validate schema integrity** in development to catch configuration issues
+17. **Use accessibility metadata** for screen reader compliance and ARIA attributes
+18. **Optimize UI based on field capabilities** - don't show sort options for non-sortable fields
+19. **Cache schema data appropriately** - schema observables handle caching automatically
+20. **Monitor schema changes** via WebSocket notifications for real-time updates
 
 ## Updated Core Pattern Summary
 

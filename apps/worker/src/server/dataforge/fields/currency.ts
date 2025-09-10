@@ -5,6 +5,15 @@
  */
 
 import type { FieldDefinition } from '../types';
+import type {
+  ValidationResult,
+  ValidationMetadata,
+  DisplayMetadata,
+  EditorMetadata,
+  FieldCapabilities,
+  AccessibilityMetadata,
+  EnhancedFieldHandler
+} from './types';
 
 export function getDefaultValue(definition: FieldDefinition): any {
   return definition.defaultValue || { amount: 0, currency: 'USD' };
@@ -166,3 +175,144 @@ export function getSqlDefault(definition: FieldDefinition): string | null {
   }
   return definition.required ? null : 'NULL';
 }
+
+// NEW: Enhanced metadata methods
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata {
+  return {
+    min: 0,
+    precision: definition.precision || 2,
+    currencyCode: definition.currencyCode || 'USD',
+    messages: {
+      required: `${definition.name} is required`,
+      min: 'Amount cannot be negative',
+      custom: {
+        INVALID_CURRENCY_FORMAT: 'Currency must be a number, string, or object with amount and currency',
+        NEGATIVE_AMOUNT: 'Amount cannot be negative',
+        INVALID_AMOUNT: 'Currency amount must be a valid number',
+        TOO_MANY_DECIMAL_PLACES: `Amount cannot have more than ${definition.precision || 2} decimal places`
+      }
+    }
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata {
+  const currencyCode = definition.currencyCode || 'USD';
+  const currencySymbol = getCurrencySymbol(currencyCode);
+  
+  return {
+    width: 150,
+    minWidth: 120,
+    textAlign: 'right',
+    prefix: currencySymbol,
+    format: 'currency',
+    showTooltip: true,
+    placeholder: '0.00',
+    // Custom formatter for currency objects
+    customFormatter: 'currency-display',
+    displayMode: 'formatted' // Show formatted currency instead of raw object
+  };
+}
+
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
+  return {
+    type: 'currency',
+    step: 0.01,
+    showSpinners: true,
+    validateWhileTyping: true,
+    showValidationOnBlur: true
+  };
+}
+
+export function getCapabilities(): FieldCapabilities {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: false,
+    supportsAggregation: true, // Can sum, average currencies
+    requiresSpecialEditor: true,
+    hasRichDisplay: true,
+    supportsValidation: true,
+    supportsFormatting: true
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
+  const currencyCode = definition.currencyCode || 'USD';
+  
+  return {
+    ariaLabel: `${definition.name} currency amount in ${currencyCode}`,
+    ariaDescription: `Enter amount in ${currencyCode}`,
+    role: 'spinbutton'
+  };
+}
+
+// Helper function for currency symbols
+function getCurrencySymbol(currencyCode: string): string {
+  const symbols: Record<string, string> = {
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    JPY: '¥',
+    CAD: 'C$',
+    AUD: 'A$'
+  };
+  return symbols[currencyCode] || currencyCode;
+}
+
+/**
+ * Format currency data for display in grid cells
+ */
+export function formatCurrencyForDisplay(value: any): string {
+  if (value == null) return '';
+  
+  // Handle currency object format: { amount: number, currency: string }
+  if (typeof value === 'object' && value.amount !== undefined) {
+    const amount = parseFloat(value.amount) || 0;
+    const currency = value.currency || 'USD';
+    const symbol = getCurrencySymbol(currency);
+    
+    // Format with appropriate decimal places
+    const formatted = amount.toFixed(2);
+    return `${symbol}${formatted}`;
+  }
+  
+  // Handle simple numeric value
+  if (typeof value === 'number') {
+    return `$${value.toFixed(2)}`;
+  }
+  
+  // Handle string that might be a number
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    if (!isNaN(parsed)) {
+      return `$${parsed.toFixed(2)}`;
+    }
+  }
+  
+  // Fallback for complex objects
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[Complex Currency Data]';
+    }
+  }
+  
+  return String(value);
+}
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata,
+  // Additional currency-specific helpers
+  formatCurrencyForDisplay,
+  getCurrencySymbol
+};

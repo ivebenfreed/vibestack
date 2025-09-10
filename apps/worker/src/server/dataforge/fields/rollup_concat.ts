@@ -1,14 +1,23 @@
 /**
- * Rollup Concat Field Handler
+ * Rollup Concat Field Handler - Frontend Calculation
  * 
- * Concatenates text values from related records via relationships. Stores as text in database,
- * updated automatically when relationships or target field values change.
+ * Provides configuration for frontend calculation of text concatenation from related records.
+ * Values are calculated in real-time from related records, not stored in database.
  */
 
 import type { FieldDefinition } from '../types';
+import type {
+  ValidationMetadata,
+  DisplayMetadata,
+  EditorMetadata,
+  FieldCapabilities,
+  AccessibilityMetadata,
+  EnhancedFieldHandler
+} from './types';
+import type { CalculationMetadata } from './rollup_sum';
 
 export function getDefaultValue(definition: FieldDefinition): any {
-  return definition.defaultValue || '';
+  return ''; // Default concatenation is always empty string
 }
 
 export function validate(value: any, definition: FieldDefinition, context: any): { 
@@ -16,118 +25,101 @@ export function validate(value: any, definition: FieldDefinition, context: any):
   errors: any[]; 
   transformedValue?: any; 
 } {
-  const errors: any[] = [];
-  
-  // Handle null/undefined - use default
-  if (value == null) {
-    return {
-      valid: true,
-      errors: [],
-      transformedValue: ''
-    };
-  }
-
-  // Convert to string
-  let concatenated: string;
-  if (typeof value === 'string') {
-    concatenated = value;
-  } else {
-    concatenated = String(value);
-  }
-
-  // Validate length constraints
-  if (definition.maxLength && concatenated.length > definition.maxLength) {
-    errors.push({
-      field: definition.name,
-      code: 'TEXT_TOO_LONG',
-      message: `${definition.name} cannot exceed ${definition.maxLength} characters`,
-      value: concatenated,
-      constraint: definition.maxLength,
-      actualLength: concatenated.length
-    });
-  }
-
-  if (definition.minLength && concatenated.length < definition.minLength) {
-    errors.push({
-      field: definition.name,
-      code: 'TEXT_TOO_SHORT',
-      message: `${definition.name} must be at least ${definition.minLength} characters`,
-      value: concatenated,
-      constraint: definition.minLength,
-      actualLength: concatenated.length
-    });
-  }
-
-  // Validate rollup configuration
-  if (!definition.rollupConfig) {
-    errors.push({
-      field: definition.name,
-      code: 'MISSING_ROLLUP_CONFIG',
-      message: `Rollup field ${definition.name} requires rollupConfig`,
-      value
-    });
-  } else {
-    const config = definition.rollupConfig;
-    if (!config.relationshipType) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_RELATIONSHIP_TYPE',
-        message: `Rollup field ${definition.name} requires relationshipType in rollupConfig`,
-        value: config
-      });
-    }
-    
-    if (!config.targetEntityType) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_TARGET_ENTITY',
-        message: `Rollup field ${definition.name} requires targetEntityType in rollupConfig`,
-        value: config
-      });
-    }
-    
-    if (!config.targetField) {
-      errors.push({
-        field: definition.name,
-        code: 'MISSING_TARGET_FIELD',
-        message: `Rollup concat field ${definition.name} requires targetField in rollupConfig`,
-        value: config
-      });
-    }
-
-    // Validate separator if specified
-    const separator = config.separator;
-    if (separator && typeof separator !== 'string') {
-      errors.push({
-        field: definition.name,
-        code: 'INVALID_SEPARATOR',
-        message: `Rollup concat separator must be a string`,
-        value: separator
-      });
-    }
-  }
-
+  // Rollup fields are read-only calculated values
   return {
-    valid: errors.length === 0,
-    errors,
-    transformedValue: concatenated
+    valid: true,
+    errors: [],
+    transformedValue: typeof value === 'string' ? value : String(value || '')
   };
 }
 
-export function getSqlType(definition: FieldDefinition): string {
-  // Use TEXT for unlimited length, or VARCHAR with specific limit
-  if (definition.maxLength && definition.maxLength <= 255) {
-    return `VARCHAR(${definition.maxLength})`;
-  }
-  return 'TEXT';
+// Rollup fields don't create database columns - they're calculated frontend values
+export function getSqlType(definition: FieldDefinition): string | null {
+  return null; // No database storage
 }
 
 export function getSqlDefault(definition: FieldDefinition): string | null {
-  const defaultValue = definition.defaultValue;
-  if (defaultValue !== undefined) {
-    return `'${String(defaultValue).replace(/'/g, "''")}'`; // Escape single quotes
-  }
-  return "''"; // Empty string default
+  return null; // No database storage
+}
+
+// Frontend calculation metadata
+export function getCalculationMetadata(definition: FieldDefinition): CalculationMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    calculationType: 'concat',
+    sourceRelationship: config.relationshipType || 'relates_to',
+    sourceEntityType: config.targetEntityType || 'Unknown',
+    sourceField: config.targetField || 'name',
+    conditions: config.conditions || {},
+    aggregationFunction: 'concat',
+    realTimeUpdates: true
+  };
+}
+
+// Enhanced metadata methods for UI integration
+export function getValidationMetadata(definition: FieldDefinition): ValidationMetadata {
+  return {
+    readOnly: true,
+    calculatedField: true,
+    messages: {
+      readOnly: `${definition.name} is automatically calculated and cannot be edited`,
+      calculation: 'This field shows concatenated text from related records'
+    }
+  };
+}
+
+export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    width: 200,
+    minWidth: 150,
+    textAlign: 'left',
+    format: 'text',
+    showCalculationIndicator: true,
+    isReadOnly: true,
+    refreshOnDependencyChange: true,
+    placeholder: '',
+    showTooltip: true,
+    tooltipContent: `Concatenated ${config.targetField || 'values'} from related ${config.targetEntityType || 'records'} (separated by "${config.separator || ', '}")`
+  };
+}
+
+export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
+  return {
+    type: 'calculated-display',
+    readOnly: true,
+    showCalculationStatus: true,
+    showRefreshButton: false, // Auto-refreshes
+    calculationIndicator: 'concat'
+  };
+}
+
+export function getCapabilities(): FieldCapabilities {
+  return {
+    supportsSorting: true,
+    supportsFiltering: true,
+    supportsGrouping: true, // Text fields are good for grouping
+    supportsAggregation: false, // No aggregation of concatenated text
+    requiresSpecialEditor: true, // Needs read-only calculated display
+    hasRichDisplay: true, // Shows calculation status
+    supportsValidation: false, // No user input validation
+    supportsFormatting: false, // Simple text display
+    isCalculatedField: true,
+    isRollupField: true
+  };
+}
+
+export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
+  const config = definition.rollupConfig || {};
+  
+  return {
+    ariaLabel: `${definition.name} calculated concatenated text field`,
+    ariaDescription: `Automatically calculated concatenation of ${config.targetField || 'values'} from related ${config.targetEntityType || 'records'}. This field is read-only.`,
+    role: 'status',
+    ariaLive: 'polite' // Announces when value changes
+  };
 }
 
 /**
@@ -138,16 +130,25 @@ export function isRollupField(): boolean {
 }
 
 /**
- * Get rollup configuration for this field
+ * Get rollup configuration for frontend calculation
  */
 export function getRollupConfig(definition: FieldDefinition): any {
-  return {
-    type: 'concat',
-    relationshipType: definition.rollupConfig?.relationshipType || 'relates_to',
-    targetEntityType: definition.rollupConfig?.targetEntityType,
-    targetField: definition.rollupConfig?.targetField,
-    separator: definition.rollupConfig?.separator || ', ',
-    conditions: definition.rollupConfig?.conditions || {},
-    refreshTriggers: ['relationship_created', 'relationship_deleted', 'target_field_updated']
-  };
+  return getCalculationMetadata(definition);
 }
+
+// Export as enhanced field handler
+export const handler: EnhancedFieldHandler = {
+  validate,
+  getDefaultValue,
+  getSqlType,
+  getSqlDefault,
+  getValidationMetadata,
+  getDisplayMetadata,
+  getEditorMetadata,
+  getCapabilities,
+  getAccessibilityMetadata,
+  // Rollup-specific methods
+  isRollupField,
+  getRollupConfig,
+  getCalculationMetadata
+};

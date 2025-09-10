@@ -294,11 +294,15 @@ export class FieldSetManager {
    */
   static convertFieldToFieldSet(fieldType: string, archetype: string) {
     return {
-      type: `${fieldType}_set`,
+      type: 'select', // Use generic select type instead of legacy _set types
       fieldSetRef: `${archetype}-${fieldType}`,
       required: true,
       syncable: true,
       serverOnly: false,
+      // Add metadata to indicate this is a field set
+      isFieldSet: true,
+      fieldSetType: fieldType, // Store the original type (priority, status, etc.)
+      archetype: archetype,
       // Default value will be resolved from field set
       getDefaultValue: () => {
         const fieldSet = this.getDefaultFieldSet(archetype, fieldType);

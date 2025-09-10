@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict gucvEPaHQIGHq3aV6X5H80XPtwz4U8P10e7AKtEfUb1AEZ5xbv64ajkMoLykdP1
+\restrict xQbjkIqEhgewE5gGuem1pw0tz4kwsFjkX4bkzb1DttNfBpRMLqr8KpvMKRsOKFH
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict gucvEPaHQIGHq3aV6X5H80XPtwz4U8P10e7AKtEfUb1AEZ5xbv64ajkMoLykdP1
+\unrestrict xQbjkIqEhgewE5gGuem1pw0tz4kwsFjkX4bkzb1DttNfBpRMLqr8KpvMKRsOKFH
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict NweapRvsgKyezv4xMqyI03Cwd7OVRDUcRIzTavOeThmEAb4f6YhLaiAvw4Kaugq
+\restrict eJ1OUNhkR0E3nPeCIaivF1Ufp2lAfYPzhfj0nfrg8eYhWbh3pG41ztbj44Ndi5d
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NweapRvsgKyezv4xMqyI03Cwd7OVRDUcRIzTavOeThmEAb4f6YhLaiAvw4Kaugq
+\unrestrict eJ1OUNhkR0E3nPeCIaivF1Ufp2lAfYPzhfj0nfrg8eYhWbh3pG41ztbj44Ndi5d
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict XBOdarP8g5GdP9btG53QEG6nOnMQ8SZYUY5GdaheOfN9NbD6Y2OvBveuCre1gr5
+\restrict IygfUvyY1bM1igGhVACWo4b1RgCKg22E4hy2egfUzgCsq7FO4Vdltn6N9l8iw9j
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict XBOdarP8g5GdP9btG53QEG6nOnMQ8SZYUY5GdaheOfN9NbD6Y2OvBveuCre1gr5
+\unrestrict IygfUvyY1bM1igGhVACWo4b1RgCKg22E4hy2egfUzgCsq7FO4Vdltn6N9l8iw9j
 \connect elevra_dev
-\restrict XBOdarP8g5GdP9btG53QEG6nOnMQ8SZYUY5GdaheOfN9NbD6Y2OvBveuCre1gr5
+\restrict IygfUvyY1bM1igGhVACWo4b1RgCKg22E4hy2egfUzgCsq7FO4Vdltn6N9l8iw9j
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2617,6 +2617,28 @@ COMMENT ON COLUMN public.integration_sync_log.metadata IS 'JSON object containin
 
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_blogpost; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_blogpost (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    tags text,
+    categories text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_blogpost REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_blogpost OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_company; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2737,6 +2759,30 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_milestone REPLI
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_milestone OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_projectsummary; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projectsummary (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text NOT NULL,
+    data jsonb,
+    total_task_count integer,
+    budget_sum numeric(15,2),
+    average_hours numeric(15,4),
+    team_members_list text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projectsummary REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projectsummary OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_projecttask; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2815,6 +2861,27 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task REPLICA ID
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testtask; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testtask (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text NOT NULL,
+    status text NOT NULL,
+    due_date timestamp without time zone
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testtask REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testtask OWNER TO postgres;
 
 --
 -- Name: org_relationship_definitions; Type: TABLE; Schema: public; Owner: postgres
@@ -4711,7 +4778,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XBOdarP8g5GdP9btG53QEG6nOnMQ8SZYUY5GdaheOfN9NbD6Y2OvBveuCre1gr5
+\unrestrict IygfUvyY1bM1igGhVACWo4b1RgCKg22E4hy2egfUzgCsq7FO4Vdltn6N9l8iw9j
 
 --
 -- Database "postgres" dump
@@ -4723,7 +4790,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict HLBgFC59MNaIMhje8NFFoax3tnnNwko2xzvTAxdXZAm8ddkuuCgpJzFYZJxhT2h
+\restrict VQQCt4lr2eLlj4WvWhdPFv1EC7oRlaGymiwP8EsKFMbgdVSucvRgiNY21ujaLZf
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -4744,7 +4811,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HLBgFC59MNaIMhje8NFFoax3tnnNwko2xzvTAxdXZAm8ddkuuCgpJzFYZJxhT2h
+\unrestrict VQQCt4lr2eLlj4WvWhdPFv1EC7oRlaGymiwP8EsKFMbgdVSucvRgiNY21ujaLZf
 
 --
 -- PostgreSQL database cluster dump complete
