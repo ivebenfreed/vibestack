@@ -108,6 +108,12 @@ export class RecordManager {
             if (data[customField.name] !== undefined) {
               relationshipData[customField.name] = data[customField.name];
               delete data[customField.name]; // Remove from data to prevent column errors
+            } else if (customField.required) {
+              // Check if required relationship field is missing
+              return {
+                success: false,
+                errors: [`${customField.name}: Field '${customField.name}' is required`]
+              };
             }
           }
         }
@@ -187,9 +193,14 @@ export class RecordManager {
         });
       });
       
-      // Add custom field definitions from entity config
+      // Add custom field definitions from entity config (exclude relationship fields)
       if (entityDef && entityDef.customFields) {
         for (const customField of entityDef.customFields) {
+          // Skip relationship fields - they are validated and processed separately
+          if (customField.type === 'custom_user_reference' || customField.type === 'custom_entity_reference') {
+            continue;
+          }
+          
           allFieldDefinitions.set(customField.name, {
             name: customField.name,
             type: customField.type,
@@ -279,7 +290,8 @@ export class RecordManager {
               const relationshipDef = RelationshipFieldHandler.convertToRelationshipMetadata(
                 fieldName,
                 fieldType || 'user_reference',
-                entityName
+                entityName,
+                fieldDef
               );
               
               await RelationshipFieldHandler.createRelationship(
@@ -336,10 +348,8 @@ export class RecordManager {
 
       // Merge custom fields back into the response
       const responseData = { ...result };
-      if (result.custom_fields && typeof result.custom_fields === 'object') {
-        Object.assign(responseData, result.custom_fields);
-        delete responseData.custom_fields; // Remove the JSONB column from response
-      }
+      // Custom fields are now direct columns in the result, no need to merge from JSONB
+      // No custom_fields JSONB column to clean up in new architecture
 
       return { success: true, data: responseData };
     } catch (error) {
@@ -448,24 +458,14 @@ export class RecordManager {
         updateData: updateData
       });
 
-      // If there are custom field updates, merge them with existing custom_fields
+      // If there are custom field updates, add them directly as columns (new architecture)
       if (Object.keys(customUpdates).length > 0) {
-        console.log(`📥 [RecordManager] Processing custom field updates...`);
+        console.log(`📥 [RecordManager] Processing custom field updates as direct columns:`, customUpdates);
         
-        // First get existing custom fields
-        const existing = await this.config.kysely
-          .selectFrom(config.tableName as any)
-          .select(['custom_fields'])
-          .where('id', '=', recordId)
-          .where('organization_id', '=', orgId)
-          .executeTakeFirst();
-        
-        console.log(`🗂️ [RecordManager] Existing custom fields:`, existing?.custom_fields);
-        
-        const existingCustom = existing?.custom_fields || {};
-        updateData.custom_fields = { ...existingCustom, ...customUpdates };
+        // Custom fields are now real database columns, so we add them directly to updateData
+        Object.assign(updateData, customUpdates);
 
-        console.log(`🔄 [RecordManager] Merged custom fields:`, updateData.custom_fields);
+        console.log(`🔄 [RecordManager] Custom fields added to update data as direct columns`);
       }
 
       // Remove system fields that shouldn't be updated
@@ -500,11 +500,10 @@ export class RecordManager {
 
       // Merge custom fields back into the response
       const responseData = { ...result };
-      if (result.custom_fields && typeof result.custom_fields === 'object') {
-        console.log(`🔄 [RecordManager] Merging custom fields into response:`, result.custom_fields);
-        Object.assign(responseData, result.custom_fields);
-        delete responseData.custom_fields; // Remove the JSONB column from response
-      }
+      // Custom fields are now direct columns in the result, no need to merge from JSONB
+      console.log(`🔄 [RecordManager] Custom fields are already included as direct columns in result`);
+
+      // No custom_fields JSONB column to clean up in new architecture
 
       console.log(`✅ [RecordManager] Update successful:`, {
         responseDataKeys: Object.keys(responseData)
@@ -595,10 +594,8 @@ export class RecordManager {
 
       // Merge custom fields into the record
       let responseData = { ...result };
-      if (result.custom_fields && typeof result.custom_fields === 'object') {
-        Object.assign(responseData, result.custom_fields);
-        delete responseData.custom_fields; // Remove the JSONB column from response
-      }
+      // Custom fields are now direct columns in the result, no need to merge from JSONB
+      // No custom_fields JSONB column to clean up in new architecture
 
       return { success: true, data: responseData };
     } catch (error) {
@@ -645,14 +642,10 @@ export class RecordManager {
 
       const results = await query.execute();
 
-      // Merge custom fields into each record
+      // Custom fields are now direct columns, no need to merge JSONB
       const mergedResults = results.map((record: any) => {
-        if (record.custom_fields && typeof record.custom_fields === 'object') {
-          const merged = { ...record, ...record.custom_fields };
-          delete merged.custom_fields; // Remove the JSONB column from response
-          return merged;
-        }
-        return record;
+        // Custom fields are already included as direct columns in the record
+        return { ...record };
       });
 
       // Resolve reference fields if requested
@@ -787,14 +780,77 @@ export class RecordManager {
         metadata = {};
       }
 
+      // Build simplified fields object for unified system
+      const fields: Record<string, any> = {};
+      if (metadata.allFields && Array.isArray(metadata.allFields)) {
+        for (const field of metadata.allFields) {
+          // Simplify field types to match actual usage
+          let fieldType = field.type;
+          
+          // Convert complex field types to simple ones that match actual data
+          if (fieldType === 'priority_set') {
+            fieldType = 'text'; // Priority is stored as simple text like "high", "medium", "low"
+          } else if (fieldType === 'status_set') {
+            fieldType = 'text'; // Status is stored as simple text like "active", "completed", etc.
+          } else if (fieldType === 'longtext') {
+            fieldType = 'text'; // Simplify longtext to text
+          }
+          
+          // Build rich field info for all fields
+          const fieldInfo: any = {
+            name: field.name,
+            type: fieldType,
+            required: field.required || false,
+            description: field.description,
+            defaultValue: field.defaultValue,
+            unique: field.unique || false,
+            indexed: field.indexed || false,
+            min: field.min,
+            max: field.max,
+            enum: field.enum,
+            regex: field.regex,
+            maxLength: field.maxLength,
+            minLength: field.minLength
+          };
+
+          // Add relationship-specific metadata
+          if (fieldType === 'user_reference' || fieldType === 'entity_reference' || 
+              fieldType === 'custom_user_reference' || fieldType === 'custom_entity_reference') {
+            fieldInfo.relationshipType = field.relationshipType;
+            fieldInfo.targetEntityType = field.targetEntityType;
+            fieldInfo.cardinality = field.cardinality;
+          }
+
+          // Add rollup-specific metadata
+          if (fieldType === 'rollup_concat' || fieldType === 'rollup_count' || 
+              fieldType === 'rollup_sum' || fieldType === 'rollup_average') {
+            fieldInfo.rollupConfig = field.rollupConfig;
+          }
+
+          // Add currency-specific metadata
+          if (fieldType === 'currency') {
+            fieldInfo.currencyConfig = field.currencyConfig;
+          }
+
+          // Clean up undefined values
+          Object.keys(fieldInfo).forEach(key => {
+            if (fieldInfo[key] === undefined) {
+              delete fieldInfo[key];
+            }
+          });
+
+          fields[field.name] = fieldInfo;
+        }
+      }
+
       return {
         success: true,
         data: {
           entityName: entity.entity_name,
           tableName: entity.table_name,
           archetype: entity.archetype,
-          fieldCount: Object.keys(metadata.fields || {}).length,
-          fields: metadata.fields || {},
+          fieldCount: Object.keys(fields).length,
+          fields: fields,
           createdAt: entity.created_at,
           updatedAt: entity.updated_at,
           syncable: metadata.syncable !== false

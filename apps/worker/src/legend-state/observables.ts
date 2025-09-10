@@ -110,28 +110,29 @@ export const universeSchema$ = observable(() => {
   let totalEntitiesAdded = 0
   
   organizations.forEach((org) => {
-    // Safety check: ensure orgId exists
-    if (!org.orgId) {
+    // Safety check: ensure orgId exists (API returns 'id', not 'orgId')
+    const orgId = org.orgId || org.id
+    if (!orgId) {
       fileLog.error(`[UniverseSchema] Skipping org with missing orgId:`, org)
       return
     }
     
-    fileLog.info(`[UniverseSchema] Processing org ${org.orgId} (${org.name || 'unnamed'})`)
+    fileLog.info(`[UniverseSchema] Processing org ${orgId} (${org.name || 'unnamed'})`)
     
     // FIXED: Get schema observable directly from cache instead of stored reference
     // This avoids the corruption that happens when Legend State's assign() stores the observable
-    const schemaObservable = getSchemaObservable$(org.orgId)
+    const schemaObservable = getSchemaObservable$(orgId)
     
     if (!schemaObservable) {
-      fileLog.debug(`[UniverseSchema] No schema observable found for org ${org.orgId}, will load asynchronously`)
+      fileLog.debug(`[UniverseSchema] No schema observable found for org ${orgId}, will load asynchronously`)
       return
     }
     
-    fileLog.info(`[UniverseSchema] Found schema observable for org ${org.orgId}, getting data...`)
+    fileLog.info(`[UniverseSchema] Found schema observable for org ${orgId}, getting data...`)
     
     const schemaData = schemaObservable.get() // Reactive access to schema data
     
-    fileLog.info(`[UniverseSchema] Schema data for org ${org.orgId}:`, {
+    fileLog.info(`[UniverseSchema] Schema data for org ${orgId}:`, {
       hasData: !!schemaData,
       isObject: typeof schemaData === 'object',
       isArray: Array.isArray(schemaData),
@@ -145,24 +146,24 @@ export const universeSchema$ = observable(() => {
     // - {}: Empty object means no schema found
     // - { [orgId]: schema }: Object with schema means loaded
     if (!schemaData) {
-      fileLog.debug(`[UniverseSchema] Schema data for org ${org.orgId} still loading (undefined/null)`)
+      fileLog.debug(`[UniverseSchema] Schema data for org ${orgId} still loading (undefined/null)`)
       return // Skip this org - data is still loading
     }
     
     if (typeof schemaData !== 'object') {
-      fileLog.error(`[UniverseSchema] Schema data for org ${org.orgId} has unexpected format (not object):`, typeof schemaData)
+      fileLog.error(`[UniverseSchema] Schema data for org ${orgId} has unexpected format (not object):`, typeof schemaData)
       return // Skip this org - unexpected format
     }
     
     // Get the schema object by orgId key (syncedCrud format)
-    const schema = schemaData[org.orgId]
+    const schema = schemaData[orgId]
     
     if (!schema) {
-      fileLog.debug(`[UniverseSchema] No schema found for org ${org.orgId} in syncedCrud data`)
+      fileLog.debug(`[UniverseSchema] No schema found for org ${orgId} in syncedCrud data`)
       return // Skip this org - no schema available
     }
       
-      fileLog.info(`[UniverseSchema] Schema object for org ${org.orgId}:`, {
+      fileLog.info(`[UniverseSchema] Schema object for org ${orgId}:`, {
         hasSchema: !!schema,
         hasEntities: !!schema?.entities,
         entityCount: schema?.entities ? Object.keys(schema.entities).length : 0
@@ -171,14 +172,14 @@ export const universeSchema$ = observable(() => {
       if (schema?.entities) {
         // In universe mode, prefix entity names with orgId for uniqueness
         Object.entries(schema.entities).forEach(([entityName, entityDef]) => {
-          const prefixedName = `${org.orgId}_${entityName}`
-          fileLog.info(`[UniverseSchema] Adding entity ${entityName} as ${prefixedName} from org ${org.orgId} (${org.name || 'unnamed'})`)
+          const prefixedName = `${orgId}_${entityName}`
+          fileLog.info(`[UniverseSchema] Adding entity ${entityName} as ${prefixedName} from org ${orgId} (${org.name || 'unnamed'})`)
           
           combinedEntities[prefixedName] = {
             ...entityDef,
             // Add metadata about which organization this entity belongs to
-            _orgId: org.orgId,
-            _orgName: org.name || org.orgId, // Fallback to orgId if name is not available
+            _orgId: orgId,
+            _orgName: org.name || orgId, // Fallback to orgId if name is not available
             _originalEntityName: entityName,
             _originalName: entityName // Also add _originalName for compatibility
           }

@@ -20,7 +20,7 @@ const { randomBytes } = require('crypto');
 
 // Database connection
 const client = new Client({
-  connectionString: 'postgres://postgres:postgres@localhost:5432/vibestack_dev'
+  connectionString: 'postgres://postgres:postgres@localhost:5432/elevra_dev'
 });
 
 // Wide Corp organization ID
@@ -417,8 +417,8 @@ async function clearExistingData() {
   console.log('🧹 Clearing existing Wide Corp data...');
   
   const tables = [
-    'timesheet', 'meeting', 'proposal', 'document', 'expense', 
-    'invoice', 'contract', 'resource', 'skill', 'certification',
+    'time_sheet', 'meeting', 'expense', 
+    'invoice', 'contract',
     'project', 'client'
   ];
   
@@ -627,7 +627,7 @@ async function seedTimesheets(projectIds) {
         else if (member.role === 'contributor') rate = 85; // Designer
         
         await client.query(`
-          INSERT INTO org_${WIDE_CORP_ORG_ID.replace(/-/g, '_')}_timesheet
+          INSERT INTO org_${WIDE_CORP_ORG_ID.replace(/-/g, '_')}_time_sheet
           (id, organization_id, project_id, user_id, date, hours, description, billable, rate, status, created_by, created_at, updated_at)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
         `, [

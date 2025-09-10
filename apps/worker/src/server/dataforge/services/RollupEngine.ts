@@ -26,11 +26,11 @@ export interface RollupFieldConfig {
 }
 
 export class RollupEngine {
-  private entityManager: EntityManager;
+  private config: { kysely: any };
   private expressionEvaluator: ExpressionEvaluator;
   
-  constructor(entityManager: EntityManager) {
-    this.entityManager = entityManager;
+  constructor(manager: { config: { kysely: any } }) {
+    this.config = manager.config;
     this.expressionEvaluator = new ExpressionEvaluator();
   }
 
@@ -389,9 +389,45 @@ export class RollupEngine {
   // Private helper methods
 
   private async storeRollupConfig(orgId: string, config: RollupFieldConfig): Promise<void> {
-    // Store in a dedicated rollup configurations table
-    // This would be implemented based on your schema needs
-    console.log(`Storing rollup config for ${config.entityName}.${config.fieldName}`);
+    try {
+      await this.config.kysely
+        .insertInto('dataforge_rollup_fields')
+        .values({
+          org_id: orgId,
+          entity_name: config.entityName,
+          field_name: config.fieldName,
+          rollup_type: config.type,
+          relationship_type: config.relationshipType,
+          target_entity_type: config.targetEntityType,
+          target_field: config.targetField || null,
+          separator: config.separator || null,
+          conditions: JSON.stringify(config.conditions || {}),
+          expression: config.expression || null,
+          computation_context: JSON.stringify(config.computationContext || {}),
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+        .onConflict((oc) => oc
+          .columns(['org_id', 'entity_name', 'field_name'])
+          .doUpdateSet({
+            rollup_type: config.type,
+            relationship_type: config.relationshipType,
+            target_entity_type: config.targetEntityType,
+            target_field: config.targetField || null,
+            separator: config.separator || null,
+            conditions: JSON.stringify(config.conditions || {}),
+            expression: config.expression || null,
+            computation_context: JSON.stringify(config.computationContext || {}),
+            updated_at: new Date()
+          })
+        )
+        .execute();
+      
+      console.log(`✅ Stored rollup config for ${config.entityName}.${config.fieldName}`);
+    } catch (error) {
+      console.error(`Failed to store rollup config for ${config.entityName}.${config.fieldName}:`, error);
+      throw error;
+    }
   }
 
   private async getRollupConfigs(
@@ -399,9 +435,30 @@ export class RollupEngine {
     orgId: string, 
     entityName: string
   ): Promise<RollupFieldConfig[]> {
-    // Retrieve rollup configurations from database
-    // This would query your rollup configs table
-    return [];
+    try {
+      const configs = await kysely
+        .selectFrom('dataforge_rollup_fields')
+        .selectAll()
+        .where('org_id', '=', orgId)
+        .where('entity_name', '=', entityName)
+        .execute();
+
+      return configs.map((config: any) => ({
+        entityName: config.entity_name,
+        fieldName: config.field_name,
+        type: config.rollup_type as any,
+        relationshipType: config.relationship_type,
+        targetEntityType: config.target_entity_type,
+        targetField: config.target_field,
+        separator: config.separator,
+        conditions: config.conditions ? JSON.parse(config.conditions) : {},
+        expression: config.expression,
+        computationContext: config.computation_context ? JSON.parse(config.computation_context) : {}
+      }));
+    } catch (error) {
+      console.error(`Failed to get rollup configs for ${entityName}:`, error);
+      return [];
+    }
   }
 
   private async getRollupConfigsByRelationship(
@@ -411,8 +468,31 @@ export class RollupEngine {
     relationshipType: string,
     targetEntityType: string
   ): Promise<RollupFieldConfig[]> {
-    // Find rollup configs that depend on this specific relationship
-    return [];
+    try {
+      const configs = await kysely
+        .selectFrom('dataforge_rollup_fields')
+        .selectAll()
+        .where('org_id', '=', orgId)
+        .where('relationship_type', '=', relationshipType)
+        .where('target_entity_type', '=', targetEntityType)
+        .execute();
+
+      return configs.map((config: any) => ({
+        entityName: config.entity_name,
+        fieldName: config.field_name,
+        type: config.rollup_type as any,
+        relationshipType: config.relationship_type,
+        targetEntityType: config.target_entity_type,
+        targetField: config.target_field,
+        separator: config.separator,
+        conditions: config.conditions ? JSON.parse(config.conditions) : {},
+        expression: config.expression,
+        computationContext: config.computation_context ? JSON.parse(config.computation_context) : {}
+      }));
+    } catch (error) {
+      console.error(`Failed to get rollup configs by relationship:`, error);
+      return [];
+    }
   }
 
   private async getRollupConfigsByTargetField(
@@ -421,7 +501,30 @@ export class RollupEngine {
     targetEntityType: string,
     targetField: string
   ): Promise<RollupFieldConfig[]> {
-    // Find rollup configs that aggregate this target field
-    return [];
+    try {
+      const configs = await kysely
+        .selectFrom('dataforge_rollup_fields')
+        .selectAll()
+        .where('org_id', '=', orgId)
+        .where('target_entity_type', '=', targetEntityType)
+        .where('target_field', '=', targetField)
+        .execute();
+
+      return configs.map((config: any) => ({
+        entityName: config.entity_name,
+        fieldName: config.field_name,
+        type: config.rollup_type as any,
+        relationshipType: config.relationship_type,
+        targetEntityType: config.target_entity_type,
+        targetField: config.target_field,
+        separator: config.separator,
+        conditions: config.conditions ? JSON.parse(config.conditions) : {},
+        expression: config.expression,
+        computationContext: config.computation_context ? JSON.parse(config.computation_context) : {}
+      }));
+    } catch (error) {
+      console.error(`Failed to get rollup configs by target field:`, error);
+      return [];
+    }
   }
 }

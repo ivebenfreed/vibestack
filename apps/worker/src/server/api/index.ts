@@ -35,7 +35,7 @@ api.use('*', enforceTrialLimits)
 
 // Mount OpenAPI routers (these will be included in unified documentation)
 api.route('/', publicOpenAPIRouter) // Public routes (health, etc.)
-// api.route('/', organizationsOpenAPIRouter) // Organization management routes - DISABLED due to UUID validation issue
+api.route('/', organizationsOpenAPIRouter) // Organization management routes - RE-ENABLED
 api.route('/', protectedOpenAPIRouter) // Protected routes
 api.route('/dataforge', dataforgeRouter) // DataForge API (already OpenAPI)
 api.route('/dataforge-migration', dataforgeMigrationRouter) // DataForge Migration API
@@ -65,6 +65,10 @@ api.route('/generic', genericKysely) // Now using Kysely instead of Drizzle
 // File Import API
 import fileImportApi from '../routes/file-import-api'
 api.route('/file-import', fileImportApi)
+
+// Dependencies API
+import dependenciesApi from '../routes/dependencies-api'
+api.route('/dependencies', dependenciesApi)
 
 // Test Parser API (development only)
 import testParserApi from '../routes/test-parser'
