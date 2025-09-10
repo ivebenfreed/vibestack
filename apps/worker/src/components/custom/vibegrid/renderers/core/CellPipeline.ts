@@ -29,6 +29,9 @@ export class CellPipeline {
     text: text,
     number: number,
     date: date,
+    datetime: date,
+    timestamp: date,
+    timestamptz: date,
     boolean: boolean,
     enum: enumValue,
     select: text, // Reuse text renderer for select
@@ -53,11 +56,6 @@ export class CellPipeline {
     // Check column cellType first, then fall back to type
     const cellType = column.cellType || column.type;
     const renderer = CellPipeline.renderers[cellType] || text;
-    
-    // Debug relationship rendering disabled for performance
-    // if (cellType?.startsWith('relationship') && column.id === 'assignee') {
-    //   fileLog.info('🔍 CellPipeline: Rendering relationship', { columnId: column.id, cellType });
-    // }
     
     // For relationship types, pass row data for pre-resolved values
     if (cellType?.startsWith('relationship')) {

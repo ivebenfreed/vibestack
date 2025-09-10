@@ -44,6 +44,8 @@ export const fastRenderers = {
   boolean: () => import('./boolean').then(m => m.boolean),
   date: () => import('./date').then(m => m.date),
   datetime: () => import('./date').then(m => m.date),
+  timestamp: () => import('./date').then(m => m.date),
+  timestamptz: () => import('./date').then(m => m.date),
   
   // Communication types
   email: () => import('./email').then(m => m.email),

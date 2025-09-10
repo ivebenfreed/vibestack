@@ -39,6 +39,12 @@ export function formatFieldForDisplay(
     case 'file':
       return formatFileForDisplay(value, options);
       
+    case 'date':
+    case 'datetime':
+    case 'timestamp':
+    case 'timestamptz':
+      return formatDateForDisplay(value, fieldType, options);
+      
     case 'multi-select':
     case 'multi_select':
       return formatMultiSelectForDisplay(value, options, fieldSchema);
@@ -66,6 +72,58 @@ export function formatFieldForDisplay(
       
     default:
       return formatGenericForDisplay(value, options);
+  }
+}
+
+/**
+ * Format date field data with current year vs previous year logic
+ * Handles both date-only fields and timestamp fields with time information
+ */
+function formatDateForDisplay(value: any, fieldType: string, options: DisplayFormatterOptions): string {
+  if (value === null || value === undefined) return '';
+  
+  try {
+    const date = value instanceof Date ? value : new Date(value);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const dateYear = date.getFullYear();
+    
+    // Check if this is a timestamp field that should include time
+    const isTimestampField = fieldType === 'datetime' || fieldType === 'timestamp' || fieldType === 'timestamptz';
+    
+    if (isTimestampField) {
+      // For timestamp fields, show date + time
+      if (dateYear === currentYear) {
+        // Current year: "Sep 10, 3:45 PM"
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const day = date.getDate();
+        const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        return `${month} ${day}, ${time}`;
+      } else {
+        // Previous years: "07/29/23, 3:45 PM"
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = String(dateYear).slice(-2);
+        const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        return `${month}/${day}/${year}, ${time}`;
+      }
+    } else {
+      // For date-only fields, show just the date
+      if (dateYear === currentYear) {
+        // Format as "May, 3" for current year
+        const month = date.toLocaleDateString('en-US', { month: 'long' });
+        const day = date.getDate();
+        return `${month}, ${day}`;
+      } else {
+        // Format as "07/29/23" for previous years
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = String(dateYear).slice(-2);
+        return `${month}/${day}/${year}`;
+      }
+    }
+  } catch {
+    return String(value);
   }
 }
 

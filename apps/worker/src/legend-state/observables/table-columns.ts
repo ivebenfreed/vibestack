@@ -245,6 +245,7 @@ function mapFieldType(fieldType: string): TableColumn['type'] {
       return 'date';
     case 'datetime':
     case 'timestamp':
+    case 'timestamptz':
       return 'datetime';
     case 'currency':
       return 'currency'; // Add currency type mapping

@@ -3,7 +3,7 @@ import type { Column } from '../types';
 /**
  * Fast date rendering function for table cells
  * Formats dates as:
- * - Current year: "Jul 29"
+ * - Current year: "May, 3"
  * - Previous years: "07/29/23"
  */
 export function date(value: any, column: Column): string {
@@ -16,10 +16,10 @@ export function date(value: any, column: Column): string {
     const dateYear = date.getFullYear();
     
     if (dateYear === currentYear) {
-      // Format as "Jul 29" for current year
-      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      // Format as "May, 3" for current year
+      const month = date.toLocaleDateString('en-US', { month: 'long' });
       const day = date.getDate();
-      return `${month} ${day}`;
+      return `${month}, ${day}`;
     } else {
       // Format as "07/29/23" for previous years
       const month = String(date.getMonth() + 1).padStart(2, '0');
