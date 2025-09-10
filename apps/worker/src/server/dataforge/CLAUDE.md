@@ -831,20 +831,31 @@ File: uploaded_by → uploaded_by
 ```
 
 ### 3. Dependency System for Gantt Charts
-**Complete project management dependency system with 4 classic dependency types.**
+**Complete project management dependency system with 4 classic dependency types and frontend synchronization.**
 
 #### Features:
 - **4 Dependency Types**: `finish_to_start`, `start_to_start`, `finish_to_finish`, `start_to_finish`
 - **Entity Restriction**: Only Project, Task, and Activity entities (temporal entities)
 - **Lead/Lag Support**: Optional offset days for dependencies
-- **Constraint Types**: Hard vs soft constraints
+- **Constraint Types**: Hard vs soft constraints  
 - **Circular Prevention**: Basic validation to prevent dependency cycles
+- **Frontend Sync**: Automatic entity schema updates with dependency metadata
+- **Re-sync Support**: Admin endpoint for dependency metadata consistency
 
 #### Implementation:
 - **DependencyManager Service** (`services/DependencyManager.ts`)
-- **Relationship Integration**: Uses `depends_on` relationship semantic with rich metadata
-- **API Endpoints**: Full CRUD operations for dependency management
-- **Validation**: Comprehensive entity type and relationship validation
+  - Full CRUD operations with validation and circular dependency prevention
+  - Automatic entity schema synchronization for frontend consumption
+  - Uses per-org relationship tables (`org_xxx_relationships`) for data storage
+  - Rich metadata support (lead/lag days, constraint types, descriptions)
+- **Dependencies API** (`routes/dependencies-api.ts`)
+  - RESTful endpoints with proper authentication integration
+  - Validation for entity types and dependency constraints
+  - Re-sync endpoint for handling out-of-sync situations
+- **Entity Schema Integration**
+  - Dependency metadata automatically stored in `business_metadata.dependencies`
+  - Frontend-ready data structure with type descriptions and relationship counts
+  - Real-time updates when dependencies are created, modified, or deleted
 
 #### API Endpoints:
 ```bash
@@ -856,6 +867,64 @@ PUT    /orgs/:orgId/dependencies/:dependencyId          # Update dependency
 DELETE /orgs/:orgId/dependencies/:dependencyId          # Remove dependency
 GET    /orgs/:orgId/projects/:projectId/critical-path   # Critical path (placeholder)
 GET    /dependency-types                                 # Get dependency type info
+POST   /orgs/:orgId/resync-schema                       # Re-sync dependency metadata
+```
+
+#### Dependency Types with Descriptions:
+- **`finish_to_start`** (FS): Predecessor must finish before successor can start (Default)
+- **`start_to_start`** (SS): Predecessor must start before successor can start  
+- **`finish_to_finish`** (FF): Predecessor must finish before successor can finish
+- **`start_to_finish`** (SF): Predecessor must start before successor can finish
+
+#### Entity Schema Metadata Structure:
+```typescript
+// Automatically stored in entity_schemas.business_metadata.dependencies
+{
+  "supportsDependencies": true,
+  "validDependencyTypes": [
+    {"type": "finish_to_start", "name": "Finish to Start (FS)", "isDefault": true},
+    {"type": "start_to_start", "name": "Start to Start (SS)", "isDefault": false},
+    {"type": "finish_to_finish", "name": "Finish to Finish (FF)", "isDefault": false},
+    {"type": "start_to_finish", "name": "Start to Finish (SF)", "isDefault": false}
+  ],
+  "currentDependencies": [...], // Array of active dependencies
+  "dependencyCount": 5,
+  "lastUpdated": "2025-01-15T10:30:00Z"
+}
+```
+
+#### Gantt Chart Data Structure:
+The system now includes a complete Gantt-ready data structure with:
+- **ProjectTask records** with proper start/due dates (Jan 1 - June 30, 2025)
+- **9+ logical dependency chains** between related tasks
+- **Milestone relationships** via existing `contributes_to` semantics
+- **Complete timeline structure** ready for Gantt chart visualization
+- **Real project data** using Wide Corp's CRM Modernization project
+
+#### Testing Dependency System:
+```bash
+# Create a finish-to-start dependency
+curl -X POST "http://localhost:4001/api/orgs/01920000-1000-7000-8000-000000000001/dependencies" \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "sourceEntityId": "task-2-id",
+    "targetEntityId": "task-1-id", 
+    "sourceEntityType": "Task",
+    "targetEntityType": "Task",
+    "dependencyType": "finish_to_start",
+    "leadLagDays": 2,
+    "isHardConstraint": true,
+    "description": "Task 2 can only start 2 days after Task 1 finishes"
+  }'
+
+# Get all dependencies for a task
+curl -X GET "http://localhost:4001/api/orgs/01920000-1000-7000-8000-000000000001/dependencies/task-1-id?entityType=Task" \
+  -b cookies.txt
+
+# Re-sync dependency metadata for all entities
+curl -X POST "http://localhost:4001/api/orgs/01920000-1000-7000-8000-000000000001/resync-schema" \
+  -b cookies.txt
 ```
 
 ### 4. Simple Approval Workflow System
@@ -1011,12 +1080,39 @@ These fields are automatically:
 9. **NEW: Use RelationshipFieldHandler** for all relationship operations
 10. **NEW: Reference fields in archetypes** (`user_reference`, `entity_reference`) are automatically processed
 
+## Latest Updates (January 2025)
+
+### Dependencies API System Fixes and Gantt Preparation
+**Complete overhaul of the dependency management system with frontend synchronization and Gantt chart preparation.**
+
+#### Key Fixes:
+- **Module Loading**: Fixed broken exports in DataForge index that were causing dependencies API to fail
+- **Schema Alignment**: Removed `field_name` column insertion to align with current relationship table architecture
+- **Authentication Integration**: Updated dependencies API to use proper user context (`c.get('user')`) instead of hardcoded values
+- **Entity Schema Sync**: Added automatic dependency metadata updates in `business_metadata.dependencies` for frontend consumption
+
+#### Gantt Chart Preparation:
+- **ProjectTask Timeline**: Set up all ProjectTask records with proper start/due dates spanning Jan 1 - June 30, 2025
+- **Dependency Chains**: Created 9+ logical dependency relationships between related tasks using finish-to-start dependencies
+- **Milestone Integration**: Connected tasks to milestones via existing `contributes_to` relationship semantics
+- **Complete Data Structure**: Full timeline structure ready for Gantt chart visualization with realistic project data
+
+#### System Integration:
+- **Per-Org Relationships**: All dependencies stored in organization-specific relationship tables
+- **Frontend Synchronization**: Entity schemas automatically updated with dependency metadata on all CRUD operations
+- **Re-sync Capability**: Admin endpoint for handling out-of-sync dependency metadata situations
+- **Full API Coverage**: Complete CRUD operations with proper validation and circular dependency prevention
+
 ## Future Considerations
 
 - [ ] Add field migration support when archetype changes
 - [ ] Implement field-level permissions
-- [ ] Add computed fields support
+- [x] ~~Add computed fields support~~ ✅ **COMPLETED** (September 2025)
+- [x] ~~Add dependency system support~~ ✅ **COMPLETED** (January 2025) 
 - [ ] Support for field relationships and foreign keys
 - [ ] Field versioning and change history
 - [ ] Advanced validation rules (cross-field validation)
 - [ ] Field templates and reusable field sets
+- [ ] Critical Path Method (CPM) algorithm for dependency scheduling
+- [ ] Gantt chart frontend component with dependency visualization
+- [ ] Cross-entity dependency relationships (Project → Task, Epic → Task)
