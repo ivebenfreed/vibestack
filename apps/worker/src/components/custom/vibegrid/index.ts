@@ -3,8 +3,8 @@
 // ====================================
 
 // Main component
-export { VibeGrid } from './VibeGrid';
-export type { VibeGridProps } from './VibeGrid';
+export { VibeGridPure } from './VibeGridPure';
+export type { VibeGridPureProps } from './VibeGridPure';
 
 // Modular components removed - files don't exist
 

@@ -2210,7 +2210,7 @@ export class SimplePassiveRenderer {
       tagBadge.textContent = tag;
       
       // Apply specific color class if available, otherwise use default styling
-      const colorClass = this.getBadgeColorClass(tag, columnId);
+      const colorClass = this.getBadgeColorClass(tag, column.id);
       if (colorClass) {
         tagBadge.classList.add(colorClass);
       } else {
