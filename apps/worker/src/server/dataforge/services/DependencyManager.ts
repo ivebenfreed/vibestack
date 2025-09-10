@@ -69,7 +69,6 @@ export class DependencyManager {
         target_entity_type: dependency.targetEntityType,
         target_entity_id: dependency.targetEntityId,
         relationship_type: 'depends_on',
-        field_name: 'dependency', // Virtual field name for dependencies
         properties: {
           dependency_type: dependency.dependencyType,
           lead_lag_days: dependency.leadLagDays || 0,
@@ -82,6 +81,10 @@ export class DependencyManager {
         created_by: createdBy
       })
       .execute();
+
+    // Update entity schemas with dependency metadata for frontend consumption
+    await this.updateEntitySchemaDependencyMetadata(kysely, orgId, dependency.sourceEntityType);
+    await this.updateEntitySchemaDependencyMetadata(kysely, orgId, dependency.targetEntityType);
   }
 
   /**
@@ -209,6 +212,14 @@ export class DependencyManager {
   ): Promise<void> {
     const tableName = this.getRelationshipTableName(orgId);
 
+    // Get the dependency before deleting to update schemas
+    const dependency = await kysely
+      .selectFrom(tableName)
+      .selectAll()
+      .where('id', '=', dependencyId)
+      .where('relationship_type', '=', 'depends_on')
+      .executeTakeFirst();
+
     // Soft delete - set valid_until timestamp
     await kysely
       .updateTable(tableName)
@@ -216,6 +227,12 @@ export class DependencyManager {
       .where('id', '=', dependencyId)
       .where('relationship_type', '=', 'depends_on')
       .execute();
+
+    // Update entity schemas for both affected entities
+    if (dependency) {
+      await this.updateEntitySchemaDependencyMetadata(kysely, orgId, dependency.source_entity_type);
+      await this.updateEntitySchemaDependencyMetadata(kysely, orgId, dependency.target_entity_type);
+    }
   }
 
   /**
@@ -229,10 +246,10 @@ export class DependencyManager {
   ): Promise<void> {
     const tableName = this.getRelationshipTableName(orgId);
 
-    // Get current properties
+    // Get current dependency to update schemas
     const current = await kysely
       .selectFrom(tableName)
-      .select('properties')
+      .selectAll()
       .where('id', '=', dependencyId)
       .where('relationship_type', '=', 'depends_on')
       .executeTakeFirst();
@@ -256,6 +273,10 @@ export class DependencyManager {
       .where('id', '=', dependencyId)
       .where('relationship_type', '=', 'depends_on')
       .execute();
+
+    // Update entity schemas for both affected entities
+    await this.updateEntitySchemaDependencyMetadata(kysely, orgId, current.source_entity_type);
+    await this.updateEntitySchemaDependencyMetadata(kysely, orgId, current.target_entity_type);
   }
 
   /**
@@ -346,5 +367,94 @@ export class DependencyManager {
    */
   static supportsDepenencies(entityType: string): boolean {
     return this.VALID_ENTITY_TYPES.includes(entityType as any);
+  }
+
+  /**
+   * Update entity schema with current dependency metadata for frontend consumption
+   */
+  static async updateEntitySchemaDependencyMetadata(
+    kysely: Kysely<any>,
+    orgId: string,
+    entityType: string
+  ): Promise<void> {
+    // Get entity archetype to check if it supports dependencies
+    const entitySchema = await kysely
+      .selectFrom('entity_schemas')
+      .select('archetype')
+      .where('org_id', '=', orgId)
+      .where('entity_name', '=', entityType)
+      .executeTakeFirst();
+
+    // Only update schema for entities that support dependencies (by archetype)
+    if (!entitySchema || !['project', 'task', 'activity'].includes(entitySchema.archetype)) {
+      return;
+    }
+
+    // Get current dependencies for this entity type
+    const tableName = this.getRelationshipTableName(orgId);
+    const dependencies = await kysely
+      .selectFrom(tableName)
+      .selectAll()
+      .where('relationship_type', '=', 'depends_on')
+      .where('valid_until', 'is', null)
+      .where((eb) =>
+        eb.or([
+          eb('source_entity_type', '=', entityType),
+          eb('target_entity_type', '=', entityType)
+        ])
+      )
+      .execute();
+
+    // Create dependency metadata for the schema
+    const dependencyMetadata = {
+      supportsDependencies: true,
+      validDependencyTypes: [
+        { type: 'finish_to_start', name: 'Finish to Start (FS)', isDefault: true },
+        { type: 'start_to_start', name: 'Start to Start (SS)', isDefault: false },
+        { type: 'finish_to_finish', name: 'Finish to Finish (FF)', isDefault: false },
+        { type: 'start_to_finish', name: 'Start to Finish (SF)', isDefault: false }
+      ],
+      currentDependencies: dependencies.map(dep => ({
+        id: dep.id,
+        sourceEntityId: dep.source_entity_id,
+        targetEntityId: dep.target_entity_id,
+        sourceEntityType: dep.source_entity_type,
+        targetEntityType: dep.target_entity_type,
+        dependencyType: dep.properties?.dependency_type || 'finish_to_start',
+        leadLagDays: dep.properties?.lead_lag_days || 0,
+        isHardConstraint: dep.properties?.is_hard_constraint ?? true,
+        description: dep.properties?.description,
+        createdAt: dep.created_at,
+        createdBy: dep.created_by
+      })),
+      dependencyCount: dependencies.length,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Get current entity schema
+    const currentSchema = await kysely
+      .selectFrom('entity_schemas')
+      .select('business_metadata')
+      .where('org_id', '=', orgId)
+      .where('entity_name', '=', entityType)
+      .executeTakeFirst();
+
+    if (currentSchema) {
+      // Update the business_metadata with dependency information
+      const updatedMetadata = {
+        ...currentSchema.business_metadata,
+        dependencies: dependencyMetadata
+      };
+
+      await kysely
+        .updateTable('entity_schemas')
+        .set({
+          business_metadata: updatedMetadata,
+          updated_at: new Date().toISOString()
+        })
+        .where('org_id', '=', orgId)
+        .where('entity_name', '=', entityType)
+        .execute();
+    }
   }
 }

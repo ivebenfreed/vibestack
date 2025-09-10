@@ -62,7 +62,6 @@ export {
 export { DDLGenerator } from './DDLGenerator';
 export { ArchetypeService } from './ArchetypeService';
 export { BulkOperationsService } from './BulkOperationsService';
-export { SchemaModificationService } from './SchemaModificationService';
 export { DependencyManager } from './services/DependencyManager';
 export type { 
   DependencyType, 
@@ -80,7 +79,7 @@ export type {
 // Foundation Entities (Base Archetypes)
 // =============================================================================
 
-export { FoundationEntityRegistry } from './entities/foundation';
+// Foundation entities removed during cleanup
 
 // Project Archetype
 export { Project } from './archetypes/ProjectArchetype';

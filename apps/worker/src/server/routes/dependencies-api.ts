@@ -10,7 +10,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { DependencyManager } from '../dataforge';
 import type { DependencyType, DependencyDefinition } from '../dataforge';
-import { createKyselyForPersistentUse } from '../lib/database-manager';
+import { withKysely } from '../lib/database-manager';
 
 const dependenciesRouter = new Hono();
 
@@ -48,17 +48,17 @@ dependenciesRouter.post(
     try {
       const orgId = c.req.param('orgId');
       const dependencyData = c.req.valid('json');
-      const kysely = createKyselyForPersistentUse(c.env);
+      const user = c.get('user');
+      const createdBy = user?.id;
 
-      // TODO: Get user ID from auth context
-      const createdBy = 'system'; // Placeholder
-
-      await DependencyManager.createDependency(
-        kysely,
-        orgId,
-        dependencyData as DependencyDefinition,
-        createdBy
-      );
+      await withKysely(async (kysely) => {
+        await DependencyManager.createDependency(
+          kysely,
+          orgId,
+          dependencyData as DependencyDefinition,
+          createdBy
+        );
+      });
 
       return c.json({
         success: true,
@@ -98,9 +98,9 @@ dependenciesRouter.get(
         }, 400);
       }
       
-      const kysely = createKyselyForPersistentUse(c.env);
-
-      const dependencies = await DependencyManager.getDependencies(kysely, orgId, entityId, entityType);
+      const dependencies = await withKysely(async (kysely) => {
+        return await DependencyManager.getDependencies(kysely, orgId, entityId, entityType);
+      });
 
       return c.json({
         success: true,
@@ -144,9 +144,9 @@ dependenciesRouter.get(
         }, 400);
       }
       
-      const kysely = createKyselyForPersistentUse(c.env);
-
-      const predecessors = await DependencyManager.getPredecessors(kysely, orgId, entityId, entityType);
+      const predecessors = await withKysely(async (kysely) => {
+        return await DependencyManager.getPredecessors(kysely, orgId, entityId, entityType);
+      });
 
       return c.json({
         success: true,
@@ -190,9 +190,9 @@ dependenciesRouter.get(
         }, 400);
       }
       
-      const kysely = createKyselyForPersistentUse(c.env);
-
-      const successors = await DependencyManager.getSuccessors(kysely, orgId, entityId, entityType);
+      const successors = await withKysely(async (kysely) => {
+        return await DependencyManager.getSuccessors(kysely, orgId, entityId, entityType);
+      });
 
       return c.json({
         success: true,
@@ -226,9 +226,9 @@ dependenciesRouter.put(
       const orgId = c.req.param('orgId');
       const dependencyId = c.req.param('dependencyId');
       const updates = c.req.valid('json');
-      const kysely = createKyselyForPersistentUse(c.env);
-
-      await DependencyManager.updateDependency(kysely, orgId, dependencyId, updates);
+      await withKysely(async (kysely) => {
+        await DependencyManager.updateDependency(kysely, orgId, dependencyId, updates);
+      });
 
       return c.json({
         success: true,
@@ -259,9 +259,9 @@ dependenciesRouter.delete(
     try {
       const orgId = c.req.param('orgId');
       const dependencyId = c.req.param('dependencyId');
-      const kysely = createKyselyForPersistentUse(c.env);
-
-      await DependencyManager.removeDependency(kysely, orgId, dependencyId);
+      await withKysely(async (kysely) => {
+        await DependencyManager.removeDependency(kysely, orgId, dependencyId);
+      });
 
       return c.json({
         success: true,
@@ -286,9 +286,9 @@ dependenciesRouter.get(
     try {
       const orgId = c.req.param('orgId');
       const projectId = c.req.param('projectId');
-      const kysely = createKyselyForPersistentUse(c.env);
-
-      const criticalPath = await DependencyManager.getCriticalPath(kysely, orgId, projectId);
+      const criticalPath = await withKysely(async (kysely) => {
+        return await DependencyManager.getCriticalPath(kysely, orgId, projectId);
+      });
 
       return c.json({
         success: true,
@@ -348,5 +348,77 @@ dependenciesRouter.get('/dependency-types', async (c) => {
     }
   });
 });
+
+// Re-sync entity schema dependency metadata (admin endpoint)
+dependenciesRouter.post(
+  '/orgs/:orgId/resync-schema',
+  async (c) => {
+    try {
+      const orgId = c.req.param('orgId');
+      const user = c.get('user');
+      
+      // Get all entities that support dependencies (by archetype)
+      const syncResults = [];
+
+      await withKysely(async (kysely) => {
+        // Find all entities with dependency-supporting archetypes
+        const dependencyEntities = await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'archetype'])
+          .where('org_id', '=', orgId)
+          .where('archetype', 'in', ['project', 'task', 'activity'])
+          .where('deleted', '=', false)
+          .execute();
+
+        for (const entity of dependencyEntities) {
+          try {
+            await DependencyManager.updateEntitySchemaDependencyMetadata(kysely, orgId, entity.entity_name);
+            syncResults.push({
+              entityName: entity.entity_name,
+              archetype: entity.archetype,
+              status: 'success',
+              message: 'Schema updated successfully'
+            });
+          } catch (error) {
+            syncResults.push({
+              entityName: entity.entity_name,
+              archetype: entity.archetype,
+              status: 'error',
+              message: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+      });
+
+      const successCount = syncResults.filter(r => r.status === 'success').length;
+      const errorCount = syncResults.filter(r => r.status === 'error').length;
+
+      return c.json({
+        success: errorCount === 0,
+        message: `Re-synced dependency metadata for ${successCount} entities`,
+        data: {
+          results: syncResults,
+          summary: {
+            total: syncResults.length,
+            successful: successCount,
+            failed: errorCount
+          }
+        },
+        metadata: {
+          orgId,
+          performedBy: user?.email || 'unknown',
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error re-syncing dependency schema:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to re-sync dependency schema',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
 
 export default dependenciesRouter;
