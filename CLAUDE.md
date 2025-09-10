@@ -154,86 +154,58 @@ curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 - **StrictPort**: Enabled to prevent port confusion - server will fail if port is unavailable
 - **Environment**: Add `export DEV_PORT=4001` to your shell profile for persistent worktree ports
 
-## Enhanced Contextual Logging System with File-Level Control
+## Simple Logger System with File and Folder Level Control
 
-**Persistent logging configuration via dev scripts with file-level granularity.**
+**Simple 3-level logging system (info, error, debug) with global configuration and file/folder level overrides.**
 
-### Quick Commands
-```bash
-pnpm dev:quiet                   # Silent mode (errors only)
-pnpm dev:sync                    # Focus on sync and state operations  
-pnpm dev:ui                      # UI components at debug level
-pnpm dev:ui:quiet-vibegrid       # Most UI quiet, VibeGrid at info level
-pnpm dev:ui:focus-vibegrid       # Most UI quiet, VibeGrid at debug level
-pnpm dev:debug                   # Multiple contexts at debug level
-pnpm dev:debug:quiet-vibegrid    # Debug mode with VibeGrid at warn level
-pnpm dev:all                     # All contexts enabled at debug level
-pnpm dev:focus                   # Focus on specific file (universe-loader)
-```
+### Basic Usage in Code
+```typescript
+import { log } from '@/logger';
 
-### Custom Configuration
-```bash
-# Use wrapper script for custom configurations
-./scripts/dev-with-logging.sh custom \
-  --contexts=ui,sync \
-  --level=debug \
-  --file-levels=vibegrid:warn,universe-loader:info \
-  --muted=table-data-store
+// Create a logger for your file
+const myLog = log('MyComponent.tsx');
+
+// Use the three log levels
+myLog.info('Component rendered', { props });
+myLog.debug('Debug info', data);
+myLog.error('Error occurred', error);
 ```
 
 ### Runtime Control (Browser Console)
+The `logControl` API is available globally in the browser console:
+
 ```javascript
-// Context controls (persistent)
-logControl.only('ui', 'sync');    // Only these contexts
-logControl.none();                 // Silent mode (errors only)
-logControl.status();               // Check current configuration
+// Set global log level (persistent)
+logControl.setGlobalLevel('debug');         // Show all logs
+logControl.setGlobalLevel('info');          // Show info and errors
+logControl.setGlobalLevel('error');         // Show only errors
 
-// File-level controls (lost on HMR - use dev scripts for persistence)
-logControl.setFileLevel('components/MyComponent', 'debug');
-logControl.muteFile('components/VerboseComponent');
-logControl.setPatternLevel('vibegrid', 'warn');  // All VibeGrid files
+// Quick shortcuts
+logControl.debug();    // Global debug mode
+logControl.info();     // Global info mode  
+logControl.error();    // Global error-only mode
 
-// Presets
-logControl.quietVibeGrid();       // UI with VibeGrid at warn
-logControl.focusFile('MyComponent'); // Only show logs from one file
+// File-level control (persistent)
+logControl.setFileLevel('MyComponent', 'debug');
+logControl.setFileLevel('components/VerboseComponent', 'error');
+
+// Folder-level control (persistent)
+logControl.setFolderLevel('vibegrid', 'info');        // All VibeGrid files at info
+logControl.setFolderLevel('components/custom', 'error'); // Folder hierarchy
+
+// Utility functions
+logControl.status();   // Shows complete config in console
+logControl.quiet('vibegrid');           // Set vibegrid to error-only
+logControl.focus('MyComponent');        // Focus on one file (others to error)
+logControl.reset();    // Back to default configuration
 ```
 
-### Usage in Code
-```typescript
-import { uiLog, syncLog, dataLog } from '@/logger';
-
-const log = uiLog('components/MyComponent.tsx');
-log.debug('Component rendered', { props });
-log.info('User action', { action });
-log.error('Validation failed', error); // Always shows (unless file muted)
-```
-
-### Available Contexts
-- `sync` - WebSocket, sync operations, state machines
-- `state` - State management, stores, Legend State
-- `ui` - Components, interactions, rendering  
-- `data` - CRUD operations, API calls, queries
-- `auth` - Authentication, permissions
-- `routing` - Navigation, route changes
-- `performance` - Performance monitoring
-- `testing` - Test-related logging
-- `debug` - General debugging
-
-### File-Level Configuration
-- **Global Level**: Base log level for all files in context
-- **File Overrides**: Specific files can have different levels (e.g., `vibegrid:warn`)
-- **Pattern Support**: `vibegrid` matches all VibeGrid components automatically
-- **Silent Setup**: File configurations load without startup noise
-- **Persistent**: Configuration survives HMR via dev scripts
-
-### Troubleshooting Logger Issues
-
-If logging configuration isn't working:
-
-1. **Use dev scripts for persistence**: Runtime file controls are lost on HMR
-2. **Check configuration**: `logControl.status()` in browser console
-3. **Verify context enabled**: Ensure your logger type's context is active
-4. **File path normalization**: Paths auto-normalized (no src/, no extension)
+### Key Features
+- **Three log levels**: info, error, debug
+- **Persistent configuration**: Survives page reloads and HMR
+- **File path normalization**: Automatic path matching
+- **Runtime configuration**: Change logging on the fly in browser console
+- **Pattern matching**: Folder patterns support partial matching
 
 **📖 Complete documentation:** [`apps/worker/src/logger/README.md`](apps/worker/src/logger/README.md)
 

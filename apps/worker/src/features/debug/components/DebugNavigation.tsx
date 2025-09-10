@@ -5,11 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 export function DebugNavigation() {
   const debugRoutes = [
     { path: '/debug/sync', label: 'Sync' },
-    { path: '/debug/database', label: 'Database' },
     { path: '/debug/integrity', label: 'Integrity' },
     { path: '/debug/state-machine-test', label: 'State Machine Test' },
     { path: '/debug/query-test', label: 'Query Test' },
-    { path: '/debug/reactflow-positioning', label: 'React Flow Positioning' },
     { path: '/debug/vibegantt', label: 'VibeGantt' },
     { path: '/debug/gantt-test-data', label: 'Gantt Test Data' },
   ];

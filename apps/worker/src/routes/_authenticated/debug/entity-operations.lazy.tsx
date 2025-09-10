@@ -17,7 +17,6 @@ import {
   removeEntityFromSchema,
   clearContext 
 } from '@/legend-state'
-import { orgSchemaClient } from '@/lib/schema-client'
 import { useAuth } from '@/lib/auth'
 
 const EntityOperationsDebug = observer(function EntityOperationsDebug() {

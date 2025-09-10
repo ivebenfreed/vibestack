@@ -13,7 +13,7 @@ import {
   IconFileText,
 } from '@tabler/icons-react'
 import type { NavGroup, NavItem } from '../types'
-import type { EntitySchema } from '@/lib/schema-client'
+import type { OrgEntitySchema } from '@/legend-state'
 
 const ENTITY_ICONS: Record<string, any> = {
   'Task': IconChecklist,
@@ -52,7 +52,7 @@ function getArchetypeCategory(archetype: string): string {
   }
 }
 
-export function generateDynamicSidebarData(schema: EntitySchema | null): NavGroup[] {
+export function generateDynamicSidebarData(schema: OrgEntitySchema | null): NavGroup[] {
   if (!schema || !schema.entities) {
     return [
       {

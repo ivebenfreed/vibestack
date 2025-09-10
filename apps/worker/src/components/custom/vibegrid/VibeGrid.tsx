@@ -103,7 +103,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
     if (!containerRef.current) return;
 
     try {
-      fileLog.info('🚀 Initializing VibeGridPure with pure observables', {
+      fileLog.info('🚀 Initializing VibeGrid', {
         tableId,
         entityType,
         columnCount: columns.length
@@ -113,18 +113,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const observables = createPureObservables(entityType, columns);
       observablesRef.current = observables;
 
-      fileLog.info('✅ Created pure observables', { entityType });
+      fileLog.debug('✅ Created pure observables', { entityType });
 
       // Wait for persistence to load before initializing renderer
       const checkPersistLoaded = () => {
         const isLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
-        fileLog.info('🔄 Checking persistence loaded state', { 
+        fileLog.debug('🔄 Checking persistence loaded state', { 
           entityType, 
           isPersistLoaded: isLoaded 
         });
         
         if (isLoaded) {
-          fileLog.info('✅ Persistence loaded, initializing renderer', { entityType });
+          fileLog.debug('✅ Persistence loaded, initializing renderer', { entityType });
           
           // Create the SimplePassiveRenderer with enhanced selection
           const renderer = new SimplePassiveRenderer({
@@ -143,7 +143,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           setIsPersistLoaded(true);
           setError(null);
 
-          fileLog.info('✅ SimplePassiveRenderer with enhanced selection initialized successfully');
+          fileLog.debug('✅ SimplePassiveRenderer initialized successfully');
 
           // Set up event handlers after renderer is created
           if (onSelectionChange) {
@@ -199,14 +199,14 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      fileLog.error('❌ Failed to initialize VibeGridPure', err);
+      fileLog.error('❌ Failed to initialize VibeGrid', err);
       setError(errorMsg);
     }
 
     // Cleanup
     return () => {
       if (rendererRef.current) {
-        fileLog.info('🧹 Cleaning up VibeGridPure');
+        fileLog.debug('🧹 Cleaning up VibeGrid');
 
         // Cleanup event subscriptions
         if ((rendererRef.current as any).selectionUnsubscribe) {
