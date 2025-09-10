@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { VibeGrid } from '@/components/custom/vibegrid'
-import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
+import { createEntityColumnsObservable } from '@/legend-state/observables/table-columns'
 import { entityOperations } from '@/legend-state'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { 
@@ -61,6 +61,8 @@ export function UniversalEntityPage({
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
+  const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null)
   
   // Extract clean display name from entity name using centralized utility
   const displayName = EntityNameUtils.toDisplayFormat(entityName);
@@ -70,8 +72,30 @@ export function UniversalEntityPage({
   const archetypeConfig = ARCHETYPE_CONFIG[archetype.toLowerCase() as keyof typeof ARCHETYPE_CONFIG] || ARCHETYPE_CONFIG.record
   const Icon = archetypeConfig.icon
   
-  // Use schema-based column configuration hook
-  const { columns, isLoading: columnsLoading, error: columnsError } = usePrecomputedEntityColumns(entityName, schema)
+  // Get columns from dynamic schema-driven generation - same pattern as debug pages
+  const columnsObservable = createEntityColumnsObservable(entityName);
+  const columns = columnsObservable.get();
+
+  // Event handlers - same pattern as debug pages
+  const handleSelectionChange = (cells: Set<string>) => {
+    setSelectedCells(cells);
+  };
+
+  const handleEditingChange = (cell: { rowId: string; columnId: string } | null) => {
+    setEditingCell(cell);
+  };
+
+  const handleEntityUpdate = async (rowId: string, updates: Record<string, any>) => {
+    const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '');
+    await entityOperations.updateEntity(fullEntityName, rowId, updates);
+  };
+
+  const handleBatchEntityUpdate = async (updates: Array<{ id: string; updates: Record<string, any> }>) => {
+    const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '');
+    for (const update of updates) {
+      await entityOperations.updateEntity(fullEntityName, update.id, update.updates);
+    }
+  };
   
   // ✅ SIMPLIFIED: Don't try to handle data here - let VibeGrid atomic bridge do it
   // Just show a placeholder count, the real count will come from VibeGrid
@@ -418,22 +442,14 @@ export function UniversalEntityPage({
 
       {/* Maximum Height Table - Every Pixel Counts */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {columnsLoading ? (
+        {columns.length === 0 ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center">
               <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>Loading schema and generating columns...</p>
+              <p>Loading table structure...</p>
             </div>
           </div>
-        ) : columnsError ? (
-          <div className="flex items-center justify-center h-full text-red-600">
-            <div className="text-center">
-              <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="font-semibold">Schema Error</p>
-              <p className="text-sm">{columnsError}</p>
-            </div>
-          </div>
-        ) : columns.length > 0 ? (
+        ) : (
           (() => {
             // Use EntityNameUtils to ensure proper prefixing without duplication
             const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '');
@@ -444,29 +460,20 @@ export function UniversalEntityPage({
                 tableId={`${entityName}-entity-table`}
                 className="h-full"
                 height="100%"
+                width="100%"
+                enableVirtualScrolling={true}
                 enableGrouping={true}
                 enableSorting={true}
                 enableFiltering={true}
-                onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
-                  console.log('🔄 UniversalEntityPage: Entity update requested', { entityName, fullEntityName, rowId, updates });
-                  try {
-                    await entityOperations.updateEntity(fullEntityName, rowId, updates);
-                    console.log('✅ UniversalEntityPage: Entity updated successfully', { entityName, fullEntityName, rowId, updates });
-                  } catch (error) {
-                    console.error('❌ UniversalEntityPage: Entity update failed', { entityName, fullEntityName, rowId, updates, error });
-                    throw error;
-                  }
-                }}
+                enableDragAndDrop={true}
+                enableSelectionColumn={true}
+                onSelectionChange={handleSelectionChange}
+                onEditingChange={handleEditingChange}
+                onEntityUpdate={handleEntityUpdate}
+                onBatchEntityUpdate={handleBatchEntityUpdate}
               />
             );
           })()
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center">
-              <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No columns available for {entityName}</p>
-            </div>
-          </div>
         )}
       </div>
     </div>

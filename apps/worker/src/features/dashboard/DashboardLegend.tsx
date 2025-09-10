@@ -19,7 +19,6 @@ import {
   removeEntityFromSchema,
   loadUniverseContext
 } from '@/legend-state'
-import { orgSchemaClient } from '@/lib/schema-client'
 import { use$ } from '@legendapp/state/react'
 import { log } from '@/logger'
 import { useParams } from '@tanstack/react-router'
@@ -57,7 +56,6 @@ const topNav = [
 const DashboardLegend = observer(function DashboardLegend() {
   const [activeTab, setActiveTab] = React.useState('overview');
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
-  const [dataReady, setDataReady] = React.useState(false);
   const { currentOrganization, user } = useAuth();
   const currentOrgId = currentOrganization?.id;
   const userId = user?.id;
@@ -82,37 +80,22 @@ const DashboardLegend = observer(function DashboardLegend() {
   const schema = use$(universeSchema$);
   const error = use$(universeError$);
   
-  // Entity count will be calculated in DashboardContent after filtering
-
-  // UNIVERSE-ONLY CONTEXT: No context switching needed according to Session 17 plan
-  // Universe context is automatically loaded by auth system for all users
-  // Components filter entity display based on route parameters, not context switching
-  fileLog.info('DashboardLegend using universe-only context - no manual loading needed', {
-    schemaLoaded: !!schema,
+  fileLog.info('DashboardLegend observables state:', {
+    loading,
+    hasSchema: !!schema,
     hasEntities: !!schema?.entities,
-    isUniverseMode,
-    routeOrgId
+    entityCount: schema?.entities ? Object.keys(schema.entities).length : 0,
+    error
   });
 
-  // Track when schema is ready - don't wait for data loading
-  useEffect(() => {
-    if (!schema?.entities || loading) {
-      setDataReady(false);
-      return;
-    }
-
-    const entityNames = Object.keys(schema.entities);
-    
-    // Entity observables are created lazily by getEntity$ when components access them
-    // No need to pre-trigger them here as syncedCrud will handle loading automatically
-    setDataReady(true);
-  }, [schema, loading]);
+  // REACTIVE: Determine if data is ready based purely on observables
+  const isDataReady = !loading && !!schema?.entities && Object.keys(schema.entities).length > 0;
 
   // Signal that the Dashboard is ready for Playwright tests
-  usePlaywrightReady(loading || !dataReady ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
+  usePlaywrightReady(!isDataReady ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
 
-  // Show loading until schema AND entity data is loaded
-  if (loading || !dataReady) {
+  // Show loading until schema data is loaded
+  if (!isDataReady) {
     // Use UnifiedLoadingScreen for consistency
     return (
       <ContentContainer>
@@ -375,7 +358,20 @@ const EntityCardWithData = observer(function EntityCardWithData({
       removeEntityFromSchema(entityName)
       
       // Then make API call (optimistic update pattern)
-      const result = await orgSchemaClient.deleteEntitySchema(orgId, entityName)
+      const response = await fetch(`/api/dataforge/orgs/${orgId}/entities/${entityName}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Delete failed: ${response.status} ${response.statusText}`)
+      }
+
+      const result = await response.json()
       
       if (!result.success) {
         // If API fails, we'd need to rollback the optimistic update

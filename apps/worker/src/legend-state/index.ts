@@ -78,3 +78,22 @@ export {
   getColumnsForEntity,
   type TableColumn
 } from './observables/table-columns'
+
+// Schema Observable - Persisted reactive schema loading
+export {
+  getSchemaObservable$,
+  getSchemaData$,
+  peekSchemaData$,
+  clearSchemaObservables,
+  reloadSchema,
+  getEntitySchema,
+  getSyncableFields,
+  getCustomFields,
+  getRelationshipFields,
+  integrateWithLegendState,
+  createSchemaObservable,
+  type OrgEntitySchema,
+  type EntityDefinition,
+  type FieldDefinition,
+  type RelationshipFieldDefinition
+} from './schema-observable'
