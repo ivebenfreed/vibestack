@@ -8,8 +8,8 @@
 import { use$ } from '@legendapp/state/react'
 import { observable } from '@legendapp/state'
 import { universeSchema$, universeLoading$, entities$ } from '../observables'
-import { stateLog } from '@/logger';
-const log = stateLog('legend-state/hooks/use-entity.ts');
+import { log } from '@/logger';
+const fileLog = log('legend-state/hooks/use-entity.ts');
 
 export interface UseEntityResult<T = any> {
   /** Entity data as array */
@@ -61,7 +61,7 @@ export function useEntity$<T = any>(entityName: string): UseEntityResult<T> {
   const dataArray = entityData ? Object.values(entityData) : []
   const isEmpty = !isLoading && entityData && Object.keys(entityData).length === 0
   
-  log.info(`🔍 [useEntity$] ${entityName}:`, {
+  fileLog.info(`🔍 [useEntity$] ${entityName}:`, {
     loading: isLoading,
     hasSchema: !!schema,
     hasAllEntities: !!allEntities,

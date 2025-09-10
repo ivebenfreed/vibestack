@@ -3,8 +3,8 @@ import { db } from '../../../../db/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '../types';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/stores/gantt-data-store.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/stores/gantt-data-store.ts');
 
 // ====================================
 // TYPES
@@ -226,7 +226,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
     },
     on: {
       TASKS_LOADED: (context, event) => {
-        log.info('📊 GanttStore: Tasks loaded', {
+        fileLog.info('📊 GanttStore: Tasks loaded', {
           count: event.tasks.length,
           projectId: context.projectId
         });
@@ -277,7 +277,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
         const { change } = event;
         const { id, operation, data } = change;
         
-        log.info('📊 GanttStore: Task changed', {
+        fileLog.info('📊 GanttStore: Task changed', {
           id,
           operation,
           changedFields: change.changedFields
@@ -317,7 +317,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       },
       
       DEPENDENCIES_LOADED: (context, event) => {
-        log.info('📊 GanttStore: Dependencies loaded', {
+        fileLog.info('📊 GanttStore: Dependencies loaded', {
           count: event.dependencies.length
         });
         
@@ -339,7 +339,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       },
       
       RESOURCES_LOADED: (context, event) => {
-        log.info('📊 GanttStore: Resources loaded', {
+        fileLog.info('📊 GanttStore: Resources loaded', {
           count: event.resources.length
         });
         
@@ -400,7 +400,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       },
       
       UPDATE_VIEW_CONFIG: (context, event) => {
-        log.info('📊 GanttStore: View config updated for coordinate recalculation', {
+        fileLog.info('📊 GanttStore: View config updated for coordinate recalculation', {
           dayWidth: event.timelineLayout?.dayWidth,
           zoomFactor: event.viewConfig?.zoomFactor
         });
@@ -480,7 +480,7 @@ export async function loadGanttData(
         });
       },
       error: (error) => {
-        log.error('Error loading tasks:', error);
+        fileLog.error('Error loading tasks:', error);
         storeActor.send({ type: 'SET_ERROR', error: error.message });
       }
     });
@@ -517,7 +517,7 @@ export async function loadGanttData(
         });
       },
       error: (error) => {
-        log.error('Error loading dependencies:', error);
+        fileLog.error('Error loading dependencies:', error);
         storeActor.send({ type: 'SET_ERROR', error: error.message });
       }
     });
@@ -545,7 +545,7 @@ export async function loadGanttData(
         });
       },
       error: (error) => {
-        log.error('Error loading resources:', error);
+        fileLog.error('Error loading resources:', error);
         storeActor.send({ type: 'SET_ERROR', error: error.message });
       }
     });
@@ -553,7 +553,7 @@ export async function loadGanttData(
     subscriptions.push(resourcesSub);
     
   } catch (error) {
-    log.error('Error setting up subscriptions:', error);
+    fileLog.error('Error setting up subscriptions:', error);
     storeActor.send({ type: 'SET_ERROR', error: error.message });
   }
   

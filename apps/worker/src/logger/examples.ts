@@ -1,6 +1,6 @@
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('logger/examples.ts');
+const fileLog = log('logger/examples.ts');
 
 /**
  * Logger Usage Examples & Configuration Guide
@@ -16,10 +16,10 @@ import { uiLog, syncLog, dataLog, stateLog, logControl } from './logger';
 // ============================================================================
 
 // In a UI component file:
-const log = uiLog('src/components/UltraTable/UltraTable.tsx');
-log.debug('Table rendered', { rowCount: 100 });
-log.info('User selected cell', { row: 5, col: 2 });
-log.error('Validation failed', new Error('Invalid data'));
+const fileLog = log('src/components/UltraTable/UltraTable.tsx');
+fileLog.debug('Table rendered', { rowCount: 100 });
+fileLog.info('User selected cell', { row: 5, col: 2 });
+fileLog.error('Validation failed', new Error('Invalid data'));
 
 // In a sync service file:
 const syncLogger = syncLog('src/sync/WebSocketService.ts');
@@ -123,15 +123,15 @@ export const focusOnPerformance = () => {
 // console.log('User clicked button', { userId: '123' });
 
 // After:
-// const log = uiLog('src/components/MyButton.tsx');
-// log.debug('User clicked button', { userId: '123' });
+// const fileLog = log('src/components/MyButton.tsx');
+// fileLog.debug('User clicked button', { userId: '123' });
 
 // Before:
 // console.error('API request failed', error);
 
 // After:
-// const log = dataLog('src/api/userService.ts');
-// log.error('API request failed', error);
+// const fileLog = log('src/api/userService.ts');
+// fileLog.error('API request failed', error);
 
 // ============================================================================
 // 6. COMMON PATTERNS
@@ -162,16 +162,16 @@ export const createHookLogger = (hookName: string) => {
 "typescript-log-ui": {
   "prefix": "logui",
   "body": [
-    "const log = uiLog('${TM_FILEPATH/.*\\/src\\///}');",
-    "log.${1|debug,info,warn,error|}('$2', $3);"
+    "const fileLog = log('${TM_FILEPATH/.*\\/src\\///}');",
+    "fileLog.${1|debug,info,warn,error|}('$2', $3);"
   ],
   "description": "Create UI logger"
 },
 "typescript-log-sync": {
   "prefix": "logsync", 
   "body": [
-    "const log = syncLog('${TM_FILEPATH/.*\\/src\\///}');",
-    "log.${1|debug,info,warn,error|}('$2', $3);"
+    "const fileLog = log('${TM_FILEPATH/.*\\/src\\///}');",
+    "fileLog.${1|debug,info,warn,error|}('$2', $3);"
   ],
   "description": "Create sync logger"
 }

@@ -1,7 +1,7 @@
 import { createDexieCollection } from './dexie-collection';
 import { Task, TaskSchema, TaskStatus, createTask } from './task-schema';
-import { uiLog } from '@/logger';
-const log = uiLog('experiments/tanstack-db-poc/task-collection.ts');
+import { log } from '@/logger';
+const fileLog = log('experiments/tanstack-db-poc/task-collection.ts');
 
 // Create the task collection with Dexie persistence
 export const taskCollection = createDexieCollection<Task>({
@@ -13,7 +13,7 @@ export const taskCollection = createDexieCollection<Task>({
 
 // Start sync immediately if not already started
 if (typeof taskCollection.startSyncImmediate === 'function') {
-  log.info('Starting sync immediately for task collection');
+  fileLog.info('Starting sync immediately for task collection');
   taskCollection.startSyncImmediate();
 }
 

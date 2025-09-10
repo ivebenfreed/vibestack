@@ -8,9 +8,9 @@
 import { type Observable } from '@legendapp/state'
 import { type PersistOptions } from '@legendapp/state/sync'
 import { ObservablePersistIndexedDB, observablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
-import { stateLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = stateLog('legend-state/helpers/PersistenceManager.ts');
+const fileLog = log('legend-state/helpers/PersistenceManager.ts');
 
 export interface EntityMetadata {
   id: string
@@ -46,7 +46,7 @@ export class PersistenceManager {
     this.dbName = dbName || `vibestack_org_${organizationId.replace(/-/g, '_')}`
     this.dbVersion = dbVersion || 1
     
-    log.info('[PersistenceManager] Initialized', {
+    fileLog.info('[PersistenceManager] Initialized', {
       organizationId,
       userId,
       dbName: this.dbName,
@@ -68,7 +68,7 @@ export class PersistenceManager {
     
     // Only increment version if schema actually changed
     if (currentSchemaHash === lastSchemaHash && lastVersion > 0) {
-      log.info(`[PersistenceManager] Schema unchanged, reusing version: ${lastVersion}`)
+      fileLog.info(`[PersistenceManager] Schema unchanged, reusing version: ${lastVersion}`)
       return lastVersion
     }
     
@@ -79,7 +79,7 @@ export class PersistenceManager {
     localStorage.setItem(versionKey, newVersion.toString())
     localStorage.setItem(schemaHashKey, currentSchemaHash)
     
-    log.info(`[PersistenceManager] Schema changed, version progression: ${lastVersion} -> ${newVersion}`, {
+    fileLog.info(`[PersistenceManager] Schema changed, version progression: ${lastVersion} -> ${newVersion}`, {
       oldHash: lastSchemaHash.substring(0, 8),
       newHash: currentSchemaHash.substring(0, 8),
       entityCount: entityNames.length
@@ -111,7 +111,7 @@ export class PersistenceManager {
    * Create IndexedDB configuration for all entity tables using Legend State v3 pattern
    */
   public async createIndexedDBConfig(entityNames: string[]) {
-    log.info(`Creating IndexedDB config for entities:`, entityNames)
+    fileLog.info(`Creating IndexedDB config for entities:`, entityNames)
     
     // Create table names for all entities plus metadata tables
     // For multi-org universe system, entityNames are in format: {orgId}_{EntityName}
@@ -126,22 +126,22 @@ export class PersistenceManager {
       'sync_state'
     ]
     
-    log.debug(`Created table names:`, tableNames)
+    fileLog.debug(`Created table names:`, tableNames)
     
     // Generate dynamic version based on schema to trigger IndexedDB upgrades when needed
     const schemaVersion = this.generateSchemaVersion(entityNames)
     
-    log.info(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
-    log.info(`[PersistenceManager] Using schema version: ${schemaVersion}`)
+    fileLog.info(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
+    fileLog.info(`[PersistenceManager] Using schema version: ${schemaVersion}`)
     
     try {
-      log.debug(`Schema version: ${schemaVersion}, table names:`, tableNames)
+      fileLog.debug(`Schema version: ${schemaVersion}, table names:`, tableNames)
       
       // Check if we need to clear database due to version downgrade
       const needsClear = this.checkForVersionDowngrade(schemaVersion)
-      log.debug(`Needs clear due to version downgrade:`, needsClear)
+      fileLog.debug(`Needs clear due to version downgrade:`, needsClear)
       if (needsClear) {
-        log.info(`[PersistenceManager] Clearing database due to version downgrade`)
+        fileLog.info(`[PersistenceManager] Clearing database due to version downgrade`)
         return await this.createConfigAfterClear(schemaVersion, tableNames, entityNames)
       }
       
@@ -158,7 +158,7 @@ export class PersistenceManager {
         }
       })
       
-      log.info(`[PersistenceManager] Legend State v3 IndexedDB configuration created successfully`)
+      fileLog.info(`[PersistenceManager] Legend State v3 IndexedDB configuration created successfully`)
       
       // Return both the configuration function and entity mapping for table names
       return {
@@ -167,17 +167,17 @@ export class PersistenceManager {
       }
       
     } catch (error) {
-      log.error(`Failed to create IndexedDB plugin:`, error)
-      log.warn(`[PersistenceManager] Failed to create IndexedDB plugin:`, error)
+      fileLog.error(`Failed to create IndexedDB plugin:`, error)
+      fileLog.warn(`[PersistenceManager] Failed to create IndexedDB plugin:`, error)
       
       // Check if this is a version downgrade error
       if (error.name === 'VersionError' && error.message?.includes('is less than the existing version')) {
-        log.info(`[PersistenceManager] Detected version downgrade, clearing database and retrying`)
+        fileLog.info(`[PersistenceManager] Detected version downgrade, clearing database and retrying`)
         return await this.createConfigAfterClear(schemaVersion, tableNames, entityNames)
       }
       
       // For other errors, return null - the calling code will handle fallback
-      log.warn(`[PersistenceManager] Using fallback storage due to IndexedDB error`)
+      fileLog.warn(`[PersistenceManager] Using fallback storage due to IndexedDB error`)
       return null
     }
   }
@@ -200,7 +200,7 @@ export class PersistenceManager {
     
     // If the new version is significantly lower, it's likely a downgrade from timestamp to hash-based versioning
     if (existingVersion > 1000000 && newVersion < 1000) {
-      log.info(`[PersistenceManager] Detected migration from timestamp (${existingVersion}) to hash-based versioning (${newVersion})`)
+      fileLog.info(`[PersistenceManager] Detected migration from timestamp (${existingVersion}) to hash-based versioning (${newVersion})`)
       return true
     }
     
@@ -231,7 +231,7 @@ export class PersistenceManager {
         }
       })
       
-      log.info(`[PersistenceManager] Legend State v3 IndexedDB configuration recreated after database clear`)
+      fileLog.info(`[PersistenceManager] Legend State v3 IndexedDB configuration recreated after database clear`)
       
       // Return both the configuration function and entity mapping for table names
       return {
@@ -240,8 +240,8 @@ export class PersistenceManager {
       }
       
     } catch (retryError) {
-      log.warn(`[PersistenceManager] Failed to create plugin even after clearing database:`, retryError)
-      log.info(`[PersistenceManager] Falling back to in-memory storage`)
+      fileLog.warn(`[PersistenceManager] Failed to create plugin even after clearing database:`, retryError)
+      fileLog.info(`[PersistenceManager] Falling back to in-memory storage`)
       return null
     }
   }
@@ -271,7 +271,7 @@ export class PersistenceManager {
         try {
           return value
         } catch (error) {
-          log.warn(`[PersistenceManager] Load transform error for path ${path.join('.')}:`, error)
+          fileLog.warn(`[PersistenceManager] Load transform error for path ${path.join('.')}:`, error)
           return {}
         }
       }
@@ -287,7 +287,7 @@ export class PersistenceManager {
         try {
           return value
         } catch (error) {
-          log.warn(`[PersistenceManager] Save transform error for path ${path.join('.')}:`, error)
+          fileLog.warn(`[PersistenceManager] Save transform error for path ${path.join('.')}:`, error)
           return value
         }
       }
@@ -315,14 +315,14 @@ export class PersistenceManager {
         } catch (error) {
           // Handle object store not found errors
           if (error.name === 'NotFoundError' || error.message?.includes('object stores was not found')) {
-            log.info(`[PersistenceManager] Object store '${table}' not found in getTable - likely schema change. Returning init data and clearing database for clean state.`)
+            fileLog.info(`[PersistenceManager] Object store '${table}' not found in getTable - likely schema change. Returning init data and clearing database for clean state.`)
             
             // Clear the problematic database to force clean recreation
             await this.clearAndRecreateDatabase()
             return init || {}
           }
           
-          log.error(`[PersistenceManager] getTable error for '${table}':`, error)
+          fileLog.error(`[PersistenceManager] getTable error for '${table}':`, error)
           return init || {}
         }
       },
@@ -334,14 +334,14 @@ export class PersistenceManager {
         } catch (error) {
           // Handle object store not found errors
           if (error.name === 'NotFoundError' || error.message?.includes('object stores was not found')) {
-            log.info(`[PersistenceManager] Object store '${table}' not found in loadTable - likely schema change. Returning empty data and clearing database for clean state.`)
+            fileLog.info(`[PersistenceManager] Object store '${table}' not found in loadTable - likely schema change. Returning empty data and clearing database for clean state.`)
             
             // Clear the problematic database to force clean recreation
             await this.clearAndRecreateDatabase()
             return {}
           }
           
-          log.error(`[PersistenceManager] loadTable error for '${table}':`, error)
+          fileLog.error(`[PersistenceManager] loadTable error for '${table}':`, error)
           return {}
         }
       },
@@ -352,12 +352,12 @@ export class PersistenceManager {
           await originalSet(table, changes, config)
         } catch (error) {
           if (error.name === 'NotFoundError' || error.message?.includes('object stores was not found')) {
-            log.info(`[PersistenceManager] Object store '${table}' not found during set - clearing database for clean recreation.`)
+            fileLog.info(`[PersistenceManager] Object store '${table}' not found during set - clearing database for clean recreation.`)
             await this.clearAndRecreateDatabase()
             return
           }
           
-          log.error(`[PersistenceManager] set error for '${table}':`, error)
+          fileLog.error(`[PersistenceManager] set error for '${table}':`, error)
         }
       },
       
@@ -367,11 +367,11 @@ export class PersistenceManager {
           await originalDeleteTable(table, config)
         } catch (error) {
           if (error.name === 'NotFoundError' || error.message?.includes('object stores was not found')) {
-            log.info(`[PersistenceManager] Object store '${table}' not found during delete - already cleared.`)
+            fileLog.info(`[PersistenceManager] Object store '${table}' not found during delete - already cleared.`)
             return
           }
           
-          log.error(`[PersistenceManager] deleteTable error for '${table}':`, error)
+          fileLog.error(`[PersistenceManager] deleteTable error for '${table}':`, error)
         }
       },
 
@@ -381,12 +381,12 @@ export class PersistenceManager {
           return await originalGetMetadata(table)
         } catch (error) {
           if (error.name === 'NotFoundError' || error.message?.includes('object stores was not found')) {
-            log.info(`[PersistenceManager] Object store '${table}' not found during getMetadata - clearing database for clean recreation.`)
+            fileLog.info(`[PersistenceManager] Object store '${table}' not found during getMetadata - clearing database for clean recreation.`)
             await this.clearAndRecreateDatabase()
             return {}
           }
           
-          log.error(`[PersistenceManager] getMetadata error for '${table}':`, error)
+          fileLog.error(`[PersistenceManager] getMetadata error for '${table}':`, error)
           return {}
         }
       },
@@ -397,12 +397,12 @@ export class PersistenceManager {
           await originalSetMetadata(table, metadata)
         } catch (error) {
           if (error.name === 'NotFoundError' || error.message?.includes('object stores was not found')) {
-            log.info(`[PersistenceManager] Object store '${table}' not found during setMetadata - clearing database for clean recreation.`)
+            fileLog.info(`[PersistenceManager] Object store '${table}' not found during setMetadata - clearing database for clean recreation.`)
             await this.clearAndRecreateDatabase()
             return
           }
           
-          log.error(`[PersistenceManager] setMetadata error for '${table}':`, error)
+          fileLog.error(`[PersistenceManager] setMetadata error for '${table}':`, error)
         }
       }
     }
@@ -413,22 +413,22 @@ export class PersistenceManager {
    */
   private async clearAndRecreateDatabase(): Promise<void> {
     try {
-      log.info(`[PersistenceManager] Clearing corrupted IndexedDB database: ${this.dbName}`)
+      fileLog.info(`[PersistenceManager] Clearing corrupted IndexedDB database: ${this.dbName}`)
       
       // Delete the entire database to force clean recreation
       const deleteRequest = indexedDB.deleteDatabase(this.dbName)
       
       await new Promise((resolve, reject) => {
         deleteRequest.onsuccess = () => {
-          log.info(`[PersistenceManager] Successfully deleted database: ${this.dbName}`)
+          fileLog.info(`[PersistenceManager] Successfully deleted database: ${this.dbName}`)
           resolve(undefined)
         }
         deleteRequest.onerror = () => {
-          log.error(`[PersistenceManager] Failed to delete database: ${this.dbName}`, deleteRequest.error)
+          fileLog.error(`[PersistenceManager] Failed to delete database: ${this.dbName}`, deleteRequest.error)
           resolve(undefined) // Don't reject, continue with fallback
         }
         deleteRequest.onblocked = () => {
-          log.warn(`[PersistenceManager] Database deletion blocked: ${this.dbName} - continuing anyway`)
+          fileLog.warn(`[PersistenceManager] Database deletion blocked: ${this.dbName} - continuing anyway`)
           resolve(undefined)
         }
       })
@@ -446,10 +446,10 @@ export class PersistenceManager {
       
       keysToRemove.forEach(key => localStorage.removeItem(key))
       
-      log.info(`[PersistenceManager] Database cleanup completed. Removed ${keysToRemove.length} localStorage entries.`)
+      fileLog.info(`[PersistenceManager] Database cleanup completed. Removed ${keysToRemove.length} localStorage entries.`)
       
     } catch (error) {
-      log.error('[PersistenceManager] Failed to clear database:', error)
+      fileLog.error('[PersistenceManager] Failed to clear database:', error)
     }
   }
 
@@ -457,7 +457,7 @@ export class PersistenceManager {
    * Create fallback plugin when IndexedDB fails
    */
   private createFallbackPlugin() {
-    log.info('[PersistenceManager] Using fallback storage plugin (localStorage-based)')
+    fileLog.info('[PersistenceManager] Using fallback storage plugin (localStorage-based)')
     
     return {
       getTable: async (table: string, init: any, config: any) => {
@@ -466,7 +466,7 @@ export class PersistenceManager {
           const data = localStorage.getItem(key)
           return data ? JSON.parse(data) : (init || {})
         } catch (error) {
-          log.warn(`[PersistenceManager] Fallback getTable error for '${table}':`, error)
+          fileLog.warn(`[PersistenceManager] Fallback getTable error for '${table}':`, error)
           return init || {}
         }
       },
@@ -477,7 +477,7 @@ export class PersistenceManager {
           const data = localStorage.getItem(key)
           return data ? JSON.parse(data) : {}
         } catch (error) {
-          log.warn(`[PersistenceManager] Fallback loadTable error for '${table}':`, error)
+          fileLog.warn(`[PersistenceManager] Fallback loadTable error for '${table}':`, error)
           return {}
         }
       },
@@ -489,7 +489,7 @@ export class PersistenceManager {
           // Store the changes directly as Legend State will manage the merging
           localStorage.setItem(key, JSON.stringify(changes))
         } catch (error) {
-          log.warn(`[PersistenceManager] Fallback set error for '${table}':`, error)
+          fileLog.warn(`[PersistenceManager] Fallback set error for '${table}':`, error)
         }
       },
       
@@ -498,7 +498,7 @@ export class PersistenceManager {
           const key = `${this.dbName}_${table}`
           localStorage.removeItem(key)
         } catch (error) {
-          log.warn(`[PersistenceManager] Fallback deleteTable error for '${table}':`, error)
+          fileLog.warn(`[PersistenceManager] Fallback deleteTable error for '${table}':`, error)
         }
       },
       
@@ -508,7 +508,7 @@ export class PersistenceManager {
           const data = localStorage.getItem(key)
           return data ? JSON.parse(data) : {}
         } catch (error) {
-          log.warn(`[PersistenceManager] Fallback getMetadata error for '${table}':`, error)
+          fileLog.warn(`[PersistenceManager] Fallback getMetadata error for '${table}':`, error)
           return {}
         }
       },
@@ -518,7 +518,7 @@ export class PersistenceManager {
           const key = `${this.dbName}_${table}_metadata`
           localStorage.setItem(key, JSON.stringify(metadata))
         } catch (error) {
-          log.warn(`[PersistenceManager] Fallback setMetadata error for '${table}':`, error)
+          fileLog.warn(`[PersistenceManager] Fallback setMetadata error for '${table}':`, error)
         }
       }
     }
@@ -554,7 +554,7 @@ export class PersistenceManager {
       
       this.syncStates.set(tableName, initialState)
       
-      log.info(`[PersistenceManager] Initialized sync state for table: ${tableName}`)
+      fileLog.info(`[PersistenceManager] Initialized sync state for table: ${tableName}`)
     }
   }
   
@@ -568,7 +568,7 @@ export class PersistenceManager {
       const newState = { ...currentState, ...updates }
       this.syncStates.set(tableName, newState)
       
-      log.info(`[PersistenceManager] Updated sync state for table: ${tableName}`, {
+      fileLog.info(`[PersistenceManager] Updated sync state for table: ${tableName}`, {
         updates,
         newState
       })
@@ -597,10 +597,10 @@ export class PersistenceManager {
       // In a full implementation, this would use the IndexedDB directly
       localStorage.setItem(stateKey, JSON.stringify(syncState))
       
-      log.info(`[PersistenceManager] Persisted sync state for table: ${tableName}`)
+      fileLog.info(`[PersistenceManager] Persisted sync state for table: ${tableName}`)
       
     } catch (error) {
-      log.error(`Failed to persist sync state for table: ${tableName}`, error)
+      fileLog.error(`Failed to persist sync state for table: ${tableName}`, error)
     }
   }
   
@@ -616,14 +616,14 @@ export class PersistenceManager {
         const parsedState = JSON.parse(storedState) as SyncState
         this.syncStates.set(tableName, parsedState)
         
-        log.info(`[PersistenceManager] Loaded sync state for table: ${tableName}`, parsedState)
+        fileLog.info(`[PersistenceManager] Loaded sync state for table: ${tableName}`, parsedState)
         return parsedState
       }
       
       return null
       
     } catch (error) {
-      log.error(`Failed to load sync state for table: ${tableName}`, error)
+      fileLog.error(`Failed to load sync state for table: ${tableName}`, error)
       return null
     }
   }
@@ -649,13 +649,13 @@ export class PersistenceManager {
       
       keysToRemove.forEach(key => localStorage.removeItem(key))
       
-      log.info('[PersistenceManager] Cleared organization data', {
+      fileLog.info('[PersistenceManager] Cleared organization data', {
         organizationId: this.organizationId,
         clearedKeys: keysToRemove.length
       })
       
     } catch (error) {
-      log.error('Failed to clear organization data', error)
+      fileLog.error('Failed to clear organization data', error)
       throw error
     }
   }

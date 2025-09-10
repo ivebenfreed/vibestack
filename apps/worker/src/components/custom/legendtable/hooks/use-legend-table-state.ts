@@ -2,13 +2,13 @@ import { useMemo, useEffect } from 'react';
 import { observe } from '@legendapp/state';
 import { createTableState, type TableState } from '../state/table-state';
 import type { TableConfig } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/hooks/use-legend-table-state.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/hooks/use-legend-table-state.ts');
 
 export function useLegendTableState(config: TableConfig): TableState {
   // Create table state only once, memoized by tableId
   const tableState$ = useMemo(() => {
-    log.info('[useLegendTableState] Creating table state for:', config.tableId);
+    fileLog.info('[useLegendTableState] Creating table state for:', config.tableId);
     return createTableState(config);
   }, [config.tableId]);
   
@@ -16,7 +16,7 @@ export function useLegendTableState(config: TableConfig): TableState {
   useEffect(() => {
     if (!config.persistState) return;
     
-    log.info('[useLegendTableState] Setting up persistence for:', config.tableId);
+    fileLog.info('[useLegendTableState] Setting up persistence for:', config.tableId);
     
     // Debounced save function to avoid excessive localStorage writes
     let saveTimeout: NodeJS.Timeout;
@@ -37,9 +37,9 @@ export function useLegendTableState(config: TableConfig): TableState {
         try {
           const key = `legend-table-${config.tableId}`;
           localStorage.setItem(key, JSON.stringify(state));
-          log.info('[useLegendTableState] State saved to localStorage:', key);
+          fileLog.info('[useLegendTableState] State saved to localStorage:', key);
         } catch (error) {
-          log.warn('[useLegendTableState] Failed to save state:', error);
+          fileLog.warn('[useLegendTableState] Failed to save state:', error);
         }
       }, 500);
     });
@@ -60,7 +60,7 @@ export function useLegendTableState(config: TableConfig): TableState {
       
       if (saved) {
         const state = JSON.parse(saved);
-        log.info('[useLegendTableState] Restoring state from localStorage:', key, state);
+        fileLog.info('[useLegendTableState] Restoring state from localStorage:', key, state);
         
         // Restore state
         if (state.viewport) {
@@ -81,7 +81,7 @@ export function useLegendTableState(config: TableConfig): TableState {
         }
       }
     } catch (error) {
-      log.warn('[useLegendTableState] Failed to restore state:', error);
+      fileLog.warn('[useLegendTableState] Failed to restore state:', error);
     }
   }, [config.tableId, config.persistState, tableState$]);
   

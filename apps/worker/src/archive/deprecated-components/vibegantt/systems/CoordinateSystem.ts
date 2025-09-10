@@ -1,6 +1,6 @@
 import type { ViewportState } from '../types';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/systems/CoordinateSystem.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/systems/CoordinateSystem.ts');
 
 export interface GanttCoordinateConfig {
   rowHeight: number;
@@ -252,7 +252,7 @@ export class CoordinateSystem {
     toCoords: { x: number; y: number },
     container?: string
   ): void {
-    log.info(`CoordinateSystem.${description}:`, {
+    fileLog.info(`CoordinateSystem.${description}:`, {
       from: fromCoords,
       to: toCoords,
       container,

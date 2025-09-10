@@ -1,8 +1,8 @@
 import type { ViewportInfo, Column } from '../types';
 import type { OverlayConfig, CellPosition } from './OverlayTypes';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/overlays/CoordinateSystem.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/overlays/CoordinateSystem.ts');
 
 // ====================================
 // COORDINATE SYSTEM UTILITIES
@@ -65,7 +65,7 @@ export class CoordinateSystem {
     rowIds: string[], 
     columnIds: string[]
   ): void {
-    log.info('CoordinateSystem.updateMappings: Updating with new data order', {
+    fileLog.info('CoordinateSystem.updateMappings: Updating with new data order', {
       rowCount: rowIds.length,
       columnCount: columnIds.length,
       firstFewRows: rowIds.slice(0, 5),
@@ -230,7 +230,7 @@ export class CoordinateSystem {
     const columnIndex = this.columnIndexMap.get(columnId);
 
     if (rowIndex === undefined || columnIndex === undefined) {
-      log.info('CoordinateSystem.getCellPositionByIds: Missing mapping', {
+      fileLog.info('CoordinateSystem.getCellPositionByIds: Missing mapping', {
         rowId,
         columnId,
         rowIndex,
@@ -272,7 +272,7 @@ export class CoordinateSystem {
            position.x >= viewportLeft &&
            position.x <= viewportRight;
            
-    log.info('CoordinateSystem.isCellVisible (absolute coordinates):', {
+    fileLog.info('CoordinateSystem.isCellVisible (absolute coordinates):', {
       row,
       column,
       position,

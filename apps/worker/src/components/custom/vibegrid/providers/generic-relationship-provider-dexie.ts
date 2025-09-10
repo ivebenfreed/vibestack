@@ -1,6 +1,6 @@
 import type { RelationshipOptionsProvider, RelationshipContext, EnumOption, Column } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/providers/generic-relationship-provider-dexie.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/providers/generic-relationship-provider-dexie.ts');
 
 /**
  * Creates a generic relationship options provider for Dexie that works with pre-loaded data
@@ -14,7 +14,7 @@ export function createGenericRelationshipProvider(
   return async (context: RelationshipContext) => {
     const { currentEntity } = context;
     
-    log.info('🔍 Generic Relationship Provider (Dexie): Loading options', {
+    fileLog.info('🔍 Generic Relationship Provider (Dexie): Loading options', {
       columnId: column.id,
       relationshipTable: column.relationshipTable,
       relationshipEntityType: column.relationshipEntityType,
@@ -25,7 +25,7 @@ export function createGenericRelationshipProvider(
     // Get the relationship table key from column metadata
     const relationshipTable = column.relationshipTable;
     if (!relationshipTable) {
-      log.warn('Generic provider: No relationshipTable specified for column', column.id);
+      fileLog.warn('Generic provider: No relationshipTable specified for column', column.id);
       return [];
     }
     
@@ -44,7 +44,7 @@ export function createGenericRelationshipProvider(
       `${relationshipTable}definition`
     ];
     
-    log.info('🔍 Generic Relationship Provider: Looking for data with keys:', {
+    fileLog.info('🔍 Generic Relationship Provider: Looking for data with keys:', {
       relationshipTable,
       dataKeys,
       availableKeys: Object.keys(relationshipData)
@@ -53,7 +53,7 @@ export function createGenericRelationshipProvider(
     for (const key of dataKeys) {
       if (relationshipData[key]) {
         targetData = relationshipData[key];
-        log.info('🔍 Generic Relationship Provider: Found target data', {
+        fileLog.info('🔍 Generic Relationship Provider: Found target data', {
           key,
           itemCount: Object.keys(targetData).length,
           sampleData: Object.values(targetData).slice(0, 2).map((item: any) => ({
@@ -67,7 +67,7 @@ export function createGenericRelationshipProvider(
     }
     
     if (!targetData || Object.keys(targetData).length === 0) {
-      log.warn('Generic provider: No data found for relationship', relationshipTable);
+      fileLog.warn('Generic provider: No data found for relationship', relationshipTable);
       return [];
     }
     
@@ -87,7 +87,7 @@ export function createGenericRelationshipProvider(
       const filterValue = currentEntity[filterField];
       
       if (filterValue) {
-        log.info('🔍 Generic provider: Applying filter', {
+        fileLog.info('🔍 Generic provider: Applying filter', {
           filterField,
           filterValue,
           beforeCount: filteredOptions.length
@@ -107,7 +107,7 @@ export function createGenericRelationshipProvider(
           return false;
         });
         
-        log.info('🔍 Generic provider: After filter', {
+        fileLog.info('🔍 Generic provider: After filter', {
           afterCount: filteredOptions.length
         });
       }
@@ -127,7 +127,7 @@ export function createGenericRelationshipProvider(
     // Sort options alphabetically by label
     filteredOptions.sort((a, b) => a.label.localeCompare(b.label));
     
-    log.info('🔍 Generic provider: Final options', {
+    fileLog.info('🔍 Generic provider: Final options', {
       count: filteredOptions.length,
       options: filteredOptions.slice(0, 5).map(o => ({ value: o.value, label: o.label }))
     });

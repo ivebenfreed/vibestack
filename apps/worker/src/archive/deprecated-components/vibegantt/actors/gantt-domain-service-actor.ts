@@ -1,7 +1,7 @@
 import { fromCallback } from 'xstate';
 import type { GanttTask, TaskDependency } from '../types';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/actors/gantt-domain-service-actor.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/actors/gantt-domain-service-actor.ts');
 
 /**
  * Domain Service Actor for Gantt Write Operations
@@ -83,7 +83,7 @@ export const ganttDomainServiceActor = fromCallback<any, DomainServiceInput>(({
         }
       }
     } catch (error) {
-      log.error('Domain service error:', error);
+      fileLog.error('Domain service error:', error);
       sendBack({
         type: 'DOMAIN_SERVICE_ERROR',
         error: error.message,

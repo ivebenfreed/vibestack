@@ -3,7 +3,7 @@ import { createActor } from 'xstate';
 import { useSelector } from '@xstate/react';
 import { 
 import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/hooks/useGanttData.ts');
+const fileLog = log('archive/deprecated-components/vibegantt/hooks/useGanttData.ts');
   createGanttStoreActor, 
   loadInitialGanttData, 
   setupGranularGanttSubscriptions 
@@ -19,7 +19,7 @@ export function useGanttData(projectId?: string) {
   
   // Initialize store actor
   if (!storeActorRef.current) {
-    log.info('📊 useGanttData: Creating store actor');
+    fileLog.info('📊 useGanttData: Creating store actor');
     const storeLogic = createGanttStoreActor(projectId);
     storeActorRef.current = createActor(storeLogic);
     storeActorRef.current.start();
@@ -49,7 +49,7 @@ export function useGanttData(projectId?: string) {
     
     const loadData = async () => {
       try {
-        log.info('📊 useGanttData: Loading initial data', { projectId });
+        fileLog.info('📊 useGanttData: Loading initial data', { projectId });
         
         // Load all data including relationships
         const { tasks, dependencies, relationships, pagination } = await loadInitialGanttData(projectId);
@@ -83,7 +83,7 @@ export function useGanttData(projectId?: string) {
         }
         
       } catch (error) {
-        log.error('❌ useGanttData: Error loading initial data', error);
+        fileLog.error('❌ useGanttData: Error loading initial data', error);
         if (mounted) {
           storeActorRef.current.send({
             type: 'setError',

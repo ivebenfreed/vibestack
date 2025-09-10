@@ -11,9 +11,9 @@ import { toast } from 'sonner';
 import { Globe, Sparkles, User, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { getEntity$ } from '@/legend-state';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('features/universe/UniverseManager.tsx');
+const fileLog = log('features/universe/UniverseManager.tsx');
 
 interface UniverseData {
   id: string;
@@ -74,7 +74,7 @@ export const UniverseManager = observer(function UniverseManager() {
       setNewUniverseName('');
       setNewUniverseDescription('');
       
-      log.info('Created new universe:', newUniverse);
+      fileLog.info('Created new universe:', newUniverse);
     } catch (error) {
       console.error('Failed to create universe:', error);
       toast.error('Failed to create universe');
@@ -95,7 +95,7 @@ export const UniverseManager = observer(function UniverseManager() {
       });
       
       toast.success('Universe updated successfully!');
-      log.info('Updated universe:', { id: userUniverse.id, updates });
+      fileLog.info('Updated universe:', { id: userUniverse.id, updates });
     } catch (error) {
       console.error('Failed to update universe:', error);
       toast.error('Failed to update universe');

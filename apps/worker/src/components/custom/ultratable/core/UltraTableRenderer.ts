@@ -12,8 +12,8 @@
 
 import type { Column, RendererOptions, ViewportInfo, RenderMetrics } from '../types';
 import { UltraCellPipeline } from './UltraCellPipeline';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/ultratable/core/UltraTableRenderer.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/ultratable/core/UltraTableRenderer.ts');
 
 // Performance constants from VibeGrid
 const DEFAULT_ROW_HEIGHT = 40;
@@ -102,7 +102,7 @@ export class UltraTableRenderer {
     this.bufferRows = options.bufferRows || DEFAULT_BUFFER_ROWS;
     
     if (options.debug) {
-      log.info('[UltraTableRenderer] Initializing with options:', {
+      fileLog.info('[UltraTableRenderer] Initializing with options:', {
         entityType: options.entityType,
         columnCount: options.columns.length,
         rowHeight: this.rowHeight,
@@ -169,7 +169,7 @@ export class UltraTableRenderer {
     this.container.appendChild(this.tableWrapper);
     
     if (this.options.debug) {
-      log.info('[UltraTableRenderer] DOM structure initialized');
+      fileLog.info('[UltraTableRenderer] DOM structure initialized');
     }
   }
   
@@ -195,7 +195,7 @@ export class UltraTableRenderer {
     this.renderMetrics.totalRows = entities.length;
     
     if (this.options.debug && entities.length > 0) {
-      log.info('[UltraTableRenderer] Data updated:', {
+      fileLog.info('[UltraTableRenderer] Data updated:', {
         entityCount: entities.length,
         renderTime: Math.round(this.renderMetrics.renderTime * 100) / 100,
         visibleRange: `${this.viewportInfo.visibleStart}-${this.viewportInfo.visibleEnd}`
@@ -235,7 +235,7 @@ export class UltraTableRenderer {
     this.headerContainer.appendChild(headerRow);
     
     if (this.options.debug) {
-      log.info('[UltraTableRenderer] Header rendered with', this.columns.length, 'columns');
+      fileLog.info('[UltraTableRenderer] Header rendered with', this.columns.length, 'columns');
     }
   }
   
@@ -553,7 +553,7 @@ export class UltraTableRenderer {
       this.viewportInfo.visibleEnd = visibleEnd;
       
       if (this.options.debug) {
-        log.info('[UltraTableRenderer] Viewport updated:', {
+        fileLog.info('[UltraTableRenderer] Viewport updated:', {
           scrollTop: this.viewportInfo.scrollTop,
           visibleRange: `${visibleStart}-${visibleEnd}`,
           totalRows: this.entities.length
@@ -609,7 +609,7 @@ export class UltraTableRenderer {
     });
     
     if (this.options.debug) {
-      log.info('[UltraTableRenderer] Event handlers set up');
+      fileLog.info('[UltraTableRenderer] Event handlers set up');
     }
   }
   
@@ -794,7 +794,7 @@ export class UltraTableRenderer {
     this.container.innerHTML = '';
     
     if (this.options.debug) {
-      log.info('[UltraTableRenderer] Destroyed and cleaned up');
+      fileLog.info('[UltraTableRenderer] Destroyed and cleaned up');
     }
   }
 }

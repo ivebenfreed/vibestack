@@ -16,9 +16,9 @@
 
 import { setup, assign, fromPromise } from 'xstate'
 import { loadUniverseContext, universeSchema$ } from '@/legend-state'
-import { stateLog } from '@/logger'
+import { log } from '@/logger'
 
-const log = stateLog('state-machines/machines/legend-state-init-machine.ts')
+const fileLog = log('state-machines/machines/legend-state-init-machine.ts')
 
 export interface LegendStateInitContext {
   // User/org info from auth
@@ -76,7 +76,7 @@ const loadSchemasService = fromPromise(async ({
 }) => {
   const { userId, organizationIds, currentOrgId, organizationData } = input
   
-  log.info('[LegendStateInit] Loading universe schemas:', {
+  fileLog.info('[LegendStateInit] Loading universe schemas:', {
     userId,
     organizationIds,
     currentOrgId,
@@ -92,7 +92,7 @@ const loadSchemasService = fromPromise(async ({
     const schema = universeSchema$.peek()
     const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0
     
-    log.info('[LegendStateInit] Universe schemas loaded successfully:', {
+    fileLog.info('[LegendStateInit] Universe schemas loaded successfully:', {
       entityCount,
       orgId: schema?.orgId
     })
@@ -100,7 +100,7 @@ const loadSchemasService = fromPromise(async ({
     return { entityCount, schema }
     
   } catch (error) {
-    log.error('[LegendStateInit] Failed to load universe schemas:', error)
+    fileLog.error('[LegendStateInit] Failed to load universe schemas:', error)
     throw error
   }
 })
@@ -115,7 +115,7 @@ const createObservablesService = fromPromise(async ({
 }) => {
   const { entityNames } = input
   
-  log.info('[LegendStateInit] Creating observables for entities:', entityNames)
+  fileLog.info('[LegendStateInit] Creating observables for entities:', entityNames)
   
   const results = {
     created: [] as string[],
@@ -130,17 +130,17 @@ const createObservablesService = fromPromise(async ({
       const observable = getEntity$(entityName)
       if (observable) {
         results.created.push(entityName)
-        log.info(`[LegendStateInit] ✅ Created observable for ${entityName}`)
+        fileLog.info(`[LegendStateInit] ✅ Created observable for ${entityName}`)
       } else {
         results.failed.push({ entityName, error: 'Observable creation returned null' })
-        log.warn(`[LegendStateInit] ❌ Failed to create observable for ${entityName}`)
+        fileLog.warn(`[LegendStateInit] ❌ Failed to create observable for ${entityName}`)
       }
     } catch (error) {
       results.failed.push({ 
         entityName, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       })
-      log.error(`[LegendStateInit] ❌ Error creating observable for ${entityName}:`, error)
+      fileLog.error(`[LegendStateInit] ❌ Error creating observable for ${entityName}:`, error)
     }
   }
   
@@ -157,7 +157,7 @@ const triggerInitialLoadsService = fromPromise(async ({
 }) => {
   const { entityNames } = input
   
-  log.info('[LegendStateInit] Triggering initial loads for entities:', entityNames)
+  fileLog.info('[LegendStateInit] Triggering initial loads for entities:', entityNames)
   
   const results = {
     triggered: [] as string[],
@@ -179,10 +179,10 @@ const triggerInitialLoadsService = fromPromise(async ({
         results.triggered.push(entityName)
         results.loaded.push({ entityName, recordCount: 0 })
         
-        log.info(`[LegendStateInit] ✅ Observable ready for ${entityName} (on-demand loading enabled)`)
+        fileLog.info(`[LegendStateInit] ✅ Observable ready for ${entityName} (on-demand loading enabled)`)
       }
     } catch (error) {
-      log.error(`[LegendStateInit] ❌ Error preparing observable for ${entityName}:`, error)
+      fileLog.error(`[LegendStateInit] ❌ Error preparing observable for ${entityName}:`, error)
     }
   }
   
@@ -252,7 +252,7 @@ export const legendStateInitMachine = setup({
     },
     
     dispatchReadyEvent: ({ context }) => {
-      log.info('[LegendStateInit] ✅ Legend State initialization complete!', {
+      fileLog.info('[LegendStateInit] ✅ Legend State initialization complete!', {
         totalEntities: context.totalEntities,
         entitiesLoaded: context.entitiesLoaded.length,
         entitiesWithData: Object.keys(context.entitiesWithData).length
@@ -308,13 +308,13 @@ export const legendStateInitMachine = setup({
       entry: [
         ({ context }) => {
           if (context.userId && context.organizationIds.length > 0) {
-            log.info('[LegendStateInit] Machine initialized with input:', {
+            fileLog.info('[LegendStateInit] Machine initialized with input:', {
               userId: context.userId,
               organizationIds: context.organizationIds,
               universeMode: true
             });
           } else {
-            log.info('[LegendStateInit] Machine ready, waiting for START event');
+            fileLog.info('[LegendStateInit] Machine ready, waiting for START event');
           }
         },
         assign({
@@ -365,7 +365,7 @@ export const legendStateInitMachine = setup({
     },
     
     loadingSchemas: {
-      entry: () => log.info('[LegendStateInit] 🔄 Loading organization schemas...'),
+      entry: () => fileLog.info('[LegendStateInit] 🔄 Loading organization schemas...'),
       
       invoke: {
         src: 'loadSchemas',
@@ -404,7 +404,7 @@ export const legendStateInitMachine = setup({
     
     creatingObservables: {
       entry: ({ context }) => {
-        log.info(`[LegendStateInit] 🔄 Creating observables for ${context.totalEntities} entities...`)
+        fileLog.info(`[LegendStateInit] 🔄 Creating observables for ${context.totalEntities} entities...`)
       },
       
       always: [
@@ -465,7 +465,7 @@ export const legendStateInitMachine = setup({
     
     triggeringInitialLoad: {
       entry: ({ context }) => {
-        log.info(`[LegendStateInit] 🔄 Triggering initial loads for ${context.observablesCreated.length} observables...`)
+        fileLog.info(`[LegendStateInit] 🔄 Triggering initial loads for ${context.observablesCreated.length} observables...`)
       },
       
       invoke: {
@@ -507,7 +507,7 @@ export const legendStateInitMachine = setup({
     
     ready: {
       entry: ({ context }) => {
-        log.info('[LegendStateInit] ✅ All Legend State observables ready!', {
+        fileLog.info('[LegendStateInit] ✅ All Legend State observables ready!', {
           entitiesLoaded: context.entitiesLoaded.length,
           totalEntities: context.totalEntities
         })
@@ -518,7 +518,7 @@ export const legendStateInitMachine = setup({
     
     error: {
       entry: ({ context }) => {
-        log.error(`[LegendStateInit] ❌ Error in ${context.currentStep}:`, context.error)
+        fileLog.error(`[LegendStateInit] ❌ Error in ${context.currentStep}:`, context.error)
       },
       
       after: {

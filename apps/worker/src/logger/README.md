@@ -1,183 +1,246 @@
-# Enhanced Contextual Logging System with File-Level Control
+# Simple Logger System with File and Folder Level Overrides
 
-**Persistent logging configuration through dev scripts with file-level granularity:**
-- VITE_LOG_CONTEXTS: comma-separated list (sync,state,ui,data,auth,routing,performance,testing,debug)
-- VITE_LOG_LEVEL: debug|info|warn|error (default: error)
-- VITE_LOG_FILE_LEVELS: file-specific levels (e.g., "vibegrid:info,universe-loader:debug")
-- VITE_LOG_MUTED_FILES: comma-separated list of files to mute
-- VITE_LOG_ONLY_FILES: comma-separated list of files to exclusively show
+**Simple 3-level logging system (info, error, debug) with global configuration and file/folder level overrides.**
+
+This logger provides a simple but powerful logging system with persistent browser storage and runtime configuration via the logControl API.
+
+## Features
+
+- Three log levels: info, error, debug
+- Global log level configuration
+- File and folder level overrides
+- Runtime configuration via logControl API
+- Persistent browser storage
+- Simple import - just `log(filename)`
 
 ## Quick Start
 
 ```typescript
-import { syncLog, stateLog, uiLog } from '@/logger';
+import { log } from '@/logger';
 
-// In any component/file
-const log = uiLog('components/MyComponent.tsx');
-log.debug('Component rendered', { props });
-log.info('User action', { action });
-log.error('Validation failed', error); // Always shows (unless file is muted)
+// Create a logger for your file
+const myLog = log('MyComponent.tsx');
+
+// Use the three log levels
+myLog.info('Component rendered', { props });
+myLog.debug('Debug info', data);
+myLog.error('Error occurred', error);
 ```
 
-## Dev Scripts with File-Level Control
+## Runtime Control (Browser Console)
 
-**Logging configuration persists through HMR via wrapper script:**
+The `logControl` API is available globally in the browser console:
 
-```bash
-# Silent mode (errors only)
-pnpm dev:quiet
-
-# Focus on UI components  
-pnpm dev:ui                      # All UI at debug level
-
-# UI with quiet VibeGrid (most UI quiet, VibeGrid at info)
-pnpm dev:ui:quiet-vibegrid       # UI at error level, VibeGrid at info level
-
-# Focus heavily on VibeGrid
-pnpm dev:ui:focus-vibegrid       # UI at error level, VibeGrid at debug level
-
-# Debug mode with quiet VibeGrid
-pnpm dev:debug:quiet-vibegrid    # Multiple contexts at debug, VibeGrid at warn
-
-
-# Focus on specific file
-pnpm dev:focus                   # Only shows logs from universe-loader
-```
-
-## Custom Configuration
-
-Use the wrapper script directly for custom configurations:
-
-```bash
-# Custom configuration example with file-level overrides
-./scripts/dev-with-logging.sh custom \
-  --contexts=ui,sync \
-  --level=debug \
-  --file-levels=vibegrid:warn,universe-loader:info \
-  --muted=table-data-store
-```
-
-## Runtime Controls (Browser Console)
-
-### Context Controls
+### Basic Level Control
 ```javascript
-// Quick controls
-logControl.only('sync', 'state');  // Only these contexts
-logControl.enable('ui');            // Add UI logs  
-logControl.disable('data');         // Remove data logs
-logControl.all();                   // Enable everything
-logControl.none();                  // Only errors
-logControl.status();                // Show current config
+// Set global log level (persistent)
+logControl.setGlobalLevel('debug');         // Show all logs
+logControl.setGlobalLevel('info');          // Show info and errors
+logControl.setGlobalLevel('error');         // Show only errors
+
+// Quick shortcuts
+logControl.debug();    // Global debug mode
+logControl.info();     // Global info mode  
+logControl.error();    // Global error-only mode
 ```
 
-### File-Level Controls (Lost on HMR)
+### File-Level Control
 ```javascript
-// File-specific controls (use dev scripts for persistence)
-logControl.setFileLevel('components/custom/vibegrid/VibeGrid', 'debug');
-logControl.muteFile('components/custom/vibegrid/stores/table-data-store');
-logControl.onlyFiles(['components/MyComponent', 'services/MyService']);
-logControl.clearFileFilters();
+// Set specific file levels (persistent)
+logControl.setFileLevel('MyComponent', 'debug');
+logControl.setFileLevel('components/VerboseComponent', 'error');
 
-// Pattern-based control
-logControl.setPatternLevel('vibegrid', 'warn');  // All VibeGrid files to warn
-
-// Presets
-logControl.quietVibeGrid();   // UI context with VibeGrid at warn
-logControl.debugVibeGrid();   // UI context with VibeGrid at debug
-logControl.focusFile('components/MyComponent');  // Only this file
+// Clear file overrides
+logControl.clearFileLevel('MyComponent');
 ```
 
-## Available Contexts
+### Folder-Level Control
+```javascript
+// Set folder patterns (persistent)
+logControl.setFolderLevel('vibegrid', 'info');        // All VibeGrid files at info
+logControl.setFolderLevel('components/custom', 'error'); // Folder hierarchy
 
-- `sync` - WebSocket, sync operations, state machines
-- `state` - State management, stores, Legend State
-- `ui` - Components, interactions, rendering  
-- `data` - CRUD operations, API calls, queries
-- `auth` - Authentication, permissions
-- `routing` - Navigation, route changes
-- `performance` - Performance monitoring
-- `testing` - Test-related logging
-- `debug` - General debugging
+// Clear folder overrides
+logControl.clearFolderLevel('vibegrid');
+```
 
-## File-Level Configuration
+### Utility Functions
+```javascript
+// Check current configuration
+logControl.status();   // Shows complete config in console
 
-### How It Works
-1. **Global Level**: Set by `VITE_LOG_LEVEL` (default: error)
-2. **File Overrides**: Set by `VITE_LOG_FILE_LEVELS` 
-3. **Muted Files**: Set by `VITE_LOG_MUTED_FILES` (no logs at all)
-4. **Only Mode**: Set by `VITE_LOG_ONLY_FILES` (only these files log)
+// Utility shortcuts
+logControl.quiet('vibegrid');           // Set vibegrid to error-only
+logControl.focus('MyComponent');        // Focus on one file (others to error)
 
-### File Path Normalization
-File paths are normalized for matching:
-- Leading slashes removed
-- `src/` prefix removed  
-- File extensions removed
-- Example: `/src/components/MyComponent.tsx` → `components/MyComponent`
+// Reset everything
+logControl.reset();    // Back to default configuration
+```
 
-### Pattern Support
-The `vibegrid` pattern automatically matches all VibeGrid component files:
-- `components/custom/vibegrid/VibeGrid`
-- `components/custom/vibegrid/stores/*`
-- `components/custom/vibegrid/actors/*`
-- `components/custom/vibegrid/components/*`
-- All VibeGridX core files and utilities
+## File Path Normalization
 
-This makes it simple to control verbosity: `vibegrid:warn` quiets all VibeGrid files.
+File paths are automatically normalized for consistent matching:
 
-## Benefits ✅
+```javascript
+// These all resolve to the same normalized path:
+log('/src/components/MyComponent.tsx')
+log('src/components/MyComponent.tsx') 
+log('components/MyComponent.tsx')
+log('components/MyComponent')
 
-- **Persistent Configuration**: Survives HMR reloads via dev scripts
-- **File-Level Granularity**: Control verbosity per file or pattern
-- **No .env.local Issues**: Direct environment variable passing
-- **Always Errors**: Error logs always show (unless file is muted)
-- **Easy Switching**: Multiple presets for common scenarios
-- **Clean Output**: Precise control prevents log pollution
+// Normalization rules:
+// - Remove leading slashes
+// - Remove 'src/' prefix  
+// - Remove file extensions (.ts, .tsx, .js, .jsx)
+// Result: 'components/MyComponent'
+```
+
+## Configuration Persistence
+
+All configuration is automatically saved to localStorage and persists across:
+- Page reloads
+- HMR (Hot Module Replacement)
+- Browser sessions
+
+The configuration is stored under the key `vibestack-logger-config`.
 
 ## Common Use Cases
 
-### Debugging Specific Component
-```bash
-# Focus on one problematic component
-./scripts/dev-with-logging.sh focus-file MyComponent
+### Example 1: Debug VibeGrid Components
+```javascript
+// In browser console:
+logControl.setGlobalLevel('error');      // Quiet everything else
+logControl.setFolderLevel('vibegrid', 'info');  // Enable VibeGrid logging
 ```
 
-### Quiet Verbose Components
-```bash
-# Keep chatty components quiet while debugging others
-pnpm dev:ui:quiet-vibegrid  # UI debugging with quiet VibeGrid
+### Example 2: Focus on One Component
+```javascript
+// Debug just one problematic component
+logControl.focus('MyProblemComponent');  // Only this component logs, others are error-only
 ```
 
-### Production-like Environment
-```bash
-# Minimal logging for performance testing
-pnpm dev:quiet  # Only errors show
+### Example 3: Quiet Verbose Components  
+```javascript
+// Keep chatty components quiet while debugging
+logControl.setGlobalLevel('info');           // Normal logging
+logControl.quiet('components/ChattyTable'); // This one stays quiet
 ```
 
-### Full Debug Mode
-```bash
-# Everything at maximum verbosity
-pnpm dev:all  # All contexts at debug level
+### Example 4: Debug Everything
+```javascript
+logControl.debug();  // Global debug mode - all logs show
+```
+
+## Pattern Matching
+
+Folder patterns support partial matching. For example:
+
+```javascript
+logControl.setFolderLevel('vibegrid', 'debug');
+```
+
+This will match any file path containing 'vibegrid':
+- `components/custom/vibegrid/VibeGrid`
+- `components/custom/vibegrid/stores/pure-observables`
+- `components/custom/vibegrid/overlays/SelectionOverlay`
+
+## Log Level Priority
+
+Log levels have the following priority (lower number = higher priority):
+
+1. **error** (0) - Always shown (unless file specifically muted)
+2. **info** (1) - Shown at info and debug levels
+3. **debug** (2) - Only shown at debug level
+
+## Browser Console Output
+
+The logger provides styled console output:
+
+- **🐛 [DEBUG]** - Orange text for debug messages
+- **ℹ️ [INFO]** - Blue text for info messages  
+- **❌ [ERROR]** - Red text for error messages
+
+Each message includes the normalized file path for easy identification.
+
+## Default Configuration
+
+The logger starts with these defaults:
+
+```javascript
+{
+  globalLevel: 'info',           // Show info and errors by default
+  fileOverrides: {},             // No file-specific overrides
+  folderOverrides: {
+    'vibegrid': 'info'          // VibeGrid components at info level
+  }
+}
+```
+
+## Migration from Old System
+
+The old contextual logger system (uiLog, syncLog, etc.) has been replaced with this simplified system. All imports should be updated to:
+
+```typescript
+// OLD (no longer works)
+import { uiLog, syncLog, stateLog } from '@/logger';
+const log = uiLog('MyComponent.tsx');
+
+// NEW (simplified)
+import { log } from '@/logger';
+const myLog = log('MyComponent.tsx');
 ```
 
 ## Troubleshooting
 
 **Logs not showing?**
 1. Check configuration: `logControl.status()` in browser console
-2. Verify context is enabled for your logger type
-3. Check if file is muted or filtered
-4. Use `pnpm dev:debug` for debug mode
+2. Verify global level allows your log level
+3. Check if file/folder overrides are affecting your logs
 
-**Too many logs?**
-1. Use `pnpm dev:quiet` for silent mode
-2. Set specific files to higher levels (warn/error)
-3. Mute verbose files with `--muted=filename`
+**Too many logs?**  
+1. Use `logControl.error()` for error-only mode
+2. Set specific patterns to higher levels: `logControl.quiet('vibegrid')`
+3. Use `logControl.focus('MyComponent')` to see only one component
 
-**File-level settings not persisting?**
-1. Use dev scripts, not runtime controls for persistence
-2. Runtime file-level controls are lost on HMR
-3. Add custom presets to `scripts/dev-with-logging.sh`
+**Configuration not persisting?**
+1. Check localStorage is enabled in your browser
+2. Configuration is stored under `vibestack-logger-config` key
+3. Use `logControl.reset()` to clear and start fresh
 
 **Logger not working?**
-1. Verify logger loaded: Check for startup log message
-2. Ensure using correct import (`uiLog`, `syncLog`, etc.)
-3. Check file path is correctly passed to logger factory
+1. Verify logger is loaded: should see initialization message
+2. Ensure using correct import: `import { log } from '@/logger'`
+3. Check browser console for any logger system errors
+
+## Advanced Usage
+
+### Custom Log Control Functions
+
+You can extend the logControl API with custom functions:
+
+```javascript
+// Add your own shortcuts
+window.debugMyFeature = () => {
+  logControl.setGlobalLevel('error');
+  logControl.setFolderLevel('myfeature', 'debug');
+  console.log('🎯 Focused on MyFeature debugging');
+};
+```
+
+### Programmatic Configuration
+
+```javascript
+// Save current config for later
+const savedConfig = logControl.status();
+
+// Apply complex configuration
+logControl.setGlobalLevel('error');
+logControl.setFolderLevel('vibegrid', 'info');
+logControl.setFileLevel('components/ImportantComponent', 'debug');
+
+// Later restore
+logControl.reset();
+// Apply savedConfig settings...
+```
+
+The simple logger system provides powerful debugging capabilities while maintaining ease of use and excellent performance.

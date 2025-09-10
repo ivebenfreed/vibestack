@@ -1,7 +1,7 @@
 import type { GanttTask, TaskDependency, TimeScale } from '../types';
 import { TIME_SCALE_CONFIG, ZOOM_UTILS } from '../constants';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/utils/coordinate-mapper.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/utils/coordinate-mapper.ts');
 
 // Coordinate mapping for pre-calculated positions
 export interface CoordinateMapping {
@@ -70,7 +70,7 @@ export function calculateCoordinateMapping({
   const validStart = parseDate(visibleDateRange.start);
   const validEnd = parseDate(visibleDateRange.end);
     
-  log.info('📐 Calculating coordinate mapping', {
+  fileLog.info('📐 Calculating coordinate mapping', {
     taskCount: taskTree.length,
     zoom,
     dateRange: visibleDateRange,
@@ -94,7 +94,7 @@ export function calculateCoordinateMapping({
   // The machine handles zoom calculations and sends us the final dayWidth
   const adjustedDayWidth = dayWidth;
   
-  log.info('📐 Using dayWidth from machine:', {
+  fileLog.info('📐 Using dayWidth from machine:', {
     receivedDayWidth: dayWidth,
     adjustedDayWidth,
     zoomFactor
@@ -124,7 +124,7 @@ export function calculateCoordinateMapping({
       
       // Log first few tasks to debug date issue
       if (rowIndex.current < 3) {
-        log.info(`📐 Task ${rowIndex.current}: ${task.title}`, {
+        fileLog.info(`📐 Task ${rowIndex.current}: ${task.title}`, {
           task: {
             id: task.id,
             startDate: task.startDate,
@@ -141,7 +141,7 @@ export function calculateCoordinateMapping({
       
       // Skip tasks without dates or with invalid dates
       if (!taskStart || !taskEnd || isNaN(taskStart.getTime()) || isNaN(taskEnd.getTime())) {
-        log.warn(`⚠️ Skipping task without valid dates: ${task.id}`, {
+        fileLog.warn(`⚠️ Skipping task without valid dates: ${task.id}`, {
           title: task.title,
           startDate: task.startDate,
           dueDate: task.dueDate
@@ -222,7 +222,7 @@ function calculateTimelineSegments(
     labelType = 'week';
   }
   
-  log.info('📅 Timeline label mode:', { 
+  fileLog.info('📅 Timeline label mode:', { 
     dayWidth: `${dayWidth}px`, 
     labelType,
     reason: dayWidth < 15 ? 'Too cramped - showing months' : 
@@ -268,7 +268,7 @@ function calculateTimelineSegments(
     currentDate.setDate(currentDate.getDate() + 1);
   }
   
-  log.info(`Generated ${segments.length} daily segments with ${labelType} labels`);
+  fileLog.info(`Generated ${segments.length} daily segments with ${labelType} labels`);
   return segments;
 }
 

@@ -1,5 +1,5 @@
 import { observable, batch, computed } from '@legendapp/state';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 import type { 
   TableRow, 
   Column, 
@@ -11,7 +11,7 @@ import type {
   CoordinateMapping 
 } from '../types';
 
-const log = uiLog('components/custom/legendtable/state/table-state.ts');
+const fileLog = log('components/custom/legendtable/state/table-state.ts');
 
 // Utility functions for data processing
 function filterData(data: TableRow[], filters: Map<string, any>, searchTerm: string): TableRow[] {
@@ -93,7 +93,7 @@ function* generateCellRange(
   const endColIndex = columns.findIndex(col => col.id === endColId);
   
   if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-    log.warn(`[generateCellRange] Invalid indices - no cells generated`, {
+    fileLog.warn(`[generateCellRange] Invalid indices - no cells generated`, {
       startRowIndex, endRowIndex, startColIndex, endColIndex,
       startCell: startCell.substring(0, 30) + '...',
       endCell: endCell.substring(0, 30) + '...'
@@ -135,7 +135,7 @@ function calculateCellRange(
   const debugStartRow = data[startRowIndex];
   const debugEndRow = data[endRowIndex];
   
-  log.info(`[calculateCellRange] DEBUG: Index mapping validation`, {
+  fileLog.info(`[calculateCellRange] DEBUG: Index mapping validation`, {
     startCell: startCell.substring(0, 40) + '...',
     endCell: endCell.substring(0, 40) + '...',
     startRowId: startRowId.substring(0, 20) + '...',
@@ -152,7 +152,7 @@ function calculateCellRange(
   });
 
   // CRITICAL DEBUG: Check what happens when we search for the exact row IDs
-  log.info(`[calculateCellRange] CRITICAL DEBUGGING: Searching for row IDs manually`, {
+  fileLog.info(`[calculateCellRange] CRITICAL DEBUGGING: Searching for row IDs manually`, {
     startRowFound: data.some(row => row.id === startRowId),
     endRowFound: data.some(row => row.id === endRowId),
     startRowSampleMatch: data.find(row => row.id === startRowId)?.name || 'NOT FOUND',
@@ -166,7 +166,7 @@ function calculateCellRange(
   });
   
   if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-    log.warn(`[calculateCellRange] Invalid indices found - returning empty selection`, {
+    fileLog.warn(`[calculateCellRange] Invalid indices found - returning empty selection`, {
       startRowIndex, endRowIndex, startColIndex, endColIndex,
       startCell, endCell, 
       dataLength: data.length,
@@ -188,7 +188,7 @@ function calculateCellRange(
   const totalCells = rowCount * colCount;
   
   // Enhanced debug logging with validation checks
-  log.info(`[calculateCellRange] Selection calculation`, {
+  fileLog.info(`[calculateCellRange] Selection calculation`, {
     startCell: startCell.substring(0, 30) + '...',
     endCell: endCell.substring(0, 30) + '...',
     startRowIndex,
@@ -215,7 +215,7 @@ function calculateCellRange(
   
   // Warn about large selections but don't spam with huge selections
   if (totalCells > 100) {
-    log.warn(`[calculateCellRange] Large selection detected - ${totalCells} cells`);
+    fileLog.warn(`[calculateCellRange] Large selection detected - ${totalCells} cells`);
   }
   
   // Limit array generation for performance - if selection is too large, use Set approach
@@ -540,7 +540,7 @@ export function createTableState(config: TableConfig) {
       const sorting = tableState$.sorting.get();
       const columns = tableState$.columns.get();
       
-      log.info('🔍 [dataProcessing] VIEWPORT-INDEPENDENT COMPUTATION START:', {
+      fileLog.info('🔍 [dataProcessing] VIEWPORT-INDEPENDENT COMPUTATION START:', {
         rawDataLength: rawData.length,
         hasFilters: filters.size > 0,
         hasSearchTerm: !!searchTerm,
@@ -568,7 +568,7 @@ export function createTableState(config: TableConfig) {
       const dataProcessing = tableState$.dataProcessing.get();
       const viewport = tableState$.viewport.get();
       
-      log.info('🔍 [processedData] COORDINATE MAPPING COMPUTATION:', {
+      fileLog.info('🔍 [processedData] COORDINATE MAPPING COMPUTATION:', {
         sortedDataLength: dataProcessing.sortedData.length,
         viewportState: viewport,
         computationTimestamp: Date.now()
@@ -612,7 +612,7 @@ export function createTableState(config: TableConfig) {
         version: Date.now() // Add versioning for change detection
       };
       
-      log.info('🔍 [processedData] COORDINATE MAPPING CREATED:', {
+      fileLog.info('🔍 [processedData] COORDINATE MAPPING CREATED:', {
         filteredDataLength: dataProcessing.filteredData.length,
         sortedDataLength: dataProcessing.sortedData.length,
         allRowsLength: rows.length,
@@ -661,7 +661,7 @@ export function createTableState(config: TableConfig) {
         }
       };
       
-      log.info('🔍 [processedData] SINGLE PIPELINE RESULT:', {
+      fileLog.info('🔍 [processedData] SINGLE PIPELINE RESULT:', {
         hasResult: !!result,
         hasRenderState: !!result.renderState,
         hasCoordinateMapping: !!result.coordinateMapping,
@@ -754,7 +754,7 @@ export function createTableState(config: TableConfig) {
         const data = processed.sortedData;
         const columns = tableState$.columns.get();
         
-        log.info(`[selectRange] UNIFIED PIPELINE: Cell range request`, {
+        fileLog.info(`[selectRange] UNIFIED PIPELINE: Cell range request`, {
           startCell: startCell.substring(0, 50) + '...',
           endCell: endCell.substring(0, 50) + '...',
           dataLength: data.length,
@@ -905,7 +905,7 @@ export function createTableState(config: TableConfig) {
         // Use raw data for pattern detection, single pipeline will handle updates
         const data = [...tableState$.data.get()];
         
-        log.info('[TableState] fillSeries: Analyzing series patterns', {
+        fileLog.info('[TableState] fillSeries: Analyzing series patterns', {
           sourceRange: Array.from(sourceRange),
           fillRange: Array.from(fillRange)
         });
@@ -915,7 +915,7 @@ export function createTableState(config: TableConfig) {
         
         if (patterns.size === 0) {
           // No patterns detected, fall back to fillDown
-          log.info('[TableState] fillSeries: No patterns detected, falling back to fillDown');
+          fileLog.info('[TableState] fillSeries: No patterns detected, falling back to fillDown');
           tableState$.fillDown(sourceRange, fillRange);
           return;
         }
@@ -938,7 +938,7 @@ export function createTableState(config: TableConfig) {
                 }
               };
               
-              log.info('[TableState] fillSeries: Applied pattern', {
+              fileLog.info('[TableState] fillSeries: Applied pattern', {
                 cellId,
                 pattern: pattern.type,
                 originalValue: pattern.samples[0],
@@ -965,7 +965,7 @@ export function createTableState(config: TableConfig) {
           isActive: true
         });
         
-        log.info('[TableState] Cells copied to clipboard', { count: cellsToUse.size });
+        fileLog.info('[TableState] Cells copied to clipboard', { count: cellsToUse.size });
       });
     },
     
@@ -980,7 +980,7 @@ export function createTableState(config: TableConfig) {
           isActive: true
         });
         
-        log.info('[TableState] Cells cut to clipboard', { count: cellsToUse.size });
+        fileLog.info('[TableState] Cells cut to clipboard', { count: cellsToUse.size });
       });
     },
     
@@ -992,7 +992,7 @@ export function createTableState(config: TableConfig) {
           isActive: false
         });
         
-        log.info('[TableState] Clipboard cleared');
+        fileLog.info('[TableState] Clipboard cleared');
       });
     }
   });

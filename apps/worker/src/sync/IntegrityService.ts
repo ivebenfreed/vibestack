@@ -19,8 +19,8 @@ import type { IMessageSender } from './interfaces';
 import { IntegrityValidator } from './integrity/IntegrityValidator';
 import { IntegrityReset } from './integrity/IntegrityReset';
 import { FingerprintGenerator } from './integrity/FingerprintGenerator';
-import { syncLog } from '@/logger';
-const log = syncLog('sync/IntegrityService.ts');
+import { log } from '@/logger';
+const fileLog = log('sync/IntegrityService.ts');
 
 // Re-export types for backward compatibility
 export interface IntegrityServiceConfig {
@@ -95,7 +95,7 @@ export class IntegrityService {
     this.config = config;
     this.dataSource = dataSource;
     
-    log.info('[IntegrityService] Initializing streamlined coordinator with split services...');
+    fileLog.info('[IntegrityService] Initializing streamlined coordinator with split services...');
 
     // Initialize sub-services with focused responsibilities
     this.validator = new IntegrityValidator(
@@ -123,7 +123,7 @@ export class IntegrityService {
       dataSource
     );
 
-    log.info('[IntegrityService] ✅ Streamlined coordinator initialized with 83% size reduction');
+    fileLog.info('[IntegrityService] ✅ Streamlined coordinator initialized with 83% size reduction');
   }
 
   /**
@@ -151,7 +151,7 @@ export class IntegrityService {
    */
   setMessageSender(sender: IMessageSender): void {
     this.messageSender = sender;
-    log.info('[IntegrityService] Message sender configured, delegating to validator');
+    fileLog.info('[IntegrityService] Message sender configured, delegating to validator');
     
     // Only validator needs message sender for server validation
     this.validator.setMessageSender(sender);
@@ -162,7 +162,7 @@ export class IntegrityService {
    */
   setMachineRef(machineRef: any): void {
     this.machineRef = machineRef;
-    log.info('[IntegrityService] Machine reference set, delegating to sub-services');
+    fileLog.info('[IntegrityService] Machine reference set, delegating to sub-services');
     
     // Delegate to all sub-services that need machine communication
     this.validator.setMachineRef(machineRef);
@@ -174,12 +174,12 @@ export class IntegrityService {
    */
   async validateIntegrity(reason: string = 'routine check'): Promise<IntegrityValidationResult> {
     try {
-      log.info(`[IntegrityService] Coordinator delegating validation to IntegrityValidator: ${reason}`);
+      fileLog.info(`[IntegrityService] Coordinator delegating validation to IntegrityValidator: ${reason}`);
       
       // Delegate to validator (validator manages its own baseline persistence)
       const result = await this.validator.validateIntegrity(reason);
       
-      log.info(`[IntegrityService] Validation completed via IntegrityValidator:`, {
+      fileLog.info(`[IntegrityService] Validation completed via IntegrityValidator:`, {
         isValid: result.isValid,
         issueCount: result.issues.length,
         recommendedAction: result.recommendedAction
@@ -187,7 +187,7 @@ export class IntegrityService {
 
       // Auto-execute reset if recommended by validator
       if (result.recommendedAction === 'reset' && this.config.autoResetOnFailure) {
-        log.info(`[IntegrityService] Auto-executing reset due to validation recommendation: ${result.resetReason}`);
+        fileLog.info(`[IntegrityService] Auto-executing reset due to validation recommendation: ${result.resetReason}`);
         
         try {
           const resetResult = await this.reset.executeReset(
@@ -196,7 +196,7 @@ export class IntegrityService {
           );
           
           if (resetResult.success) {
-            log.info(`[IntegrityService] ✅ Auto-reset completed successfully`);
+            fileLog.info(`[IntegrityService] ✅ Auto-reset completed successfully`);
             // Return a successful validation result after reset
             return {
               isValid: true,
@@ -206,12 +206,12 @@ export class IntegrityService {
               resetReason: `Auto-reset completed: ${result.resetReason}`
             };
           } else {
-            log.error(`[IntegrityService] ❌ Auto-reset failed:`, resetResult.error);
+            fileLog.error(`[IntegrityService] ❌ Auto-reset failed:`, resetResult.error);
             // Return the original validation failure if reset failed
             return result;
           }
         } catch (resetError) {
-          log.error(`[IntegrityService] ❌ Auto-reset threw error:`, resetError);
+          fileLog.error(`[IntegrityService] ❌ Auto-reset threw error:`, resetError);
           // Return the original validation failure if reset threw
           return result;
         }
@@ -220,7 +220,7 @@ export class IntegrityService {
       return result;
 
     } catch (error) {
-      log.error('[IntegrityService] Coordinator validation error:', error);
+      fileLog.error('[IntegrityService] Coordinator validation error:', error);
       this.callbacks.onValidationError?.(error as Error, reason);
       throw error;
     }
@@ -231,14 +231,14 @@ export class IntegrityService {
    */
   async establishBaseline(reason: string = 'post-initial-sync'): Promise<void> {
     try {
-      log.info(`[IntegrityService] Coordinator establishing baseline: ${reason}`);
+      fileLog.info(`[IntegrityService] Coordinator establishing baseline: ${reason}`);
       
       // Delegate to validator for baseline establishment
       await this.validator.establishBaseline(reason);
       
-      log.info(`[IntegrityService] Baseline establishment completed`);
+      fileLog.info(`[IntegrityService] Baseline establishment completed`);
     } catch (error) {
-      log.error(`[IntegrityService] Baseline establishment error:`, error);
+      fileLog.error(`[IntegrityService] Baseline establishment error:`, error);
       throw error;
     }
   }
@@ -247,7 +247,7 @@ export class IntegrityService {
    * Handle validation response from server - delegates to IntegrityValidator
    */
   async handleValidationResponse(message: any): Promise<IntegrityValidationResult> {
-    log.info('[IntegrityService] Coordinator delegating validation response to IntegrityValidator');
+    fileLog.info('[IntegrityService] Coordinator delegating validation response to IntegrityValidator');
     return await this.validator.handleValidationResponse(message);
   }
 
@@ -256,11 +256,11 @@ export class IntegrityService {
    */
   async executeReset(reason: string, resetType: 'full_reset' | 'table_reset' = 'full_reset'): Promise<IntegrityResetResult> {
     try {
-      log.info(`[IntegrityService] Coordinator delegating reset to IntegrityReset: ${reason} (${resetType})`);
+      fileLog.info(`[IntegrityService] Coordinator delegating reset to IntegrityReset: ${reason} (${resetType})`);
       
       const result = await this.reset.executeReset(reason, resetType);
       
-      log.info(`[IntegrityService] Reset completed via IntegrityReset:`, {
+      fileLog.info(`[IntegrityService] Reset completed via IntegrityReset:`, {
         success: result.success,
         tablesCleared: result.tablesCleared.length,
         lsnReset: result.lsnReset
@@ -269,7 +269,7 @@ export class IntegrityService {
       return result;
 
     } catch (error) {
-      log.error('[IntegrityService] Coordinator reset error:', error);
+      fileLog.error('[IntegrityService] Coordinator reset error:', error);
       throw error;
     }
   }
@@ -278,7 +278,7 @@ export class IntegrityService {
    * Generate local fingerprints - delegates to FingerprintGenerator
    */
   async generateLocalFingerprints(): Promise<Record<string, TableFingerprint>> {
-    log.info('[IntegrityService] Coordinator delegating fingerprint generation to FingerprintGenerator');
+    fileLog.info('[IntegrityService] Coordinator delegating fingerprint generation to FingerprintGenerator');
     return await this.fingerprinter.generateAllFingerprints();
   }
 
@@ -286,7 +286,7 @@ export class IntegrityService {
    * Generate fingerprints since timestamp - delegates to FingerprintGenerator
    */
   async generateFingerprintsSinceTimestamp(sinceTimestamp: number): Promise<Record<string, TableFingerprint>> {
-    log.info(`[IntegrityService] Coordinator delegating timestamp-based fingerprints to FingerprintGenerator`);
+    fileLog.info(`[IntegrityService] Coordinator delegating timestamp-based fingerprints to FingerprintGenerator`);
     return await this.fingerprinter.generateFingerprintsSinceTimestamp(sinceTimestamp);
   }
 
@@ -294,7 +294,7 @@ export class IntegrityService {
    * Clear domain data - delegates to IntegrityReset
    */
   async clearDomainData(): Promise<boolean> {
-    log.info('[IntegrityService] Coordinator delegating domain data clearing to IntegrityReset');
+    fileLog.info('[IntegrityService] Coordinator delegating domain data clearing to IntegrityReset');
     return await this.reset.clearDomainData();
   }
 
@@ -302,7 +302,7 @@ export class IntegrityService {
    * Reset integrity baseline - delegates to IntegrityReset
    */
   async resetIntegrityBaseline(reason: string = 'Manual baseline reset'): Promise<void> {
-    log.info(`[IntegrityService] Coordinator delegating baseline reset to IntegrityReset: ${reason}`);
+    fileLog.info(`[IntegrityService] Coordinator delegating baseline reset to IntegrityReset: ${reason}`);
     await this.reset.resetIntegrityBaseline(reason);
   }
 
@@ -311,7 +311,7 @@ export class IntegrityService {
    */
   updateConfig(config: Partial<IntegrityServiceConfig>): void {
     this.config = { ...this.config, ...config };
-    log.info('[IntegrityService] Coordinator updating config across all sub-services');
+    fileLog.info('[IntegrityService] Coordinator updating config across all sub-services');
     
     // Update configs in sub-services as needed
     // Note: Sub-services don't currently have updateConfig methods, 
@@ -337,11 +337,11 @@ export class IntegrityService {
         return snapshot.context;
       }
 
-      log.warn('[IntegrityService] No orchestrator or app-init context found');
+      fileLog.warn('[IntegrityService] No orchestrator or app-init context found');
       return null;
 
     } catch (error) {
-      log.warn('[IntegrityService] Error getting orchestrator context:', error);
+      fileLog.warn('[IntegrityService] Error getting orchestrator context:', error);
       return null;
     }
   }
@@ -369,7 +369,7 @@ export class IntegrityService {
       return '0/0';
 
     } catch (error) {
-      log.warn('[IntegrityService] Could not get current LSN:', error);
+      fileLog.warn('[IntegrityService] Could not get current LSN:', error);
       return '0/0';
     }
   }
@@ -379,7 +379,7 @@ export class IntegrityService {
    */
   establishCurrentBaseline(): void {
     try {
-      log.info('[IntegrityService] Coordinator establishing current baseline...');
+      fileLog.info('[IntegrityService] Coordinator establishing current baseline...');
       
       const now = Date.now();
       const baselineData = {
@@ -398,9 +398,9 @@ export class IntegrityService {
             type: 'UPDATE_INTEGRITY_BASELINE',
             baseline: baselineData
           });
-          log.info('[IntegrityService] ✅ Baseline established in app-init context');
+          fileLog.info('[IntegrityService] ✅ Baseline established in app-init context');
         } catch (error) {
-          log.warn('[IntegrityService] Could not update app-init baseline:', error);
+          fileLog.warn('[IntegrityService] Could not update app-init baseline:', error);
         }
       }
 
@@ -412,14 +412,14 @@ export class IntegrityService {
           const parsedState = JSON.parse(stored);
           parsedState.integrityBaseline = baselineData;
           localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(parsedState));
-          log.info('[IntegrityService] ✅ Baseline established in localStorage');
+          fileLog.info('[IntegrityService] ✅ Baseline established in localStorage');
         }
       } catch (error) {
-        log.warn('[IntegrityService] Could not update localStorage baseline:', error);
+        fileLog.warn('[IntegrityService] Could not update localStorage baseline:', error);
       }
 
     } catch (error) {
-      log.error('[IntegrityService] Error establishing baseline:', error);
+      fileLog.error('[IntegrityService] Error establishing baseline:', error);
     }
   }
 
@@ -452,7 +452,7 @@ export class IntegrityService {
    * Destroy/cleanup coordinator and sub-services
    */
   destroy(): void {
-    log.info('[IntegrityService] Coordinator destroying sub-services...');
+    fileLog.info('[IntegrityService] Coordinator destroying sub-services...');
     
     // Sub-services don't currently have destroy methods, but this is where
     // they would be called if cleanup is needed in the future
@@ -461,6 +461,6 @@ export class IntegrityService {
     this.messageSender = null;
     this.machineRef = null;
     
-    log.info('[IntegrityService] ✅ Coordinator cleanup completed');
+    fileLog.info('[IntegrityService] ✅ Coordinator cleanup completed');
   }
 }

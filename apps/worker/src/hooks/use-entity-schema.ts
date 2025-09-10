@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { stateLog } from '@/logger';
+import { log } from '@/logger';
 import { use$ } from '@legendapp/state/react';
 import { universeContext$, universeSchema$ } from '@/legend-state';
 import { 
@@ -22,7 +22,7 @@ import {
   type ValidationResult 
 } from '@/lib/schema-client';
 
-const log = stateLog('hooks/use-entity-schema.ts');
+const fileLog = log('hooks/use-entity-schema.ts');
 
 export interface UseEntitySchemaResult {
   schema: OrgEntitySchema | null;
@@ -65,7 +65,7 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
   const loadSchema = useCallback(async () => {
     // Schema is loaded by Legend State init machine after auth is ready
     // This ensures we never try to fetch before authentication
-    log.info('[useOrgSchema] Schema request for org:', orgId, 'Already loaded:', !!schema);
+    fileLog.info('[useOrgSchema] Schema request for org:', orgId, 'Already loaded:', !!schema);
   }, [orgId, schema]);
 
   // Listen for local schema ready events (from Legend State init machine)
@@ -73,7 +73,7 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
     const handleLocalSchemaReady = (event: CustomEvent) => {
       const { schema: eventSchema, source } = event.detail;
       if (eventSchema && eventSchema.orgId === orgId) {
-        log.info('[useOrgSchema] 🚀 Schema ready from:', source);
+        fileLog.info('[useOrgSchema] 🚀 Schema ready from:', source);
         setCached(true);
       }
     };
@@ -214,7 +214,7 @@ export function usePreloadSchemas(orgIds: string[]) {
 
   const preload = useCallback(async () => {
     // No-op: Legend State init machine handles all schema loading
-    log.info('[usePreloadSchemas] Schema preloading handled by Legend State init machine');
+    fileLog.info('[usePreloadSchemas] Schema preloading handled by Legend State init machine');
   }, []);
 
   return {
@@ -264,6 +264,6 @@ export function useSchemaUpdates(orgId: string | null, onSchemaUpdate?: (entityN
     //
     // return () => ws.close();
 
-    log.info(`[Schema Updates] WebSocket connection placeholder for org: ${orgId}`);
+    fileLog.info(`[Schema Updates] WebSocket connection placeholder for org: ${orgId}`);
   }, [orgId, onSchemaUpdate]);
 }

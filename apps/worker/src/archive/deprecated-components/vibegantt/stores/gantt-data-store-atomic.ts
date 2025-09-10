@@ -6,8 +6,8 @@ import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '..
 import { taskService } from '@/domain/task-service';
 import { entityDependencyService } from '@/domain/entity-dependency-service';
 import { calculateCoordinateMapping, type CoordinateMapping } from '../utils/coordinate-mapper';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/stores/gantt-data-store-atomic.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/stores/gantt-data-store-atomic.ts');
 
 // ====================================
 // MEMORY LIMITS
@@ -85,7 +85,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
       setInitialData: {
         tasks: (context, event: { tasks: Record<string, any>, relationships: any }) => {
           if (process.env.NODE_ENV === 'development') {
-            log.info('📊 GanttStore: Setting tasks', {
+            fileLog.info('📊 GanttStore: Setting tasks', {
               taskCount: Object.keys(event.tasks).length,
               hasRelationships: !!event.relationships
             });
@@ -135,7 +135,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
       updateTask: {
         tasks: (context, event: { task: any }) => {
           if (process.env.NODE_ENV === 'development') {
-            log.info('📊 GanttStore: Updating task atomically', {
+            fileLog.info('📊 GanttStore: Updating task atomically', {
               taskId: event.task.id,
               title: event.task.title
             });
@@ -198,7 +198,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
       updateRelationshipTable: {
         relationships: (context, event: { table: string, data: any[] }) => {
           if (process.env.NODE_ENV === 'development') {
-            log.info('📊 GanttStore: Updating relationship table', {
+            fileLog.info('📊 GanttStore: Updating relationship table', {
               table: event.table,
               dataCount: event.data.length
             });
@@ -244,7 +244,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
           });
           
           if (process.env.NODE_ENV === 'development' && changedCount > 0) {
-            log.info('📊 GanttStore: Re-resolved tasks after relationship change', {
+            fileLog.info('📊 GanttStore: Re-resolved tasks after relationship change', {
               table: event.table,
               changedTasks: changedCount
             });
@@ -305,7 +305,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
       deleteTask: {
         tasks: (context, event: { taskId: string }) => {
           if (process.env.NODE_ENV === 'development') {
-            log.info('📊 GanttStore: Deleting task', { taskId: event.taskId });
+            fileLog.info('📊 GanttStore: Deleting task', { taskId: event.taskId });
           }
           
           const { [event.taskId]: deleted, ...rest } = context.tasks;
@@ -452,7 +452,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
       
       setDayWidth: {
         dayWidth: (context, event: { dayWidth: number }) => {
-          log.info('📐 GanttStore: setDayWidth handler - updating dayWidth', {
+          fileLog.info('📐 GanttStore: setDayWidth handler - updating dayWidth', {
             oldDayWidth: context.dayWidth,
             newDayWidth: event.dayWidth,
             eventType: event.type || 'setDayWidth'
@@ -464,7 +464,7 @@ export const createGanttStoreLogic = (projectId?: string, domainService?: any, i
           return event.dayWidth;
         },
         coordinateMapping: (context, event) => {
-          log.info('📐 GanttStore: setDayWidth handler - recalculating coordinates', {
+          fileLog.info('📐 GanttStore: setDayWidth handler - recalculating coordinates', {
             eventDayWidth: event.dayWidth,
             contextDayWidth: context.dayWidth,
             zoom: context.zoom,
@@ -751,7 +751,7 @@ function resolveTaskRelationships(task: any, relationships: any): any {
 // ====================================
 
 export async function loadInitialGanttData(projectId?: string, domainService?: any) {
-  log.info('📊 GanttStore: Loading initial data from IndexedDB', { projectId, domainService });
+  fileLog.info('📊 GanttStore: Loading initial data from IndexedDB', { projectId, domainService });
   
   try {
     // Build query for tasks
@@ -781,7 +781,7 @@ export async function loadInitialGanttData(projectId?: string, domainService?: a
       };
       
       if (process.env.NODE_ENV === 'development') {
-        log.info('📊 GanttStore: Pagination enabled', paginationInfo);
+        fileLog.info('📊 GanttStore: Pagination enabled', paginationInfo);
       }
     } else {
       // Load all tasks
@@ -809,7 +809,7 @@ export async function loadInitialGanttData(projectId?: string, domainService?: a
     });
   
     // Log before querying dependencies
-    log.info('📊 GanttStore: Querying dependencies for task IDs:', taskIds.slice(0, 5), '...');
+    fileLog.info('📊 GanttStore: Querying dependencies for task IDs:', taskIds.slice(0, 5), '...');
     
     // Load all relationships in parallel with error handling
     let users = [], projects = [], statusDefs = [], tags = [], dependencies = [];
@@ -823,13 +823,13 @@ export async function loadInitialGanttData(projectId?: string, domainService?: a
       taskIds.length > 0 ? entityDependencyService.getTaskDependencies(taskIds) : []
     ]);
   } catch (error) {
-    log.error('📊 GanttStore: Error loading relationships from database:', error);
+    fileLog.error('📊 GanttStore: Error loading relationships from database:', error);
     // Continue with empty arrays - better than crashing
-    log.info('📊 GanttStore: Continuing with empty relationship data');
+    fileLog.info('📊 GanttStore: Continuing with empty relationship data');
   }
   
   // Log dependency query results
-  log.info('📊 GanttStore: Raw dependency query result:', {
+  fileLog.info('📊 GanttStore: Raw dependency query result:', {
     totalFound: dependencies.length,
     firstFew: dependencies.slice(0, 3)
   });
@@ -868,7 +868,7 @@ export async function loadInitialGanttData(projectId?: string, domainService?: a
     };
   });
   
-  log.info('📊 GanttStore: Initial data loaded', {
+  fileLog.info('📊 GanttStore: Initial data loaded', {
     taskCount: Object.keys(resolvedTasks).length,
     dependencyCount: Object.keys(dependencyMap).length,
     relationshipTables: Object.keys(relationships),
@@ -877,20 +877,20 @@ export async function loadInitialGanttData(projectId?: string, domainService?: a
   });
   
   // Log task details for debugging
-  log.info('📊 GanttStore: Task details for project', projectId);
+  fileLog.info('📊 GanttStore: Task details for project', projectId);
   Object.values(resolvedTasks).forEach(task => {
-    log.info(`  Task: ${task.id} - ${task.title} (project: ${task.projectId})`);
+    fileLog.info(`  Task: ${task.id} - ${task.title} (project: ${task.projectId})`);
   });
   
   // Log dependency details
-  log.info('📊 GanttStore: Dependencies found:', dependencies.length);
+  fileLog.info('📊 GanttStore: Dependencies found:', dependencies.length);
   if (dependencies.length > 0) {
     dependencies.forEach(dep => {
-      log.info(`  Dep: ${dep.id} - ${dep.predecessorId} -> ${dep.successorId} (type: ${dep.type})`);
+      fileLog.info(`  Dep: ${dep.id} - ${dep.predecessorId} -> ${dep.successorId} (type: ${dep.type})`);
     });
   } else {
-    log.info('  No dependencies found for tasks in this project');
-    log.info('  Task IDs:', taskIds);
+    fileLog.info('  No dependencies found for tasks in this project');
+    fileLog.info('  Task IDs:', taskIds);
   }
   
   return {
@@ -901,7 +901,7 @@ export async function loadInitialGanttData(projectId?: string, domainService?: a
   };
   
   } catch (error) {
-    log.error('📊 GanttStore: Critical error loading initial data:', error);
+    fileLog.error('📊 GanttStore: Critical error loading initial data:', error);
     // Return minimal valid data structure to prevent crashes
     return {
       tasks: {},
@@ -932,11 +932,11 @@ export function setupGranularGanttSubscriptions(
   // Check if pagination is enabled
   const snapshot = storeActor.getSnapshot();
   if (snapshot?.context?.pagination?.enabled) {
-    log.info('📊 GanttStore: Skipping subscriptions - pagination mode');
+    fileLog.info('📊 GanttStore: Skipping subscriptions - pagination mode');
     return () => {};
   }
   
-  log.info('📊 GanttStore: Setting up granular subscriptions', { projectId, domainService });
+  fileLog.info('📊 GanttStore: Setting up granular subscriptions', { projectId, domainService });
   
   // Track previous state for change detection
   let previousTasks: Record<string, any> = {};
@@ -954,7 +954,7 @@ export function setupGranularGanttSubscriptions(
       });
     }
     initialLoadComplete = true;
-    log.info('📊 GanttStore: Initial load complete, enabling live updates');
+    fileLog.info('📊 GanttStore: Initial load complete, enabling live updates');
   }, 100);
   
   // Subscribe to task changes
@@ -1024,7 +1024,7 @@ export function setupGranularGanttSubscriptions(
       });
       
       if (addedIds.length > 0 || changedIds.length > 0 || deletedIds.length > 0) {
-        log.info('📊 GanttStore: Task updates detected', {
+        fileLog.info('📊 GanttStore: Task updates detected', {
           added: addedIds.length,
           changed: changedIds.length,
           deleted: deletedIds.length
@@ -1034,7 +1034,7 @@ export function setupGranularGanttSubscriptions(
       previousTasks = currentTaskMap;
     },
     error: (error) => {
-      log.error('❌ GanttStore: Task subscription error', error);
+      fileLog.error('❌ GanttStore: Task subscription error', error);
       storeActor.send({ type: 'setError', error: error.message });
     }
   });
@@ -1079,7 +1079,7 @@ export function setupGranularGanttSubscriptions(
       
       // Detect changes
       if (JSON.stringify(previousDependencies) !== JSON.stringify(depMap)) {
-        log.info('📊 GanttStore: Dependencies updated', {
+        fileLog.info('📊 GanttStore: Dependencies updated', {
           count: Object.keys(depMap).length
         });
         storeActor.send({ 
@@ -1090,7 +1090,7 @@ export function setupGranularGanttSubscriptions(
       }
     },
     error: (error) => {
-      log.error('❌ GanttStore: Dependency subscription error', error);
+      fileLog.error('❌ GanttStore: Dependency subscription error', error);
     }
   });
   
@@ -1117,7 +1117,7 @@ export function setupGranularGanttSubscriptions(
         
         const previousMap = previousRelationships[key] || {};
         if (JSON.stringify(previousMap) !== JSON.stringify(currentMap)) {
-          log.info('📊 GanttStore: Relationship updated', { table, count: data.length });
+          fileLog.info('📊 GanttStore: Relationship updated', { table, count: data.length });
           storeActor.send({ type: 'updateRelationshipTable', table: key, data });
           previousRelationships[key] = currentMap;
         }
@@ -1129,7 +1129,7 @@ export function setupGranularGanttSubscriptions(
   
   // Return cleanup function
   return () => {
-    log.info('📊 GanttStore: Cleaning up subscriptions');
+    fileLog.info('📊 GanttStore: Cleaning up subscriptions');
     subscriptions.forEach(sub => sub.unsubscribe());
   };
 }
@@ -1153,7 +1153,7 @@ export function saveDisplayState(projectId: string, state: any) {
     };
     localStorage.setItem(key, JSON.stringify(displayState));
   } catch (error) {
-    log.error('Failed to save gantt display state:', error);
+    fileLog.error('Failed to save gantt display state:', error);
   }
 }
 
@@ -1165,7 +1165,7 @@ export function loadDisplayState(projectId: string): any | null {
       return JSON.parse(stored);
     }
   } catch (error) {
-    log.error('Failed to load gantt display state:', error);
+    fileLog.error('Failed to load gantt display state:', error);
   }
   return null;
 }
@@ -1176,7 +1176,7 @@ export function loadDisplayState(projectId: string): any | null {
 
 export function createGanttStoreActor(projectId?: string, domainService?: any, initialDayWidth: number = 50) {
   if (process.env.NODE_ENV === 'development') {
-    log.info('📊 GanttStore: Creating atomic store logic', { projectId });
+    fileLog.info('📊 GanttStore: Creating atomic store logic', { projectId });
   }
   
   return createGanttStoreLogic(projectId, domainService, initialDayWidth);

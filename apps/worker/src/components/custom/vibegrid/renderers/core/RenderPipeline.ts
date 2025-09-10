@@ -9,8 +9,8 @@ import type { DOMSystem } from '../systems/DOMSystem';
 import type { HeaderEngine } from '../engines/HeaderEngine';
 import type { RowEngine } from '../engines/RowEngine';
 import type { PerformanceSystem } from '../systems/PerformanceSystem';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/renderers/core/RenderPipeline.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/renderers/core/RenderPipeline.ts');
 
 // ====================================
 // TYPES
@@ -65,7 +65,7 @@ export class RenderPipeline {
       
       // Check if this is the first render
       if (this.isFirstRender) {
-        log.info('🎨 RenderOrchestrator: First render - executing synchronously');
+        fileLog.info('🎨 RenderOrchestrator: First render - executing synchronously');
         this.isFirstRender = false;
         
         // CRITICAL: Set row count BEFORE updating viewport
@@ -78,16 +78,16 @@ export class RenderPipeline {
         this.config.performanceMonitor.recordPhase('viewport', viewportTime);
         
         // Log viewport info for debugging
-        log.info('🎨 RenderOrchestrator: First render viewport info AFTER updateViewport', {
+        fileLog.info('🎨 RenderOrchestrator: First render viewport info AFTER updateViewport', {
           visibleRange: this.config.virtualGrid.getVisibleRange(),
           metrics: this.config.virtualGrid.getMetrics()
         });
         
         // STEP 3: Render visible rows
-        log.info('🎨 RenderOrchestrator: About to render visible rows synchronously');
+        fileLog.info('🎨 RenderOrchestrator: About to render visible rows synchronously');
         const metrics = this.config.rowRenderingEngine.renderVisibleRows(state);
         this.config.performanceMonitor.recordPhase('visibleRows', metrics.renderTime);
-        log.info('🎨 RenderOrchestrator: Visible rows rendered synchronously', metrics);
+        fileLog.info('🎨 RenderOrchestrator: Visible rows rendered synchronously', metrics);
         
         // STEP 4: Apply optimistic operations
         const optimisticStart = performance.now();
@@ -100,7 +100,7 @@ export class RenderPipeline {
         this.config.performanceMonitor.recordPhase('total', totalTime);
         this.config.performanceMonitor.logBreakdown();
         
-        log.info('🎨 RenderOrchestrator: First render complete synchronously', {
+        fileLog.info('🎨 RenderOrchestrator: First render complete synchronously', {
           renderTime: totalTime,
           rowCount: state.rows.length,
           timestamp: performance.now()
@@ -122,7 +122,7 @@ export class RenderPipeline {
         // Subsequent renders: use RAF for better performance
         // Reduce logging frequency for performance
         if (Math.random() < 0.1) {
-          log.info('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
+          fileLog.info('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
             rowCount: state.rows.length,
             columnCount: state.columns?.length,
             timestamp: performance.now(),
@@ -180,7 +180,7 @@ export class RenderPipeline {
             this.pendingRenderFrame = null;
             // Reduce logging for performance
             if (Math.random() < 0.05) {
-              log.info('🎨 RenderOrchestrator: RAF callback executing', {
+              fileLog.info('🎨 RenderOrchestrator: RAF callback executing', {
                 timestamp: performance.now()
               });
             }
@@ -233,7 +233,7 @@ export class RenderPipeline {
       viewportHeight = measurements.container.client.height || 
                        measurements.table.client.height || 
                        600; // Ultimate fallback
-      log.info('🎨 RenderOrchestrator: Using container height as viewport had no height', {
+      fileLog.info('🎨 RenderOrchestrator: Using container height as viewport had no height', {
         viewportHeight,
         containerHeight: measurements.container.client.height,
         tableHeight: measurements.table.client.height
@@ -250,7 +250,7 @@ export class RenderPipeline {
     const scrollLeft = measurements.viewport.scroll.left;
     
     // Debug log actual measurements
-    log.info('🎨 RenderOrchestrator: updateViewport measurements', {
+    fileLog.info('🎨 RenderOrchestrator: updateViewport measurements', {
       viewportHeight,
       viewportWidth,
       containerHeight: measurements.container.client.height,

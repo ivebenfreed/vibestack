@@ -1,5 +1,5 @@
-import { syncLog } from '@/logger';
-const log = syncLog('sync/config.ts');
+import { log } from '@/logger';
+const fileLog = log('sync/config.ts');
 /**
  * Sync Configuration
  * 
@@ -42,7 +42,7 @@ export function getApiBaseUrl(): string {
       const url = new URL(envApiUrl);
       return `${url.protocol}//${url.host}`;
     } catch (e) {
-      log.warn('Invalid API URL format in environment variables:', envApiUrl);
+      fileLog.warn('Invalid API URL format in environment variables:', envApiUrl);
       // Fall back to default behavior
     }
   }

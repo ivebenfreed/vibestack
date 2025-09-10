@@ -1,8 +1,8 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/overlays/ClipboardOverlayDOM.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/overlays/ClipboardOverlayDOM.ts');
 
 // ====================================
 // CLIPBOARD OVERLAY - DOM Implementation
@@ -71,7 +71,7 @@ export class ClipboardOverlayDOM {
     visualCells: VisualCellPosition[],
     isCut: boolean
   ): void {
-    log.info('ClipboardOverlayDOM: Updating with visual positions', {
+    fileLog.info('ClipboardOverlayDOM: Updating with visual positions', {
       cellCount: visualCells.length,
       isCut
     });
@@ -92,7 +92,7 @@ export class ClipboardOverlayDOM {
     }
     
     if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      log.error('ClipboardOverlayDOM: Invalid bounds calculated');
+      fileLog.error('ClipboardOverlayDOM: Invalid bounds calculated');
       this.clear();
       return;
     }
@@ -101,7 +101,7 @@ export class ClipboardOverlayDOM {
     const height = maxY - minY;
     
     if (width <= 0 || height <= 0) {
-      log.warn('ClipboardOverlayDOM: Invalid dimensions', { width, height });
+      fileLog.warn('ClipboardOverlayDOM: Invalid dimensions', { width, height });
       this.clear();
       return;
     }
@@ -116,7 +116,7 @@ export class ClipboardOverlayDOM {
     clipboardState: { copiedCells: Set<string>; isCut: boolean } | null,
     viewport: ViewportInfo | null
   ): void {
-    log.info('ClipboardOverlayDOM: updateIndicator called', {
+    fileLog.info('ClipboardOverlayDOM: updateIndicator called', {
       hasClipboardState: !!clipboardState,
       hasViewport: !!viewport,
       cellCount: clipboardState?.copiedCells.size || 0
@@ -130,7 +130,7 @@ export class ClipboardOverlayDOM {
     // Calculate bounds of copied cells
     const bounds = this.calculateBounds(clipboardState.copiedCells, viewport);
     if (!bounds) {
-      log.warn('ClipboardOverlayDOM: No bounds calculated');
+      fileLog.warn('ClipboardOverlayDOM: No bounds calculated');
       this.clear();
       return;
     }
@@ -183,7 +183,7 @@ export class ClipboardOverlayDOM {
     // Animate the dashed border
     this.startDashAnimation();
     
-    log.info('ClipboardOverlayDOM: Indicator shown', {
+    fileLog.info('ClipboardOverlayDOM: Indicator shown', {
       x, y, width, height, isCut, color
     });
   }
@@ -273,7 +273,7 @@ export class ClipboardOverlayDOM {
       this.indicator = null;
     }
     
-    log.info('ClipboardOverlayDOM: Indicator cleared');
+    fileLog.info('ClipboardOverlayDOM: Indicator cleared');
   }
   
   /**

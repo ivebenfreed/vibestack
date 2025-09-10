@@ -1,7 +1,7 @@
 import type { ColumnDragState } from '../types';
 import type { CoordinateMapping } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/overlays/ColumnDragOverlayDOM.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/overlays/ColumnDragOverlayDOM.ts');
 
 // ====================================
 // COLUMN DRAG OVERLAY - DOM Implementation
@@ -86,14 +86,14 @@ export class ColumnDragOverlayDOM {
     this.dragState = dragState;
     
     if (!this.coordinateMapping) {
-      log.warn('ColumnDragOverlayDOM: No coordinate mapping available');
+      fileLog.warn('ColumnDragOverlayDOM: No coordinate mapping available');
       return;
     }
     
     // Get column info from coordinate mapping
     const column = this.coordinateMapping.columns.find(col => col.columnId === dragState.draggedColumnId);
     if (!column) {
-      log.warn('ColumnDragOverlayDOM: Column not found:', dragState.draggedColumnId);
+      fileLog.warn('ColumnDragOverlayDOM: Column not found:', dragState.draggedColumnId);
       return;
     }
     

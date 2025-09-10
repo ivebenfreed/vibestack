@@ -7,8 +7,8 @@ import { CellPipeline } from './CellPipeline';
 import type { VirtualScrollManager } from '../managers/VirtualScrollManager';
 import type { ColumnManager } from '../managers/ColumnManager';
 import type { DOMSystem } from '../systems/DOMSystem';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/engines/RowEngine.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/renderers/engines/RowEngine.ts');
 
 // ====================================
 // CONSTANTS
@@ -122,11 +122,11 @@ export class RowEngine {
   updateSingleRow(rowId: string, newData: any, state: RenderState, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
     const rowElement = this.config.domManager.getRowElement(rowId);
     if (!rowElement) {
-      log.warn('RowEngine: updateSingleRow - row element not found:', rowId);
+      fileLog.warn('RowEngine: updateSingleRow - row element not found:', rowId);
       return;
     }
     
-    log.info('🔧 RowEngine: Updating single row', {
+    fileLog.info('🔧 RowEngine: Updating single row', {
       rowId,
       hasRowElement: !!rowElement,
       newDataKeys: Object.keys(newData)
@@ -154,11 +154,11 @@ export class RowEngine {
   updateSingleCell(rowId: string, columnId: string, newValue: any, column: Column, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
     const cellElement = this.config.domManager.getCellElement(rowId, columnId);
     if (!cellElement) {
-      log.warn('RowEngine: updateSingleCell - cell element not found:', { rowId, columnId });
+      fileLog.warn('RowEngine: updateSingleCell - cell element not found:', { rowId, columnId });
       return;
     }
     
-    log.info('🔧 RowEngine: Updating single cell', {
+    fileLog.info('🔧 RowEngine: Updating single cell', {
       rowId,
       columnId,
       newValue,
@@ -175,13 +175,13 @@ export class RowEngine {
         try {
           const resolvedValue = resolver(newValue);
           rowData[`__resolved_${columnId}`] = resolvedValue;
-          log.info('🔧 RowEngine: Resolved relationship value', {
+          fileLog.info('🔧 RowEngine: Resolved relationship value', {
             columnId,
             rawValue: newValue,
             resolvedValue
           });
         } catch (error) {
-          log.error('RowEngine: Error resolving relationship', {
+          fileLog.error('RowEngine: Error resolving relationship', {
             columnId,
             value: newValue,
             error
@@ -286,7 +286,7 @@ export class RowEngine {
     
     // Only log occasionally for performance
     if (Math.random() < 0.05) {
-      log.info('🎨 RowEngine: Row processing complete', {
+      fileLog.info('🎨 RowEngine: Row processing complete', {
         existingRows: existingRowCount,
         newRows: newRowCount,
         totalRows: rows.length
@@ -453,7 +453,7 @@ export class RowEngine {
     
     // DEBUG: Log DOM position calculation
     if (column.id === 'project' && row.id === '03097812-7cc9-4d3d-87d3-e0626ee2cfd8') {
-      log.info('🔍 RowEngine: Creating project cell DOM position', {
+      fileLog.info('🔍 RowEngine: Creating project cell DOM position', {
         rowId: row.id,
         columnId: column.id,
         columnIndex: index,
@@ -548,7 +548,7 @@ export class RowEngine {
     
     // DEBUG: Log offset calculation for project column
     if (index < columns.length && columns[index].id === 'project') {
-      log.info('🔍 RowEngine: calculateCellOffset for project column', {
+      fileLog.info('🔍 RowEngine: calculateCellOffset for project column', {
         columnIndex: index,
         finalOffset: offset,
         enableSelectionColumn: this.config.enableSelectionColumn,

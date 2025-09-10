@@ -7,9 +7,9 @@
 import { fromPromise } from 'xstate';
 import type { OrganizationInfo, CreateOrganizationInput } from './types';
 import { authClient } from '@/lib/auth';
-import { syncLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = syncLog('state-machines/organization-actors.ts');
+const myLog = log('state-machines/organization-actors.ts');
 
 // Mock organization API - replace with actual API calls
 class OrganizationAPI {
@@ -98,7 +98,7 @@ export const loadOrganizationsActor = fromPromise(async () => {
     const organizations = await organizationAPI.getUserOrganizations();
     
     if (!organizations || !Array.isArray(organizations)) {
-      log.error('[OrganizationActors] Invalid organizations response format');
+      myLog.error('[OrganizationActors] Invalid organizations response format');
       return {
         success: false,
         organizations: [],
@@ -112,7 +112,7 @@ export const loadOrganizationsActor = fromPromise(async () => {
       error: null
     };
   } catch (error) {
-    log.error('[OrganizationActors] Failed to load organizations:', error);
+    myLog.error('[OrganizationActors] Failed to load organizations:', error);
     
     return {
       success: false,
@@ -124,11 +124,11 @@ export const loadOrganizationsActor = fromPromise(async () => {
 
 // Create organization actor
 export const createOrganizationActor = fromPromise(async ({ input }: { input: CreateOrganizationInput }) => {
-  log.info('[OrganizationActors] Creating organization:', input);
+  myLog.info('[OrganizationActors] Creating organization:', input);
   
   try {
     const organization = await organizationAPI.createOrganization(input);
-    log.info('[OrganizationActors] Created organization:', organization);
+    myLog.info('[OrganizationActors] Created organization:', organization);
     
     return {
       success: true,
@@ -136,7 +136,7 @@ export const createOrganizationActor = fromPromise(async ({ input }: { input: Cr
       error: null
     };
   } catch (error) {
-    log.error('[OrganizationActors] Failed to create organization:', error);
+    myLog.error('[OrganizationActors] Failed to create organization:', error);
     
     return {
       success: false,
@@ -148,7 +148,7 @@ export const createOrganizationActor = fromPromise(async ({ input }: { input: Cr
 
 // Select organization actor
 export const selectOrganizationActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
-  log.info('[OrganizationActors] Selecting organization:', input.organizationId);
+  myLog.info('[OrganizationActors] Selecting organization:', input.organizationId);
   
   try {
     // Call switch endpoint to persist the selection
@@ -156,7 +156,7 @@ export const selectOrganizationActor = fromPromise(async ({ input }: { input: { 
     
     // Then get the full organization details
     const organization = await organizationAPI.getOrganization(input.organizationId);
-    log.info('[OrganizationActors] Selected and persisted organization:', organization);
+    myLog.info('[OrganizationActors] Selected and persisted organization:', organization);
     
     return {
       success: true,
@@ -164,7 +164,7 @@ export const selectOrganizationActor = fromPromise(async ({ input }: { input: { 
       error: null
     };
   } catch (error) {
-    log.error('[OrganizationActors] Failed to select organization:', error);
+    myLog.error('[OrganizationActors] Failed to select organization:', error);
     
     return {
       success: false,
@@ -193,7 +193,7 @@ export const loadBillingActor = fromPromise(async ({ input }: { input: { organiz
   } catch (error) {
     // Billing endpoint may not exist yet (404 is expected for new orgs)
     if (error instanceof Error && !error.message.includes('404')) {
-      log.warn('[OrganizationActors] Billing info not available');
+      myLog.warn('[OrganizationActors] Billing info not available');
     }
     
     return {
@@ -209,7 +209,7 @@ export const loadBillingActor = fromPromise(async ({ input }: { input: { organiz
 
 // Upgrade subscription actor
 export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: { organizationId: string; planType: string; paymentData?: any } }) => {
-  log.info('[OrganizationActors] Upgrading subscription for:', input.organizationId, 'to plan:', input.planType);
+  myLog.info('[OrganizationActors] Upgrading subscription for:', input.organizationId, 'to plan:', input.planType);
   
   try {
     const response = await fetch(`${window.location.origin}/api/organizations/${input.organizationId}/billing/upgrade`, {
@@ -227,7 +227,7 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
     }
 
     const upgradeResult = await response.json();
-    log.info('[OrganizationActors] Upgraded subscription:', upgradeResult);
+    myLog.info('[OrganizationActors] Upgraded subscription:', upgradeResult);
     
     return {
       success: true,
@@ -236,7 +236,7 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
       error: null
     };
   } catch (error) {
-    log.error('[OrganizationActors] Failed to upgrade subscription:', error);
+    myLog.error('[OrganizationActors] Failed to upgrade subscription:', error);
     
     return {
       success: false,
@@ -249,7 +249,7 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
 
 // Simple organization switching actor
 export const switchOrganizationActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
-  log.info('[OrganizationActors] Switching to organization:', input.organizationId);
+  myLog.info('[OrganizationActors] Switching to organization:', input.organizationId);
   
   try {
     // 1. Call the organization switch API
@@ -288,7 +288,7 @@ export const switchOrganizationActor = fromPromise(async ({ input }: { input: { 
         new Date(session.data.session.expiresAt).toISOString() : null,
     };
   } catch (error) {
-    log.error('[OrganizationActors] Failed to switch organization:', error);
+    myLog.error('[OrganizationActors] Failed to switch organization:', error);
     
     return {
       success: false,

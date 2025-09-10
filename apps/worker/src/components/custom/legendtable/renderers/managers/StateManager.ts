@@ -18,8 +18,8 @@ import type { HeaderEngine } from '../engines/HeaderEngine';
 import type { RowEngine } from '../engines/RowEngine';
 import type { PerformanceMonitor } from './PerformanceMonitor';
 import type { RenderOrchestrator } from './RenderOrchestrator';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/managers/StateManager.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/renderers/managers/StateManager.ts');
 
 // ====================================
 // TYPES
@@ -90,7 +90,7 @@ export class StateManager {
       // Direct render without column reconfiguration
       this.renderDirectly(state);
     } catch (error) {
-      log.error('[StateManager] Initialize error:', error);
+      fileLog.error('[StateManager] Initialize error:', error);
     }
   }
   
@@ -100,7 +100,7 @@ export class StateManager {
   initializeCanvasPostRender(): void {
     const canvasContainer = this.config.domManager.getElement('canvasContainer');
     if (canvasContainer && this.config.options.onStateChange && !this.canvasInitialized) {
-      log.info('🔧 StateManager: Emitting canvas.container.ready event post-render');
+      fileLog.info('🔧 StateManager: Emitting canvas.container.ready event post-render');
       this.config.options.onStateChange({
         type: 'canvas.container.ready',
         container: canvasContainer
@@ -117,7 +117,7 @@ export class StateManager {
    * Set or update columns - DEPRECATED: Now handled by state machine coordinate mapping
    */
   setColumns(columns: Column[]): void {
-    log.warn('StateManager: setColumns is deprecated - column data comes from state machine coordinate mapping');
+    fileLog.warn('StateManager: setColumns is deprecated - column data comes from state machine coordinate mapping');
     // Column information now comes from state machine coordinate mapping
   }
   
@@ -125,7 +125,7 @@ export class StateManager {
    * Set or update column visibility - DEPRECATED: Now handled by state machine coordinate mapping
    */
   setColumnVisibility(visibility: Record<string, boolean>): void {
-    log.warn('StateManager: setColumnVisibility is deprecated - column visibility comes from state machine coordinate mapping');
+    fileLog.warn('StateManager: setColumnVisibility is deprecated - column visibility comes from state machine coordinate mapping');
     // Column visibility changes should go through state machine
   }
   
@@ -133,7 +133,7 @@ export class StateManager {
    * Set column order - DEPRECATED: Now handled by state machine coordinate mapping  
    */
   setColumnOrder(order: string[]): void {
-    log.warn('StateManager: setColumnOrder is deprecated - column order comes from state machine coordinate mapping');
+    fileLog.warn('StateManager: setColumnOrder is deprecated - column order comes from state machine coordinate mapping');
     // Column order changes should go through state machine
   }
   
@@ -171,7 +171,7 @@ export class StateManager {
         version
       };
     }
-    log.info('StateManager: Updated coordinate mapping from state machine:', {
+    fileLog.info('StateManager: Updated coordinate mapping from state machine:', {
       version,
       columnCount: coordinateMapping.columns.length
     });
@@ -187,7 +187,7 @@ export class StateManager {
       // Delegate to render orchestrator
       this.config.renderOrchestrator.render(state);
     } catch (error) {
-      log.error('[StateManager] Render error:', error);
+      fileLog.error('[StateManager] Render error:', error);
     }
   }
   

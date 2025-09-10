@@ -1,6 +1,6 @@
 import type { Column } from '../../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/managers/ColumnManager.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/renderers/managers/ColumnManager.ts');
 
 // ====================================
 // COLUMN MANAGER - PASSIVE UTILITY
@@ -103,7 +103,7 @@ export class ColumnManager {
     // State machine coordinateMapping is the authoritative source
     const totalWidth = coordinateMapping.columns.reduce((sum: number, col: any) => sum + col.width, 0);
     
-    log.info('ColumnManager: Using state machine total width:', {
+    fileLog.info('ColumnManager: Using state machine total width:', {
       totalWidth,
       columnCount: coordinateMapping.columns.length,
       version: coordinateMapping.version
@@ -122,7 +122,7 @@ export class ColumnManager {
     const colData = coordinateMapping.columns.find((col: any) => col.columnId === columnId);
     
     if (!colData) {
-      log.warn(`ColumnManager: Column ${columnId} not found in coordinate mapping`);
+      fileLog.warn(`ColumnManager: Column ${columnId} not found in coordinate mapping`);
       return 0;
     }
     
@@ -155,7 +155,7 @@ export class ColumnManager {
     const colData = coordinateMapping.columns.find((col: any) => col.columnId === columnId);
     
     if (!colData) {
-      log.warn(`ColumnManager: Column ${columnId} not found in coordinate mapping`);
+      fileLog.warn(`ColumnManager: Column ${columnId} not found in coordinate mapping`);
       return 120; // Default width
     }
     

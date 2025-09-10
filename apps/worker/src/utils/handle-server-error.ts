@@ -1,11 +1,11 @@
 import { AxiosError } from 'axios'
 import { toast } from 'sonner'
-import { uiLog } from '@/logger';
-const log = uiLog('utils/handle-server-error.ts');
+import { log } from '@/logger';
+const fileLog = log('utils/handle-server-error.ts');
 
 export function handleServerError(error: unknown) {
    
-  log.info(error)
+  fileLog.info(error)
 
   let errMsg = 'Something went wrong!'
 

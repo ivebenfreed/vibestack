@@ -21,11 +21,11 @@ import {
 } from '@/legend-state'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { use$ } from '@legendapp/state/react'
-import { uiLog } from '@/logger'
+import { log } from '@/logger'
 import { useParams } from '@tanstack/react-router'
 
 // Create logger instance for this file
-const log = uiLog('features/dashboard/DashboardLegend.tsx');
+const fileLog = log('features/dashboard/DashboardLegend.tsx');
 
 const topNav = [
   {
@@ -70,7 +70,7 @@ const DashboardLegend = observer(function DashboardLegend() {
   const isUniverseMode = !routeOrgId;
   const contextOrgId = routeOrgId || 'universe';
   
-  log.info('DashboardLegend route analysis:', { 
+  fileLog.info('DashboardLegend route analysis:', { 
     routeOrgId, 
     isUniverseMode, 
     contextOrgId,
@@ -87,7 +87,7 @@ const DashboardLegend = observer(function DashboardLegend() {
   // UNIVERSE-ONLY CONTEXT: No context switching needed according to Session 17 plan
   // Universe context is automatically loaded by auth system for all users
   // Components filter entity display based on route parameters, not context switching
-  log.info('DashboardLegend using universe-only context - no manual loading needed', {
+  fileLog.info('DashboardLegend using universe-only context - no manual loading needed', {
     schemaLoaded: !!schema,
     hasEntities: !!schema?.entities,
     isUniverseMode,
@@ -205,7 +205,7 @@ const DashboardContent = observer(function DashboardContent({
   error: string | null
   routeOrgId?: string
 }) {
-  log.info('DashboardContent render:', { isUniverseMode, schema: !!schema, error, routeOrgId })
+  fileLog.info('DashboardContent render:', { isUniverseMode, schema: !!schema, error, routeOrgId })
 
   if (error) {
     return (
@@ -235,13 +235,13 @@ const DashboardContent = observer(function DashboardContent({
       // Organization mode: only show entities belonging to this organization
       const orgPrefix = `${routeOrgId}_`
       const filteredKeys = allEntityKeys.filter(key => key.startsWith(orgPrefix))
-      log.info('Filtered entity list for org:', { routeOrgId, orgPrefix, filteredKeys, allKeys: allEntityKeys })
+      fileLog.info('Filtered entity list for org:', { routeOrgId, orgPrefix, filteredKeys, allKeys: allEntityKeys })
       return filteredKeys
     }
   })()
   
   const entityCount = entityList.length
-  log.info('Entity list from schema:', { entityList, entityCount, isUniverseMode, routeOrgId })
+  fileLog.info('Entity list from schema:', { entityList, entityCount, isUniverseMode, routeOrgId })
 
   if (entityList.length === 0) {
     const contextLabel = isUniverseMode ? 'universe' : 'organization'
@@ -296,7 +296,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
   const entityStore = getEntity$(entityName)
   
   // Debug logging
-  log.info(`EntityCardWithData for ${entityName}:`, {
+  fileLog.info(`EntityCardWithData for ${entityName}:`, {
     entityStoreExists: !!entityStore,
     entityStoreType: typeof entityStore,
     hasGet: typeof entityStore?.get === 'function',
@@ -318,12 +318,12 @@ const EntityCardWithData = observer(function EntityCardWithData({
         try {
           // Force initial load by accessing the observable
           const currentData = entityStore.get()
-          log.info(`Manual trigger for ${entityName}:`, {
+          fileLog.info(`Manual trigger for ${entityName}:`, {
             hasCurrentData: !!currentData,
             dataKeys: currentData ? Object.keys(currentData).length : 0
           })
         } catch (error) {
-          log.warn(`Error during manual trigger for ${entityName}:`, error)
+          fileLog.warn(`Error during manual trigger for ${entityName}:`, error)
         }
       }
     }, [entityStore, entityName])
@@ -332,7 +332,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
     data = use$(entityStore)
     
     // CRITICAL DEBUG: Log exactly what data we're getting
-    log.info(`Data received for ${entityName}:`, {
+    fileLog.info(`Data received for ${entityName}:`, {
       data,
       dataType: typeof data,
       dataLength: data ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 'no data',
@@ -363,7 +363,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
   
   // Handle entity deletion using new schema client API
   const handleDelete = async (entityName: string) => {
-    log.info(`Deleting entity type: ${entityName}`)
+    fileLog.info(`Deleting entity type: ${entityName}`)
     
     try {
       const orgId = currentOrganization?.id
@@ -383,7 +383,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
         throw new Error(result.error || 'Failed to delete entity schema')
       }
       
-      log.info(`Successfully deleted entity type: ${entityName}`)
+      fileLog.info(`Successfully deleted entity type: ${entityName}`)
       
     } catch (error) {
       console.error(`[Dashboard] Failed to delete entity ${entityName}:`, error)

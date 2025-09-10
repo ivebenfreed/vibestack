@@ -6,18 +6,18 @@
 
 import { liveStoreSchemaClient } from './livestore-schema-client';
 import { liveStoreSchemaManager } from './livestore-dynamic-schema';
-import { uiLog } from '@/logger';
-const log = uiLog('lib/test-livestore-integration.ts');
+import { log } from '@/logger';
+const fileLog = log('lib/test-livestore-integration.ts');
 
 /**
  * Test LiveStore Integration
  */
 export async function testLiveStoreIntegration(): Promise<void> {
-  log.info('🧪 Testing LiveStore Beta Integration...');
+  fileLog.info('🧪 Testing LiveStore Beta Integration...');
 
   try {
     // Test 1: Schema Generation
-    log.info('\n📋 Test 1: Schema Generation');
+    fileLog.info('\n📋 Test 1: Schema Generation');
     const mockOrgSchema = {
       orgId: 'test-org-livestore',
       entities: {
@@ -45,20 +45,20 @@ export async function testLiveStoreIntegration(): Promise<void> {
       mockOrgSchema
     );
 
-    log.info('✅ Schema generated successfully');
-    log.info(`   - Tables: ${Object.keys(schema).length}`);
-    log.info(`   - Events: ${Object.keys(events).length}`);
+    fileLog.info('✅ Schema generated successfully');
+    fileLog.info(`   - Tables: ${Object.keys(schema).length}`);
+    fileLog.info(`   - Events: ${Object.keys(events).length}`);
 
     // Validate schema
     const validation = liveStoreSchemaManager.validateSchema(schema);
     if (validation.valid) {
-      log.info('✅ Schema validation passed');
+      fileLog.info('✅ Schema validation passed');
     } else {
       throw new Error(`Schema validation failed: ${validation.errors.join(', ')}`);
     }
 
     // Test 2: LiveStore Instance Creation
-    log.info('\n🏗️ Test 2: LiveStore Instance Creation');
+    fileLog.info('\n🏗️ Test 2: LiveStore Instance Creation');
     
     try {
       const instance = await liveStoreSchemaClient.initializeLiveStore(
@@ -67,89 +67,89 @@ export async function testLiveStoreIntegration(): Promise<void> {
       );
 
       if (instance) {
-        log.info('✅ LiveStore instance created successfully');
+        fileLog.info('✅ LiveStore instance created successfully');
         
         // Test instance ready
         await instance.ready();
-        log.info('✅ LiveStore instance is ready');
+        fileLog.info('✅ LiveStore instance is ready');
 
         // Test basic query (should work even with empty database)
         try {
           const result = await instance.query('SELECT name FROM sqlite_master WHERE type=?', ['table']);
-          log.info(`✅ Query executed successfully, found ${result.length} tables`);
+          fileLog.info(`✅ Query executed successfully, found ${result.length} tables`);
           
           // List the tables created
           if (result.length > 0) {
-            log.info('   Tables created:');
+            fileLog.info('   Tables created:');
             result.forEach((row: any) => {
-              log.info(`   - ${row.name}`);
+              fileLog.info(`   - ${row.name}`);
             });
           }
         } catch (queryError) {
-          log.info('⚠️ Query test skipped (expected in test environment):', String(queryError).substring(0, 100));
+          fileLog.info('⚠️ Query test skipped (expected in test environment):', String(queryError).substring(0, 100));
         }
 
         // Test instance closure
         await instance.close();
-        log.info('✅ LiveStore instance closed successfully');
+        fileLog.info('✅ LiveStore instance closed successfully');
 
       } else {
-        log.info('⚠️ LiveStore instance creation returned null (may be normal in test environment)');
+        fileLog.info('⚠️ LiveStore instance creation returned null (may be normal in test environment)');
       }
 
     } catch (instanceError) {
-      log.info('⚠️ LiveStore instance test failed (may be expected in test environment):');
-      log.info(`   Error: ${String(instanceError).substring(0, 200)}`);
-      log.info('   This is often normal when testing outside a browser environment');
+      fileLog.info('⚠️ LiveStore instance test failed (may be expected in test environment):');
+      fileLog.info(`   Error: ${String(instanceError).substring(0, 200)}`);
+      fileLog.info('   This is often normal when testing outside a browser environment');
     }
 
     // Test 3: Schema Converter
-    log.info('\n🔄 Test 3: Schema Converter');
+    fileLog.info('\n🔄 Test 3: Schema Converter');
     
     try {
       const { createOrgStoreConfig } = await import('./livestore-schema-converter');
       const storeConfig = createOrgStoreConfig('test-org-livestore', schema, events);
       
-      log.info('✅ Schema converter working');
-      log.info(`   - Store ID: ${storeConfig.storeId}`);
-      log.info(`   - Schema tables: ${Object.keys(storeConfig.schema.tables || {}).length}`);
-      log.info(`   - Events: ${Object.keys(storeConfig.events || {}).length}`);
+      fileLog.info('✅ Schema converter working');
+      fileLog.info(`   - Store ID: ${storeConfig.storeId}`);
+      fileLog.info(`   - Schema tables: ${Object.keys(storeConfig.schema.tables || {}).length}`);
+      fileLog.info(`   - Events: ${Object.keys(storeConfig.events || {}).length}`);
       
     } catch (converterError) {
-      log.error('❌ Schema converter test failed:', converterError);
+      fileLog.error('❌ Schema converter test failed:', converterError);
       throw converterError;
     }
 
     // Test 4: Instance Management
-    log.info('\n📊 Test 4: Instance Management');
+    fileLog.info('\n📊 Test 4: Instance Management');
     
     const existingInstance = liveStoreSchemaClient.getLiveStoreInstance('test-org-livestore');
     if (existingInstance) {
-      log.info('✅ Instance retrieved from cache');
+      fileLog.info('✅ Instance retrieved from cache');
     } else {
-      log.info('✅ No cached instance (as expected after cleanup)');
+      fileLog.info('✅ No cached instance (as expected after cleanup)');
     }
 
     // Clean up
     await liveStoreSchemaClient.cleanup();
-    log.info('✅ Cleanup completed');
+    fileLog.info('✅ Cleanup completed');
 
-    log.info('\n🎉 LiveStore Integration Test Results:');
-    log.info('✅ Schema generation working');
-    log.info('✅ Schema validation working');
-    log.info('✅ LiveStore packages imported successfully');
-    log.info('✅ Schema converter working');
-    log.info('✅ Instance management working');
-    log.info('✅ All core integration components functional');
+    fileLog.info('\n🎉 LiveStore Integration Test Results:');
+    fileLog.info('✅ Schema generation working');
+    fileLog.info('✅ Schema validation working');
+    fileLog.info('✅ LiveStore packages imported successfully');
+    fileLog.info('✅ Schema converter working');
+    fileLog.info('✅ Instance management working');
+    fileLog.info('✅ All core integration components functional');
 
-    log.info('\n📝 Next Steps:');
-    log.info('1. 🔗 Integrate with WebSocket service for real-time updates');
-    log.info('2. 🧪 Test with real organization data');
-    log.info('3. 📊 Performance benchmark against Dexie');
-    log.info('4. 🌐 Test in browser environment for full functionality');
+    fileLog.info('\n📝 Next Steps:');
+    fileLog.info('1. 🔗 Integrate with WebSocket service for real-time updates');
+    fileLog.info('2. 🧪 Test with real organization data');
+    fileLog.info('3. 📊 Performance benchmark against Dexie');
+    fileLog.info('4. 🌐 Test in browser environment for full functionality');
 
   } catch (error) {
-    log.error('❌ LiveStore Integration Test Failed:', error);
+    fileLog.error('❌ LiveStore Integration Test Failed:', error);
     throw error;
   }
 }
@@ -157,5 +157,5 @@ export async function testLiveStoreIntegration(): Promise<void> {
 // Export for global usage
 if (typeof window !== 'undefined') {
   (window as any).testLiveStoreIntegration = testLiveStoreIntegration;
-  log.info('🧪 LiveStore integration test available as window.testLiveStoreIntegration()');
+  fileLog.info('🧪 LiveStore integration test available as window.testLiveStoreIntegration()');
 }

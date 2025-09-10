@@ -9,9 +9,9 @@
 import { observable, computed } from '@legendapp/state';
 import { universeSchema$, universeOrgId$ } from '../observables';
 import { getEntity$ } from '../observables';
-import { stateLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = stateLog('legend-state/table-columns');
+const fileLog = log('legend-state/table-columns');
 
 export interface TableColumn {
   id: string;
@@ -39,13 +39,13 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
   const orgId = universeOrgId$.get();
   
   if (!schema || !orgId || !schema.entities) {
-    log.debug(`Schema not ready for entity ${entityName}`, { schema: !!schema, orgId: !!orgId });
+    fileLog.debug(`Schema not ready for entity ${entityName}`, { schema: !!schema, orgId: !!orgId });
     return [];
   }
 
   const entity = schema.entities[entityName];
   if (!entity) {
-    log.debug(`Entity ${entityName} not found in schema`, { 
+    fileLog.debug(`Entity ${entityName} not found in schema`, { 
       availableEntities: Object.keys(schema.entities || {}) 
     });
     return [];
@@ -163,7 +163,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
         column.cellType = isTagsField ? 'tags' : 'select'; // Ensure cellType is set for editor selection
         column.options = detectedOptions;
         
-        log.info(`🎯 Auto-detected ${isTagsField ? 'tags' : 'select'} field: ${field.name}`, {
+        fileLog.info(`🎯 Auto-detected ${isTagsField ? 'tags' : 'select'} field: ${field.name}`, {
           entityName,
           columnId: column.id,
           detectedOptions: detectedOptions.slice(0, 3),
@@ -179,7 +179,7 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
     // No longer adding _resolved columns to prevent sync conflicts
   }
 
-  log.debug(`Generated ${columns.length} columns for ${entityName}`, {
+  fileLog.debug(`Generated ${columns.length} columns for ${entityName}`, {
     entityName,
     columnIds: columns.map(c => c.id),
     referenceFields: columns.filter(c => c.referenceType).map(c => ({ id: c.id, type: c.referenceType }))
@@ -358,13 +358,13 @@ function detectColumnOptions(entityName: string, fieldName: string): Array<{ val
     // Get the entity data from Legend State
     const entityObs = getEntity$(entityName);
     if (!entityObs) {
-      log.debug(`Entity observable not available for ${entityName}`);
+      fileLog.debug(`Entity observable not available for ${entityName}`);
       return null;
     }
     
     const entityData = entityObs.peek();
     if (!entityData || typeof entityData !== 'object') {
-      log.debug(`No data available for ${entityName}`);
+      fileLog.debug(`No data available for ${entityName}`);
       return null;
     }
     
@@ -392,7 +392,7 @@ function detectColumnOptions(entityName: string, fieldName: string): Array<{ val
     
     return null;
   } catch (error) {
-    log.warn(`Failed to detect options for ${entityName}.${fieldName}:`, error);
+    fileLog.warn(`Failed to detect options for ${entityName}.${fieldName}:`, error);
     return null;
   }
 }

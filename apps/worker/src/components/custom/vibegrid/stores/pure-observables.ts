@@ -12,10 +12,10 @@ import { observable, computed, batch } from '@legendapp/state';
 import { syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$ } from '@/legend-state/observables';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 
-const log = uiLog('components/custom/vibegrid/stores/pure-observables.ts');
+const fileLog = log('components/custom/vibegrid/stores/pure-observables.ts');
 
 // ====================================
 // TYPES
@@ -179,7 +179,7 @@ function applyGrouping(rows: any[], groupConfig: GroupConfig): any[] {
     return rows;
   }
   
-  log.info('🎯 Applying grouping', { 
+  fileLog.info('🎯 Applying grouping', { 
     rowCount: rows.length, 
     groupFields: groupConfig.fields.map(f => f.field) 
   });
@@ -190,7 +190,7 @@ function applyGrouping(rows: any[], groupConfig: GroupConfig): any[] {
   // Flatten the tree into a virtual row array with group headers and data rows
   const virtualRows = flattenGroupTree(groupTree, groupConfig.expandedGroups);
   
-  log.info('🎯 Grouping applied', {
+  fileLog.info('🎯 Grouping applied', {
     originalRows: rows.length,
     virtualRows: virtualRows.length,
     groupCount: countGroups(groupTree)
@@ -347,7 +347,7 @@ function generateTableStateKey(entityType: string): string | null {
     const userId = universeUserId$.peek();
     
     if (!orgId || !userId || orgId === 'universe') {
-      log.debug('🔧 Cannot generate storage key - missing context', { orgId, userId });
+      fileLog.debug('🔧 Cannot generate storage key - missing context', { orgId, userId });
       return null;
     }
     
@@ -357,11 +357,11 @@ function generateTableStateKey(entityType: string): string | null {
       : entityType;
     
     const storageKey = `vibestack_table_state_${orgId}_${cleanEntityName}_${userId}`;
-    log.debug('🔧 Generated table state storage key', { storageKey, entityType, orgId, userId });
+    fileLog.debug('🔧 Generated table state storage key', { storageKey, entityType, orgId, userId });
     
     return storageKey;
   } catch (error) {
-    log.error('❌ Error generating storage key', { error: error.message, entityType });
+    fileLog.error('❌ Error generating storage key', { error: error.message, entityType });
     return null;
   }
 }
@@ -393,13 +393,13 @@ function createDefaultTableState(entityType: string, columns: Column[]): Partial
  */
 function transformTableState(loaded: any, defaultState: Partial<PersistedTableState>): PersistedTableState {
   if (!loaded || typeof loaded !== 'object') {
-    log.info('🔧 No saved state found, using defaults');
+    fileLog.info('🔧 No saved state found, using defaults');
     return defaultState as PersistedTableState;
   }
   
   // Handle version migrations
   if (loaded.version !== '1.0') {
-    log.info('🔧 Migrating table state from version', loaded.version, 'to 1.0');
+    fileLog.info('🔧 Migrating table state from version', loaded.version, 'to 1.0');
     // Add migration logic here for future versions
   }
   
@@ -411,7 +411,7 @@ function transformTableState(loaded: any, defaultState: Partial<PersistedTableSt
     lastUpdated: new Date().toISOString()
   };
   
-  log.info('🔧 Restored table state with', {
+  fileLog.info('🔧 Restored table state with', {
     columns: Object.keys(merged.columnWidths || {}).length,
     sorts: merged.sortBy.length,
     filters: merged.filters.length,
@@ -431,20 +431,20 @@ function loadDisplayState(entityType: string): Partial<PersistedTableState> | nu
     const entityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
     const storageKey = `vibegridx_display_${entityName}`;
     
-    log.debug('🔧 Loading display state', { entityType, entityName, storageKey });
+    fileLog.debug('🔧 Loading display state', { entityType, entityName, storageKey });
     
     const stored = localStorage.getItem(storageKey);
     if (!stored) {
-      log.debug('🔧 No stored display state found', { storageKey });
+      fileLog.debug('🔧 No stored display state found', { storageKey });
       return null;
     }
     
     const parsed = JSON.parse(stored);
-    log.info('🔧 Loaded display state from localStorage', { storageKey, state: parsed });
+    fileLog.info('🔧 Loaded display state from localStorage', { storageKey, state: parsed });
     return parsed;
     
   } catch (error) {
-    log.error('❌ Error loading display state', { entityType, error: error.message });
+    fileLog.error('❌ Error loading display state', { entityType, error: error.message });
     return null;
   }
 }
@@ -472,10 +472,10 @@ function saveDisplayState(entityType: string, tableState: any): void {
     };
     
     localStorage.setItem(storageKey, JSON.stringify(displayState));
-    log.info('🎯 TableCore: Saved persistent display state', { storageKey, displayState });
+    fileLog.info('🎯 TableCore: Saved persistent display state', { storageKey, displayState });
     
   } catch (error) {
-    log.error('❌ Error saving display state', { entityType, error: error.message });
+    fileLog.error('❌ Error saving display state', { entityType, error: error.message });
   }
 }
 
@@ -484,11 +484,11 @@ function saveDisplayState(entityType: string, tableState: any): void {
 // ====================================
 
 export function createTableCore$(entityType: string, columns: Column[]) {
-  log.info('🎯 Creating tableCore$ observable with Legend State localStorage persistence', { entityType, columnCount: columns.length });
+  fileLog.info('🎯 Creating tableCore$ observable with Legend State localStorage persistence', { entityType, columnCount: columns.length });
   
   // Create default state structure
   const defaultState = createDefaultTableState(entityType, columns);
-  log.info('🎯 Default state created', { entityType, defaultSortBy: defaultState.sortBy });
+  fileLog.info('🎯 Default state created', { entityType, defaultSortBy: defaultState.sortBy });
   
   // Extract clean entity name for storage key (remove org prefix)
   const cleanEntityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
@@ -515,7 +515,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       const schema = universeSchema$.get();
       
       if (loading || !schema?.entities || !schema.entities[entityType]) {
-        log.debug('⏳ Schema not ready for processedRows', { entityType, loading });
+        fileLog.debug('⏳ Schema not ready for processedRows', { entityType, loading });
         return [];
       }
       
@@ -531,16 +531,16 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         try {
           // Direct .get() call like atomic bridge
           data = entityObs.get() || {};
-          log.debug('✅ Got entity data', {
+          fileLog.debug('✅ Got entity data', {
             entityType,
             recordCount: Object.keys(data || {}).length
           });
         } catch (error) {
-          log.error('❌ Failed to get entity data', { entityType, error: error.message });
+          fileLog.error('❌ Failed to get entity data', { entityType, error: error.message });
           data = {};
         }
       } else {
-        log.warn('⚠️ Entity observable not available', { entityType });
+        fileLog.warn('⚠️ Entity observable not available', { entityType });
       }
       
       let rows = Object.values(data || {});
@@ -553,7 +553,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         rows = applyGrouping(rows, groupConfig);
       }
       
-      log.info('🎯 Processed rows computed', {
+      fileLog.info('🎯 Processed rows computed', {
         entityObservable: !!entityObs,
         inputCount: Object.keys(data || {}).length,
         outputCount: rows.length,
@@ -570,7 +570,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       const current = tableCore$.sortBy.get();
       const index = current.findIndex(s => s.field === field);
       
-      log.debug('toggleSort called', { 
+      fileLog.debug('toggleSort called', { 
         field, 
         isMultiSort, 
         currentSort: current, 
@@ -583,23 +583,23 @@ export function createTableCore$(entityType: string, columns: Column[]) {
           // Add new sort - either replace all or add to existing based on multi-sort mode
           if (isMultiSort) {
             const newSort = [...current, { field, direction: 'asc' }];
-            log.debug('Adding new sort field to multi-sort', { newSort });
+            fileLog.debug('Adding new sort field to multi-sort', { newSort });
             tableCore$.sortBy.set(newSort);
           } else {
             const newSort = [{ field, direction: 'asc' }];
-            log.debug('Setting single sort field', { newSort });
+            fileLog.debug('Setting single sort field', { newSort });
             tableCore$.sortBy.set(newSort);
           }
         } else if (current[index].direction === 'asc') {
           // Change to desc
           const newSort = [...current];
           newSort[index] = { ...current[index], direction: 'desc' };
-          log.debug('Changing sort direction to desc', { field, newSort });
+          fileLog.debug('Changing sort direction to desc', { field, newSort });
           tableCore$.sortBy.set(newSort);
         } else {
           // Third click: remove this sort field entirely (allow unsorted state)
           const newSort = current.filter((_, i) => i !== index);
-          log.debug('Removing sort field', { field, newSort });
+          fileLog.debug('Removing sort field', { field, newSort });
           tableCore$.sortBy.set(newSort);
         }
         
@@ -608,7 +608,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       });
       
       const finalSort = tableCore$.sortBy.get();
-      log.info('Sort toggled - checking persistence', { 
+      fileLog.info('Sort toggled - checking persistence', { 
         field, 
         isMultiSort, 
         finalSort, 
@@ -619,13 +619,13 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       // Check what's actually in localStorage
       try {
         const stored = localStorage.getItem(`vibestack-table-${entityType}`);
-        log.debug('Current localStorage content after sort change', {
+        fileLog.debug('Current localStorage content after sort change', {
           storageKey: `vibestack-table-${entityType}`,
           storedValue: stored,
           parsedValue: stored ? JSON.parse(stored) : null
         });
       } catch (e) {
-        log.error('Failed to read localStorage after sort change', { error: e.message });
+        fileLog.error('Failed to read localStorage after sort change', { error: e.message });
       }
     },
     
@@ -644,14 +644,14 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         // persistObservable will automatically persist changes
       });
       
-      log.info('🎯 Filter set (auto-persistent)', { field, value, operator });
+      fileLog.info('🎯 Filter set (auto-persistent)', { field, value, operator });
     },
     
     clearFilter(field: string) {
       const filters = tableCore$.filters.get();
       tableCore$.filters.set(filters.filter(f => f.field !== field));
       // persistObservable automatically persists changes
-      log.info('🎯 Filter cleared (auto-persistent)', { field });
+      fileLog.info('🎯 Filter cleared (auto-persistent)', { field });
     },
     
     toggleColumn(columnId: string) {
@@ -662,7 +662,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       });
       // persistObservable automatically persists changes
       
-      log.info('🎯 Column toggled (auto-persistent)', { columnId, visible: !visibility[columnId] });
+      fileLog.info('🎯 Column toggled (auto-persistent)', { columnId, visible: !visibility[columnId] });
     },
     
     setColumnWidth(columnId: string, width: number) {
@@ -673,7 +673,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       });
       // persistObservable automatically persists changes
       
-      log.info('🎯 Column width set (auto-persistent)', { columnId, width });
+      fileLog.info('🎯 Column width set (auto-persistent)', { columnId, width });
     },
     
     // Update column width (for resize overlay)
@@ -694,13 +694,13 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         // syncObservable automatically persists changes to localStorage
       });
       
-      log.info('🎯 Column width updated (auto-persistent)', { columnId, width });
+      fileLog.info('🎯 Column width updated (auto-persistent)', { columnId, width });
     },
     
     setGroupConfig(config: GroupConfig | null) {
       tableCore$.groupConfig.set(config);
       // persistObservable automatically persists changes
-      log.info('🎯 Group config set (auto-persistent)', { config });
+      fileLog.info('🎯 Group config set (auto-persistent)', { config });
     },
     
     toggleGroupExpansion(groupId: string) {
@@ -711,10 +711,10 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       
       if (expandedGroups.has(groupId)) {
         expandedGroups.delete(groupId);
-        log.info('🎯 Group collapsed', { groupId });
+        fileLog.info('🎯 Group collapsed', { groupId });
       } else {
         expandedGroups.add(groupId);
-        log.info('🎯 Group expanded', { groupId });
+        fileLog.info('🎯 Group expanded', { groupId });
       }
       
       tableCore$.groupConfig.set({
@@ -730,7 +730,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       
       // This would require getting all group IDs from the processed rows
       // For now, just log the intent
-      log.info('🎯 Expand all groups requested');
+      fileLog.info('🎯 Expand all groups requested');
       // TODO: Implement when we have access to all group IDs
     },
     
@@ -744,7 +744,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       });
       // persistObservable automatically persists changes
       
-      log.info('🎯 All groups collapsed (auto-persistent)');
+      fileLog.info('🎯 All groups collapsed (auto-persistent)');
     },
     
     // Column visibility methods
@@ -755,7 +755,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       );
       tableCore$.columnVisibility.set(allVisible);
       // persistObservable automatically persists changes
-      log.info('🎯 All columns shown (auto-persistent)');
+      fileLog.info('🎯 All columns shown (auto-persistent)');
     },
     
     hideAllColumns() {
@@ -773,7 +773,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       
       tableCore$.columnVisibility.set(newVisibility);
       // persistObservable automatically persists changes
-      log.info('🎯 All hideable columns hidden (auto-persistent)');
+      fileLog.info('🎯 All hideable columns hidden (auto-persistent)');
     },
     
     // Helper getters
@@ -791,7 +791,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
   // Configure simplified localStorage persistence using syncObservable without complex transforms
   let tableCoreSync$ = null;
   try {
-    log.debug('Configuring syncObservable for localStorage persistence', { entityType, storageKey });
+    fileLog.debug('Configuring syncObservable for localStorage persistence', { entityType, storageKey });
     
     tableCoreSync$ = syncObservable(tableCore$, {
       persist: {
@@ -800,21 +800,21 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       }
     });
     
-    log.debug('syncObservable configured successfully', { 
+    fileLog.debug('syncObservable configured successfully', { 
       entityType,
       storageKey,
       hasSyncObservable: !!tableCoreSync$,
       currentSortByAfterInit: tableCore$.sortBy.get()
     });
     
-    log.info('🎯 Simplified Legend State localStorage persistence configured', { 
+    fileLog.info('🎯 Simplified Legend State localStorage persistence configured', { 
       entityType,
       storageKey,
       currentSortByAfterInit: tableCore$.sortBy.get()
     });
   } catch (error) {
     console.error('🔧 PERSISTENCE DEBUG: Failed to configure syncObservable', { entityType, error });
-    log.error('❌ Failed to configure Legend State persistence', { entityType, error: error.message });
+    fileLog.error('❌ Failed to configure Legend State persistence', { entityType, error: error.message });
   }
   
   // Return the observable with sync state
@@ -829,7 +829,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 // ====================================
 
 export function createTableInteraction$(tableCore$?: any) {
-  log.info('🎯 Creating tableInteraction$ observable');
+  fileLog.info('🎯 Creating tableInteraction$ observable');
   
   const tableInteraction$ = observable({
     // Selection state
@@ -932,7 +932,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.anchorCell.set(cellId);
       });
       
-      log.info('🎯 Cell selected', { cellId, isMulti });
+      fileLog.info('🎯 Cell selected', { cellId, isMulti });
     },
     
     toggleCellSelection(rowId: string, columnId: string, isCtrlKey: boolean = false, isShiftKey: boolean = false) {
@@ -965,7 +965,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectionMode.set('cell');
       });
       
-      log.info('🎯 Cell selection toggled', { 
+      fileLog.info('🎯 Cell selection toggled', { 
         cellId, 
         isCtrlKey, 
         isShiftKey,
@@ -982,7 +982,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectionMode.set('row');
       });
       
-      log.info('🎯 Row selected', { rowId, isMulti });
+      fileLog.info('🎯 Row selected', { rowId, isMulti });
     },
     
     selectRange(startCell: string, endCell: string) {
@@ -1025,7 +1025,7 @@ export function createTableInteraction$(tableCore$?: any) {
             }
           }
           
-          log.info('🎯 Rectangular range selected', {
+          fileLog.info('🎯 Rectangular range selected', {
             startCell,
             endCell,
             bounds: { minRowIndex, maxRowIndex, minColIndex, maxColIndex },
@@ -1040,7 +1040,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectedCells.set(cells);
       });
       
-      log.info('🎯 Range selected', { startCell, endCell, selectedCount: tableInteraction$.selectedCells.get().size });
+      fileLog.info('🎯 Range selected', { startCell, endCell, selectedCount: tableInteraction$.selectedCells.get().size });
     },
     
     // Drag selection methods
@@ -1058,7 +1058,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectionMode.set('range');
       });
       
-      log.info('🎯 Drag selection started', { cellId });
+      fileLog.info('🎯 Drag selection started', { cellId });
     },
     
     updateDragSelection(cellId: string) {
@@ -1105,7 +1105,7 @@ export function createTableInteraction$(tableCore$?: any) {
             }
           }
           
-          log.info('🎯 Rectangular range calculated', {
+          fileLog.info('🎯 Rectangular range calculated', {
             startCell,
             endCell: cellId,
             bounds: { minRowIndex, maxRowIndex, minColIndex, maxColIndex },
@@ -1120,7 +1120,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectedCells.set(cells);
       });
       
-      log.info('🎯 Drag selection updated', { startCell, currentCell: cellId, selectedCount: tableInteraction$.selectedCells.get().size });
+      fileLog.info('🎯 Drag selection updated', { startCell, currentCell: cellId, selectedCount: tableInteraction$.selectedCells.get().size });
     },
     
     endDragSelection() {
@@ -1130,7 +1130,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.dragSelectCurrent.set(null);
       });
       
-      log.info('🎯 Drag selection ended');
+      fileLog.info('🎯 Drag selection ended');
     },
     
     clearSelection() {
@@ -1141,7 +1141,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.isSelecting.set(false);
       });
       
-      log.info('🎯 Selection cleared');
+      fileLog.info('🎯 Selection cleared');
     },
     
     startEdit(cellId: string, initialValue?: any) {
@@ -1152,7 +1152,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.editValidation.set(null);
       });
       
-      log.info('🎯 Edit started', { cellId, initialValue });
+      fileLog.info('🎯 Edit started', { cellId, initialValue });
     },
     
     updateEditValue(value: any) {
@@ -1168,7 +1168,7 @@ export function createTableInteraction$(tableCore$?: any) {
       // If valueOverride is provided, use it; otherwise use the current edit value
       const value = valueOverride !== undefined ? valueOverride : tableInteraction$.editValue.get();
       
-      log.debug('saveEdit called', { 
+      fileLog.debug('saveEdit called', { 
         cellId, 
         valueOverride, 
         editValueFromObservable: tableInteraction$.editValue.get(),
@@ -1179,7 +1179,7 @@ export function createTableInteraction$(tableCore$?: any) {
       if (cellId) {
         const [rowId, columnId] = cellId.split(':');
         
-        log.info('🎯 Saving edit', { cellId, value, rowId, columnId });
+        fileLog.info('🎯 Saving edit', { cellId, value, rowId, columnId });
         
         // Ensure we have a valid tableCore$ reference
         if (!tableCore$) {
@@ -1191,7 +1191,7 @@ export function createTableInteraction$(tableCore$?: any) {
         
         try {
           
-          log.info('🔄 Attempting to save edit', { entityType, rowId, columnId, value });
+          fileLog.info('🔄 Attempting to save edit', { entityType, rowId, columnId, value });
           
           // CORRECT LEGEND STATE PATTERN: Use syncedCrud with .get() and .set()
           // Import the correct entity operations
@@ -1201,7 +1201,7 @@ export function createTableInteraction$(tableCore$?: any) {
           // Legend State getEntity$() expects org-prefixed names for proper lookup
           const orgPrefixedEntityName = entityType;
           
-          log.info('🔄 Using entityOperations.updateEntity for database persistence', { 
+          fileLog.info('🔄 Using entityOperations.updateEntity for database persistence', { 
             originalEntityType: entityType,
             orgPrefixedEntityName: orgPrefixedEntityName,
             rowId,
@@ -1213,11 +1213,11 @@ export function createTableInteraction$(tableCore$?: any) {
             [columnId]: value
           });
           
-          log.info('✅ Edit saved successfully via syncedCrud', { entityType, rowId, columnId, value });
+          fileLog.info('✅ Edit saved successfully via syncedCrud', { entityType, rowId, columnId, value });
           
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          log.error('❌ Error saving edit', { cellId, value, error: errorMessage });
+          fileLog.error('❌ Error saving edit', { cellId, value, error: errorMessage });
           
           // Show user-friendly error
           if (typeof window !== 'undefined') {
@@ -1245,7 +1245,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.editValidation.set(null);
       });
       
-      log.info('🎯 Edit cancelled');
+      fileLog.info('🎯 Edit cancelled');
     },
     
     setHoveredCell(cellId: string | null) {
@@ -1262,7 +1262,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.dragSource.set(sourceId);
       });
       
-      log.info('🎯 Drag started', { sourceId });
+      fileLog.info('🎯 Drag started', { sourceId });
     },
     
     updateDragTarget(targetId: string | null) {
@@ -1274,7 +1274,7 @@ export function createTableInteraction$(tableCore$?: any) {
       const target = tableInteraction$.dragTarget.get();
       
       if (source && target && source !== target) {
-        log.info('🎯 Drag completed', { source, target });
+        fileLog.info('🎯 Drag completed', { source, target });
         // Implement actual drag logic here
       }
       
@@ -1292,12 +1292,12 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.resizeStartWidth.set(startWidth);
       });
       
-      log.info('🎯 Column resize started', { columnId, startX, startWidth });
+      fileLog.info('🎯 Column resize started', { columnId, startX, startWidth });
     },
     
     endColumnResize() {
       tableInteraction$.resizingColumn.set(null);
-      log.info('🎯 Column resize ended');
+      fileLog.info('🎯 Column resize ended');
     },
     
     // Header Menu Methods
@@ -1310,7 +1310,7 @@ export function createTableInteraction$(tableCore$?: any) {
         });
       });
       
-      log.info('🎯 Header menu opened', { columnId, position, menuType });
+      fileLog.info('🎯 Header menu opened', { columnId, position, menuType });
     },
     
     closeHeaderMenu() {
@@ -1320,7 +1320,7 @@ export function createTableInteraction$(tableCore$?: any) {
         menuType: null
       });
       
-      log.info('🎯 Header menu closed');
+      fileLog.info('🎯 Header menu closed');
     },
     
     // Context Menu Methods
@@ -1334,7 +1334,7 @@ export function createTableInteraction$(tableCore$?: any) {
         });
       });
       
-      log.info('🎯 Context menu opened', { context, targetId, position });
+      fileLog.info('🎯 Context menu opened', { context, targetId, position });
     },
     
     closeContextMenu() {
@@ -1345,7 +1345,7 @@ export function createTableInteraction$(tableCore$?: any) {
         targetId: null
       });
       
-      log.info('🎯 Context menu closed');
+      fileLog.info('🎯 Context menu closed');
     },
     
     // Column Visibility Menu Methods
@@ -1355,7 +1355,7 @@ export function createTableInteraction$(tableCore$?: any) {
         searchValue: ''
       });
       
-      log.info('🎯 Column visibility menu opened');
+      fileLog.info('🎯 Column visibility menu opened');
     },
     
     closeColumnVisibilityMenu() {
@@ -1364,7 +1364,7 @@ export function createTableInteraction$(tableCore$?: any) {
         searchValue: ''
       });
       
-      log.info('🎯 Column visibility menu closed');
+      fileLog.info('🎯 Column visibility menu closed');
     },
     
     setColumnVisibilitySearch(searchValue: string) {
@@ -1377,7 +1377,7 @@ export function createTableInteraction$(tableCore$?: any) {
         isOpen: true
       });
       
-      log.info('🎯 Group config menu opened');
+      fileLog.info('🎯 Group config menu opened');
     },
     
     closeGroupConfigMenu() {
@@ -1385,7 +1385,7 @@ export function createTableInteraction$(tableCore$?: any) {
         isOpen: false
       });
       
-      log.info('🎯 Group config menu closed');
+      fileLog.info('🎯 Group config menu closed');
     }
   });
   
@@ -1397,7 +1397,7 @@ export function createTableInteraction$(tableCore$?: any) {
 // ====================================
 
 export function createTableViewport$(tableCore$?: any) {
-  log.info('🎯 Creating tableViewport$ observable');
+  fileLog.info('🎯 Creating tableViewport$ observable');
   
   const tableViewport$ = observable({
     // Scroll position
@@ -1504,7 +1504,7 @@ export function createTableViewport$(tableCore$?: any) {
         tableViewport$.scrollLeft.set(left);
       });
       
-      log.debug('🎯 Scroll updated', { top, left });
+      fileLog.debug('🎯 Scroll updated', { top, left });
     },
     
     updateViewport(width: number, height: number) {
@@ -1513,7 +1513,7 @@ export function createTableViewport$(tableCore$?: any) {
         tableViewport$.viewportHeight.set(height);
       });
       
-      log.info('🎯 Viewport updated', { width, height });
+      fileLog.info('🎯 Viewport updated', { width, height });
     },
     
     updateContent(width: number, height: number) {
@@ -1522,7 +1522,7 @@ export function createTableViewport$(tableCore$?: any) {
         tableViewport$.contentHeight.set(height);
       });
       
-      log.info('🎯 Content dimensions updated', { width, height });
+      fileLog.info('🎯 Content dimensions updated', { width, height });
     },
     
     scrollToRow(rowIndex: number) {
@@ -1530,7 +1530,7 @@ export function createTableViewport$(tableCore$?: any) {
       const newTop = rowIndex * rowHeight;
       tableViewport$.scrollTop.set(newTop);
       
-      log.info('🎯 Scrolled to row', { rowIndex, scrollTop: newTop });
+      fileLog.info('🎯 Scrolled to row', { rowIndex, scrollTop: newTop });
     },
     
     scrollToColumn(columnIndex: number, columnWidths: number[]) {
@@ -1540,7 +1540,7 @@ export function createTableViewport$(tableCore$?: any) {
       }
       tableViewport$.scrollLeft.set(newLeft);
       
-      log.info('🎯 Scrolled to column', { columnIndex, scrollLeft: newLeft });
+      fileLog.info('🎯 Scrolled to column', { columnIndex, scrollLeft: newLeft });
     },
     
     ensureCellVisible(rowIndex: number, columnIndex: number, columnWidths: number[]) {
@@ -1576,7 +1576,7 @@ export function createTableViewport$(tableCore$?: any) {
         tableViewport$.scrollLeft.set(columnRight - viewportWidth);
       }
       
-      log.info('🎯 Ensured cell visible', { rowIndex, columnIndex });
+      fileLog.info('🎯 Ensured cell visible', { rowIndex, columnIndex });
     }
   });
   
@@ -1588,7 +1588,7 @@ export function createTableViewport$(tableCore$?: any) {
 // ====================================
 
 export function createPureObservables(entityType: string, columns: Column[]) {
-  log.info('🎯 Creating pure observables for table', { entityType, columns: columns.length });
+  fileLog.info('🎯 Creating pure observables for table', { entityType, columns: columns.length });
   
   const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns);
   

@@ -1,7 +1,7 @@
 import type { ColumnResizeState } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/overlays/ColumnResizeOverlayDOM.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/overlays/ColumnResizeOverlayDOM.ts');
 
 // ====================================
 // COLUMN RESIZE OVERLAY - DOM Implementation
@@ -73,14 +73,14 @@ export class ColumnResizeOverlayDOM {
     }
     
     if (!this.coordinateMapping) {
-      log.warn('ColumnResizeOverlayDOM: No coordinate mapping available');
+      fileLog.warn('ColumnResizeOverlayDOM: No coordinate mapping available');
       return;
     }
     
     // Get column info from coordinate mapping
     const column = this.coordinateMapping.columns.find(col => col.columnId === resizeState.columnId);
     if (!column) {
-      log.warn('ColumnResizeOverlayDOM: Column not found:', resizeState.columnId);
+      fileLog.warn('ColumnResizeOverlayDOM: Column not found:', resizeState.columnId);
       return;
     }
     
@@ -108,7 +108,7 @@ export class ColumnResizeOverlayDOM {
       transition: 'none'
     });
     
-    log.info('ColumnResizeOverlayDOM: Indicator updated', {
+    fileLog.info('ColumnResizeOverlayDOM: Indicator updated', {
       columnId: resizeState.columnId,
       newWidth: resizeState.newWidth,
       indicatorX: newX

@@ -4,8 +4,8 @@ import type {
 } from '../../types';
 import type { CoordinateMapping } from '../../stores/gantt-data-store';
 import { GanttEventDelegationManager } from '../../systems/GanttEventDelegationManager';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/renderers/core/GanttRenderer.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/renderers/core/GanttRenderer.ts');
 
 /**
  * GanttRenderer with Coordinate-Based Rendering
@@ -46,14 +46,14 @@ export class GanttRenderer {
     this.eventHandler = eventHandler;
     this.machineEventHandler = machineEventHandler;
     
-    log.info('GanttRenderer: Created with container', { 
+    fileLog.info('GanttRenderer: Created with container', { 
       container: this.container.className,
       bounds: this.container.getBoundingClientRect()
     });
   }
   
   initialize(): void {
-    log.info('GanttRenderer: Initializing');
+    fileLog.info('GanttRenderer: Initializing');
     
     this.createContainerStructure();
     this.measureContainer();
@@ -61,7 +61,7 @@ export class GanttRenderer {
     this.setupEventDelegation();
     this.setupScrollSync();
     
-    log.info('GanttRenderer: Initialization complete');
+    fileLog.info('GanttRenderer: Initialization complete');
   }
   
   private createContainerStructure(): void {
@@ -223,32 +223,32 @@ export class GanttRenderer {
     this.containerWidth = bounds.width;
     this.containerHeight = bounds.height;
     
-    log.info('GanttRenderer: Container measured', {
+    fileLog.info('GanttRenderer: Container measured', {
       width: this.containerWidth,
       height: this.containerHeight
     });
   }
   
   private initializeRenderers(): void {
-    log.info('GanttRenderer: Initializing renderers');
+    fileLog.info('GanttRenderer: Initializing renderers');
     
     // No longer need sub-renderers with coordinate-based approach
     // All rendering is done directly in renderFromCoordinates
     
-    log.info('GanttRenderer: Renderers initialized');
+    fileLog.info('GanttRenderer: Renderers initialized');
   }
   
   private setupEventDelegation(): void {
     // Create a hybrid event handler that routes events appropriately
     const hybridEventHandler = (event: any) => {
-      log.info('GanttRenderer: Routing event:', event.type);
+      fileLog.info('GanttRenderer: Routing event:', event.type);
       
       // Route zoom events directly to machine, other events through renderer
       if (event.type === 'ZOOM_REQUEST' && this.machineEventHandler) {
-        log.info('GanttRenderer: Routing ZOOM_REQUEST directly to machine');
+        fileLog.info('GanttRenderer: Routing ZOOM_REQUEST directly to machine');
         this.machineEventHandler(event);
       } else {
-        log.info('GanttRenderer: Routing event through renderer forwarding');
+        fileLog.info('GanttRenderer: Routing event through renderer forwarding');
         this.eventHandler(event);
       }
     };
@@ -260,7 +260,7 @@ export class GanttRenderer {
       1.0    // Initial zoom factor
     );
     
-    log.info('GanttRenderer: Event delegation setup complete with hybrid routing');
+    fileLog.info('GanttRenderer: Event delegation setup complete with hybrid routing');
   }
   
   private setupScrollSync(): void {
@@ -292,7 +292,7 @@ export class GanttRenderer {
     tasks: Record<string, GanttTask>;
     dependencies: Record<string, TaskDependency>;
   }): void {
-    log.info('GanttRenderer: Rendering from coordinates', {
+    fileLog.info('GanttRenderer: Rendering from coordinates', {
       taskCount: params.coordinateMapping.tasks.length,
       segmentCount: params.coordinateMapping.timeline.segments.length,
       totalWidth: params.coordinateMapping.timeline.totalWidth,
@@ -307,7 +307,7 @@ export class GanttRenderer {
     
     // Apply any pending dayWidth update
     if (this.pendingDayWidth !== null) {
-      log.info('GanttRenderer: Applying pending dayWidth update:', this.pendingDayWidth);
+      fileLog.info('GanttRenderer: Applying pending dayWidth update:', this.pendingDayWidth);
       const pendingWidth = this.pendingDayWidth;
       this.pendingDayWidth = null; // Clear the pending update
       
@@ -790,7 +790,7 @@ export class GanttRenderer {
     coordinateMapping: CoordinateMapping,
     dependencies: Record<string, TaskDependency>
   ): void {
-    log.info('GanttRenderer: renderDependenciesFromCoordinates called with', {
+    fileLog.info('GanttRenderer: renderDependenciesFromCoordinates called with', {
       dependencyCount: Object.keys(dependencies).length,
       dependencyIds: Object.keys(dependencies)
     });
@@ -878,7 +878,7 @@ export class GanttRenderer {
       const isBackward = targetX < sourceX;
       const offset = 20;
       
-      log.info('GanttRenderer: Dependency routing', {
+      fileLog.info('GanttRenderer: Dependency routing', {
         dep: dep.id,
         type: dep.type,
         sourceX,
@@ -1416,11 +1416,11 @@ export class GanttRenderer {
    * Apply proper time scale zoom with date-based anchoring
    */
   applyTimeScaleZoom(dayWidth: number, anchorX: number, anchorDate?: Date): void {
-    log.info(`Time scale zoom: dayWidth=${dayWidth}px, anchorX=${anchorX}`, anchorDate ? `, anchorDate=${anchorDate.toISOString()}` : '');
+    fileLog.info(`Time scale zoom: dayWidth=${dayWidth}px, anchorX=${anchorX}`, anchorDate ? `, anchorDate=${anchorDate.toISOString()}` : '');
     
     // This method is now handled by coordinate recalculation in the store
     // No CSS transforms needed - content will be re-rendered with new scale
-    log.info('Time scale zoom will be handled by coordinate recalculation and re-render');
+    fileLog.info('Time scale zoom will be handled by coordinate recalculation and re-render');
     
     // TODO: Implement date-based viewport anchoring
     // Calculate which date should remain under the mouse cursor
@@ -1431,19 +1431,19 @@ export class GanttRenderer {
    * Update dependency selection
    */
   updateDependencySelection(dependencyId: string | null): void {
-    log.info('GanttRenderer: updateDependencySelection called with:', dependencyId);
+    fileLog.info('GanttRenderer: updateDependencySelection called with:', dependencyId);
     
     // Store the selection
     this.selectedDependencyId = dependencyId;
     
     // Update visual state if dependency exists in current DOM
     if (dependencyId) {
-      log.info('GanttRenderer: Looking for dependency group with ID:', dependencyId);
+      fileLog.info('GanttRenderer: Looking for dependency group with ID:', dependencyId);
       const depGroup = this.dependencyContainer.querySelector(`.vibegantt-dependency-group[data-dependency-id="${dependencyId}"]`) as HTMLElement;
-      log.info('GanttRenderer: Found dependency group:', depGroup);
+      fileLog.info('GanttRenderer: Found dependency group:', depGroup);
       
       if (depGroup) {
-        log.info('GanttRenderer: Applying visual selection to dependency group');
+        fileLog.info('GanttRenderer: Applying visual selection to dependency group');
         
         // Clear other selections
         this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
@@ -1464,11 +1464,11 @@ export class GanttRenderer {
         depGroup.classList.add('selected');
         const lines = depGroup.querySelectorAll('.vibegantt-dependency');
         const hitArea = depGroup.querySelector('.vibegantt-dependency-hitarea') as HTMLElement;
-        log.info('GanttRenderer: Found dependency lines:', lines.length);
+        fileLog.info('GanttRenderer: Found dependency lines:', lines.length);
         
         lines.forEach(line => {
           const lineEl = line as HTMLElement;
-          log.info('GanttRenderer: Setting line to selected style');
+          fileLog.info('GanttRenderer: Setting line to selected style');
           lineEl.style.backgroundColor = '#3b82f6';
           if (lineEl.classList.contains('vibegantt-dependency-horizontal')) {
             lineEl.style.height = '3px';
@@ -1492,12 +1492,12 @@ export class GanttRenderer {
           t.taskId === depGroup.dataset.successorId
         );
         
-        log.info('GanttRenderer: Source/target coords:', { sourceCoord, targetCoord });
+        fileLog.info('GanttRenderer: Source/target coords:', { sourceCoord, targetCoord });
         
         if (sourceCoord && targetCoord) {
           const midX = (sourceCoord.xPosition + sourceCoord.width + targetCoord.xPosition) / 2;
           const midY = (sourceCoord.yPosition + targetCoord.yPosition + sourceCoord.height) / 2;
-          log.info('GanttRenderer: Showing dependency controls at:', { midX, midY });
+          fileLog.info('GanttRenderer: Showing dependency controls at:', { midX, midY });
           this.showDependencyControls(depGroup, dependencyId, midX, midY);
         }
       }
@@ -1537,7 +1537,7 @@ export class GanttRenderer {
     this.containerWidth = width;
     this.containerHeight = height;
     
-    log.info('GanttRenderer: Resized', { width, height });
+    fileLog.info('GanttRenderer: Resized', { width, height });
     
     // Container will scroll to show full timeline
     // No need to update internal dimensions as they're coordinate-based
@@ -1547,7 +1547,7 @@ export class GanttRenderer {
    * Start dependency creation from a task
    */
   private startDependencyCreation(sourceTaskId: string, event: MouseEvent): void {
-    log.info('GanttRenderer: Starting dependency creation from task', sourceTaskId);
+    fileLog.info('GanttRenderer: Starting dependency creation from task', sourceTaskId);
     
     // Send event to machine
     this.eventHandler({
@@ -1595,7 +1595,7 @@ export class GanttRenderer {
       if (targetTask) {
         const targetTaskId = targetTask.dataset.taskId;
         if (targetTaskId && targetTaskId !== sourceTaskId) {
-          log.info('GanttRenderer: Creating dependency to task', targetTaskId);
+          fileLog.info('GanttRenderer: Creating dependency to task', targetTaskId);
           this.eventHandler({
             type: 'DEPENDENCY_CREATE_END',
             targetTaskId
@@ -1669,10 +1669,10 @@ export class GanttRenderer {
    * Uses coordinate recalculation for consistency but optimized for performance
    */
   updateTimelineLayout(dayWidth: number): void {
-    log.info(`GanttRenderer: Updating timeline layout with dayWidth=${dayWidth}px`);
+    fileLog.info(`GanttRenderer: Updating timeline layout with dayWidth=${dayWidth}px`);
     
     if (!this.currentCoordinates || !this.currentCoordinates.timeline || !this.currentCoordinates.tasks) {
-      log.warn('GanttRenderer: Cannot update timeline layout - no coordinate data available yet');
+      fileLog.warn('GanttRenderer: Cannot update timeline layout - no coordinate data available yet');
       this.handleCoordinateUnavailable(dayWidth);
       return;
     }
@@ -1711,7 +1711,7 @@ export class GanttRenderer {
     // Update internal coordinates first
     this.currentCoordinates = updatedMapping;
     
-    log.info(`GanttRenderer: Coordinate-based timeline update: ${oldDayWidth}px/day → ${dayWidth}px/day (${scaleRatio.toFixed(3)}x)`);
+    fileLog.info(`GanttRenderer: Coordinate-based timeline update: ${oldDayWidth}px/day → ${dayWidth}px/day (${scaleRatio.toFixed(3)}x)`);
     
     // Re-render everything with new coordinates for consistency
     this.renderFromCoordinates({
@@ -1727,19 +1727,19 @@ export class GanttRenderer {
    * Handle coordinate updates that require full re-rendering
    */
   private handleCoordinateUnavailable(dayWidth: number): void {
-    log.warn('GanttRenderer: Cannot update timeline layout - no coordinate data available yet');
-    log.warn('GanttRenderer: Available properties:', Object.keys(this.currentCoordinates || {}));
+    fileLog.warn('GanttRenderer: Cannot update timeline layout - no coordinate data available yet');
+    fileLog.warn('GanttRenderer: Available properties:', Object.keys(this.currentCoordinates || {}));
       
     // Store the dayWidth for when coordinates become available
     this.pendingDayWidth = dayWidth;
-    log.info('GanttRenderer: Stored pending dayWidth for when coordinates become available:', dayWidth);
+    fileLog.info('GanttRenderer: Stored pending dayWidth for when coordinates become available:', dayWidth);
   }
 
   /**
    * Clean up and destroy
    */
   destroy(): void {
-    log.info('GanttRenderer: Destroying');
+    fileLog.info('GanttRenderer: Destroying');
     
     // Clean up event manager
     if (this.eventManager) {
@@ -1752,6 +1752,6 @@ export class GanttRenderer {
     // Clear container
     this.container.innerHTML = '';
     
-    log.info('GanttRenderer: Destroyed');
+    fileLog.info('GanttRenderer: Destroyed');
   }
 }

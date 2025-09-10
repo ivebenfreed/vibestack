@@ -1,6 +1,6 @@
 import type { Column } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/cell-renderers/enum.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/renderers/cell-renderers/enum.ts');
 
 /**
  * Fast enum rendering function for table cells
@@ -19,7 +19,7 @@ export function enumValue(value: any, column: Column): string {
   
   // Column must have options configured - no fallbacks
   if (!column.options || !Array.isArray(column.options)) {
-    log.warn(`[enumValue] Column ${column.id} is type 'enum' but missing options array`);
+    fileLog.warn(`[enumValue] Column ${column.id} is type 'enum' but missing options array`);
     return String(value);
   }
   
@@ -30,7 +30,7 @@ export function enumValue(value: any, column: Column): string {
   });
   
   if (!option) {
-    log.warn(`[enumValue] Value '${value}' not found in column ${column.id} options`);
+    fileLog.warn(`[enumValue] Value '${value}' not found in column ${column.id} options`);
     return String(value);
   }
   

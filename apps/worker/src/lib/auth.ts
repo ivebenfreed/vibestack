@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/react"; // Use React client
 import { adminClient, emailOTPClient } from "better-auth/client/plugins";
-import { authLog } from '@/logger';
-const log = authLog('lib/auth.ts');
+import { log } from '@/logger';
+const myLog = log('lib/auth.ts');
 
 // Define the base URL for the Better Auth server
 // Using same-origin architecture - everything from same domain
@@ -9,7 +9,7 @@ const currentHostname = window.location.hostname;
 const isLocalDev = currentHostname === 'localhost' || currentHostname === '127.0.0.1';
 
 // Debug logging to see what's happening
-log.info('[AUTH] Environment detection:', {
+myLog.info('[AUTH] Environment detection:', {
   hostname: currentHostname,
   isLocalDev,
   origin: window.location.origin,
@@ -20,7 +20,7 @@ log.info('[AUTH] Environment detection:', {
 
 // Use same origin for all environments - no cross-origin requests needed
 const authApiBaseUrl = window.location.origin;
-log.info('[AUTH] Using same-origin API URL:', authApiBaseUrl);
+myLog.info('[AUTH] Using same-origin API URL:', authApiBaseUrl);
 
 // Create the Better Auth client instance
 export const authClient = createAuthClient({
@@ -48,19 +48,19 @@ export const authClient = createAuthClient({
       shouldRetry: (response: Response | null) => {
         // Always retry on network failures (response is null)
         if (response === null) {
-          log.info('[AUTH] Network failure detected, will retry');
+          myLog.info('[AUTH] Network failure detected, will retry');
           return true;
         }
         
         // Retry on 5xx server errors
         if (response.status >= 500) {
-          log.info(`[AUTH] Server error ${response.status} detected, will retry`);
+          myLog.info(`[AUTH] Server error ${response.status} detected, will retry`);
           return true;
         }
         
         // Don't retry on 4xx client errors (auth failures, validation errors, etc.)
         if (response.status >= 400 && response.status < 500) {
-          log.info(`[AUTH] Client error ${response.status} detected, will not retry`);
+          myLog.info(`[AUTH] Client error ${response.status} detected, will not retry`);
         }
         return false;
       }
@@ -71,7 +71,7 @@ export const authClient = createAuthClient({
       const { error, response } = context;
       
       // Log the error details for debugging
-      log.info("[AUTH] Request failed:", { 
+      myLog.info("[AUTH] Request failed:", { 
         error: error?.message, 
         status: response?.status,
         url: context.request?.url 
@@ -79,7 +79,7 @@ export const authClient = createAuthClient({
       
       // Handle session failures by triggering immediate sign-out
       if (response?.status && [401, 403].includes(response.status)) {
-        log.info("[AUTH] Session failure detected, triggering sign-out");
+        myLog.info("[AUTH] Session failure detected, triggering sign-out");
         // Dispatch custom event to trigger auth machine sign-out
         window.dispatchEvent(new CustomEvent('auth:session-fault', {
           detail: { status: response.status, url: context.request?.url }
@@ -93,7 +93,7 @@ export const authClient = createAuthClient({
       
       // Log network failures and server errors for debugging
       if (!response || response.status >= 500) {
-        log.warn("[AUTH] Network/server error - will retry:", error?.message || `HTTP ${response?.status}`);
+        myLog.warn("[AUTH] Network/server error - will retry:", error?.message || `HTTP ${response?.status}`);
       }
     },
     
@@ -103,14 +103,14 @@ export const authClient = createAuthClient({
         return await fetch(input, init);
       } catch (error) {
         // Convert network errors to Response.error() so Better Fetch can retry them
-        log.info("[AUTH] Network error caught, converting for retry:", error);
+        myLog.info("[AUTH] Network error caught, converting for retry:", error);
         return Response.error();
       }
     }
   },
   fetch: (url: string, options: RequestInit) => {
-    log.info(`[AUTH] Fetch request to: ${url}`);
-    log.info('[AUTH] Request options:', JSON.stringify({
+    myLog.info(`[AUTH] Fetch request to: ${url}`);
+    myLog.info('[AUTH] Request options:', JSON.stringify({
       method: options.method,
       headers: options.headers,
       credentials: options.credentials,
@@ -124,11 +124,11 @@ export const authClient = createAuthClient({
     };
     
     return fetch(url, enhancedOptions).then(response => {
-      log.info(`[AUTH] Response status: ${response.status}`);
-      log.info(`[AUTH] Response headers:`, Object.fromEntries(response.headers.entries()));
+      myLog.info(`[AUTH] Response status: ${response.status}`);
+      myLog.info(`[AUTH] Response headers:`, Object.fromEntries(response.headers.entries()));
       return response;
     }).catch(error => {
-      log.error('[AUTH] Fetch error:', error);
+      myLog.error('[AUTH] Fetch error:', error);
       throw error;
     });
   }
@@ -143,14 +143,14 @@ export const authClient = createAuthClient({
  */
 export const initiateSignIn = async (/* Add necessary parameters like email, password */) => {
   try {
-    log.info(`[AUTH] Attempting sign-in via: ${authApiBaseUrl}`);
+    myLog.info(`[AUTH] Attempting sign-in via: ${authApiBaseUrl}`);
     // Example: Call Better Auth sign-in method
     // const result = await authClient.signIn('email', { email, password });
-    // log.info("[AUTH] Sign-in successful:", result);
+    // myLog.info("[AUTH] Sign-in successful:", result);
     // Handle success (e.g., redirect, update state)
     alert("Sign-in logic needs implementation using authClient.signIn");
   } catch (error) {
-    log.error("[AUTH] Failed to initiate sign-in:", error);
+    myLog.error("[AUTH] Failed to initiate sign-in:", error);
     alert("Sign-in failed. Please check the console.");
   }
 };
@@ -161,14 +161,14 @@ export const initiateSignIn = async (/* Add necessary parameters like email, pas
  */
 export const initiateSignUp = async (/* Add necessary parameters */) => {
   try {
-    log.info(`[AUTH] Attempting sign-up via: ${authApiBaseUrl}`);
+    myLog.info(`[AUTH] Attempting sign-up via: ${authApiBaseUrl}`);
     // Example: Call Better Auth sign-up method
     // const result = await authClient.signUp('email', { email, password, name });
-    // log.info("[AUTH] Sign-up successful:", result);
+    // myLog.info("[AUTH] Sign-up successful:", result);
     // Handle success
     alert("Sign-up logic needs implementation using authClient.signUp");
   } catch (error) {
-    log.error("[AUTH] Failed to initiate sign-up:", error);
+    myLog.error("[AUTH] Failed to initiate sign-up:", error);
     alert("Sign-up failed. Please check the console.");
   }
 };

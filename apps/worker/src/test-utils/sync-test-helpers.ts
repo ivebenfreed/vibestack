@@ -1,5 +1,5 @@
-import { debugLog } from '@/logger';
-const log = debugLog('test-utils/sync-test-helpers.ts');
+import { log } from '@/logger';
+const fileLog = log('test-utils/sync-test-helpers.ts');
 /**
  * Test utilities for controlling sync state in Playwright tests
  * These are exposed to window for test access
@@ -24,19 +24,19 @@ export async function testForceSetSyncState(newLSN: string = '0/0', clientId?: s
     
     // Force set the state
     localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(newState));
-    log.info(`[TEST] Force set sync state:`, newState);
+    fileLog.info(`[TEST] Force set sync state:`, newState);
     
     // Verify it was set
     const verification = localStorage.getItem(SYNC_STATE_KEY);
     if (verification) {
       const parsed = JSON.parse(verification);
-      log.info(`[TEST] Verified state: LSN=${parsed.currentLSN}, ClientID=${parsed.clientId}`);
+      fileLog.info(`[TEST] Verified state: LSN=${parsed.currentLSN}, ClientID=${parsed.clientId}`);
       return parsed.currentLSN === newLSN;
     }
     
     return false;
   } catch (error) {
-    log.error('[TEST] Failed to force set sync state:', error);
+    fileLog.error('[TEST] Failed to force set sync state:', error);
     return false;
   }
 }
@@ -46,7 +46,7 @@ export async function testForceSetSyncState(newLSN: string = '0/0', clientId?: s
  */
 export async function testResetToFreshState(): Promise<boolean> {
   try {
-    log.info('[TEST] Resetting to completely fresh state...');
+    fileLog.info('[TEST] Resetting to completely fresh state...');
     
     const SYNC_STATE_KEY = 'sync-machine-state';
     
@@ -56,14 +56,14 @@ export async function testResetToFreshState(): Promise<boolean> {
     // Verify removal
     const afterRemoval = localStorage.getItem(SYNC_STATE_KEY);
     if (afterRemoval === null) {
-      log.info('[TEST] ✅ Successfully removed sync state - will get fresh state on reload');
+      fileLog.info('[TEST] ✅ Successfully removed sync state - will get fresh state on reload');
       return true;
     } else {
-      log.info('[TEST] ⚠️ Sync state still exists after removal attempt');
+      fileLog.info('[TEST] ⚠️ Sync state still exists after removal attempt');
       return false;
     }
   } catch (error) {
-    log.error('[TEST] Failed to reset to fresh state:', error);
+    fileLog.error('[TEST] Failed to reset to fresh state:', error);
     return false;
   }
 }
@@ -75,7 +75,7 @@ export async function testResetToFreshState(): Promise<boolean> {
  */
 export async function testSetLSN(newLSN: string = '0/0', reason: string = 'Test LSN change'): Promise<boolean> {
   try {
-    log.info(`[TEST] Setting LSN to: ${newLSN} (${reason})`);
+    fileLog.info(`[TEST] Setting LSN to: ${newLSN} (${reason})`);
     
     // Update sync machine state in localStorage
     const SYNC_STATE_KEY = 'sync-machine-state';
@@ -86,7 +86,7 @@ export async function testSetLSN(newLSN: string = '0/0', reason: string = 'Test 
       const oldLSN = parsedState.currentLSN;
       parsedState.currentLSN = newLSN;
       localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(parsedState));
-      log.info(`[TEST] LSN changed: ${oldLSN} → ${newLSN}`);
+      fileLog.info(`[TEST] LSN changed: ${oldLSN} → ${newLSN}`);
       
       // Also send LSN_UPDATE event to sync machine if available
       try {
@@ -101,21 +101,21 @@ export async function testSetLSN(newLSN: string = '0/0', reason: string = 'Test 
               lsn: newLSN,
               reason: reason
             });
-            log.info(`[TEST] LSN_UPDATE event sent to sync machine`);
+            fileLog.info(`[TEST] LSN_UPDATE event sent to sync machine`);
           }
         }
       } catch (e) {
-        log.warn('[TEST] Could not send LSN_UPDATE event:', e);
+        fileLog.warn('[TEST] Could not send LSN_UPDATE event:', e);
       }
       
       return true;
     } else {
-      log.warn('[TEST] No sync machine state found in localStorage');
+      fileLog.warn('[TEST] No sync machine state found in localStorage');
       // Try to create fresh state with the desired LSN
       return testForceSetSyncState(newLSN);
     }
   } catch (error) {
-    log.error('[TEST] Failed to set LSN:', error);
+    fileLog.error('[TEST] Failed to set LSN:', error);
     return false;
   }
 }
@@ -130,14 +130,14 @@ export function testGetSyncState(): { clientId: string; currentLSN: string } | n
     
     if (stored) {
       const parsedState = JSON.parse(stored);
-      log.info('[TEST] Current sync state:', parsedState);
+      fileLog.info('[TEST] Current sync state:', parsedState);
       return parsedState;
     } else {
-      log.info('[TEST] No sync state found');
+      fileLog.info('[TEST] No sync state found');
       return null;
     }
   } catch (error) {
-    log.error('[TEST] Failed to get sync state:', error);
+    fileLog.error('[TEST] Failed to get sync state:', error);
     return null;
   }
 }
@@ -147,11 +147,11 @@ export function testGetSyncState(): { clientId: string; currentLSN: string } | n
  */
 export async function testRestartSync(reason: string = 'Test sync restart'): Promise<boolean> {
   try {
-    log.info(`[TEST] Restarting sync: ${reason}`);
+    fileLog.info(`[TEST] Restarting sync: ${reason}`);
     
     const appInitActor = (window as any).appInitActor;
     if (!appInitActor) {
-      log.warn('[TEST] No app init actor available');
+      fileLog.warn('[TEST] No app init actor available');
       return false;
     }
     
@@ -159,25 +159,25 @@ export async function testRestartSync(reason: string = 'Test sync restart'): Pro
     const syncActor = appInitSnapshot?.children?.syncMachine;
     
     if (!syncActor) {
-      log.warn('[TEST] No sync machine available');
+      fileLog.warn('[TEST] No sync machine available');
       return false;
     }
     
     // Disconnect
-    log.info('[TEST] Sending DISCONNECT...');
+    fileLog.info('[TEST] Sending DISCONNECT...');
     syncActor.send({ type: 'DISCONNECT', reason });
     
     // Wait and reconnect
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    log.info('[TEST] Sending CONNECT...');
+    fileLog.info('[TEST] Sending CONNECT...');
     syncActor.send({ type: 'CONNECT', reason });
     
-    log.info('[TEST] Sync restart triggered');
+    fileLog.info('[TEST] Sync restart triggered');
     return true;
     
   } catch (error) {
-    log.error('[TEST] Failed to restart sync:', error);
+    fileLog.error('[TEST] Failed to restart sync:', error);
     return false;
   }
 }
@@ -187,7 +187,7 @@ export async function testRestartSync(reason: string = 'Test sync restart'): Pro
  */
 export function testClearSyncData(): void {
   try {
-    log.info('[TEST] Clearing sync data...');
+    fileLog.info('[TEST] Clearing sync data...');
     
     // Clear sync machine state
     localStorage.removeItem('sync-machine-state');
@@ -203,12 +203,12 @@ export function testClearSyncData(): void {
     
     keysToRemove.forEach(key => {
       localStorage.removeItem(key);
-      log.info(`[TEST] Removed localStorage key: ${key}`);
+      fileLog.info(`[TEST] Removed localStorage key: ${key}`);
     });
     
-    log.info('[TEST] Sync data cleared');
+    fileLog.info('[TEST] Sync data cleared');
   } catch (error) {
-    log.error('[TEST] Failed to clear sync data:', error);
+    fileLog.error('[TEST] Failed to clear sync data:', error);
   }
 }
 
@@ -225,7 +225,7 @@ if (typeof window !== 'undefined') {
   
   // Log availability in test/development mode
   if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
-    log.info('[TEST] Sync test helpers available at window.testSyncHelpers');
-    log.info('[TEST] New methods: forceSetSyncState(lsn, clientId?), resetToFreshState()');
+    fileLog.info('[TEST] Sync test helpers available at window.testSyncHelpers');
+    fileLog.info('[TEST] New methods: forceSetSyncState(lsn, clientId?), resetToFreshState()');
   }
 }

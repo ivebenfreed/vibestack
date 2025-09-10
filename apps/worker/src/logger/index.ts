@@ -1,407 +1,331 @@
 /**
- * Enhanced Contextual Logging System with File-Level Control
+ * Simple Logger System with File and Folder Level Overrides
  * 
- * Environment variables control what logs show:
- * - VITE_LOG_CONTEXTS: comma-separated list (sync,state,ui,data,auth,routing,performance,testing,debug)
- * - VITE_LOG_LEVEL: debug|info|warn|error (default: error)
+ * This logger provides a simple 3-level logging system (info, error, debug)
+ * with global configuration and file/folder level overrides.
  * 
- * File-level control via runtime:
- * - logControl.setFileLevel('path/to/file.ts', 'debug')
- * - logControl.muteFile('path/to/file.ts')
- * - logControl.onlyFiles(['file1.ts', 'file2.ts'])
+ * Features:
+ * - Three log levels: info, error, debug
+ * - Global log level configuration
+ * - File and folder level overrides
+ * - Runtime configuration via logControl API
+ * - Persistent browser storage
  * 
- * Usage:
- *   import { syncLog } from '@/logger';
- *   const log = syncLog('MyFile.ts');
- *   log.debug('message', data);
+ * Usage Examples:
+ * 
+ * import { log } from '@/logger';
+ * const myLog = log('MyComponent.tsx');
+ * myLog.info('Component rendered', { props });
+ * myLog.debug('Debug info', data);
+ * myLog.error('Error occurred', error);
+ * 
+ * // Runtime control (browser console)
+ * logControl.setGlobalLevel('debug');         // Set global level
+ * logControl.setFileLevel('MyComponent', 'info'); // Set specific file level
+ * logControl.setFolderLevel('vibegrid', 'error');  // Set folder level
  */
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type LogContext = 
-  | 'sync'           // Sync operations, WebSocket, state machines
-  | 'ui'             // UI components, interactions, rendering
-  | 'data'           // Data operations, CRUD, queries
-  | 'auth'           // Authentication, permissions
-  | 'routing'        // Navigation, route changes
-  | 'performance'    // Performance monitoring, optimization
-  | 'state'          // State management, stores
-  | 'testing'        // Test-related logging
-  | 'debug';         // General debugging
+// Log levels (in priority order)
+export type LogLevel = 'error' | 'info' | 'debug';
 
-interface FileLogConfig {
-  level?: LogLevel;
-  muted?: boolean;
+// Log configuration interface
+interface LogConfig {
+  globalLevel: LogLevel;
+  fileOverrides: Record<string, LogLevel>;
+  folderOverrides: Record<string, LogLevel>;
 }
 
-class SimpleLogger {
-  private enabledContexts: Set<LogContext> = new Set();
-  private logLevel: LogLevel = 'info';
-  private logLevels = ['debug', 'info', 'warn', 'error'];
+// Default configuration
+const DEFAULT_CONFIG: LogConfig = {
+  globalLevel: 'info',
+  fileOverrides: {},
+  folderOverrides: {}
+};
+
+// Log level priorities (lower number = higher priority)
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  error: 0,
+  info: 1,
+  debug: 2
+};
+
+// Browser storage key
+const STORAGE_KEY = 'vibestack-logger-config';
+
+/**
+ * Normalize file path for consistent matching
+ */
+function normalizeFilePath(filePath: string): string {
+  return filePath
+    .replace(/^\/+/, '')           // Remove leading slashes
+    .replace(/^src\//, '')         // Remove src/ prefix
+    .replace(/\.(ts|tsx|js|jsx)$/, ''); // Remove file extension
+}
+
+/**
+ * Logger configuration manager
+ */
+class LoggerConfig {
+  private config: LogConfig;
   
-  // File-level configuration
-  private fileConfigs: Map<string, FileLogConfig> = new Map();
-  private fileOnlyMode: Set<string> | null = null; // If set, only these files can log
-
   constructor() {
-    this.loadConfig();
+    this.config = this.loadConfig();
   }
-
-  private loadConfig() {
-    // Read environment variables set by dev scripts (no .env.local caching issues)
-    const contexts = import.meta.env.VITE_LOG_CONTEXTS;
-    const level = import.meta.env.VITE_LOG_LEVEL || 'error';
+  
+  private loadConfig(): LogConfig {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+      }
+    } catch (error) {
+      console.warn('Failed to load logger config from localStorage:', error);
+    }
+    return { ...DEFAULT_CONFIG };
+  }
+  
+  private saveConfig(): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
+    } catch (error) {
+      console.warn('Failed to save logger config to localStorage:', error);
+    }
+  }
+  
+  /**
+   * Check if a log level should be shown for a given file
+   */
+  shouldLog(level: LogLevel, filePath: string): boolean {
+    const normalizedPath = normalizeFilePath(filePath);
     
-    this.logLevel = level as LogLevel;
+    // Get effective log level for this file
+    const effectiveLevel = this.getEffectiveLevel(normalizedPath);
     
-    if (contexts === undefined || contexts === '') {
-      // No env var specified or empty string, default to quiet mode
-      this.enabledContexts = new Set();
-    } else if (contexts === 'none') {
-      // Explicitly set to none
-      this.enabledContexts = new Set();
-    } else {
-      // Specific contexts set via dev script
-      this.enabledContexts = new Set(contexts.split(',').filter(Boolean) as LogContext[]);
+    // Check if current log level meets the threshold
+    return LOG_LEVEL_PRIORITY[level] <= LOG_LEVEL_PRIORITY[effectiveLevel];
+  }
+  
+  private getEffectiveLevel(normalizedPath: string): LogLevel {
+    // Check for exact file match first
+    if (this.config.fileOverrides[normalizedPath]) {
+      return this.config.fileOverrides[normalizedPath];
     }
     
-    // Load file-level configurations from environment
-    // VITE_LOG_FILE_LEVELS="vibegrid:warn,universe-loader:info"
-    const fileLevels = import.meta.env.VITE_LOG_FILE_LEVELS;
-    if (fileLevels) {
-      const configs = fileLevels.split(',');
-      configs.forEach((config: string) => {
-        const [pattern, fileLevel] = config.split(':');
-        if (pattern && fileLevel) {
-          // Handle patterns (e.g., "vibegrid/*" or specific files)
-          const lowerPattern = pattern.toLowerCase();
-          if (lowerPattern.includes('vibegrid')) {
-            this.setPatternLevel('vibegrid', fileLevel as LogLevel, true);
-          } else if (lowerPattern === 'groupconfig' || lowerPattern === 'groupheaderrow') {
-            // Handle specific VibeGrid component names
-            this.setFileLevel(`components/custom/vibegrid/components/${pattern}`, fileLevel as LogLevel, true);
-          } else if (lowerPattern === 'vibegridxheader') {
-            this.setFileLevel('components/custom/vibegrid/components/VibeGridXHeader', fileLevel as LogLevel, true);
-          } else {
-            this.setFileLevel(pattern, fileLevel as LogLevel, true);
-          }
+    // Check for folder matches (check from most specific to least specific)
+    const pathParts = normalizedPath.split('/');
+    for (let i = pathParts.length - 1; i >= 0; i--) {
+      const folderPath = pathParts.slice(0, i + 1).join('/');
+      if (this.config.folderOverrides[folderPath]) {
+        return this.config.folderOverrides[folderPath];
+      }
+      
+      // Also check partial folder names (e.g., 'vibegrid' matches any folder containing 'vibegrid')
+      for (const [folderPattern, level] of Object.entries(this.config.folderOverrides)) {
+        if (normalizedPath.includes(folderPattern)) {
+          return level;
         }
-      });
-    }
-    
-    // Load muted files from environment
-    // VITE_LOG_MUTED_FILES="file1,file2"
-    const mutedFiles = import.meta.env.VITE_LOG_MUTED_FILES;
-    if (mutedFiles) {
-      mutedFiles.split(',').forEach((file: string) => {
-        if (file) this.muteFile(file, true);
-      });
-    }
-    
-    // Load file-only mode from environment
-    // VITE_LOG_ONLY_FILES="file1,file2"
-    const onlyFiles = import.meta.env.VITE_LOG_ONLY_FILES;
-    if (onlyFiles) {
-      this.onlyFiles(onlyFiles.split(',').filter(Boolean));
-    }
-    
-    const configInfo = [];
-    configInfo.push(`contexts=${contexts || 'none'}`);
-    configInfo.push(`level=${level}`);
-    if (fileLevels) configInfo.push(`file-levels=${fileLevels}`);
-    if (mutedFiles) configInfo.push(`muted=${mutedFiles}`);
-    if (onlyFiles) configInfo.push(`only-files=${onlyFiles}`);
-    
-    console.log(`🔧 [Logger] Loaded: ${configInfo.join(', ')}`);
-  }
-
-  private getFileKey(filePath: string): string {
-    // Normalize file path for consistent matching
-    // Remove leading slashes, src/, and file extensions
-    return filePath
-      .replace(/^\/+/, '')
-      .replace(/^src\//, '')
-      .replace(/\.(ts|tsx|js|jsx)$/, '');
-  }
-
-  shouldLog(context: LogContext, level: LogLevel, filePath: string): boolean {
-    // Errors always show unless file is muted
-    const fileKey = this.getFileKey(filePath);
-    const fileConfig = this.fileConfigs.get(fileKey);
-    
-    // Check if file is muted
-    if (fileConfig?.muted) return false;
-    
-    // Check file-only mode
-    if (this.fileOnlyMode && !this.fileOnlyMode.has(fileKey)) return false;
-    
-    // Errors always show (unless muted)
-    if (level === 'error') return true;
-    
-    // Check if context is enabled
-    if (!this.enabledContexts.has(context)) return false;
-    
-    // Determine effective log level (file-specific or global)
-    const effectiveLevel = fileConfig?.level || this.logLevel;
-    const currentLevelIndex = this.logLevels.indexOf(effectiveLevel);
-    const messageLevelIndex = this.logLevels.indexOf(level);
-    
-    return messageLevelIndex >= currentLevelIndex;
-  }
-
-  log(context: LogContext, level: LogLevel, filePath: string, message: string, data?: any): void {
-    if (!this.shouldLog(context, level, filePath)) return;
-
-    const fileName = filePath.split('/').pop()?.replace(/\.(ts|tsx|js|jsx)$/, '') || 'App';
-    const timestamp = new Date().toISOString().substr(11, 12);
-    const contextIcon = this.getContextIcon(context);
-    const levelIcon = this.getLevelIcon(level);
-    
-    // Add file-level indicator if configured
-    const fileKey = this.getFileKey(filePath);
-    const fileConfig = this.fileConfigs.get(fileKey);
-    const fileIndicator = fileConfig?.level ? `[${fileConfig.level[0].toUpperCase()}]` : '';
-    
-    const formatted = `${timestamp} [${context.toUpperCase()}:${fileName}]${fileIndicator} ${contextIcon} ${levelIcon} ${message}`;
-    
-    switch (level) {
-      case 'debug':
-      case 'info':
-        console.info(formatted, data ?? '');
-        break;
-      case 'warn':
-        console.warn(formatted, data ?? '');
-        break;
-      case 'error':
-        console.error(formatted, data ?? '');
-        break;
-    }
-  }
-
-  private getLevelIcon(level: LogLevel): string {
-    switch (level) {
-      case 'debug': return '🔍';
-      case 'info': return 'ℹ️';
-      case 'warn': return '⚠️';
-      case 'error': return '❌';
-      default: return '📝';
-    }
-  }
-
-  private getContextIcon(context: LogContext): string {
-    switch (context) {
-      case 'sync': return '🔄';
-      case 'ui': return '🎨';
-      case 'data': return '💾';
-      case 'auth': return '🔐';
-      case 'routing': return '🗺️';
-      case 'performance': return '⚡';
-      case 'state': return '📊';
-      case 'testing': return '🧪';
-      case 'debug': return '🐛';
-      default: return '📝';
-    }
-  }
-
-  // Runtime control - simple context toggling
-  enable(...contexts: LogContext[]): void {
-    contexts.forEach(ctx => this.enabledContexts.add(ctx));
-    console.info('✅ Enabled contexts:', contexts.join(', '));
-  }
-
-  disable(...contexts: LogContext[]): void {
-    contexts.forEach(ctx => this.enabledContexts.delete(ctx));
-    console.info('❌ Disabled contexts:', contexts.join(', '));
-  }
-
-  only(...contexts: LogContext[]): void {
-    this.enabledContexts.clear();
-    contexts.forEach(ctx => this.enabledContexts.add(ctx));
-    console.info('🎯 Only enabled contexts:', contexts.join(', '));
-  }
-
-  all(): void {
-    this.enabledContexts = new Set(['sync', 'ui', 'data', 'auth', 'routing', 'performance', 'state', 'testing', 'debug']);
-    console.info('🌍 All contexts enabled');
-  }
-
-  none(): void {
-    this.enabledContexts.clear();
-    console.info('🔇 All contexts disabled (errors will still show)');
-  }
-
-  // File-level control methods
-  setFileLevel(filePath: string, level: LogLevel, silent = false): void {
-    const key = this.getFileKey(filePath);
-    const config = this.fileConfigs.get(key) || {};
-    config.level = level;
-    this.fileConfigs.set(key, config);
-    if (!silent) console.info(`📄 Set ${key} to ${level} level`);
-  }
-
-  muteFile(filePath: string, silent = false): void {
-    const key = this.getFileKey(filePath);
-    const config = this.fileConfigs.get(key) || {};
-    config.muted = true;
-    this.fileConfigs.set(key, config);
-    if (!silent) console.info(`🔇 Muted ${key}`);
-  }
-
-  unmuteFile(filePath: string): void {
-    const key = this.getFileKey(filePath);
-    const config = this.fileConfigs.get(key);
-    if (config) {
-      config.muted = false;
-      if (!config.level) {
-        this.fileConfigs.delete(key);
       }
     }
-    console.info(`🔊 Unmuted ${key}`);
-  }
-
-  onlyFiles(filePaths: string[]): void {
-    this.fileOnlyMode = new Set(filePaths.map(p => this.getFileKey(p)));
-    console.info(`📁 Only logging from:`, Array.from(this.fileOnlyMode));
-  }
-
-  clearFileFilters(): void {
-    this.fileOnlyMode = null;
-    this.fileConfigs.clear();
-    console.info('🗑️ Cleared all file-level filters');
-  }
-
-  // Set level for multiple files matching a pattern
-  setPatternLevel(pattern: string, level: LogLevel, silent = false): void {
-    // Store pattern-based rules for evaluation
-    // For simplicity, we'll handle common patterns
-    if (pattern.includes('vibegrid')) {
-      // Set level for all VibeGrid files
-      const vibegridFiles = [
-        'components/custom/vibegrid/VibeGrid',
-        'components/custom/vibegrid/stores/table-data-store',
-        'components/custom/vibegrid/stores/table-data-store-atomic',
-        'components/custom/vibegrid/stores/legend-state-atomic-bridge',
-        'components/custom/vibegrid/actors/renderer-actor',
-        'components/custom/vibegrid/actors/canvas-actor',
-        'components/custom/vibegrid/systems/EventDelegationManager',
-        'components/custom/vibegrid/systems/EventSystemMigration',
-        'components/custom/vibegrid/coordinates/VibeGridXCoordinateManager',
-        'components/custom/vibegrid/VibeGridXEvents',
-        'components/custom/vibegrid/VibeGridXCore',
-        'components/custom/vibegrid/VibeGridXHooks',
-        'components/custom/vibegrid/components/ContextMenuRenderer',
-        'components/custom/vibegrid/components/VibeGridXColumnVisibility',
-        'components/custom/vibegrid/components/VibeGridXHeader',
-        'components/custom/vibegrid/components/GroupHeaderRow',
-        'components/custom/vibegrid/components/GroupConfig'
-      ];
-      vibegridFiles.forEach(file => this.setFileLevel(file, level, silent));
-      if (!silent) console.info(`🎯 Set all VibeGrid files to ${level} level`);
-    }
-  }
-
-  status(): void {
-    console.info('📊 Enabled contexts:', Array.from(this.enabledContexts));
-    console.info('📏 Global log level:', this.logLevel);
-    if (this.fileConfigs.size > 0) {
-      console.info('📄 File-specific levels:');
-      this.fileConfigs.forEach((config, file) => {
-        if (config.level) console.info(`  - ${file}: ${config.level}`);
-        if (config.muted) console.info(`  - ${file}: MUTED`);
-      });
-    }
-    if (this.fileOnlyMode) {
-      console.info('📁 File-only mode:', Array.from(this.fileOnlyMode));
-    }
-  }
-
-  // Focus on specific context with optional file filtering
-  focus(context: LogContext | 'none', options?: { files?: string[], level?: LogLevel }): void {
-    if (context === 'none') {
-      this.none();
-      return;
-    }
     
-    this.only(context);
-    
-    if (options?.files) {
-      this.onlyFiles(options.files);
-    }
-    
-    if (options?.level) {
-      this.logLevel = options.level;
-    }
-    
-    console.info(`🎯 Focused on ${context}`, options || '');
+    // Fall back to global level
+    return this.config.globalLevel;
+  }
+  
+  /**
+   * Set global log level
+   */
+  setGlobalLevel(level: LogLevel): void {
+    this.config.globalLevel = level;
+    this.saveConfig();
+  }
+  
+  /**
+   * Set log level for a specific file
+   */
+  setFileLevel(filePath: string, level: LogLevel): void {
+    const normalizedPath = normalizeFilePath(filePath);
+    this.config.fileOverrides[normalizedPath] = level;
+    this.saveConfig();
+  }
+  
+  /**
+   * Set log level for a folder pattern
+   */
+  setFolderLevel(folderPattern: string, level: LogLevel): void {
+    this.config.folderOverrides[folderPattern] = level;
+    this.saveConfig();
+  }
+  
+  /**
+   * Remove file-specific override
+   */
+  clearFileLevel(filePath: string): void {
+    const normalizedPath = normalizeFilePath(filePath);
+    delete this.config.fileOverrides[normalizedPath];
+    this.saveConfig();
+  }
+  
+  /**
+   * Remove folder-specific override
+   */
+  clearFolderLevel(folderPattern: string): void {
+    delete this.config.folderOverrides[folderPattern];
+    this.saveConfig();
+  }
+  
+  /**
+   * Reset to default configuration
+   */
+  reset(): void {
+    this.config = { ...DEFAULT_CONFIG };
+    this.saveConfig();
+  }
+  
+  /**
+   * Get current configuration status
+   */
+  getStatus(): LogConfig {
+    return { ...this.config };
   }
 }
 
-// Singleton instance
-const logger = new SimpleLogger();
+// Global configuration instance
+const config = new LoggerConfig();
 
-// Expose logger controls in browser console
-if (typeof window !== 'undefined') {
-  (window as any).logControl = {
-    // Context controls
-    enable: (...contexts: LogContext[]) => logger.enable(...contexts),
-    disable: (...contexts: LogContext[]) => logger.disable(...contexts),
-    only: (...contexts: LogContext[]) => logger.only(...contexts),
-    all: () => logger.all(),
-    none: () => logger.none(),
-    clear: () => logger.none(),
-    focus: (context: LogContext | 'none', options?: any) => logger.focus(context, options),
-    
-    // File-level controls
-    setFileLevel: (file: string, level: LogLevel) => logger.setFileLevel(file, level),
-    muteFile: (file: string) => logger.muteFile(file),
-    unmuteFile: (file: string) => logger.unmuteFile(file),
-    onlyFiles: (files: string[]) => logger.onlyFiles(files),
-    clearFileFilters: () => logger.clearFileFilters(),
-    setPatternLevel: (pattern: string, level: LogLevel) => logger.setPatternLevel(pattern, level),
-    
-    // Status
-    status: () => logger.status(),
-    
-    // Presets for common scenarios
-    quietVibeGrid: () => {
-      logger.only('ui');
-      logger.setPatternLevel('vibegrid', 'warn');
-      console.info('🎯 VibeGrid set to warn level, other UI components at info');
+/**
+ * Log control API for runtime configuration
+ */
+export const logControl = {
+  /**
+   * Set global log level
+   */
+  setGlobalLevel: (level: LogLevel) => config.setGlobalLevel(level),
+  
+  /**
+   * Set log level for a specific file
+   */
+  setFileLevel: (filePath: string, level: LogLevel) => config.setFileLevel(filePath, level),
+  
+  /**
+   * Set log level for a folder pattern
+   */
+  setFolderLevel: (folderPattern: string, level: LogLevel) => config.setFolderLevel(folderPattern, level),
+  
+  /**
+   * Clear file-specific override
+   */
+  clearFileLevel: (filePath: string) => config.clearFileLevel(filePath),
+  
+  /**
+   * Clear folder-specific override
+   */
+  clearFolderLevel: (folderPattern: string) => config.clearFolderLevel(folderPattern),
+  
+  /**
+   * Reset to default configuration
+   */
+  reset: () => config.reset(),
+  
+  /**
+   * Get current configuration status
+   */
+  status: () => {
+    const status = config.getStatus();
+    console.log('📊 Logger Configuration:', status);
+    return status;
+  },
+  
+  /**
+   * Enable debug mode globally
+   */
+  debug: () => config.setGlobalLevel('debug'),
+  
+  /**
+   * Enable info mode globally
+   */
+  info: () => config.setGlobalLevel('info'),
+  
+  /**
+   * Enable error only mode globally
+   */
+  error: () => config.setGlobalLevel('error'),
+  
+  /**
+   * Quiet a specific file or folder pattern
+   */
+  quiet: (pattern: string) => config.setFolderLevel(pattern, 'error'),
+  
+  /**
+   * Focus on a specific file or folder pattern (debug level)
+   */
+  focus: (pattern: string) => {
+    config.setGlobalLevel('error');    // Quiet everything else
+    config.setFolderLevel(pattern, 'debug');  // Focus on this pattern
+  }
+};
+
+/**
+ * Create a logger instance for a specific file
+ */
+function createLogger(filename: string) {
+  const normalizedPath = normalizeFilePath(filename);
+  
+  return {
+    debug: (message: string, data?: any) => {
+      if (config.shouldLog('debug', normalizedPath)) {
+        const prefix = `🐛 [DEBUG] ${normalizedPath}`;
+        console.log(
+          `%c${prefix}%c ${message}`,
+          'color: #F97316; font-weight: bold',
+          'color: inherit',
+          data !== undefined ? data : ''
+        );
+      }
     },
     
-    debugVibeGrid: () => {
-      logger.only('ui');
-      logger.setPatternLevel('vibegrid', 'debug');
-      console.info('🎯 VibeGrid set to debug level');
+    info: (message: string, data?: any) => {
+      if (config.shouldLog('info', normalizedPath)) {
+        const prefix = `ℹ️ [INFO] ${normalizedPath}`;
+        console.info(
+          `%c${prefix}%c ${message}`,
+          'color: #3B82F6; font-weight: bold',
+          'color: inherit',
+          data !== undefined ? data : ''
+        );
+      }
     },
     
-    focusFile: (file: string) => {
-      logger.all();
-      logger.onlyFiles([file]);
-      console.info(`🎯 Focused on single file: ${file}`);
+    error: (message: string, data?: any) => {
+      if (config.shouldLog('error', normalizedPath)) {
+        const prefix = `❌ [ERROR] ${normalizedPath}`;
+        console.error(
+          `%c${prefix}%c ${message}`,
+          'color: #EF4444; font-weight: bold',
+          'color: inherit',
+          data !== undefined ? data : ''
+        );
+      }
     }
   };
 }
 
-// Logger factory functions for each context
-function createContextLogger(context: LogContext) {
-  return (filePath: string) => ({
-    debug: (message: string, data?: any) => logger.log(context, 'debug', filePath, message, data),
-    info: (message: string, data?: any) => logger.log(context, 'info', filePath, message, data),
-    warn: (message: string, data?: any) => logger.log(context, 'warn', filePath, message, data),
-    error: (message: string, data?: any) => logger.log(context, 'error', filePath, message, data),
-  });
+/**
+ * Main log function
+ * 
+ * Usage:
+ * import { log } from '@/logger';
+ * const myLog = log('MyComponent.tsx');
+ * myLog.info('Something happened', data);
+ */
+export const log = (filename: string) => createLogger(filename);
+
+// Expose logControl in browser console
+if (typeof window !== 'undefined') {
+  (window as any).logControl = logControl;
 }
 
-// Export context-specific loggers
-export const syncLog = createContextLogger('sync');
-export const uiLog = createContextLogger('ui');
-export const dataLog = createContextLogger('data');
-export const authLog = createContextLogger('auth');
-export const routingLog = createContextLogger('routing');
-export const performanceLog = createContextLogger('performance');
-export const stateLog = createContextLogger('state');
-export const testingLog = createContextLogger('testing');
-export const debugLog = createContextLogger('debug');
-
-// Export global logger for advanced use cases
-export { logger };
+// Initialize with sensible defaults for VibeStack development
+if (typeof window !== 'undefined') {
+  // Set VibeGrid components to info level by default (reduce noise)
+  logControl.setFolderLevel('vibegrid', 'info');
+}

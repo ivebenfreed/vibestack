@@ -13,9 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Globe, Building2, User, Users, Folder, Eye, Play, Pause, Archive, Edit } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { getEntity$ } from '@/legend-state';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('features/worlds/WorldSelector.tsx');
+const fileLog = log('features/worlds/WorldSelector.tsx');
 
 interface WorldData {
   id: string;

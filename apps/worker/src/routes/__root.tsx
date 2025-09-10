@@ -18,7 +18,7 @@ import { authMachine } from '@/state-machines/machines/auth-machine'
 import { simpleNotificationSyncMachine } from '@/state-machines/machines/simple-notification-sync-machine'
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
 import { useAuth, useSystem } from '@/state-machines'
-import { stateLog } from '@/logger'
+import { log } from '@/logger'
 import React from 'react'
 import { useRouter } from '@tanstack/react-router'
 
@@ -34,11 +34,11 @@ interface RouterContext {
 // Auth machine now directly calls loadOrgContext() when ready
 
 // Create logger instance for this file
-const log = stateLog('routes/__root.tsx');
+const rootLog = log('routes/__root.tsx');
 
 // 🔥 HMR FIX: Check for preserved actors from previous module
 if (import.meta.hot && import.meta.hot.data.authMachineActor) {
-  log.info('🔥 HMR: Found preserved actors from previous module')
+  rootLog.info('🔥 HMR: Found preserved actors from previous module')
   
   // Restore preserved actors
   ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
@@ -48,7 +48,7 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
   import.meta.hot.data.authMachineActor = null
   import.meta.hot.data.simpleNotificationSyncMachineActor = null
   
-  log.info('🔥 HMR: Actors restored successfully')
+  rootLog.info('🔥 HMR: Actors restored successfully')
 }
 
 // 🔥 AUTH PERSISTENCE: Auth machine handles its own persistence internally
@@ -58,7 +58,7 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
 let authMachineActor = (window as any).authMachineActor
 
 if (!authMachineActor) {
-  log.info('Creating new auth machine actor at', Date.now());
+  rootLog.info('Creating new auth machine actor at', Date.now());
   
   // Add inspection in test/dev mode
   const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
@@ -71,7 +71,7 @@ if (!authMachineActor) {
     const stored = localStorage.getItem('auth-machine-snapshot');
     if (stored) {
       persistedSnapshot = JSON.parse(stored);
-      log.info('Restored auth machine snapshot:', persistedSnapshot?.value);
+      rootLog.info('Restored auth machine snapshot:', persistedSnapshot?.value);
       
       // CRITICAL: Reset Legend State flag to ensure it always initializes on app start
       // This flag should NOT be persisted as Legend State needs to be initialized
@@ -79,7 +79,7 @@ if (!authMachineActor) {
       if (persistedSnapshot?.context) {
         persistedSnapshot.context.legendStateSetupComplete = false;
         persistedSnapshot.context.legendStateError = null;
-        log.info('[ROOT] Reset legendStateSetupComplete flag for fresh initialization');
+        rootLog.info('[ROOT] Reset legendStateSetupComplete flag for fresh initialization');
       }
     }
   } catch (error) {
@@ -97,7 +97,7 @@ if (!authMachineActor) {
     snapshot: persistedSnapshot
   })
   
-  log.info('Auth machine created, starting...');
+  rootLog.info('Auth machine created, starting...');
   authMachineActor.start()
   
   // Store globally
@@ -105,7 +105,7 @@ if (!authMachineActor) {
   
   // Add event listener for session faults
   const handleSessionFault = (event: CustomEvent) => {
-    log.info('[ROOT] Session fault detected, sending SESSION_FAULT event to auth machine:', event.detail)
+    rootLog.info('[ROOT] Session fault detected, sending SESSION_FAULT event to auth machine:', event.detail)
     authMachineActor.send({ type: 'SESSION_FAULT' })
   }
   window.addEventListener('auth:session-fault', handleSessionFault as EventListener)
@@ -137,13 +137,13 @@ if (!authMachineActor) {
       const user = snapshot.context.user
       
       if (currentOrganization?.id && user?.id) {
-        log.info('Auth ready - starting parallel Legend State and sync initialization:', currentOrganization.id)
+        rootLog.info('Auth ready - starting parallel Legend State and sync initialization:', currentOrganization.id)
         
         // 🔄 SYNC: Connect sync machine when ready
         const connectSync = () => {
           const syncActor = (window as any).simpleNotificationSyncMachineActor;
           if (syncActor) {
-            log.info('✅ Triggering sync connection - auth ready');
+            rootLog.info('✅ Triggering sync connection - auth ready');
             syncActor.send({ 
               type: 'CONNECT', 
               organizationId: currentOrganization.id,
@@ -161,11 +161,11 @@ if (!authMachineActor) {
         import('../legend-state').then(({ universeHelpers }) => {
           // Initialize universe context for organizations display
           universeHelpers.setAuthenticated(true, user.id).then(async () => {
-            log.info('Universe context authenticated and workspace data loaded')
+            rootLog.info('Universe context authenticated and workspace data loaded')
             
             // No need to refresh - Legend State init machine handles all loading
             
-            log.info('Universe helpers setup complete - persistence handled by Legend State init machine')
+            rootLog.info('Universe helpers setup complete - persistence handled by Legend State init machine')
           }).catch((error) => {
             console.error('[ROOT] Failed to initialize universe helpers:', error)
           })
@@ -188,7 +188,7 @@ if (!authMachineActor) {
     const user = initialSnapshot.context.user
     
     // Debug log to see what organization data we have
-    log.info('[ROOT] Restored auth state organizations:', {
+    rootLog.info('[ROOT] Restored auth state organizations:', {
       orgCount: userOrganizations?.length,
       hasNames: userOrganizations?.[0]?.name ? true : false,
       firstOrgName: userOrganizations?.[0]?.name || 'NO NAME',
@@ -196,14 +196,14 @@ if (!authMachineActor) {
     })
     
     if (userOrganizations?.length > 0 && user?.id) {
-      log.info('Initial auth already ready - loading Legend State universe context')
+      rootLog.info('Initial auth already ready - loading Legend State universe context')
       
       // 🔄 SYNC: Connect sync machine for restored auth state (wait for actor to be ready)
       // Use first organization for sync connection (universe mode still needs an org for WebSocket)
       const connectSync = () => {
         const syncActor = (window as any).simpleNotificationSyncMachineActor;
         if (syncActor) {
-          log.info('✅ Triggering sync connection - restored auth ready');
+          rootLog.info('✅ Triggering sync connection - restored auth ready');
           syncActor.send({ 
             type: 'CONNECT', 
             organizationId: userOrganizations[0].id,
@@ -221,12 +221,12 @@ if (!authMachineActor) {
       import('../legend-state').then(({ universeHelpers, universeLoader }) => {
         // Initialize universe context for organizations display
         universeHelpers.setAuthenticated(true, user.id).then(async () => {
-          log.info('Universe context authenticated, loading workspace data...')
+          rootLog.info('Universe context authenticated, loading workspace data...')
           
           // Load workspace data using the universe loader
           await universeLoader.loadWorkspaceData()
           
-          log.info('Universe helpers setup complete (initial) - workspace data loaded')
+          rootLog.info('Universe helpers setup complete (initial) - workspace data loaded')
         }).catch((error) => {
           console.error('[ROOT] Failed to initialize universe helpers (initial):', error)
         })
@@ -265,17 +265,17 @@ if (!simpleNotificationSyncMachineActor) {
   // Set up subscriptions for new actor
   simpleNotificationSyncMachineActor.subscribe((snapshot) => {
     // Sync machine is now independent - no app init coordination needed
-    log.info('SyncMachine State changed:', snapshot.value)
+    rootLog.info('SyncMachine State changed:', snapshot.value)
   })
 } else {
-  log.info('SyncMachine 🔥 HMR: Using existing sync machine actor')
+  rootLog.info('SyncMachine 🔥 HMR: Using existing sync machine actor')
 }
 
 // Create Legend State Init Machine actor (independent of auth machine)
 let legendStateInitActor = (window as any).legendStateInitActor
 
 if (!legendStateInitActor) {
-  log.info('Creating Legend State init machine actor - independent initialization')
+  rootLog.info('Creating Legend State init machine actor - independent initialization')
   
   // Import the machine
   import('../state-machines/machines/legend-state-init-machine').then(({ legendStateInitMachine }) => {
@@ -291,7 +291,7 @@ if (!legendStateInitActor) {
     // Universe mode: don't pass currentOrgId - we load all orgs
     
     if (userId && organizationIds.length > 0) {
-      log.info('[ROOT] Creating Legend State machine with auth data:', {
+      rootLog.info('[ROOT] Creating Legend State machine with auth data:', {
         userId,
         organizationIds,
         universeMode: true
@@ -314,7 +314,7 @@ if (!legendStateInitActor) {
       
       // Subscribe to state changes
       legendStateInitActor.subscribe((snapshot) => {
-        log.info('[ROOT] Legend State machine state changed:', snapshot.value)
+        rootLog.info('[ROOT] Legend State machine state changed:', snapshot.value)
         
         // When Legend State is ready, dispatch event
         if (snapshot.matches('ready')) {
@@ -322,7 +322,7 @@ if (!legendStateInitActor) {
         }
       })
     } else {
-      log.info('[ROOT] Deferring Legend State init - no auth data yet')
+      rootLog.info('[ROOT] Deferring Legend State init - no auth data yet')
       
       // Listen for auth state changes to initialize Legend State
       const handleAuthReady = (event: CustomEvent) => {
@@ -332,7 +332,7 @@ if (!legendStateInitActor) {
         const currentOrgId = authSnapshot?.context?.currentOrganization?.id
         
         if (userId && organizationIds.length > 0 && !legendStateInitActor) {
-          log.info('[ROOT] Auth ready, initializing Legend State machine now')
+          rootLog.info('[ROOT] Auth ready, initializing Legend State machine now')
           
           legendStateInitActor = createActor(legendStateInitMachine, {
             ...inspectOptions,
@@ -348,7 +348,7 @@ if (!legendStateInitActor) {
           ;(window as any).legendStateInitActor = legendStateInitActor
           
           legendStateInitActor.subscribe((snapshot) => {
-            log.info('[ROOT] Legend State machine state changed:', snapshot.value)
+            rootLog.info('[ROOT] Legend State machine state changed:', snapshot.value)
             if (snapshot.matches('ready')) {
               window.dispatchEvent(new CustomEvent('legend-state:initialized'))
             }
@@ -362,7 +362,7 @@ if (!legendStateInitActor) {
     console.error('[ROOT] Failed to import Legend State machine:', error)
   })
 } else {
-  log.info('Legend State machine 🔥 HMR: Using existing Legend State actor')
+  rootLog.info('Legend State machine 🔥 HMR: Using existing Legend State actor')
 }
 
 // Dexie uses native IndexedDB, no special error handling needed
@@ -373,37 +373,37 @@ if (!legendStateInitActor) {
 // 🔥 HMR FIX: Preserve actors across HMR updates
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    log.info('XSTATE 🔥 HMR Dispose: Preserving actors for next module...')
+    rootLog.info('XSTATE 🔥 HMR Dispose: Preserving actors for next module...')
     
     // Store actor references in hot data to preserve across HMR
     import.meta.hot.data.authMachineActor = (window as any).authMachineActor
     import.meta.hot.data.simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
     
     // Don't stop actors - let them continue running
-    log.info('XSTATE 🔥 HMR: Actors preserved for hot reload')
+    rootLog.info('XSTATE 🔥 HMR: Actors preserved for hot reload')
   })
   
   // On accept, restore the preserved actors
   import.meta.hot.accept(() => {
-    log.info('XSTATE 🔥 HMR Accept: Module reloaded')
+    rootLog.info('XSTATE 🔥 HMR Accept: Module reloaded')
   })
 }
 
 // Reset sync machine on sign-out and clear Legend State context
 window.addEventListener('auth:signout', () => {
-  log.info('XSTATE Resetting sync machine and Legend State on sign-out')
+  rootLog.info('XSTATE Resetting sync machine and Legend State on sign-out')
   
   // Reset simple notification sync machine to idle state for fresh initialization on next sign-in
   const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
   if (simpleNotificationSyncMachineActor) {
-    log.info('XSTATE Resetting simple notification sync machine on sign-out')
+    rootLog.info('XSTATE Resetting simple notification sync machine on sign-out')
     simpleNotificationSyncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
   }
   
   // Clear Legend State context on sign-out
   import('../legend-state').then(({ clearContext }) => {
     clearContext()
-    log.info('XSTATE Legend State context cleared on sign-out')
+    rootLog.info('XSTATE Legend State context cleared on sign-out')
   }).catch((error) => {
     console.warn('[XSTATE] Failed to clear Legend State context:', error)
   })
@@ -433,7 +433,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     </div>
   ),
   component: function RootComponent() {
-    log.info('RootComponent rendering at', Date.now());
+    rootLog.info('RootComponent rendering at', Date.now());
     return (
       <InitializationErrorBoundary>
         {/* 🔥 FIXED: No provider needed - using direct actor access */}
@@ -446,7 +446,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponentInternal() {
-  log.info('RootComponentInternal rendering at', Date.now());
+  rootLog.info('RootComponentInternal rendering at', Date.now());
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
   
@@ -475,18 +475,18 @@ function RootComponentInternal() {
 }
 
 function AppWithInitialization() {
-  log.info('AppWithInitialization rendering at', Date.now());
+  rootLog.info('AppWithInitialization rendering at', Date.now());
   const navigate = useNavigate()
   const router = useRouter()
   const { isSystemReady } = useSystem()
   const { isAuthenticated } = useAuth()
-  log.info('AppWithInitialization states:', { isSystemReady, isAuthenticated });
+  rootLog.info('AppWithInitialization states:', { isSystemReady, isAuthenticated });
   
   // Listen for auth state changes to handle navigation
   React.useEffect(() => {
     const handleAuthStateChange = (event: CustomEvent) => {
       const { authenticated, reason } = event.detail
-      log.info('Auth state changed:', { authenticated, reason })
+      rootLog.info('Auth state changed:', { authenticated, reason })
       
       // Note: Immediate navigation now handled in useAuth.signOut() to prevent component re-rendering
       const publicPaths = ['/sign-', '/reset-password', '/complete-registration', '/forgot-password', '/verify-email', '/otp-verify']
@@ -494,7 +494,7 @@ function AppWithInitialization() {
       
       if (!authenticated && reason === 'unauthenticated' && !isPublicPath) {
         // Handle edge cases where auth check fails (not from sign-out)
-        log.info('Unauthenticated state detected, redirecting to sign-in')
+        rootLog.info('Unauthenticated state detected, redirecting to sign-in')
         navigate({ to: '/sign-in', replace: true })
       }
     }

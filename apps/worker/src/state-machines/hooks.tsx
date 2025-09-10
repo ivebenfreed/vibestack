@@ -3,9 +3,9 @@ import { useSelector } from '@xstate/react';
 import { useNavigate } from '@tanstack/react-router';
 import { authClient } from '@/lib/auth';
 import type { UserInfo } from './types';
-import { stateLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = stateLog('state-machines/hooks.tsx');
+const myLog = log('state-machines/hooks.tsx');
 
 // Auth-focused hook - directly communicates with AuthMachine
 export function useAuth() {
@@ -131,14 +131,14 @@ export function useAuth() {
       // Check if actor is still active before sending events
       const snapshot = authActor.getSnapshot();
       if (snapshot.status === 'stopped') {
-        log.info('[useAuth] Auth actor is stopped, skipping SIGN_IN event');
+        myLog.info('[useAuth] Auth actor is stopped, skipping SIGN_IN event');
         return;
       }
       
-      log.info('[useAuth] Sending SIGN_IN directly to AuthMachine');
+      myLog.info('[useAuth] Sending SIGN_IN directly to AuthMachine');
       authActor.send({ type: 'SIGN_IN', credentials });
     } else {
-      log.error('[useAuth] AuthMachine actor not available');
+      myLog.error('[useAuth] AuthMachine actor not available');
     }
   }, [authActor]);
 
@@ -147,13 +147,13 @@ export function useAuth() {
       // Check if actor is still active before sending events
       const snapshot = authActor.getSnapshot();
       if (snapshot.status === 'stopped') {
-        log.info('[useAuth] Auth actor is stopped, skipping SIGN_OUT event');
+        myLog.info('[useAuth] Auth actor is stopped, skipping SIGN_OUT event');
         // Just navigate since actor is stopped
         navigate({ to: '/sign-in', replace: true });
         return;
       }
       
-      log.info('[useAuth] Immediate navigation to prevent component re-rendering');
+      myLog.info('[useAuth] Immediate navigation to prevent component re-rendering');
       // Get current location to preserve as redirect
       const currentPath = window.location.pathname;
       // Don't redirect back to sign-in or sign-up pages
@@ -166,10 +166,10 @@ export function useAuth() {
         replace: true 
       });
       
-      log.info('[useAuth] Sending SIGN_OUT directly to AuthMachine');
+      myLog.info('[useAuth] Sending SIGN_OUT directly to AuthMachine');
       authActor.send({ type: 'SIGN_OUT' });
     } else {
-      log.error('[useAuth] AuthMachine actor not available');
+      myLog.error('[useAuth] AuthMachine actor not available');
       // Fallback navigation
       navigate({ to: '/sign-in', replace: true });
     }
@@ -177,38 +177,38 @@ export function useAuth() {
 
   const refreshAuth = useMemo(() => () => {
     if (authActor) {
-      log.info('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
+      myLog.info('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
       authActor.send({ type: 'CHECK_AUTH' });
     } else {
-      log.error('[useAuth] AuthMachine actor not available');
+      myLog.error('[useAuth] AuthMachine actor not available');
     }
   }, [authActor]);
 
   // Organization actions
   const createOrganization = useMemo(() => (organizationData: { name: string; domain?: string }) => {
     if (authActor) {
-      log.info('[useAuth] Creating organization:', organizationData);
+      myLog.info('[useAuth] Creating organization:', organizationData);
       authActor.send({ type: 'CREATE_ORGANIZATION', organizationData });
     }
   }, [authActor]);
 
   const selectOrganization = useMemo(() => (organizationId: string) => {
     if (authActor) {
-      log.info('[useAuth] Selecting organization:', organizationId);
+      myLog.info('[useAuth] Selecting organization:', organizationId);
       authActor.send({ type: 'SELECT_ORGANIZATION', organizationId });
     }
   }, [authActor]);
 
   const switchOrganization = useMemo(() => (organizationId: string) => {
     if (authActor) {
-      log.info('[useAuth] Switching organization:', organizationId);
+      myLog.info('[useAuth] Switching organization:', organizationId);
       authActor.send({ type: 'SWITCH_ORGANIZATION', organizationId });
     }
   }, [authActor]);
 
   const reloadOrganizations = useMemo(() => () => {
     if (authActor) {
-      log.info('[useAuth] Reloading organizations');
+      myLog.info('[useAuth] Reloading organizations');
       authActor.send({ type: 'REFRESH_ORGANIZATIONS' });
     }
   }, [authActor]);
@@ -338,7 +338,7 @@ export function useAppInit() {
       
       return unsubscribe;
     }).catch((err) => {
-      log.error('[useAppInit] Failed to import Legend State:', err);
+      myLog.error('[useAppInit] Failed to import Legend State:', err);
       setError('Failed to load Legend State');
     });
   }, []);
@@ -362,10 +362,10 @@ export function useAppInit() {
     
     // Actions (simplified - Legend State handles retries internally)
     retryInit: () => {
-      log.info('[useAppInit] Legend State handles retries automatically');
+      myLog.info('[useAppInit] Legend State handles retries automatically');
     },
     restartSync: () => {
-      log.info('[useAppInit] Use sync machine directly for restart');
+      myLog.info('[useAppInit] Use sync machine directly for restart');
       const syncActor = (window as any).simpleNotificationSyncMachineActor;
       if (syncActor) {
         syncActor.send({ type: 'RECONNECT' });
@@ -391,7 +391,7 @@ export function useSync() {
   // Get sync machine from global actor - updated for simple notification sync machine
   const syncMachine = useMemo(() => {
     const machine = (window as any).simpleNotificationSyncMachineActor || (window as any).syncMachineActor || null;
-    log.info('[useSync] Found sync machine:', !!machine, machine ? 'type: simpleNotificationSyncMachine' : 'no machine');
+    myLog.info('[useSync] Found sync machine:', !!machine, machine ? 'type: simpleNotificationSyncMachine' : 'no machine');
     return machine;
   }, []);
 

@@ -1,23 +1,23 @@
 import { useState, useEffect, useMemo } from 'react';
 import { observable } from '@legendapp/state';
 import type { TableRow } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/hooks/use-table-data.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/hooks/use-table-data.ts');
 
 export function useTableData(entityType: string, initialData?: TableRow[]) {
   // Create data observable
   const data$ = useMemo(() => {
-    log.info('[useTableData] Creating data observable for:', entityType);
+    fileLog.info('[useTableData] Creating data observable for:', entityType);
     return observable(initialData || []);
   }, []);
   
   // Use only real data - no dummy data fallback
   useEffect(() => {
     if (initialData && initialData.length > 0) {
-      log.info('[useTableData] Using provided initial data:', initialData.length, 'rows');
+      fileLog.info('[useTableData] Using provided initial data:', initialData.length, 'rows');
       data$.set(initialData);
     } else {
-      log.info('[useTableData] No initial data provided, keeping empty table');
+      fileLog.info('[useTableData] No initial data provided, keeping empty table');
       data$.set([]);
     }
   }, [entityType, initialData, data$]);
@@ -51,7 +51,7 @@ export function useTableData(entityType: string, initialData?: TableRow[]) {
     
     refreshData: () => {
       // No dummy data - refresh would reload from the actual data source
-      log.info('[useTableData] Refresh requested - real data source should handle this');
+      fileLog.info('[useTableData] Refresh requested - real data source should handle this');
     }
   }), [data$, entityType, initialData]);
   

@@ -13,8 +13,8 @@
 import { setup, assign, fromPromise } from 'xstate'
 import { getSyncWebSocketUrl, getOrgActorWebSocketUrl } from '../../sync/config'
 import { syncLogger } from '../../sync/utils/SyncLogger'
-import { syncLog } from '@/logger';
-const log = syncLog('sync/simple-notification-sync-machine.ts');
+import { log } from '@/logger';
+const fileLog = log('sync/simple-notification-sync-machine.ts');
 
 // Simple context for table notifications only
 export interface SimpleNotificationSyncContext {
@@ -95,9 +95,9 @@ export const simpleNotificationSyncMachine = setup({
   
   actions: {
     setupWebSocketListeners: ({ context, self }) => {
-      log.info('🔧 Setting up WebSocket listeners')
+      fileLog.info('🔧 Setting up WebSocket listeners')
       if (!context.webSocket) {
-        log.warn('❌ No WebSocket to set up listeners on')
+        fileLog.warn('❌ No WebSocket to set up listeners on')
         return
       }
       
@@ -120,7 +120,7 @@ export const simpleNotificationSyncMachine = setup({
           // Handle table change notifications immediately for Legend State
           if (message.type === 'srv_table_change_notification') {
             syncLogger.info('notification-sync', `🔔 Table notification: ${JSON.stringify(message.tables)}`)
-            log.info('🔔 [SimpleNotificationSync] TABLE CHANGE NOTIFICATION:', {
+            fileLog.info('🔔 [SimpleNotificationSync] TABLE CHANGE NOTIFICATION:', {
               tables: message.tables,
               organizationId: message.organizationId,
               lsn: message.lsn,
@@ -130,8 +130,8 @@ export const simpleNotificationSyncMachine = setup({
             })
             
             // DIRECT CustomEvent dispatch in XState handler - bypass the onmessage handler
-            log.info('🚀 [SimpleNotificationSync] Dispatching CustomEvent vibestack:table-change-notification')
-            log.info('📋 [SimpleNotificationSync] Event detail:', {
+            fileLog.info('🚀 [SimpleNotificationSync] Dispatching CustomEvent vibestack:table-change-notification')
+            fileLog.info('📋 [SimpleNotificationSync] Event detail:', {
               tables: message.tables,
               organizationId: message.organizationId,
               lsn: message.lsn,
@@ -151,7 +151,7 @@ export const simpleNotificationSyncMachine = setup({
               }
             }));
             
-            log.info('✅ [SimpleNotificationSync] CustomEvent dispatched')
+            fileLog.info('✅ [SimpleNotificationSync] CustomEvent dispatched')
             
           } else if (message.type === 'srv_heartbeat') {
             // Silent heartbeat handling at debug level
@@ -262,7 +262,7 @@ export const simpleNotificationSyncMachine = setup({
           target: 'connecting',
           actions: [
             ({ event }) => {
-              log.info('[SimpleNotificationSync] 🔗 CONNECT event received!', {
+              fileLog.info('[SimpleNotificationSync] 🔗 CONNECT event received!', {
                 organizationId: event.organizationId,
                 userId: event.userId
               })
@@ -276,9 +276,9 @@ export const simpleNotificationSyncMachine = setup({
                 if (!persistentClientId) {
                   persistentClientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
                   localStorage.setItem('vibestack_websocket_client_id', persistentClientId)
-                  log.info('🆔 [SimpleNotificationSync] Generated new persistent client ID:', persistentClientId)
+                  fileLog.info('🆔 [SimpleNotificationSync] Generated new persistent client ID:', persistentClientId)
                 } else {
-                  log.info('🆔 [SimpleNotificationSync] Using existing persistent client ID:', persistentClientId)
+                  fileLog.info('🆔 [SimpleNotificationSync] Using existing persistent client ID:', persistentClientId)
                 }
                 return persistentClientId
               },

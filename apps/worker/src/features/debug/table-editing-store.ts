@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import { subscribeWithSelector } from 'zustand/middleware'
-import { uiLog } from '@/logger';
-const log = uiLog('features/debug/table-editing-store.ts');
+import { log } from '@/logger';
+const fileLog = log('features/debug/table-editing-store.ts');
 
 interface EditingCell {
   rowId: string
@@ -29,7 +29,7 @@ export const useTableEditingStore = create<TableEditingState>((set, get) => ({
   editingValue: '',
   
   startEditing: (cell, initialValue) => {
-    log.info(`🔍 [Zustand] Starting edit: ${cell.rowId}.${cell.columnId} = "${initialValue}"`)
+    fileLog.info(`🔍 [Zustand] Starting edit: ${cell.rowId}.${cell.columnId} = "${initialValue}"`)
     // ✅ PERFORMANCE: Use batch update to prevent cascading re-renders
     set(state => ({ 
       editingCell: cell, 
@@ -42,7 +42,7 @@ export const useTableEditingStore = create<TableEditingState>((set, get) => ({
   },
   
   stopEditing: () => {
-    log.info(`🔍 [Zustand] Stopping edit`)
+    fileLog.info(`🔍 [Zustand] Stopping edit`)
     // ✅ PERFORMANCE: Use batch update to prevent cascading re-renders
     set(state => ({ 
       editingCell: null, 

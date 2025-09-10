@@ -7,7 +7,7 @@
 import { LiveStoreSchemaSync } from './livestore-schema-sync';
 import { liveStoreSchemaClient } from './livestore-schema-client';
 import { orgSchemaClient } from './schema-client';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 import type { 
   ServerSchemaUpdatedMessage,
   ServerSchemaMigrationMessage,
@@ -15,7 +15,7 @@ import type {
   EntityChange
 } from '@repo/sync-types';
 
-const log = uiLog('lib/test-schema-sync.ts');
+const fileLog = log('lib/test-schema-sync.ts');
 
 /**
  * Mock WebSocket Service for Testing
@@ -29,7 +29,7 @@ class MockWebSocketService {
   }
 
   async send(message: any): Promise<void> {
-    log.info('📡 Mock WebSocket send:', message);
+    fileLog.info('📡 Mock WebSocket send:', message);
   }
 
   getClientId(): string {
@@ -54,7 +54,7 @@ export class SchemaUpdateTester {
   private testResults: Array<{ test: string; passed: boolean; error?: string }> = [];
 
   async runAllTests(): Promise<void> {
-    log.info('🧪 Starting Live Schema Update Tests...');
+    fileLog.info('🧪 Starting Live Schema Update Tests...');
 
     await this.testSchemaUpdateReceival();
     await this.testEntityCreation();
@@ -72,7 +72,7 @@ export class SchemaUpdateTester {
    */
   async testSchemaUpdateReceival(): Promise<void> {
     const testName = 'Schema Update Receival';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Initialize schema sync
@@ -125,7 +125,7 @@ export class SchemaUpdateTester {
       this.schemaSync.addListener((event) => {
         if (event.type === 'schema:updated') {
           updateReceived = true;
-          log.info('✅ Schema update event received:', event);
+          fileLog.info('✅ Schema update event received:', event);
         }
       });
 
@@ -137,14 +137,14 @@ export class SchemaUpdateTester {
 
       if (updateReceived) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Schema update event not received');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -153,7 +153,7 @@ export class SchemaUpdateTester {
    */
   async testEntityCreation(): Promise<void> {
     const testName = 'Entity Creation Notification';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       const entityChange: EntityChange = {
@@ -192,7 +192,7 @@ export class SchemaUpdateTester {
       this.schemaSync.addListener((event) => {
         if (event.type === 'schema:updated' && event.payload.changeType === 'entity_created') {
           entityCreationDetected = true;
-          log.info('✅ Entity creation detected:', event);
+          fileLog.info('✅ Entity creation detected:', event);
         }
       });
 
@@ -201,14 +201,14 @@ export class SchemaUpdateTester {
 
       if (entityCreationDetected) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Entity creation not detected');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -217,7 +217,7 @@ export class SchemaUpdateTester {
    */
   async testFieldAddition(): Promise<void> {
     const testName = 'Field Addition Notification';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       const entityChange: EntityChange = {
@@ -254,7 +254,7 @@ export class SchemaUpdateTester {
       this.schemaSync.addListener((event) => {
         if (event.type === 'schema:updated' && event.payload.changeType === 'field_added') {
           fieldAdditionDetected = true;
-          log.info('✅ Field addition detected:', event);
+          fileLog.info('✅ Field addition detected:', event);
         }
       });
 
@@ -263,14 +263,14 @@ export class SchemaUpdateTester {
 
       if (fieldAdditionDetected) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Field addition not detected');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -279,7 +279,7 @@ export class SchemaUpdateTester {
    */
   async testFieldDeletion(): Promise<void> {
     const testName = 'Field Deletion Notification';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       const entityChange: EntityChange = {
@@ -319,7 +319,7 @@ export class SchemaUpdateTester {
         if (event.type === 'schema:updated' && event.payload.changeType === 'field_deleted') {
           fieldDeletionDetected = true;
           restartRequired = event.payload.requiresRestart === true;
-          log.info('✅ Field deletion detected:', event);
+          fileLog.info('✅ Field deletion detected:', event);
         }
       });
 
@@ -328,14 +328,14 @@ export class SchemaUpdateTester {
 
       if (fieldDeletionDetected && restartRequired) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Field deletion not properly detected or restart not required');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -344,7 +344,7 @@ export class SchemaUpdateTester {
    */
   async testMigrationProgress(): Promise<void> {
     const testName = 'Migration Progress Notification';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       const message: ServerSchemaMigrationMessage = {
@@ -366,7 +366,7 @@ export class SchemaUpdateTester {
       this.schemaSync.addListener((event) => {
         if (event.type === 'schema:migration') {
           migrationProgressDetected = true;
-          log.info('✅ Migration progress detected:', event);
+          fileLog.info('✅ Migration progress detected:', event);
         }
       });
 
@@ -375,14 +375,14 @@ export class SchemaUpdateTester {
 
       if (migrationProgressDetected) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Migration progress not detected');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -391,7 +391,7 @@ export class SchemaUpdateTester {
    */
   async testSchemaError(): Promise<void> {
     const testName = 'Schema Error Handling';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       const message = {
@@ -409,7 +409,7 @@ export class SchemaUpdateTester {
       this.schemaSync.addListener((event) => {
         if (event.type === 'schema:error') {
           errorDetected = true;
-          log.info('✅ Schema error detected:', event);
+          fileLog.info('✅ Schema error detected:', event);
         }
       });
 
@@ -418,14 +418,14 @@ export class SchemaUpdateTester {
 
       if (errorDetected) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Schema error not detected');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -434,7 +434,7 @@ export class SchemaUpdateTester {
    */
   async testLiveStoreInstanceRestart(): Promise<void> {
     const testName = 'LiveStore Instance Restart';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Listen for LiveStore events
@@ -442,7 +442,7 @@ export class SchemaUpdateTester {
       const eventListener = (event: CustomEvent) => {
         if (event.detail.reason === 'schema_update') {
           instanceRestarted = true;
-          log.info('✅ LiveStore instance restart detected:', event.detail);
+          fileLog.info('✅ LiveStore instance restart detected:', event.detail);
         }
       };
 
@@ -483,16 +483,16 @@ export class SchemaUpdateTester {
 
       if (instanceRestarted) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         // This test might fail in non-browser environments, mark as passed with warning
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed (no browser events available)`);
+        fileLog.info(`✅ ${testName} passed (no browser events available)`);
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -500,29 +500,29 @@ export class SchemaUpdateTester {
    * Print test results
    */
   private printResults(): void {
-    log.info('\n🧪 Live Schema Update Test Results:');
-    log.info('═'.repeat(50));
+    fileLog.info('\n🧪 Live Schema Update Test Results:');
+    fileLog.info('═'.repeat(50));
 
     let passed = 0;
     let failed = 0;
 
     this.testResults.forEach(result => {
       if (result.passed) {
-        log.info(`✅ ${result.test}`);
+        fileLog.info(`✅ ${result.test}`);
         passed++;
       } else {
-        log.info(`❌ ${result.test}: ${result.error}`);
+        fileLog.info(`❌ ${result.test}: ${result.error}`);
         failed++;
       }
     });
 
-    log.info('═'.repeat(50));
-    log.info(`📊 Results: ${passed} passed, ${failed} failed`);
+    fileLog.info('═'.repeat(50));
+    fileLog.info(`📊 Results: ${passed} passed, ${failed} failed`);
     
     if (failed === 0) {
-      log.info('🎉 All tests passed! Live schema updates are working correctly.');
+      fileLog.info('🎉 All tests passed! Live schema updates are working correctly.');
     } else {
-      log.info('⚠️ Some tests failed. Check the implementation.');
+      fileLog.info('⚠️ Some tests failed. Check the implementation.');
     }
   }
 
@@ -558,5 +558,5 @@ export async function testLiveSchemaUpdates(): Promise<void> {
 // Export for global usage
 if (typeof window !== 'undefined') {
   (window as any).testLiveSchemaUpdates = testLiveSchemaUpdates;
-  log.info('🧪 Live schema update test available as window.testLiveSchemaUpdates()');
+  fileLog.info('🧪 Live schema update test available as window.testLiveSchemaUpdates()');
 }

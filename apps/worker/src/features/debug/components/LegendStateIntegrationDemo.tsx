@@ -10,11 +10,11 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { usePrecomputedEntityColumns } from '@/legend-state/hooks/use-precomputed-entity-columns'
 import { entityOperations, getEntity$, getUniverseEntity$, universeContext$, universeSchema$, universeOrgId$ } from '@/legend-state'
-import { debugLog } from '@/logger'
+import { log } from '@/logger'
 import { observer } from '@legendapp/state/react'
 
 // Create logger instance for this file
-const log = debugLog('features/debug/components/LegendStateIntegrationDemo.tsx');
+const fileLog = log('features/debug/components/LegendStateIntegrationDemo.tsx');
 
 export const LegendStateIntegrationDemo = observer(() => {
   const [selectedEntity, setSelectedEntity] = useState('')
@@ -79,7 +79,7 @@ export const LegendStateIntegrationDemo = observer(() => {
   const baseEntityName = selectedEntity.includes('_') ? selectedEntity.split('_')[1] : selectedEntity
   const { columns, isLoading, error } = usePrecomputedEntityColumns(baseEntityName)
   
-  log.info('Component state:', { 
+  fileLog.info('Component state:', { 
     selectedEntity,
     baseEntityName,
     availableEntitiesCount: availableEntities.length,
@@ -105,18 +105,18 @@ export const LegendStateIntegrationDemo = observer(() => {
         if (entityObs) {
           const data = entityObs.get()
           setEntityData(data || {})
-          log.info(`Loaded ${selectedEntity} data:`, { 
+          fileLog.info(`Loaded ${selectedEntity} data:`, { 
             recordCount: Object.keys(data || {}).length,
             sampleRecord: Object.values(data || {})[0],
             entityObservableType: typeof entityObs,
             hasGetMethod: typeof entityObs.get === 'function'
           })
         } else {
-          log.warn(`Entity ${selectedEntity} not available via getUniverseEntity$`)
+          fileLog.warn(`Entity ${selectedEntity} not available via getUniverseEntity$`)
           setEntityData({})
         }
       } catch (err) {
-        log.error('Failed to load entity data:', err)
+        fileLog.error('Failed to load entity data:', err)
         setEntityData({})
       } finally {
         setDataLoading(false)
@@ -182,9 +182,9 @@ export const LegendStateIntegrationDemo = observer(() => {
       
       // Use the base entity name for creation, not the org-prefixed name
       await entityOperations.createEntity(entityNameForCreation, sampleData)
-      log.info(`Created sample ${entityNameForCreation} (from ${selectedEntity}):`, sampleData)
+      fileLog.info(`Created sample ${entityNameForCreation} (from ${selectedEntity}):`, sampleData)
     } catch (err) {
-      log.error('Failed to create sample data:', err)
+      fileLog.error('Failed to create sample data:', err)
     }
   }
 
@@ -276,12 +276,12 @@ export const LegendStateIntegrationDemo = observer(() => {
             tableId={`debug-${selectedEntity.toLowerCase()}-table`}
             className="h-full"
             onEntityUpdate={async (rowId: string, updates: Record<string, any>) => {
-              log.info('Entity update requested:', { entityType: selectedEntity, rowId, updates });
+              fileLog.info('Entity update requested:', { entityType: selectedEntity, rowId, updates });
               try {
                 await entityOperations.updateEntity(selectedEntity, rowId, updates);
-                log.info('Entity updated successfully:', { entityType: selectedEntity, rowId, updates });
+                fileLog.info('Entity updated successfully:', { entityType: selectedEntity, rowId, updates });
               } catch (error) {
-                log.error('Entity update failed:', { entityType: selectedEntity, rowId, updates, error });
+                fileLog.error('Entity update failed:', { entityType: selectedEntity, rowId, updates, error });
                 throw error;
               }
             }}

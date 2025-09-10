@@ -9,9 +9,9 @@ import { getEntity$ } from '@/legend-state/observables';
 import { PassiveTableRenderer } from '@/components/custom/vibegrid/renderers/core/PassiveTableRenderer';
 import { createPureObservables } from '@/components/custom/vibegrid/stores/pure-observables';
 import { createEntityColumnsObservable } from '@/legend-state';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('routes/test-passive-renderer');
+const fileLog = log('routes/test-passive-renderer');
 
 export const Route = createFileRoute('/_authenticated/org/$orgId/test-passive-renderer')({
   component: TestPassiveRenderer,
@@ -28,7 +28,7 @@ function TestPassiveRenderer() {
     if (!containerRef.current) return;
 
     try {
-      log.info('🧪 Initializing PassiveTableRenderer test', { orgId });
+      fileLog.info('🧪 Initializing PassiveTableRenderer test', { orgId });
 
       // Get columns from schema - no hardcoding!
       const columnsObservable = createEntityColumnsObservable('Task');
@@ -38,7 +38,7 @@ function TestPassiveRenderer() {
         throw new Error('No columns available for Task entity - schema may not be loaded yet');
       }
       
-      log.info('🧪 Using schema-driven columns', { 
+      fileLog.info('🧪 Using schema-driven columns', { 
         columnCount: columns.length,
         columnIds: columns.map(c => c.id),
         referenceFields: columns.filter(c => c.referenceType).map(c => ({ id: c.id, type: c.referenceType }))
@@ -51,7 +51,7 @@ function TestPassiveRenderer() {
         columns
       );
 
-      log.info('🧪 Created pure observables', { entityType });
+      fileLog.info('🧪 Created pure observables', { entityType });
 
       // Create the PassiveTableRenderer
       const renderer = new PassiveTableRenderer({
@@ -65,11 +65,11 @@ function TestPassiveRenderer() {
       setIsInitialized(true);
       setError(null);
 
-      log.info('🧪 PassiveTableRenderer initialized successfully');
+      fileLog.info('🧪 PassiveTableRenderer initialized successfully');
 
       // Test interactions
       setTimeout(() => {
-        log.info('🧪 Testing observable methods');
+        fileLog.info('🧪 Testing observable methods');
         
         // Test sorting
         tableCore$.toggleSort('priority');
@@ -86,14 +86,14 @@ function TestPassiveRenderer() {
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      log.error('🧪 Failed to initialize PassiveTableRenderer', err);
+      fileLog.error('🧪 Failed to initialize PassiveTableRenderer', err);
       setError(errorMsg);
     }
 
     // Cleanup
     return () => {
       if (rendererRef.current) {
-        log.info('🧪 Cleaning up PassiveTableRenderer');
+        fileLog.info('🧪 Cleaning up PassiveTableRenderer');
         rendererRef.current.destroy();
         rendererRef.current = null;
       }

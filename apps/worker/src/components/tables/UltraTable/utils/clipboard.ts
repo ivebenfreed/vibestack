@@ -9,8 +9,8 @@
  */
 
 import { selectionState$ } from '../state/selection-state'
-import { uiLog } from '@/logger';
-const log = uiLog('components/tables/UltraTable/utils/clipboard.ts');
+import { log } from '@/logger';
+const fileLog = log('components/tables/UltraTable/utils/clipboard.ts');
 
 export interface CopyOptions {
   format?: 'tsv' | 'json' | 'html' | 'all'
@@ -48,7 +48,7 @@ export async function copyToClipboard(
                         selectedRows.size > 0
     
     if (onlySelected && !hasSelection) {
-      log.warn('[Clipboard] No cells or rows selected for copy operation')
+      fileLog.warn('[Clipboard] No cells or rows selected for copy operation')
       return false
     }
     
@@ -89,7 +89,7 @@ export async function copyToClipboard(
           endCol: columns.length - 1
         }
       } else {
-        log.warn('[Clipboard] No valid rows found for selected IDs')
+        fileLog.warn('[Clipboard] No valid rows found for selected IDs')
         return false
       }
     } else {
@@ -198,7 +198,7 @@ export async function copyToClipboard(
     
     return true
   } catch (error) {
-    log.error('[Clipboard] Copy failed:', error)
+    fileLog.error('[Clipboard] Copy failed:', error)
     return false
   }
 }
@@ -220,7 +220,7 @@ export async function pasteFromClipboard(): Promise<PasteResult> {
           const data = JSON.parse(jsonText)
           return { success: true, data, format: 'json' }
         } catch (e) {
-          log.warn('[Clipboard] Invalid JSON format, trying other formats')
+          fileLog.warn('[Clipboard] Invalid JSON format, trying other formats')
         }
       }
       
@@ -240,7 +240,7 @@ export async function pasteFromClipboard(): Promise<PasteResult> {
           const data = parseHtmlTable(htmlText)
           return { success: true, data, format: 'html' }
         } catch (e) {
-          log.warn('[Clipboard] Invalid HTML table format, trying plain text')
+          fileLog.warn('[Clipboard] Invalid HTML table format, trying plain text')
         }
       }
       
@@ -263,7 +263,7 @@ export async function pasteFromClipboard(): Promise<PasteResult> {
     
     return { success: false, error: 'No supported format found in clipboard' }
   } catch (error) {
-    log.error('[Clipboard] Paste failed:', error)
+    fileLog.error('[Clipboard] Paste failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }

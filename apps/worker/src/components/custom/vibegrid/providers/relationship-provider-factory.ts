@@ -6,8 +6,8 @@
  */
 
 import type { RelationshipOptionsProvider, EnumOption } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/providers/relationship-provider-factory.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/providers/relationship-provider-factory.ts');
 
 /**
  * Creates a relationship options provider that reads from the store
@@ -23,27 +23,27 @@ export function createStoreRelationshipProvider(
   return async (context) => {
     const store = getStore();
     if (!store) {
-      log.warn('RelationshipProvider: No store available');
+      fileLog.warn('RelationshipProvider: No store available');
       return [];
     }
 
     // Get current store snapshot
     const snapshot = store.getSnapshot();
     if (!snapshot?.context?.relationships) {
-      log.warn('RelationshipProvider: No relationships in store context');
+      fileLog.warn('RelationshipProvider: No relationships in store context');
       return [];
     }
 
     // Get the relationship data for this table
     const relationshipData = snapshot.context.relationships[relationshipTable];
     if (!relationshipData) {
-      log.warn(`RelationshipProvider: No data for table ${relationshipTable}`);
+      fileLog.warn(`RelationshipProvider: No data for table ${relationshipTable}`);
       return [];
     }
     
     // Debug tags specifically
     if (relationshipTable === 'tags' && process.env.NODE_ENV === 'development') {
-      log.info('🔍 RelationshipProvider: Tags data from store', {
+      fileLog.info('🔍 RelationshipProvider: Tags data from store', {
         tagCount: Object.keys(relationshipData).length,
         sampleTags: Object.values(relationshipData).slice(0, 3).map((tag: any) => ({
           id: tag.id,
@@ -90,7 +90,7 @@ export function createStoreRelationshipProvider(
         // Filter options to only include allowed IDs
         options = options.filter(option => allowedIds.includes(option.value));
         
-        log.info('🔍 RelationshipProvider: Applied filter', {
+        fileLog.info('🔍 RelationshipProvider: Applied filter', {
           relationshipTable,
           originalCount: Object.keys(relationshipData).length,
           filteredCount: options.length,
@@ -100,18 +100,18 @@ export function createStoreRelationshipProvider(
         
         // Debug empty results for tags
         if (relationshipTable === 'tags' && options.length === 0) {
-          log.warn('🔍 RelationshipProvider: No tags after filter!', {
+          fileLog.warn('🔍 RelationshipProvider: No tags after filter!', {
             originalTagIds: Object.keys(relationshipData).slice(0, 10),
             allowedIds: allowedIds,
             hasCurrentEntity: !!context?.currentEntity
           });
         }
       } catch (error) {
-        log.error('RelationshipProvider: Error applying filter', error);
+        fileLog.error('RelationshipProvider: Error applying filter', error);
       }
     }
 
-    log.info('🔍 RelationshipProvider: Generated options from store', {
+    fileLog.info('🔍 RelationshipProvider: Generated options from store', {
       relationshipTable,
       optionCount: options.length,
       sampleOptions: options.slice(0, 3)

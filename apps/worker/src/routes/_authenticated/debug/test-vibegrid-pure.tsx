@@ -6,11 +6,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { VibeGrid } from '@/components/custom/vibegrid';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 import { createEntityColumnsObservable } from '@/legend-state/observables/table-columns';
 import { observer } from '@legendapp/state/react';
 
-const log = uiLog('routes/test-vibegrid-pure');
+const myLog = log('routes/test-vibegrid-pure');
 
 const TestVibeGridPure = observer(() => {
   // Use hardcoded orgId for testing (Wide Corp)
@@ -23,22 +23,22 @@ const TestVibeGridPure = observer(() => {
   const columns = columnsObservable.get();
 
   const handleSelectionChange = (cells: Set<string>) => {
-    log.info('Selection changed', { cellCount: cells.size });
+    myLog.info('Selection changed', { cellCount: cells.size });
     setSelectedCells(cells);
   };
 
   const handleEditingChange = (cell: { rowId: string; columnId: string } | null) => {
-    log.info('Editing changed', { cell });
+    myLog.info('Editing changed', { cell });
     setEditingCell(cell);
   };
 
   const handleEntityUpdate = async (rowId: string, updates: Record<string, any>) => {
-    log.info('Entity update requested', { rowId, updates });
+    myLog.info('Entity update requested', { rowId, updates });
     // In a real app, this would call the entity update service
   };
 
   const handleBatchEntityUpdate = async (updates: Array<{ id: string; updates: Record<string, any> }>) => {
-    log.info('Batch entity update requested', { updateCount: updates.length });
+    myLog.info('Batch entity update requested', { updateCount: updates.length });
     // In a real app, this would call the batch entity update service
   };
 

@@ -3,8 +3,8 @@ import { checkAuthActor, signInActor, signOutActor } from '../auth-actors';
 import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor, switchOrganizationActor } from '../organization-actors';
 import { legendStateInitMachine } from './legend-state-init-machine';
 import type { UserInfo, OrganizationInfo, CreateOrganizationInput } from '../types';
-import { syncLog } from '@/logger';
-const log = syncLog('state-machines/machines/auth-machine.ts');
+import { log } from '@/logger';
+const fileLog = log('state-machines/machines/auth-machine.ts');
 
 export interface AuthContext {
   user: UserInfo | null;
@@ -88,7 +88,7 @@ export const authMachine = setup({
     switchOrganization: switchOrganizationActor,
     // Simple actor to create a default personal org if user has none
     createDefaultPersonalOrg: fromPromise(async ({ input }: { input: { userId: string } }) => {
-      log.info('[AuthMachine] Creating default personal organization for user:', input.userId);
+      fileLog.info('[AuthMachine] Creating default personal organization for user:', input.userId);
       
       // For now, just return a mock personal org
       // In production, this would call the API to create the org
@@ -115,7 +115,7 @@ export const authMachine = setup({
     }),
     
     dispatchAuthStateChange: ({ context }, params: { authenticated: boolean; reason: string }) => {
-      log.info('[AuthMachine] Dispatching auth state change:', { authenticated: params.authenticated, reason: params.reason });
+      fileLog.info('[AuthMachine] Dispatching auth state change:', { authenticated: params.authenticated, reason: params.reason });
       
       // For sign-out, dispatch signout event immediately for navigation
       if (!params.authenticated && (params.reason === 'sign-out-success' || params.reason === 'sign-out-error')) {
@@ -156,16 +156,16 @@ export const authMachine = setup({
         if (context.currentOrganization) {
           const validOrg = organizations.find(org => org.id === context.currentOrganization.id);
           if (validOrg) {
-            log.info('[AuthMachine] Current organization validated against loaded organizations:', validOrg.name);
+            fileLog.info('[AuthMachine] Current organization validated against loaded organizations:', validOrg.name);
             return validOrg; // Return the org from the list (may have updated info)
           } else {
-            log.info('[AuthMachine] Current organization no longer valid, clearing:', context.currentOrganization.id);
+            fileLog.info('[AuthMachine] Current organization no longer valid, clearing:', context.currentOrganization.id);
             return null;
           }
         }
         
         // No current organization - don't auto-select, let the state machine handle selection logic
-        log.info('[AuthMachine] No current organization - organizations loaded for selection');
+        fileLog.info('[AuthMachine] No current organization - organizations loaded for selection');
         return null;
       },
     }),
@@ -239,7 +239,7 @@ export const authMachine = setup({
           if (trialEndsAt) {
             const isExpired = new Date(trialEndsAt) < new Date();
             if (isExpired) {
-              log.info('[AuthMachine] Trial has expired', { trialEndsAt, now: new Date().toISOString() });
+              fileLog.info('[AuthMachine] Trial has expired', { trialEndsAt, now: new Date().toISOString() });
             }
             return isExpired;
           }
@@ -251,7 +251,7 @@ export const authMachine = setup({
           if (trialEndsAt) {
             const isExpired = new Date(trialEndsAt) < new Date();
             if (isExpired) {
-              log.info('[AuthMachine] Organization trial has expired', { trialEndsAt, now: new Date().toISOString() });
+              fileLog.info('[AuthMachine] Organization trial has expired', { trialEndsAt, now: new Date().toISOString() });
             }
             return isExpired;
           }
@@ -368,7 +368,7 @@ export const authMachine = setup({
   
   context: ({ input }: { input?: { user?: UserInfo; authToken?: string; sessionExpiry?: string } }) => {
     // Use input or defaults - snapshot restoration will handle persisted context
-    log.info('[AuthMachine] Initializing context with input:', input?.user?.email || 'no user');
+    fileLog.info('[AuthMachine] Initializing context with input:', input?.user?.email || 'no user');
     return {
       user: input?.user || null,
       authToken: input?.authToken || null,
@@ -406,7 +406,7 @@ export const authMachine = setup({
     // 🚀 OPTIMIZED: Determine initial state based on persisted context
     determiningInitialState: {
       entry: ({ context }) => {
-        log.info('[AuthMachine] 🎯 TRANSITION: Starting initial state determination', {
+        fileLog.info('[AuthMachine] 🎯 TRANSITION: Starting initial state determination', {
           hasUser: !!context.user,
           hasToken: !!context.authToken,
           hasOrg: !!context.currentOrganization,
@@ -433,7 +433,7 @@ export const authMachine = setup({
           },
           target: 'authenticated.ready',
           actions: [
-            ({ context }) => log.info(`[AuthMachine] ✅ TRANSITION: Restored complete session: ${context.user?.email}, org: ${context.currentOrganization?.name}, legendState: ${context.legendStateSetupComplete}`),
+            ({ context }) => fileLog.info(`[AuthMachine] ✅ TRANSITION: Restored complete session: ${context.user?.email}, org: ${context.currentOrganization?.name}, legendState: ${context.legendStateSetupComplete}`),
             { 
               type: 'dispatchAuthStateChange',
               params: { authenticated: true, reason: 'session-restored-complete' }
@@ -459,7 +459,7 @@ export const authMachine = setup({
           },
           target: 'authenticated.initializingLegendState',
           actions: [
-            ({ context }) => log.info(`[AuthMachine] ✅ TRANSITION: Restored session with org but needs Legend State init: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
+            ({ context }) => fileLog.info(`[AuthMachine] ✅ TRANSITION: Restored session with org but needs Legend State init: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
             { 
               type: 'dispatchAuthStateChange',
               params: { authenticated: true, reason: 'session-restored-needs-legend-state' }
@@ -481,7 +481,7 @@ export const authMachine = setup({
           },
           target: 'authenticated',
           actions: [
-            ({ context }) => log.info(`[AuthMachine] Valid session for ${context.user?.email}, loading organizations`),
+            ({ context }) => fileLog.info(`[AuthMachine] Valid session for ${context.user?.email}, loading organizations`),
             { 
               type: 'dispatchAuthStateChange',
               params: { authenticated: true, reason: 'session-restored-needs-org' }
@@ -491,7 +491,7 @@ export const authMachine = setup({
         {
           // Otherwise, check auth
           target: 'checking',
-          actions: () => log.info('[AuthMachine] No persisted session, checking auth status')
+          actions: () => fileLog.info('[AuthMachine] No persisted session, checking auth status')
         }
       ]
     },
@@ -640,7 +640,7 @@ export const authMachine = setup({
     
     authenticated: {
       entry: ({ context }) => {
-        log.info('[AuthMachine] 🎯 Entering AUTHENTICATED state', {
+        fileLog.info('[AuthMachine] 🎯 Entering AUTHENTICATED state', {
           user: context.user?.email,
           hasOrgs: context.userOrganizations?.length > 0,
           currentOrg: context.currentOrganization?.id
@@ -666,7 +666,7 @@ export const authMachine = setup({
       states: {
         // NEW: Determine whether to do full setup or skip to ready
         determineFlow: {
-          entry: () => log.info('[AuthMachine] 🔀 Determining auth flow...'),
+          entry: () => fileLog.info('[AuthMachine] 🔀 Determining auth flow...'),
           always: [
             {
               // ONLY skip to ready if EVERYTHING is truly complete from a restored session
@@ -678,7 +678,7 @@ export const authMachine = setup({
                   context.userOrganizations?.length > 0;
                 
                 if (hasEverything) {
-                  log.warn('[AuthMachine] ⚠️ Skipping setup - restored session has everything', {
+                  fileLog.warn('[AuthMachine] ⚠️ Skipping setup - restored session has everything', {
                     org: context.currentOrganization.id,
                     legendState: context.legendStateSetupComplete
                   });
@@ -696,7 +696,7 @@ export const authMachine = setup({
                   legendStateSetupComplete: false,
                   legendStateError: null
                 }),
-                () => log.info('[AuthMachine] 🚀 Starting post-auth setup sequence')
+                () => fileLog.info('[AuthMachine] 🚀 Starting post-auth setup sequence')
               ]
             }
           ]
@@ -708,14 +708,14 @@ export const authMachine = setup({
           
           states: {
             step1_loadOrganizations: {
-              entry: () => log.info('[AuthMachine] 📋 Step 1: Loading organizations'),
+              entry: () => fileLog.info('[AuthMachine] 📋 Step 1: Loading organizations'),
               invoke: {
                 src: 'loadOrganizations',
                 onDone: {
                   target: 'step2_setupOrganization',
                   actions: [
                     'setUserOrganizations',
-                    ({ context }) => log.info('[AuthMachine] ✅ Step 1 complete: Loaded', context.userOrganizations?.length || 0, 'organizations')
+                    ({ context }) => fileLog.info('[AuthMachine] ✅ Step 1 complete: Loaded', context.userOrganizations?.length || 0, 'organizations')
                   ]
                 },
                 onError: {
@@ -723,20 +723,20 @@ export const authMachine = setup({
                   target: 'step2_setupOrganization',
                   actions: [
                     'setOrganizationError',
-                    () => log.error('[AuthMachine] ⚠️ Step 1 failed but continuing')
+                    () => fileLog.error('[AuthMachine] ⚠️ Step 1 failed but continuing')
                   ]
                 }
               }
             },
             
             step2_setupOrganization: {
-              entry: () => log.info('[AuthMachine] 📋 Step 2: Setting up organization'),
+              entry: () => fileLog.info('[AuthMachine] 📋 Step 2: Setting up organization'),
               always: [
                 {
                   // If we already have an org, continue
                   guard: ({ context }) => !!context.currentOrganization,
                   target: 'step3_initializeLegendState',
-                  actions: () => log.info('[AuthMachine] ✅ Step 2: Using existing organization')
+                  actions: () => fileLog.info('[AuthMachine] ✅ Step 2: Using existing organization')
                 },
                 {
                   // Auto-select first org if available
@@ -744,7 +744,7 @@ export const authMachine = setup({
                   target: 'step3_initializeLegendState',
                   actions: [
                     'autoSelectOrganization',
-                    ({ context }) => log.info('[AuthMachine] ✅ Step 2: Auto-selected organization', context.currentOrganization?.id)
+                    ({ context }) => fileLog.info('[AuthMachine] ✅ Step 2: Auto-selected organization', context.currentOrganization?.id)
                   ]
                 },
                 {
@@ -755,7 +755,7 @@ export const authMachine = setup({
             },
             
             creatingDefaultOrg: {
-              entry: () => log.info('[AuthMachine] 📋 Step 2b: Creating default personal organization'),
+              entry: () => fileLog.info('[AuthMachine] 📋 Step 2b: Creating default personal organization'),
               invoke: {
                 src: 'createDefaultPersonalOrg',
                 input: ({ context }) => ({ userId: context.user?.id }),
@@ -766,19 +766,19 @@ export const authMachine = setup({
                       currentOrganization: ({ event }) => (event as any).output?.organization,
                       userOrganizations: ({ event, context }) => [...(context.userOrganizations || []), (event as any).output?.organization].filter(Boolean)
                     }),
-                    () => log.info('[AuthMachine] ✅ Step 2b: Created default organization')
+                    () => fileLog.info('[AuthMachine] ✅ Step 2b: Created default organization')
                   ]
                 },
                 onError: {
                   // Continue even if org creation fails
                   target: 'step3_initializeLegendState',
-                  actions: () => log.error('[AuthMachine] ⚠️ Step 2b failed but continuing')
+                  actions: () => fileLog.error('[AuthMachine] ⚠️ Step 2b failed but continuing')
                 }
               }
             },
             
             step3_initializeLegendState: {
-              entry: () => log.info('[AuthMachine] 📋 Step 3: Initializing Legend State'),
+              entry: () => fileLog.info('[AuthMachine] 📋 Step 3: Initializing Legend State'),
               invoke: {
                 src: 'legendStateInit',
                 input: ({ context }) => {
@@ -788,7 +788,7 @@ export const authMachine = setup({
                     name: org.name
                   })) || [];
                   
-                  log.info('[AuthMachine] 🎯 Invoking Legend State machine with:', {
+                  fileLog.info('[AuthMachine] 🎯 Invoking Legend State machine with:', {
                     userId: context.user?.id,
                     organizationIds,
                     currentOrgId: context.currentOrganization?.id,
@@ -806,7 +806,7 @@ export const authMachine = setup({
                   target: 'step4_complete',
                   actions: [
                     'setLegendStateSuccess',
-                    () => log.info('[AuthMachine] ✅ Step 3 complete: Legend State initialized')
+                    () => fileLog.info('[AuthMachine] ✅ Step 3 complete: Legend State initialized')
                   ]
                 },
                 onError: {
@@ -814,7 +814,7 @@ export const authMachine = setup({
                   target: 'step4_complete',
                   actions: [
                     'setLegendStateError',
-                    ({ event }) => log.error('[AuthMachine] ⚠️ Step 3 failed:', event.error, 'but continuing')
+                    ({ event }) => fileLog.error('[AuthMachine] ⚠️ Step 3 failed:', event.error, 'but continuing')
                   ]
                 }
               }
@@ -822,20 +822,20 @@ export const authMachine = setup({
             
             step4_complete: {
               type: 'final' as const,
-              entry: () => log.info('[AuthMachine] 🎉 Post-auth setup sequence complete!')
+              entry: () => fileLog.info('[AuthMachine] 🎉 Post-auth setup sequence complete!')
             }
           },
           
           onDone: {
             target: 'ready',
-            actions: () => log.info('[AuthMachine] ➡️ Transitioning to READY state')
+            actions: () => fileLog.info('[AuthMachine] ➡️ Transitioning to READY state')
           }
         },
         
         loadingOrganizations: {
           entry: [
             'setLoadingOrganizations',
-            ({ context }) => log.info('[AuthMachine] 📥 LOADING ORGANIZATIONS:', {
+            ({ context }) => fileLog.info('[AuthMachine] 📥 LOADING ORGANIZATIONS:', {
               userId: context.user?.id,
               currentLegendStateComplete: context.legendStateSetupComplete,
               currentOrgId: context.currentOrganization?.id,
@@ -852,7 +852,7 @@ export const authMachine = setup({
                 actions: [
                   'setUserOrganizations', 
                   'clearLoadingOrganizations',
-                  ({ context }) => log.info('[AuthMachine] ✅ From loadingOrganizations -> initializingLegendState (Legend State NOT complete)', {
+                  ({ context }) => fileLog.info('[AuthMachine] ✅ From loadingOrganizations -> initializingLegendState (Legend State NOT complete)', {
                     orgId: context.currentOrganization?.id,
                     legendStateSetupComplete: context.legendStateSetupComplete
                   })
@@ -865,7 +865,7 @@ export const authMachine = setup({
                 actions: [
                   'setUserOrganizations', 
                   'clearLoadingOrganizations',
-                  ({ context }) => log.error('[AuthMachine] ❌ BYPASSING Legend State init - going directly to ready!', {
+                  ({ context }) => fileLog.error('[AuthMachine] ❌ BYPASSING Legend State init - going directly to ready!', {
                     orgId: context.currentOrganization?.id,
                     legendStateSetupComplete: context.legendStateSetupComplete,
                     organizationSetupComplete: context.organizationSetupComplete,
@@ -879,7 +879,7 @@ export const authMachine = setup({
                 actions: [
                   'setUserOrganizations', 
                   'clearLoadingOrganizations',
-                  ({ context }) => log.info('[AuthMachine] ➡️ From loadingOrganizations -> loadingBilling (normal flow)', {
+                  ({ context }) => fileLog.info('[AuthMachine] ➡️ From loadingOrganizations -> loadingBilling (normal flow)', {
                     hasCurrentOrg: !!context.currentOrganization,
                     legendStateSetupComplete: context.legendStateSetupComplete
                   })
@@ -924,7 +924,7 @@ export const authMachine = setup({
 
         checkingOrganizationSetup: {
           entry: ({ context }) => {
-            log.info('[AuthMachine] 🔍 CHECKING ORGANIZATION SETUP:', {
+            fileLog.info('[AuthMachine] 🔍 CHECKING ORGANIZATION SETUP:', {
               hasOrganizations: !!context.userOrganizations?.length,
               orgCount: context.userOrganizations?.length || 0,
               hasCurrentOrg: !!context.currentOrganization,
@@ -939,18 +939,18 @@ export const authMachine = setup({
             {
               target: 'needsOrganizationSetup',
               guard: 'hasNoOrganizations',
-              actions: [() => log.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSetup - no organizations found')]
+              actions: [() => fileLog.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSetup - no organizations found')]
             },
             {
               target: 'needsOrganizationSelection',
               guard: 'hasNoCurrentOrganization',
-              actions: [() => log.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSelection - no current organization')]
+              actions: [() => fileLog.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSelection - no current organization')]
             },
             {
               // Check for trial expiration BEFORE setting up Legend State
               target: 'trialExpiredSetup',
               guard: 'isTrialExpiredAndNeedsUpgrade',
-              actions: [({ context }) => log.info('[AuthMachine] ➡️ Transitioning to trialExpiredSetup - trial expired, needs upgrade', {
+              actions: [({ context }) => fileLog.info('[AuthMachine] ➡️ Transitioning to trialExpiredSetup - trial expired, needs upgrade', {
                 orgId: context.currentOrganization?.id,
                 isTrialExpired: context.isTrialExpired,
                 needsBillingSetup: context.needsBillingSetup
@@ -960,7 +960,7 @@ export const authMachine = setup({
               // If we have org but no persistence, set up persistence
               target: 'initializingLegendState',
               guard: ({ context }) => !!context.currentOrganization && !context.legendStateSetupComplete,
-              actions: [({ context }) => log.info('[AuthMachine] ➡️ Transitioning to initializingLegendState - have org but Legend State not complete', {
+              actions: [({ context }) => fileLog.info('[AuthMachine] ➡️ Transitioning to initializingLegendState - have org but Legend State not complete', {
                 orgId: context.currentOrganization?.id,
                 legendStateSetupComplete: context.legendStateSetupComplete
               })]
@@ -969,7 +969,7 @@ export const authMachine = setup({
               // If we have org and persistence is complete, go to ready
               target: 'ready',
               guard: ({ context }) => !!context.currentOrganization && context.legendStateSetupComplete,
-              actions: [({ context }) => log.warn('[AuthMachine] ⚠️ SKIPPING Legend State init - already complete!', {
+              actions: [({ context }) => fileLog.warn('[AuthMachine] ⚠️ SKIPPING Legend State init - already complete!', {
                 orgId: context.currentOrganization?.id,
                 legendStateSetupComplete: context.legendStateSetupComplete,
                 note: 'This might be stale state - Legend State may not actually be initialized'
@@ -980,7 +980,7 @@ export const authMachine = setup({
               target: 'initializingLegendState',
               actions: [
                 'autoSelectOrganization',
-                () => log.info('[AuthMachine] ➡️ Auto-selecting organization and transitioning to initializingLegendState')
+                () => fileLog.info('[AuthMachine] ➡️ Auto-selecting organization and transitioning to initializingLegendState')
               ]
             }
           ]
@@ -1115,7 +1115,7 @@ export const authMachine = setup({
         initializingLegendState: {
           entry: [
             'setLoadingLegendState',
-            ({ context }) => log.info(`[AuthMachine] 🎯 TRANSITION: Entering initializingLegendState for user: ${context.user?.email}, org: ${context.currentOrganization?.name}`)
+            ({ context }) => fileLog.info(`[AuthMachine] 🎯 TRANSITION: Entering initializingLegendState for user: ${context.user?.email}, org: ${context.currentOrganization?.name}`)
           ],
           
           // RE-ENABLED: Legend State machine integration for universe context
@@ -1129,7 +1129,7 @@ export const authMachine = setup({
                 name: org.name
               })) || [];
               
-              log.info(`[AuthMachine] Passing to Legend State machine for universe mode:`, {
+              fileLog.info(`[AuthMachine] Passing to Legend State machine for universe mode:`, {
                 organizationIds,
                 userId: context.user?.id,
                 currentOrgId: context.currentOrganization?.id,
@@ -1150,7 +1150,7 @@ export const authMachine = setup({
               actions: [
                 'setLegendStateSuccess', 
                 'clearLoadingLegendState',
-                ({ context }) => log.info(`[AuthMachine] ✅ Legend State initialization completed for user: ${context.user?.email}`)
+                ({ context }) => fileLog.info(`[AuthMachine] ✅ Legend State initialization completed for user: ${context.user?.email}`)
               ]
             },
             
@@ -1171,7 +1171,7 @@ export const authMachine = setup({
 
         ready: {
           entry: ({ context }) => {
-            log.info(`[AuthMachine] 🎯 TRANSITION: Reached READY state - auth flow complete!`, {
+            fileLog.info(`[AuthMachine] 🎯 TRANSITION: Reached READY state - auth flow complete!`, {
               user: context.user?.email,
               org: context.currentOrganization?.name,
               legendState: context.legendStateSetupComplete
@@ -1189,14 +1189,14 @@ export const authMachine = setup({
             // 🔄 SYNC: Connect sync machine when auth is fully ready
             const syncActor = (window as any).simpleNotificationSyncMachineActor;
             if (syncActor && context.user?.id && context.currentOrganization?.id) {
-              log.info('[AuthMachine] ✅ TRANSITION: Triggering sync connection - auth ready');
+              fileLog.info('[AuthMachine] ✅ TRANSITION: Triggering sync connection - auth ready');
               syncActor.send({ 
                 type: 'CONNECT', 
                 organizationId: context.currentOrganization.id,
                 userId: context.user.id
               });
             } else {
-              log.warn('[AuthMachine] ⚠️ TRANSITION: Sync actor not found or missing org/user data', {
+              fileLog.warn('[AuthMachine] ⚠️ TRANSITION: Sync actor not found or missing org/user data', {
                 syncActor: !!syncActor,
                 userId: context.user?.id,
                 orgId: context.currentOrganization?.id
@@ -1229,7 +1229,7 @@ export const authMachine = setup({
         SESSION_FAULT: {
           target: 'signingOut',
           actions: [
-            ({ context }) => log.info('[AuthMachine] Session fault detected, signing out:', context.user?.email),
+            ({ context }) => fileLog.info('[AuthMachine] Session fault detected, signing out:', context.user?.email),
             assign({
               authError: 'Session has expired or become invalid'
             })
@@ -1240,7 +1240,7 @@ export const authMachine = setup({
     },
     
     unauthenticated: {
-      // entry: () => log.info('[AuthMachine] User not authenticated'),
+      // entry: () => fileLog.info('[AuthMachine] User not authenticated'),
       
       on: {
         SIGN_IN: {
@@ -1267,7 +1267,7 @@ export const authMachine = setup({
     },
     
     signingIn: {
-      // entry: () => log.info('[AuthMachine] Starting sign-in process'),
+      // entry: () => fileLog.info('[AuthMachine] Starting sign-in process'),
       
       invoke: {
         src: 'signIn',
@@ -1328,7 +1328,7 @@ export const authMachine = setup({
     },
     
     signingOut: {
-      // entry: () => log.info('[AuthMachine] Starting sign-out process'),
+      // entry: () => fileLog.info('[AuthMachine] Starting sign-out process'),
       
       invoke: {
         src: 'signOut',
@@ -1357,7 +1357,7 @@ export const authMachine = setup({
     
     errorRecovery: {
       entry: ({ context }) => {
-        log.info('[AuthMachine] Entering error recovery state', {
+        fileLog.info('[AuthMachine] Entering error recovery state', {
           error: context.authError,
           retryCount: context.errorRetryCount || 0
         });

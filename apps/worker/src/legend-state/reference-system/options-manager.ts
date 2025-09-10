@@ -5,8 +5,8 @@
 
 import { observable, computed } from '@legendapp/state'
 import { universeOrgId$, universeSchema$, universeContext$ } from '../observables'
-import { stateLog } from '@/logger';
-const log = stateLog('legend-state/reference-system/options-manager.ts');
+import { log } from '@/logger';
+const fileLog = log('legend-state/reference-system/options-manager.ts');
 
 // Types
 export interface SystemOption {
@@ -114,7 +114,7 @@ async function loadSystemOptions(optionType: string, archetype: string, key: str
       throw new Error('No organizations available for loading options')
     }
     
-    log.debug(`[OptionsManager] Using organization ${orgId} for options loading`)
+    fileLog.debug(`[OptionsManager] Using organization ${orgId} for options loading`)
     
     // Use unified options API endpoint
     const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionType}`)
@@ -143,11 +143,11 @@ async function loadSystemOptions(optionType: string, archetype: string, key: str
       options: transformedOptions
     }
     
-    log.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
+    fileLog.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
     optionsStore$.systemOptions[key].set(optionSet)
     
   } catch (error) {
-    log.error(`[OptionsManager] Error loading options for ${key}:`, error)
+    fileLog.error(`[OptionsManager] Error loading options for ${key}:`, error)
     optionsStore$.errors[key].set(error.message)
     optionsStore$.systemOptions[key].set({
       id: key,
@@ -225,11 +225,11 @@ async function loadCustomOptions(optionSetName: string, orgId: string, key: stri
       options: transformedOptions
     }
     
-    log.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
+    fileLog.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
     optionsStore$.customOptions[key].set(optionSet)
     
   } catch (error) {
-    log.error(`[OptionsManager] Error loading options for ${key}:`, error)
+    fileLog.error(`[OptionsManager] Error loading options for ${key}:`, error)
     optionsStore$.errors[key].set(error.message)
     optionsStore$.customOptions[key].set({
       id: key,
@@ -307,7 +307,7 @@ export const OptionsManager = {
   resolveCustomOption(optionSetName: string, value: string, organizationId?: string) {
     const orgId = getValidOrgId(organizationId)
     if (!orgId) {
-      log.warn(`[OptionsManager] No valid organization ID for resolveCustomOption: ${optionSetName}`)
+      fileLog.warn(`[OptionsManager] No valid organization ID for resolveCustomOption: ${optionSetName}`)
       return null
     }
     const key = `custom:${optionSetName}_${orgId}`
@@ -346,7 +346,7 @@ export const OptionsManager = {
       }
     }
     
-    log.info('[OptionsManager] Preloading system options for common combinations')
+    fileLog.info('[OptionsManager] Preloading system options for common combinations')
   },
   
   /**
@@ -357,7 +357,7 @@ export const OptionsManager = {
     optionsStore$.customOptions.set({})
     optionsStore$.loading.set(new Set())
     optionsStore$.errors.set({})
-    log.info('[OptionsManager] Cache cleared')
+    fileLog.info('[OptionsManager] Cache cleared')
   },
   
   // Internal observables for debugging

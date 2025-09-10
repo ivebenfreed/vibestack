@@ -21,9 +21,9 @@ import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '@/state-machines'
 import { Route } from '../../sign-in'
 import { authClient } from '@/lib/auth'
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('features/auth/sign-in/components/user-auth-form.tsx');
+const fileLog = log('features/auth/sign-in/components/user-auth-form.tsx');
 
 type UserAuthFormProps = HTMLAttributes<HTMLFormElement>
 
@@ -54,7 +54,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   // Handle successful authentication with proper orchestrator coordination
   useEffect(() => {
     if (isAuthenticated && isLoading) {
-      log.info("[AUTH] Authentication successful via orchestrator, redirecting to:", redirectTo);
+      fileLog.info("[AUTH] Authentication successful via orchestrator, redirecting to:", redirectTo);
       toast.success("Login successful!");
       navigate({ to: redirectTo, replace: true });
       setIsLoading(false);
@@ -74,7 +74,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   useEffect(() => {
     if (!isSigningIn && isLoading && !isAuthenticated && !authError) {
       // Sign-in completed but no success or error - possible unexpected state
-      log.warn("[AUTH] Sign-in completed but no clear result");
+      fileLog.warn("[AUTH] Sign-in completed but no clear result");
       toast.error("Sign-in failed. Please try again.");
       setIsLoading(false);
     }
@@ -83,7 +83,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      log.info("[AUTH] Attempting sign-in with orchestrator:", data.email);
+      fileLog.info("[AUTH] Attempting sign-in with orchestrator:", data.email);
       
       // Use ONLY the orchestrator sign-in - remove dual system
       signIn({ email: data.email, password: data.password });

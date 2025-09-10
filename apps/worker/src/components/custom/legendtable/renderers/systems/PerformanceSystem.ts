@@ -1,5 +1,5 @@
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/systems/PerformanceSystem.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/renderers/systems/PerformanceSystem.ts');
 // ====================================
 // PERFORMANCE MONITOR
 // ====================================
@@ -207,7 +207,7 @@ export class PerformanceSystem {
     const perItemTime = duration / updateCount;
     
     if (perItemTime > this.targets.cellUpdate) {
-      log.warn(`Slow batch update: ${duration.toFixed(2)}ms for ${updateCount} cells (${perItemTime.toFixed(2)}ms per cell)`);
+      fileLog.warn(`Slow batch update: ${duration.toFixed(2)}ms for ${updateCount} cells (${perItemTime.toFixed(2)}ms per cell)`);
       
       this.emitEvent({
         type: 'batch.update',
@@ -261,7 +261,7 @@ export class PerformanceSystem {
    */
   logBreakdown(): void {
     const metrics = this.getMetrics();
-    log.info('🔍 RENDER PIPELINE BREAKDOWN:', {
+    fileLog.info('🔍 RENDER PIPELINE BREAKDOWN:', {
       'Header': `${metrics.phases.header.toFixed(2)}ms`,
       'Viewport': `${metrics.phases.viewport.toFixed(2)}ms`,
       'Visible rows': `${metrics.phases.visibleRows.toFixed(2)}ms`,

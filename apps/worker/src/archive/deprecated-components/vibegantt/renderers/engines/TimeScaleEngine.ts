@@ -2,7 +2,7 @@ import { TIME_SCALE_CONFIG } from '../../constants';
 import type { TimeScale, DateRange } from '../../types';
 import { 
 import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/renderers/engines/TimeScaleEngine.ts');
+const fileLog = log('archive/deprecated-components/vibegantt/renderers/engines/TimeScaleEngine.ts');
   startOfHour, 
   startOfDay, 
   startOfWeek, 
@@ -41,7 +41,7 @@ export class TimeScaleEngine {
     this.pixelsPerDay = this.calculatePixelsPerDay();
     this.minDate = new Date(2000, 0, 1);
     this.maxDate = new Date(2100, 0, 1);
-    log.info('TimeScaleEngine: Initialized with', {
+    fileLog.info('TimeScaleEngine: Initialized with', {
       zoomLevel,
       pixelsPerDay: this.pixelsPerDay
     });
@@ -62,7 +62,7 @@ export class TimeScaleEngine {
   
   // Set pixels per day directly (for intermediate zoom steps)
   setPixelsPerDay(pixelsPerDay: number): void {
-    log.info('TimeScaleEngine: Setting pixels per day', {
+    fileLog.info('TimeScaleEngine: Setting pixels per day', {
       oldValue: this.pixelsPerDay,
       newValue: pixelsPerDay,
       zoomLevel: this.zoomLevel

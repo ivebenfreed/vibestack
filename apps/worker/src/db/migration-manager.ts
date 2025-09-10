@@ -13,8 +13,8 @@ import { PGliteWorker } from '@electric-sql/pglite/worker';
 // Remove static import
 // import { dbMessageBus } from './db'; 
 import { getApiBaseUrl } from '@/sync/config';
-import { dataLog } from '@/logger';
-const log = dataLog('db/migration-manager.ts');
+import { log } from '@/logger';
+const fileLog = log('db/migration-manager.ts');
 
 // Define migration interface to match server response
 export interface Migration {
@@ -43,7 +43,7 @@ export const checkMigrationTableExists = async (db: PGliteWorker): Promise<boole
     // Correctly check the rows property of the PGliteWorker query result
     return result.rows.length > 0;
   } catch (error) {
-    log.error('Error checking if migration table exists:', error);
+    fileLog.error('Error checking if migration table exists:', error);
     return false;
   }
 };
@@ -65,7 +65,7 @@ export const getAllAppliedMigrationNames = async (db: PGliteWorker): Promise<str
     if (error instanceof Error && error.message.includes('relation "schema_version" does not exist')) {
       return [];
     }
-    log.error('Error getting applied migration names:', error);
+    fileLog.error('Error getting applied migration names:', error);
     // Re-throw other errors
     throw error; 
   }
@@ -77,19 +77,19 @@ export const getAllAppliedMigrationNames = async (db: PGliteWorker): Promise<str
  */
 export const fetchMigrationsFromServer = async (): Promise<Migration[] | null> => {
   try {
-    log.info('Fetching migrations from server...');
+    fileLog.info('Fetching migrations from server...');
     
     // Get the API base URL
     const baseUrl = getApiBaseUrl();
-    log.info(`API base URL: ${baseUrl}`);
+    fileLog.info(`API base URL: ${baseUrl}`);
     
     // Use a relative URL instead of a fully qualified URL
     // This lets the browser and Vite handle the proper URL construction
     const apiUrl = `/api/migrations`;
     
-    log.info(`Fetching migrations using relative path: ${apiUrl}`);
-    log.info(`Document location: ${window.location.href}`);
-    log.info(`Cookie available: ${!!document.cookie}`);
+    fileLog.info(`Fetching migrations using relative path: ${apiUrl}`);
+    fileLog.info(`Document location: ${window.location.href}`);
+    fileLog.info(`Cookie available: ${!!document.cookie}`);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -101,12 +101,12 @@ export const fetchMigrationsFromServer = async (): Promise<Migration[] | null> =
       signal: AbortSignal.timeout(10000),
     });
     
-    log.info(`Response status: ${response.status}`);
-    log.info(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
+    fileLog.info(`Response status: ${response.status}`);
+    fileLog.info(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
     
     if (!response.ok) {
       const errorText = await response.text();
-      log.error(`Error response body:`, errorText);
+      fileLog.error(`Error response body:`, errorText);
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
     
@@ -127,13 +127,13 @@ export const fetchMigrationsFromServer = async (): Promise<Migration[] | null> =
       throw new Error('Invalid migrations data format');
     }
     
-    log.info(`Fetched ${migrations.length} migrations from server`);
+    fileLog.info(`Fetched ${migrations.length} migrations from server`);
     return migrations;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      log.warn('Migration fetch timed out');
+      fileLog.warn('Migration fetch timed out');
     } else {
-      log.error('Error fetching migrations from server:', error);
+      fileLog.error('Error fetching migrations from server:', error);
     }
     return null;
   }
@@ -147,17 +147,17 @@ export const fetchMigrationsFromServer = async (): Promise<Migration[] | null> =
  */
 export const applyMigrations = async (db: PGliteWorker, migrations: Migration[]): Promise<boolean> => {
   if (migrations.length === 0) {
-    log.info('No migrations to apply');
+    fileLog.info('No migrations to apply');
     return true;
   }
   
-  log.info(`Applying ${migrations.length} total migrations checked against local state...`);
+  fileLog.info(`Applying ${migrations.length} total migrations checked against local state...`);
   
   try {
     // Ensure schema_version table exists first
     const hasTable = await checkMigrationTableExists(db);
     if (!hasTable) {
-      log.info('Creating schema_version table...');
+      fileLog.info('Creating schema_version table...');
       // Use migration_name as PK
       await db.query(`
         CREATE TABLE schema_version (
@@ -177,15 +177,15 @@ export const applyMigrations = async (db: PGliteWorker, migrations: Migration[])
       .sort((a, b) => parseInt(a.timestamp, 10) - parseInt(b.timestamp, 10)); // Sort numerically
     
     if (pendingMigrations.length === 0) {
-      log.info('All migrations already applied');
+      fileLog.info('All migrations already applied');
       return true;
     }
     
-    log.info(`Applying ${pendingMigrations.length} pending migrations...`);
+    fileLog.info(`Applying ${pendingMigrations.length} pending migrations...`);
         
     // Apply each migration in order
     for (const migration of pendingMigrations) {
-      log.info(`Applying migration: ${migration.migration_name}`);
+      fileLog.info(`Applying migration: ${migration.migration_name}`);
       
       // Apply each query in the migration
       for (const sql of migration.up_queries) {
@@ -198,11 +198,11 @@ export const applyMigrations = async (db: PGliteWorker, migrations: Migration[])
           // Check if this is a "relation already exists" error or if dropping a constraint that doesn't exist
           if (errorMessage.includes('already exists')) {
             // Table or type already exists, log it but don't fail the migration
-            log.warn(`Warning: Object already exists, continuing migration: ${sql.substring(0, 60)}...`);
+            fileLog.warn(`Warning: Object already exists, continuing migration: ${sql.substring(0, 60)}...`);
             
             // If this is a CREATE TABLE statement, we can consider it "successful" and continue
             if (sql.toUpperCase().includes('CREATE TABLE') || sql.toUpperCase().includes('CREATE TYPE')) {
-              log.info('CREATE statement skipped as object already exists');
+              fileLog.info('CREATE statement skipped as object already exists');
               continue; // Skip to the next SQL statement
             }
           } 
@@ -212,12 +212,12 @@ export const applyMigrations = async (db: PGliteWorker, migrations: Migration[])
             (errorMessage.includes('relation') && errorMessage.includes('does not exist')) ||
             (errorMessage.includes('index') && errorMessage.includes('does not exist'))
           ) {
-            log.warn(`Warning: Constraint, relation, or index doesn't exist, continuing: ${sql.substring(0, 60)}...`);
+            fileLog.warn(`Warning: Constraint, relation, or index doesn't exist, continuing: ${sql.substring(0, 60)}...`);
             continue; // Skip to the next SQL statement
           }
           else {
             // For other errors, log and return false to indicate migration failure
-            log.error(`Error executing migration query: ${sql}`, error);
+            fileLog.error(`Error executing migration query: ${sql}`, error);
             return false;
           }
         }
@@ -229,10 +229,10 @@ export const applyMigrations = async (db: PGliteWorker, migrations: Migration[])
         [migration.migration_name] // Use migration_name
       );
       
-      log.info(`Migration applied: ${migration.migration_name}`);
+      fileLog.info(`Migration applied: ${migration.migration_name}`);
     }
     
-    log.info('All migrations applied successfully');
+    fileLog.info('All migrations applied successfully');
     
     // Emit event for migration completion
     // Dynamically import dbMessageBus to avoid circular dependency
@@ -245,7 +245,7 @@ export const applyMigrations = async (db: PGliteWorker, migrations: Migration[])
     
     return true;
   } catch (error) {
-    log.error('Error applying migrations:', error);
+    fileLog.error('Error applying migrations:', error);
     return false;
   }
 };
@@ -256,7 +256,7 @@ export const applyMigrations = async (db: PGliteWorker, migrations: Migration[])
  */
 export const checkAndApplyMigrations = async (): Promise<boolean> => {
   try {
-    log.info('Checking for database migrations...');
+    fileLog.info('Checking for database migrations...');
     
     // Get database instance dynamically to avoid circular dependency
     const { getDatabase } = await import('./db.ts'); 
@@ -265,7 +265,7 @@ export const checkAndApplyMigrations = async (): Promise<boolean> => {
     // Fetch migrations from server
     const migrations = await fetchMigrationsFromServer();
     if (!migrations) {
-      log.warn('Could not fetch migrations, skipping migration check');
+      fileLog.warn('Could not fetch migrations, skipping migration check');
       return false;
     }
     
@@ -274,7 +274,7 @@ export const checkAndApplyMigrations = async (): Promise<boolean> => {
     
     return result;
   } catch (error) {
-    log.error('Error checking and applying migrations:', error);
+    fileLog.error('Error checking and applying migrations:', error);
     return false;
   }
 }; 

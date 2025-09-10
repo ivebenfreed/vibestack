@@ -13,8 +13,8 @@ import { orgSchemaClient } from '@/lib/schema-client'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
 import { initializationManager, ensureLegendStateReady, type PersistenceContext } from './helpers/InitializationManager'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
-import { stateLog } from '@/logger';
-const log = stateLog('legend-state/observables.ts');
+import { log } from '@/logger';
+const fileLog = log('legend-state/observables.ts');
 
 // Custom error classes for better error handling
 export class ValidationError extends Error {
@@ -112,7 +112,7 @@ export const universeSchema$ = observable(() => {
         const prefixedName = `${org.orgId}_${entityName}`
         // Debug log to check org.name value
         if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-          log.info(`[UniverseSchema] Adding entity ${entityName} from org ${org.orgId}, name: ${org.name}`)
+          fileLog.info(`[UniverseSchema] Adding entity ${entityName} from org ${org.orgId}, name: ${org.name}`)
         }
         combinedEntities[prefixedName] = {
           ...entityDef,
@@ -214,7 +214,7 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
     if (!response.ok) {
       if (response.status === 404) {
         // Validation endpoint doesn't exist - skip validation
-        log.info(`[Observable] Validation endpoint not available for ${entityName} - skipping`)
+        fileLog.info(`[Observable] Validation endpoint not available for ${entityName} - skipping`)
         return true
       }
       
@@ -241,7 +241,7 @@ async function validateItem(orgId: string, entityName: string, item: any, operat
       throw error
     }
     // Network errors or other issues - don't block the operation
-    log.warn(`[Observable] Validation check failed for ${entityName} ${operation}:`, error.message)
+    fileLog.warn(`[Observable] Validation check failed for ${entityName} ${operation}:`, error.message)
     return true
   }
 }
@@ -254,7 +254,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   const hasPersistenceConfig = !!persistenceConfig?.entityTableMap
   
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    log.info(`[Observable] Creating ${entityName} observable - persistence: ${hasPersistenceConfig ? 'available' : 'not available'}`)
+    fileLog.info(`[Observable] Creating ${entityName} observable - persistence: ${hasPersistenceConfig ? 'available' : 'not available'}`)
   }
   
   // SCHEMA-DRIVEN ORG PARAMETERS: Extract org ID and entity name from org-prefixed entity name
@@ -266,7 +266,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   // **NEW: Handle virtual entities with different API patterns**
   if (isVirtual) {
-    log.info(`[Observable] Creating virtual entity observable: ${entityName}`, {
+    fileLog.info(`[Observable] Creating virtual entity observable: ${entityName}`, {
       isVirtual,
       backendTables: schema._backendTables,
       originalName: schema._originalName
@@ -306,15 +306,15 @@ function createEntityObservable(entityName: string, schema?: any) {
         actualOrgId = parts[0]
         actualEntityName = parts[1]
         
-        log.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
+        fileLog.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
       } else {
-        log.error(`[Observable] Invalid entity name format: ${entityName} - expected orgId_entityName`)
+        fileLog.error(`[Observable] Invalid entity name format: ${entityName} - expected orgId_entityName`)
         actualOrgId = 'unknown'
         actualEntityName = entityName
       }
     } else {
       // Fallback for non-prefixed entities (shouldn't happen in universe schema)
-      log.warn(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
+      fileLog.warn(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
       actualOrgId = schema?._organizationId || 'unknown'
       actualEntityName = entityName
     }
@@ -324,7 +324,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
   
-  log.info(`[Observable] Creating entity observable for ${entityName}`, {
+  fileLog.info(`[Observable] Creating entity observable for ${entityName}`, {
     hasPersistenceManager: !!persistenceManager,
     hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence,
     hasConfig: !!persistenceConfig
@@ -344,7 +344,7 @@ function createEntityObservable(entityName: string, schema?: any) {
     // LIST - Simple function that returns array of records (Legend State v3 pattern)
     list: async () => {
       try {
-        log.info(`[Observable] Loading ${entityName} from:`, baseUrl);
+        fileLog.info(`[Observable] Loading ${entityName} from:`, baseUrl);
         
         const response = await fetch(baseUrl, {
           credentials: 'include',
@@ -354,26 +354,26 @@ function createEntityObservable(entityName: string, schema?: any) {
         if (!response.ok) {
           // Handle common cases gracefully
           if (response.status === 404) {
-            log.info(`[Observable] Entity ${entityName} table not found (404) - returning empty data`)
+            fileLog.info(`[Observable] Entity ${entityName} table not found (404) - returning empty data`)
             return []
           }
           if (response.status === 500) {
             // Likely table doesn't exist - don't spam console
-            log.info(`[Observable] Entity ${entityName} table not created yet (500) - returning empty data`)
+            fileLog.info(`[Observable] Entity ${entityName} table not created yet (500) - returning empty data`)
             return []
           }
-          log.warn(`[Observable] Failed to load ${entityName}:`, response.status)
+          fileLog.warn(`[Observable] Failed to load ${entityName}:`, response.status)
           return []
         }
         
         const result = await response.json()
         const data = result.data || []
         
-        log.info(`[Observable] Loaded ${entityName}: ${data.length} records`)
+        fileLog.info(`[Observable] Loaded ${entityName}: ${data.length} records`)
         
         return data
       } catch (error) {
-        log.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
+        fileLog.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
         return []
       }
     },
@@ -386,7 +386,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           try {
             await validateItem(orgId, entityName, item, 'create')
           } catch (validationError) {
-            log.warn(`[Observable] Validation failed for ${entityName}:`, validationError.message)
+            fileLog.warn(`[Observable] Validation failed for ${entityName}:`, validationError.message)
             throw validationError
           }
         }
@@ -426,11 +426,11 @@ function createEntityObservable(entityName: string, schema?: any) {
         }
         
         const result = await response.json()
-        log.info(`[Observable] Successfully created ${entityName}:`, result.data?.id || 'unknown-id')
+        fileLog.info(`[Observable] Successfully created ${entityName}:`, result.data?.id || 'unknown-id')
         return result.data || item
       } catch (error) {
         // Add context to help debugging
-        log.error(`[Observable] Create error for ${entityName}:`, {
+        fileLog.error(`[Observable] Create error for ${entityName}:`, {
           error: error.message,
           item: item ? { id: item.id, ...Object.keys(item).slice(0, 3) } : 'null', // Avoid logging sensitive data
           orgId,
@@ -448,7 +448,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           try {
             await validateItem(orgId, entityName, item, 'update')
           } catch (validationError) {
-            log.warn(`[Observable] Validation failed for ${entityName} update:`, validationError.message)
+            fileLog.warn(`[Observable] Validation failed for ${entityName} update:`, validationError.message)
             throw validationError
           }
         }
@@ -492,10 +492,10 @@ function createEntityObservable(entityName: string, schema?: any) {
         }
         
         const result = await response.json()
-        log.info(`[Observable] Successfully updated ${entityName}:`, item.id)
+        fileLog.info(`[Observable] Successfully updated ${entityName}:`, item.id)
         return result.data || item
       } catch (error) {
-        log.error(`[Observable] Update error for ${entityName}:`, {
+        fileLog.error(`[Observable] Update error for ${entityName}:`, {
           error: error.message,
           itemId: item?.id || 'unknown',
           orgId,
@@ -526,7 +526,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
           
           if (response.status === 404) {
-            log.warn(`[Observable] ${entityName} already deleted:`, item.id)
+            fileLog.warn(`[Observable] ${entityName} already deleted:`, item.id)
             return undefined // Treat as successful deletion
           }
           if (response.status === 403) {
@@ -539,10 +539,10 @@ function createEntityObservable(entityName: string, schema?: any) {
           throw new Error(`Delete ${entityName} failed: ${errorMessage}`)
         }
         
-        log.info(`[Observable] Successfully deleted ${entityName}:`, item.id)
+        fileLog.info(`[Observable] Successfully deleted ${entityName}:`, item.id)
         return undefined // Successful deletion
       } catch (error) {
-        log.error(`[Observable] Delete error for ${entityName}:`, {
+        fileLog.error(`[Observable] Delete error for ${entityName}:`, {
           error: error.message,
           itemId: item?.id || 'unknown',
           orgId,
@@ -559,7 +559,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           return []
         }
 
-        log.info(`[Observable] Batch updating ${items.length} ${entityName} records`)
+        fileLog.info(`[Observable] Batch updating ${items.length} ${entityName} records`)
 
         const response = await fetch(`${baseUrl}/batch`, {
           method: 'PUT',
@@ -594,10 +594,10 @@ function createEntityObservable(entityName: string, schema?: any) {
         }
 
         const result = await response.json()
-        log.info(`[Observable] Successfully batch updated ${items.length} ${entityName} records`)
+        fileLog.info(`[Observable] Successfully batch updated ${items.length} ${entityName} records`)
         return result.data || items
       } catch (error) {
-        log.error(`[Observable] Batch update error for ${entityName}:`, {
+        fileLog.error(`[Observable] Batch update error for ${entityName}:`, {
           error: error.message,
           itemCount: items?.length || 0,
           orgId,
@@ -630,7 +630,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         
         // Only log notifications in development for debugging
         if (typeof window !== 'undefined' && window.location?.hostname === 'localhost' && notification.test) {
-          log.info(`[Observable] ${entityName} received test notification:`, notification)
+          fileLog.info(`[Observable] ${entityName} received test notification:`, notification)
         }
         
         // **NEW: Enhanced notification handling for virtual entities**
@@ -643,7 +643,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           })
           
           if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-            log.info(`[Observable] Virtual entity ${entityName} sync triggered by backend table change:`, notification.tables)
+            fileLog.info(`[Observable] Virtual entity ${entityName} sync triggered by backend table change:`, notification.tables)
           }
         } else {
           // Regular entities use original logic
@@ -653,7 +653,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           })
           
           if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-            log.info(`[Observable] ${entityName} sync triggered by WebSocket`)
+            fileLog.info(`[Observable] ${entityName} sync triggered by WebSocket`)
           }
         }
         
@@ -672,7 +672,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         if (typeof window !== 'undefined') {
           window.removeEventListener('vibestack:table-change-notification', handler as any)
           if (window.location?.hostname === 'localhost') {
-            log.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+            fileLog.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
           }
         }
       }
@@ -681,7 +681,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    log.info(`[Observable] Creating syncedCrud for ${entityName}, hasPersistenceConfig: ${!!persistenceConfig?.entityTableMap}`)
+    fileLog.info(`[Observable] Creating syncedCrud for ${entityName}, hasPersistenceConfig: ${!!persistenceConfig?.entityTableMap}`)
   }
   
   // CRITICAL FIX: Use syncedCrud(config) directly like in working example
@@ -691,7 +691,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   // Log available methods for debugging (should now have proper syncedCrud methods)
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
     setTimeout(() => {
-      log.info(`[Observable] ${entityName} observable created with methods:`, Object.getOwnPropertyNames(syncedObservable))
+      fileLog.info(`[Observable] ${entityName} observable created with methods:`, Object.getOwnPropertyNames(syncedObservable))
     }, 10)
   }
   
@@ -703,7 +703,7 @@ function createEntityObservable(entityName: string, schema?: any) {
  * This should only be called by auth state machines, not components
  */
 export async function loadUniverseContext(userId: string, organizationIds: string[], organizationData?: Array<{ id: string; name: string }>) {
-  log.info(`[Observable] Loading universe context for ${organizationIds.length} organizations`)
+  fileLog.info(`[Observable] Loading universe context for ${organizationIds.length} organizations`)
   
   // Update loading state
   universeContext$.loading.set(true)
@@ -731,12 +731,12 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
           }
         })
         
-        log.info(`[Observable] Fetched ${organizations.length} organizations from API with names`)
+        fileLog.info(`[Observable] Fetched ${organizations.length} organizations from API with names`)
       } else {
-        log.warn('[Observable] Failed to fetch organizations from API, using IDs as names')
+        fileLog.warn('[Observable] Failed to fetch organizations from API, using IDs as names')
       }
     } catch (error) {
-      log.error('[Observable] Error fetching organizations:', error)
+      fileLog.error('[Observable] Error fetching organizations:', error)
     }
   } else {
     // Use provided organization data
@@ -763,7 +763,7 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
           success: true
         }
       } catch (error) {
-        log.error(`[Observable] Failed to load schema for org ${orgId}:`, error)
+        fileLog.error(`[Observable] Failed to load schema for org ${orgId}:`, error)
         return {
           orgId,
           error: error instanceof Error ? error.message : 'Failed to load schema',
@@ -789,7 +789,7 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
         })
         
         const entityCount = result.schema.entities ? Object.keys(result.schema.entities).length : 0
-        log.info(`[Observable] Loaded ${entityCount} entities from org ${result.orgId} (${orgName})`)
+        fileLog.info(`[Observable] Loaded ${entityCount} entities from org ${result.orgId} (${orgName})`)
       } else {
         const orgName = orgNameMap.get(result.orgId) || result.orgId
         
@@ -809,7 +809,7 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
       return total + (result.schema?.entities ? Object.keys(result.schema.entities).length : 0)
     }, 0)
     
-    log.info(`[Observable] Universe context loaded with ${totalEntities} total entities across ${organizationIds.length} organizations`)
+    fileLog.info(`[Observable] Universe context loaded with ${totalEntities} total entities across ${organizationIds.length} organizations`)
     
     // **NEW: Add virtual entities for options system**
     await addVirtualOptionsEntities(organizationIds)
@@ -818,7 +818,7 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     await initializePersistence(userId, organizationIds, totalEntities)
     
   } catch (error) {
-    log.error('[Observable] Failed to load universe context:', error)
+    fileLog.error('[Observable] Failed to load universe context:', error)
     universeContext$.assign({
       loading: false,
       error: error instanceof Error ? error.message : 'Failed to load universe context'
@@ -833,7 +833,7 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
  */
 async function addVirtualOptionsEntities(organizationIds: string[]) {
   try {
-    log.info(`[Observable] Adding virtual options entities for ${organizationIds.length} organizations`)
+    fileLog.info(`[Observable] Adding virtual options entities for ${organizationIds.length} organizations`)
     
     const currentUniverse = universeContext$.peek()
     const existingOrganizations = { ...currentUniverse.organizations }
@@ -917,7 +917,7 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
         })
         
         const businessEntityCount = existingBusinessEntities.length
-        log.info(`[Observable] Added SystemOption, CustomOption, and ${businessEntityCount} entity reference virtual entities for org ${orgId}`)
+        fileLog.info(`[Observable] Added SystemOption, CustomOption, and ${businessEntityCount} entity reference virtual entities for org ${orgId}`)
       }
     })
     
@@ -936,10 +936,10 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
       }
     })
     
-    log.info(`[Observable] Added ${totalVirtualEntities} total virtual entities to universe schema`)
+    fileLog.info(`[Observable] Added ${totalVirtualEntities} total virtual entities to universe schema`)
     
   } catch (error) {
-    log.error('[Observable] Failed to add virtual options entities:', error)
+    fileLog.error('[Observable] Failed to add virtual options entities:', error)
     // Don't throw - this is not critical for basic functionality
   }
 }
@@ -950,7 +950,7 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
 async function initializePersistence(userId: string, organizationIds: string[], totalEntities: number) {
   // Skip if no entities or already initialized
   if (totalEntities === 0 || (persistenceManager && syncedCrudWithPersistence)) {
-    log.info(`[Observable] Skipping persistence initialization: entities=${totalEntities}, already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
+    fileLog.info(`[Observable] Skipping persistence initialization: entities=${totalEntities}, already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
     return
   }
   
@@ -958,7 +958,7 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     // Use primary organization for persistence (first in list)
     const primaryOrgId = organizationIds[0]
     if (!primaryOrgId) {
-      log.warn('[Observable] No organization ID available for persistence setup')
+      fileLog.warn('[Observable] No organization ID available for persistence setup')
       return
     }
     
@@ -967,11 +967,11 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
     
     if (entityKeys.length === 0) {
-      log.info('[Observable] No entities found, skipping persistence setup')
+      fileLog.info('[Observable] No entities found, skipping persistence setup')
       return
     }
     
-    log.info(`[Observable] Initializing persistence for ${entityKeys.length} entities in org ${primaryOrgId}`)
+    fileLog.info(`[Observable] Initializing persistence for ${entityKeys.length} entities in org ${primaryOrgId}`)
     
     // Create persistence manager with enhanced error handling
     persistenceManager = createPersistenceManager(primaryOrgId, userId)
@@ -990,18 +990,18 @@ async function initializePersistence(userId: string, organizationIds: string[], 
       // In Legend State v3, persistOptions IS the function that wraps syncedCrud with persistence
       syncedCrudWithPersistence = persistOptions
       
-      log.info('[Observable] Persistence configured with IndexedDB plugin')
+      fileLog.info('[Observable] Persistence configured with IndexedDB plugin')
     } else {
       // No IndexedDB plugin - use syncedCrud without persistence
       syncedCrudWithPersistence = syncedCrud
-      log.info('[Observable] Persistence disabled - using server-only sync')
+      fileLog.info('[Observable] Persistence disabled - using server-only sync')
     }
     
     // Update tracking variables
     currentOrgId = primaryOrgId
     currentSchemaVersion = currentSchema?.version || 'unknown'
     
-    log.info(`[Observable] Persistence initialized successfully`, {
+    fileLog.info(`[Observable] Persistence initialized successfully`, {
       orgId: primaryOrgId,
       entityCount: entityKeys.length,
       schemaVersion: currentSchemaVersion,
@@ -1010,13 +1010,13 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     })
     
   } catch (error) {
-    log.error('[Observable] Failed to initialize persistence:', error)
+    fileLog.error('[Observable] Failed to initialize persistence:', error)
     
     // Check for specific IndexedDB errors and provide user-friendly handling
     if (error?.name === 'NotFoundError' || 
         error?.message?.includes('object stores was not found') ||
         error?.message?.includes('Error loading local cache')) {
-      log.info('[Observable] IndexedDB schema issue detected - continuing without persistence')
+      fileLog.info('[Observable] IndexedDB schema issue detected - continuing without persistence')
       
       // Clear any corrupted IndexedDB data
       try {
@@ -1024,7 +1024,7 @@ async function initializePersistence(userId: string, organizationIds: string[], 
           await persistenceManager.clearOrganizationData()
         }
       } catch (clearError) {
-        log.warn('[Observable] Failed to clear corrupted data:', clearError)
+        fileLog.warn('[Observable] Failed to clear corrupted data:', clearError)
       }
     }
     
@@ -1035,7 +1035,7 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     currentSchemaVersion = null
     
     // Continue with server-only sync - the app will still work
-    log.info('[Observable] Continuing with server-only sync (no local persistence)')
+    fileLog.info('[Observable] Continuing with server-only sync (no local persistence)')
   }
 }
 
@@ -1056,7 +1056,7 @@ export const entities$ = observable(() => {
   
   // Return empty object while still loading or no schema
   if (loading || !schema?.entities) {
-    log.info(`[Observable] Entities not ready yet`, {
+    fileLog.info(`[Observable] Entities not ready yet`, {
       loading,
       hasSchema: !!schema,
       hasEntities: !!schema?.entities
@@ -1067,7 +1067,7 @@ export const entities$ = observable(() => {
   // Safely get entity keys (these are org-prefixed in universe schema)
   const entityKeys = schema.entities && typeof schema.entities === 'object' ? Object.keys(schema.entities) : []
   
-  log.info(`[Observable] Creating entity observables for universe schema`, {
+  fileLog.info(`[Observable] Creating entity observables for universe schema`, {
     schemaVersion: schema.version || 'unknown',
     entityCount: entityKeys.length,
     sampleEntities: entityKeys.slice(0, 3)
@@ -1098,7 +1098,7 @@ export const entities$ = observable(() => {
             globalEntityCache[cacheKey] = observable
             return observable
           } catch (entityError) {
-            log.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
+            fileLog.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
             return null
           }
         },
@@ -1107,10 +1107,10 @@ export const entities$ = observable(() => {
       })
     })
     
-    log.info(`[Observable] Set up lazy entity observables for ${entityKeys.length} entities`)
+    fileLog.info(`[Observable] Set up lazy entity observables for ${entityKeys.length} entities`)
     return entityObservables
   } catch (error) {
-    log.error('[Observable] Error setting up entity observables:', error)
+    fileLog.error('[Observable] Error setting up entity observables:', error)
     // Return empty object on error to prevent crashes
     return {}
   }
@@ -1139,11 +1139,11 @@ export function getEntity$(entityName: string) {
       const fallbackSchema = currentSchema?.entities?.[cleanEntityName]
       
       if (fallbackSchema) {
-        log.warn(`[Observable] DEPRECATED: Entity ${entityName} not found with org-prefix, found with clean name ${cleanEntityName}. Callers should use org-prefixed names.`)
+        fileLog.warn(`[Observable] DEPRECATED: Entity ${entityName} not found with org-prefix, found with clean name ${cleanEntityName}. Callers should use org-prefixed names.`)
         // Don't proceed with fallback - enforce org-prefixed usage
       }
       
-      log.warn(`[Observable] Entity ${entityName} not available in universe schema`)
+      fileLog.warn(`[Observable] Entity ${entityName} not available in universe schema`)
       // Entity not found - this is expected during initial load
       return null
     }
@@ -1153,18 +1153,18 @@ export function getEntity$(entityName: string) {
     
     // Check if we already have the observable cached
     if (globalEntityCache[cacheKey]) {
-      log.info(`[Observable] Retrieved cached ${entityName} observable`)
+      fileLog.info(`[Observable] Retrieved cached ${entityName} observable`)
       return globalEntityCache[cacheKey]
     }
     
     // Create the observable directly if not cached
     try {
-      log.info(`[Observable] Creating new observable for ${entityName}`)
+      fileLog.info(`[Observable] Creating new observable for ${entityName}`)
       const observable = createEntityObservable(entityName, entitySchema)
       globalEntityCache[cacheKey] = observable
       
       // DEBUG: Check what we created
-      log.info(`[Observable] Created ${entityName} observable`, {
+      fileLog.info(`[Observable] Created ${entityName} observable`, {
         type: typeof observable,
         isFunction: typeof observable === 'function',
         hasGet: typeof observable?.get === 'function',
@@ -1176,11 +1176,11 @@ export function getEntity$(entityName: string) {
       
       return observable
     } catch (createError) {
-      log.error(`[Observable] Error creating observable for ${entityName}:`, createError)
+      fileLog.error(`[Observable] Error creating observable for ${entityName}:`, createError)
       return null
     }
   } catch (error) {
-    log.error(`[Observable] Error getting entity observable for ${entityName}:`, error)
+    fileLog.error(`[Observable] Error getting entity observable for ${entityName}:`, error)
     return null
   }
 }
@@ -1191,7 +1191,7 @@ export function getEntity$(entityName: string) {
  * For regular context: getUniverseEntity$('Client') - falls back to current org
  */
 export function getUniverseEntity$(entityIdentifier: string) {
-  log.info(`[UniverseObservable] getUniverseEntity$ called with "${entityIdentifier}"`)
+  fileLog.info(`[UniverseObservable] getUniverseEntity$ called with "${entityIdentifier}"`)
   try {
     // Check if this is an org-prefixed entity name (contains UUID pattern)
     const orgPrefixMatch = entityIdentifier.match(/^([a-f0-9-]{36})_(.+)$/)
@@ -1199,7 +1199,7 @@ export function getUniverseEntity$(entityIdentifier: string) {
     if (orgPrefixMatch) {
       // Extract org ID and entity name from prefixed identifier
       const [, orgId, entityName] = orgPrefixMatch
-      log.info(`[UniverseObservable] Accessing org-prefixed entity ${entityName} from org ${orgId}`)
+      fileLog.info(`[UniverseObservable] Accessing org-prefixed entity ${entityName} from org ${orgId}`)
       
       // For org-prefixed entities, we need to check if the current org context has this entity
       const currentOrgContext = {
@@ -1215,8 +1215,8 @@ export function getUniverseEntity$(entityIdentifier: string) {
       const schemaKey = entityIdentifier
       
       if (!currentOrgContext?.schema?.entities?.[schemaKey]) {
-        log.warn(`[UniverseObservable] Entity ${schemaKey} not available in current universe schema`)
-        log.info(`[UniverseObservable] Available entities:`, Object.keys(currentOrgContext?.schema?.entities || {}))
+        fileLog.warn(`[UniverseObservable] Entity ${schemaKey} not available in current universe schema`)
+        fileLog.info(`[UniverseObservable] Available entities:`, Object.keys(currentOrgContext?.schema?.entities || {}))
         return null
       }
       
@@ -1225,17 +1225,17 @@ export function getUniverseEntity$(entityIdentifier: string) {
       
       // Check cache first
       if (globalEntityCache[cacheKey]) {
-        log.info(`[UniverseObservable] Retrieved cached org-prefixed ${entityIdentifier} observable`)
+        fileLog.info(`[UniverseObservable] Retrieved cached org-prefixed ${entityIdentifier} observable`)
         return globalEntityCache[cacheKey]
       }
       
       // Create observable for this specific organization's entity
       try {
-        log.info(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
+        fileLog.info(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
         const observable = createEntityObservable(entityIdentifier, currentOrgContext.schema.entities[schemaKey])
         globalEntityCache[cacheKey] = observable
         
-        log.info(`[UniverseObservable] Created ${entityIdentifier} observable`, {
+        fileLog.info(`[UniverseObservable] Created ${entityIdentifier} observable`, {
           orgId,
           entityName,
           type: typeof observable,
@@ -1244,17 +1244,17 @@ export function getUniverseEntity$(entityIdentifier: string) {
         
         return observable
       } catch (createError) {
-        log.error(`[UniverseObservable] Error creating observable for ${entityIdentifier}:`, createError)
+        fileLog.error(`[UniverseObservable] Error creating observable for ${entityIdentifier}:`, createError)
         return null
       }
     } else {
       // No org prefix - fall back to regular getEntity$ behavior
-      log.info(`[UniverseObservable] No org prefix detected, falling back to regular getEntity$ for ${entityIdentifier}`)
+      fileLog.info(`[UniverseObservable] No org prefix detected, falling back to regular getEntity$ for ${entityIdentifier}`)
       return getEntity$(entityIdentifier)
     }
   } catch (error) {
     console.error(`🔥 UNIVERSE DEBUG: Exception in getUniverseEntity$ for ${entityIdentifier}:`, error)
-    log.error(`[UniverseObservable] Error getting universe entity observable for ${entityIdentifier}:`, error)
+    fileLog.error(`[UniverseObservable] Error getting universe entity observable for ${entityIdentifier}:`, error)
     return null
   }
 }
@@ -1263,7 +1263,7 @@ export function getUniverseEntity$(entityIdentifier: string) {
  * Clear all observables (for logout or org switching)
  */
 export function clearContext() {
-  log.info('[Observable] Clearing all observables with robust cleanup')
+  fileLog.info('[Observable] Clearing all observables with robust cleanup')
   
   // Use InitializationManager for coordinated cleanup
   initializationManager.reset()
@@ -1273,7 +1273,7 @@ export function clearContext() {
     try {
       persistenceManager.clearOrganizationData()
     } catch (error) {
-      log.warn('[Observable] Error clearing legacy persistence data:', error)
+      fileLog.warn('[Observable] Error clearing legacy persistence data:', error)
     }
     persistenceManager = null
   }
@@ -1294,7 +1294,7 @@ export function clearContext() {
     error: null,
   })
   
-  log.info('[Observable] ✅ Context cleared successfully')
+  fileLog.info('[Observable] ✅ Context cleared successfully')
 }
 
 /**
@@ -1303,11 +1303,11 @@ export function clearContext() {
 export function handleTableNotification(notification: any) {
   if (!notification?.table) return
   
-  log.info(`[Observable] Table notification for ${notification.table}:`, notification.operation)
+  fileLog.info(`[Observable] Table notification for ${notification.table}:`, notification.operation)
   
   // Handle schema changes from external sources (other clients)
   if (notification.table === 'entity_schemas') {
-    log.info(`[Observable] External entity schema change detected - reloading universe schema`)
+    fileLog.info(`[Observable] External entity schema change detected - reloading universe schema`)
     // Reload the entire universe context since we don't track individual orgs anymore
     const userId = universeUserId$.peek()
     if (userId) {
@@ -1331,16 +1331,16 @@ export function handleTableNotification(notification: any) {
 export function removeEntityFromSchema(entityName: string) {
   const currentSchema = universeSchema$.peek()
   if (!currentSchema?.entities) {
-    log.warn(`[Observable] Cannot remove entity ${entityName} - no schema loaded`)
+    fileLog.warn(`[Observable] Cannot remove entity ${entityName} - no schema loaded`)
     return
   }
   
   if (!currentSchema.entities[entityName]) {
-    log.warn(`[Observable] Entity ${entityName} not found in schema`)
+    fileLog.warn(`[Observable] Entity ${entityName} not found in schema`)
     return
   }
   
-  log.info(`[Observable] Removing entity ${entityName} from local schema observable`)
+  fileLog.info(`[Observable] Removing entity ${entityName} from local schema observable`)
   
   // Create new schema without the deleted entity - ensure deep clone
   const newEntities = { ...currentSchema.entities }
@@ -1354,13 +1354,13 @@ export function removeEntityFromSchema(entityName: string) {
     orgId: currentSchema.orgId
   }
   
-  log.info(`[Observable] New schema will have ${Object.keys(newEntities).length} entities (was ${Object.keys(currentSchema.entities).length})`)
+  fileLog.info(`[Observable] New schema will have ${Object.keys(newEntities).length} entities (was ${Object.keys(currentSchema.entities).length})`)
   
   // Update the observable immediately - this will trigger all reactive components
   // Schema is now managed by universe context - this is a no-op
-  log.info('Schema update requested but handled by universe context')
+  fileLog.info('Schema update requested but handled by universe context')
   
-  log.info(`[Observable] Schema updated locally - UI should update immediately`)
+  fileLog.info(`[Observable] Schema updated locally - UI should update immediately`)
 }
 
 /**
@@ -1371,11 +1371,11 @@ async function reloadOrgSchema(orgId: string) {
     const schemaResult = await orgSchemaClient.loadOrgSchema(orgId)
     if (schemaResult.success && schemaResult.schema) {
       // Schema is now managed by universe context - this is a no-op
-      log.info('Schema update requested but handled by universe context')
-      log.info(`[Observable] Schema reloaded from server`)
+      fileLog.info('Schema update requested but handled by universe context')
+      fileLog.info(`[Observable] Schema reloaded from server`)
     }
   } catch (error) {
-    log.error('[Observable] Failed to reload schema:', error)
+    fileLog.error('[Observable] Failed to reload schema:', error)
   }
 }
 
@@ -1461,7 +1461,7 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
     }))
     
   } catch (error) {
-    log.error('[Observable] Error creating entity groups:', error)
+    fileLog.error('[Observable] Error creating entity groups:', error)
     return []
   }
 })
@@ -1536,7 +1536,7 @@ export const batchOperations = {
       .filter(({ result }) => result.status === 'rejected')
     
     if (failures.length > 0) {
-      log.warn(`[BatchOperations] ${failures.length}/${ids.length} deletions failed:`, failures)
+      fileLog.warn(`[BatchOperations] ${failures.length}/${ids.length} deletions failed:`, failures)
     }
     
     return {
@@ -1568,7 +1568,7 @@ export const batchOperations = {
       .filter(({ result }) => result.status === 'rejected')
     
     if (failures.length > 0) {
-      log.warn(`[BatchOperations] ${failures.length}/${items.length} creations failed:`, failures)
+      fileLog.warn(`[BatchOperations] ${failures.length}/${items.length} creations failed:`, failures)
     }
     
     return {
@@ -1638,7 +1638,7 @@ export const entityOperations = {
    */
   async updateEntity(entityName: string, id: string, data: any, options: { validate?: boolean } = {}) {
     try {
-      log.info(`[Observable] Direct observable update for ${entityName}:${id}`, data)
+      fileLog.info(`[Observable] Direct observable update for ${entityName}:${id}`, data)
       
       // Get the entity observable (this is the syncedCrud observable)
       const entity$ = getEntity$(entityName)
@@ -1646,7 +1646,7 @@ export const entityOperations = {
         throw new Error(`Entity ${entityName} observable not found`)
       }
       
-      log.info(`[Observable] Found entity record ${entityName}:${id}, updating fields:`, Object.keys(data))
+      fileLog.info(`[Observable] Found entity record ${entityName}:${id}, updating fields:`, Object.keys(data))
       
       // CORRECT PATTERN: For syncedCrud with list operations, access the record directly
       // entity$[id] gives us the observable for that specific record
@@ -1655,7 +1655,7 @@ export const entityOperations = {
       // FIXED: Use syncedCrud's update function directly
       // syncedCrud observables provide CRUD operations: list, create, update, delete
       // Don't access individual record observables, use the built-in update function
-      log.info(`[Observable] Using syncedCrud update for ${entityName}:${id}:`, data)
+      fileLog.info(`[Observable] Using syncedCrud update for ${entityName}:${id}:`, data)
       
       // Get current data from the observable
       const allRecords = entity$.get()
@@ -1667,21 +1667,21 @@ export const entityOperations = {
       
       // Create updated record by merging current data with updates  
       const updatedRecord = { ...currentRecord, ...data, updated_at: new Date().toISOString() }
-      log.info(`[Observable] Merged record data:`, updatedRecord)
+      fileLog.info(`[Observable] Merged record data:`, updatedRecord)
       
       // CORRECT syncedCrud pattern: update the record in the observable data
       // This will trigger the update function defined in the syncedCrud config and sync to server
       const newRecords = { ...allRecords, [id]: updatedRecord }
       entity$.set(newRecords)
       
-      log.info(`✅ [Observable] Observable update completed for ${entityName}:${id}`)
+      fileLog.info(`✅ [Observable] Observable update completed for ${entityName}:${id}`)
       // syncedCrud will automatically handle the server sync in the background
       
       // Return the updated record that was already merged above
       return updatedRecord
       
     } catch (error) {
-      log.error(`❌ [Observable] Update failed for ${entityName}:${id}`, { error: error.message, data })
+      fileLog.error(`❌ [Observable] Update failed for ${entityName}:${id}`, { error: error.message, data })
       throw error
     }
   },
@@ -1712,13 +1712,13 @@ export const entityOperations = {
         const syncConfig = (entity$ as any)[Symbol.for('LegendState_syncedCrud')]
         if (syncConfig && syncConfig.delete) {
           const deleteResult = await syncConfig.delete(recordToDelete, { id })
-          log.info(`[Observable] Direct delete result:`, deleteResult)
+          fileLog.info(`[Observable] Direct delete result:`, deleteResult)
           return { success: true }
         } else {
           throw new Error('syncedCrud delete function not accessible')
         }
       } catch (directDeleteError) {
-        log.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
+        fileLog.warn(`[Observable] Direct syncedCrud delete failed:`, directDeleteError.message)
         
         // Fallback: trigger a manual server delete (bypass Legend State sync)
         const contextOrgId = universeOrgId$.peek()
@@ -1736,7 +1736,7 @@ export const entityOperations = {
           if (entitySchema) {
             deleteOrgId = entitySchema._organizationId || contextOrgId
             deleteEntityName = entitySchema._originalName || entityName
-            log.info(`[Observable] Delete fallback - using actual org ${deleteOrgId} for entity ${deleteEntityName}`)
+            fileLog.info(`[Observable] Delete fallback - using actual org ${deleteOrgId} for entity ${deleteEntityName}`)
           }
         }
         
@@ -1755,7 +1755,7 @@ export const entityOperations = {
         }
         
         // Manually trigger a refresh to get updated data
-        log.info(`[Observable] Manual server delete successful, triggering refresh`)
+        fileLog.info(`[Observable] Manual server delete successful, triggering refresh`)
         if (typeof (entity$ as any).refresh === 'function') {
           (entity$ as any).refresh()
         }
@@ -1791,7 +1791,7 @@ if (typeof window !== 'undefined') {
         errorMessage.includes('NotFoundError: Failed to execute \'transaction\' on \'IDBDatabase\'') ||
         errorMessage.includes('One of the specified object stores was not found')) {
       
-      log.info('[Observable] Intercepted Legend State IndexedDB error - handling gracefully')
+      fileLog.info('[Observable] Intercepted Legend State IndexedDB error - handling gracefully')
       
       // Clear IndexedDB data to fix schema mismatch
       if (persistenceManager) {
@@ -1818,7 +1818,7 @@ if (typeof window !== 'undefined') {
     
     if (errorMessage.includes('NotFoundError') && 
         errorMessage.includes('object stores was not found')) {
-      log.info('[Observable] Caught unhandled IndexedDB error - preventing crash')
+      fileLog.info('[Observable] Caught unhandled IndexedDB error - preventing crash')
       
       // Clear corrupted data
       if (persistenceManager) {

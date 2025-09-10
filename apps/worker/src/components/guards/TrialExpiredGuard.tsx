@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from '@tanstack/react-router';
 import { useAuth } from '@/state-machines';
-import { syncLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = syncLog('components/guards/TrialExpiredGuard.tsx');
+const fileLog = log('components/guards/TrialExpiredGuard.tsx');
 
 interface TrialExpiredGuardProps {
   children: React.ReactNode;
@@ -39,7 +39,7 @@ export function TrialExpiredGuard({ children }: TrialExpiredGuardProps) {
     
     // If trial is expired and needs billing setup, and we're not on an allowed page
     if (isTrialExpired && needsBillingSetup && !isAllowedPath) {
-      log.info('[TrialExpiredGuard] Trial expired, redirecting to billing', {
+      fileLog.info('[TrialExpiredGuard] Trial expired, redirecting to billing', {
         currentPath,
         isTrialExpired,
         needsBillingSetup

@@ -6,8 +6,8 @@
  */
 
 import type { Column } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/utils/relationship-discovery.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/utils/relationship-discovery.ts');
 
 export interface RelationshipConfig {
   fieldName: string;           // e.g., 'projectId', 'assigneeId', 'tags'
@@ -125,7 +125,7 @@ export function resolveEntityRelationships(
     
     // Minimal logging for debugging - only for first few entities
     if (config.fieldName === 'tags' && relationshipValue && relationshipValue.length > 0 && Math.random() < 0.05) {
-      log.info(`🔍 Relationship Discovery: Processing ${relationshipValue.length} tags for entity ${entity.id}`);
+      fileLog.info(`🔍 Relationship Discovery: Processing ${relationshipValue.length} tags for entity ${entity.id}`);
     }
     
     if (relationshipValue && relationships[config.relationshipTable]) {
@@ -149,7 +149,7 @@ export function resolveEntityRelationships(
         
         // Minimal logging for debugging - only sample entities
         if (config.fieldName === 'tags' && resolvedNames.length > 0 && Math.random() < 0.05) {
-          log.info(`🔍 Relationship Discovery: Resolved ${resolvedNames.length} tag names for entity ${entity.id}:`, resolvedNames);
+          fileLog.info(`🔍 Relationship Discovery: Resolved ${resolvedNames.length} tag names for entity ${entity.id}:`, resolvedNames);
         }
       } else {
         // Single relationship

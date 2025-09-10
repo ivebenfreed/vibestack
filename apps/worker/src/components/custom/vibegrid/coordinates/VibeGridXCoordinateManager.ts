@@ -19,9 +19,9 @@
 // ====================================
 
 import type { CellRef, TableRow, Column, ViewportInfo } from '../types';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('components/custom/vibegrid/coordinates/VibeGridXCoordinateManager.ts');
+const fileLog = log('components/custom/vibegrid/coordinates/VibeGridXCoordinateManager.ts');
 
 export interface CoordinatePosition {
   rowIndex: number;
@@ -142,7 +142,7 @@ export class VibeGridXCoordinateManager {
       return mapping;
     });
     
-    log.info('VibeGridXCoordinateManager.updateColumns:', {
+    fileLog.info('VibeGridXCoordinateManager.updateColumns:', {
       columnCount: columns.length,
       columnIds: columns.map(c => c.id),
       columnMappings: newColumns.map(c => ({ id: c.columnId, index: c.index, offset: c.offset }))
@@ -177,7 +177,7 @@ export class VibeGridXCoordinateManager {
     const columnMapping = this.mapping.columns.find(c => c.columnId === cellRef.columnId);
     
     if (!rowMapping || !columnMapping) {
-      log.warn('VibeGridXCoordinateManager: Could not find mapping for cell', cellRef);
+      fileLog.warn('VibeGridXCoordinateManager: Could not find mapping for cell', cellRef);
       return null;
     }
     
@@ -223,7 +223,7 @@ export class VibeGridXCoordinateManager {
     const rowHeight = 40;
     const y = position.rowIndex * rowHeight;
     
-    log.info('getCellPosition: Row mapping check', {
+    fileLog.info('getCellPosition: Row mapping check', {
       rowId,
       sortedIndex: position.rowIndex,
       calculatedY: y,
@@ -273,7 +273,7 @@ export class VibeGridXCoordinateManager {
     const viewportY = absolutePos.y;
     const viewportX = absolutePos.x;
     
-    log.info('getCellPositionWithViewport: Using absolute coordinates', {
+    fileLog.info('getCellPositionWithViewport: Using absolute coordinates', {
       rowId,
       absoluteRowIndex,
       absoluteY: absolutePos.y,
@@ -333,7 +333,7 @@ export class VibeGridXCoordinateManager {
     const columnMapping = this.mapping.columns[position.columnIndex];
     
     if (!rowMapping || !columnMapping) {
-      log.warn('VibeGridXCoordinateManager: Invalid position', position);
+      fileLog.warn('VibeGridXCoordinateManager: Invalid position', position);
       return null;
     }
     
@@ -595,7 +595,7 @@ export class VibeGridXCoordinateManager {
    * Debug helper
    */
   debug(): void {
-    log.info('VibeGridXCoordinateManager Debug:', {
+    fileLog.info('VibeGridXCoordinateManager Debug:', {
       version: this.version,
       rowCount: this.mapping.rows.length,
       columnCount: this.mapping.columns.length,

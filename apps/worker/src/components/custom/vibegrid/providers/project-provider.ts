@@ -1,6 +1,6 @@
 import type { RelationshipOptionsProvider, RelationshipContext } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/providers/project-provider.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/providers/project-provider.ts');
 
 /**
  * @deprecated This atom-based provider is deprecated.
@@ -12,6 +12,6 @@ const log = uiLog('components/custom/vibegrid/providers/project-provider.ts');
  * Sorted by name
  */
 export const projectProvider: RelationshipOptionsProvider = async (context: RelationshipContext) => {
-  log.warn('⚠️ DEPRECATED: Atom-based project provider called. VibeGrid uses Dexie providers.');
+  fileLog.warn('⚠️ DEPRECATED: Atom-based project provider called. VibeGrid uses Dexie providers.');
   return [];
 };

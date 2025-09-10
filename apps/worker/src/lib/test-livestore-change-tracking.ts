@@ -13,8 +13,8 @@ import {
   LiveStoreSyncService 
 } from './livestore-sync-integration';
 import { createLiveStoreOperations } from './livestore-operations';
-import { uiLog } from '@/logger';
-const log = uiLog('lib/test-livestore-change-tracking.ts');
+import { log } from '@/logger';
+const fileLog = log('lib/test-livestore-change-tracking.ts');
 
 /**
  * Mock LiveStore instance for testing
@@ -27,7 +27,7 @@ class MockLiveStoreInstance {
   }
   
   async query(sql: string, params?: any[]): Promise<any[]> {
-    log.info(`🗄️ Mock query: ${sql}`, params);
+    fileLog.info(`🗄️ Mock query: ${sql}`, params);
     
     // Simple mock for table queries
     if (sql.includes('SELECT') && sql.includes('sqlite_master')) {
@@ -46,12 +46,12 @@ class MockLiveStoreInstance {
   }
   
   async apply(event: any): Promise<void> {
-    log.info(`📨 Mock apply:`, event);
+    fileLog.info(`📨 Mock apply:`, event);
     // Mock event application
   }
   
   async close(): Promise<void> {
-    log.info(`🔌 Mock close`);
+    fileLog.info(`🔌 Mock close`);
   }
   
   // Mock methods for testing
@@ -87,7 +87,7 @@ class MockDexieDB {
     
     async add(change: any) {
       this.data.set(change.id, change);
-      log.info(`💾 Mock local_changes.add:`, change);
+      fileLog.info(`💾 Mock local_changes.add:`, change);
       return change.id;
     },
     
@@ -99,7 +99,7 @@ class MockDexieDB {
               const results = Array.from(this.data.values())
                 .filter(item => item[field] === value)
                 .filter(filter);
-              log.info(`🔍 Mock query results:`, results.length);
+              fileLog.info(`🔍 Mock query results:`, results.length);
               return results;
             }
           })
@@ -111,7 +111,7 @@ class MockDexieDB {
                 this.data.set(id, { ...item, ...updates });
               }
             }
-            log.info(`✏️ Mock modify: ${values.length} items`);
+            fileLog.info(`✏️ Mock modify: ${values.length} items`);
             return values.length;
           }
         })
@@ -172,7 +172,7 @@ export class LiveStoreChangeTrackingTester {
    * Run all change tracking tests
    */
   async runAllTests(): Promise<void> {
-    log.info('🧪 Testing LiveStore Change Tracking Integration...');
+    fileLog.info('🧪 Testing LiveStore Change Tracking Integration...');
 
     await this.testBasicChangeTracking();
     await this.testOperationsIntegration();
@@ -188,7 +188,7 @@ export class LiveStoreChangeTrackingTester {
    */
   async testBasicChangeTracking(): Promise<void> {
     const testName = 'Basic Change Tracking';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Register instance
@@ -210,7 +210,7 @@ export class LiveStoreChangeTrackingTester {
         const change = changes[0];
         if (change.operation === 'insert' && change.entity_id === 'project-1') {
           this.testResults.push({ test: testName, passed: true });
-          log.info(`✅ ${testName} passed`);
+          fileLog.info(`✅ ${testName} passed`);
         } else {
           throw new Error('Change data incorrect');
         }
@@ -220,7 +220,7 @@ export class LiveStoreChangeTrackingTester {
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -229,7 +229,7 @@ export class LiveStoreChangeTrackingTester {
    */
   async testOperationsIntegration(): Promise<void> {
     const testName = 'Operations Integration';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Clear previous data
@@ -255,14 +255,14 @@ export class LiveStoreChangeTrackingTester {
       
       if (insertChange && insertChange.table_name === 'test_org_tasks') {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('Insert change not tracked correctly');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -271,7 +271,7 @@ export class LiveStoreChangeTrackingTester {
    */
   async testSyncIntegration(): Promise<void> {
     const testName = 'Sync Integration';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Clear previous data
@@ -314,14 +314,14 @@ export class LiveStoreChangeTrackingTester {
       
       if (pendingChanges.length > 0) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error('No pending changes found');
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -330,7 +330,7 @@ export class LiveStoreChangeTrackingTester {
    */
   async testChangeTrackingDisabling(): Promise<void> {
     const testName = 'Change Tracking Disabling';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Clear previous data
@@ -370,7 +370,7 @@ export class LiveStoreChangeTrackingTester {
         
         if (changesAfterEnable.length === 1) {
           this.testResults.push({ test: testName, passed: true });
-          log.info(`✅ ${testName} passed`);
+          fileLog.info(`✅ ${testName} passed`);
         } else {
           throw new Error('Change tracking not properly re-enabled');
         }
@@ -380,7 +380,7 @@ export class LiveStoreChangeTrackingTester {
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -389,7 +389,7 @@ export class LiveStoreChangeTrackingTester {
    */
   async testDuplicatePrevention(): Promise<void> {
     const testName = 'Duplicate Prevention';
-    log.info(`🧪 Testing: ${testName}`);
+    fileLog.info(`🧪 Testing: ${testName}`);
 
     try {
       // Clear previous data
@@ -414,14 +414,14 @@ export class LiveStoreChangeTrackingTester {
       
       if (changes.length === 1) {
         this.testResults.push({ test: testName, passed: true });
-        log.info(`✅ ${testName} passed`);
+        fileLog.info(`✅ ${testName} passed`);
       } else {
         throw new Error(`Expected 1 change, got ${changes.length}`);
       }
 
     } catch (error) {
       this.testResults.push({ test: testName, passed: false, error: String(error) });
-      log.error(`❌ ${testName} failed:`, error);
+      fileLog.error(`❌ ${testName} failed:`, error);
     }
   }
 
@@ -429,35 +429,35 @@ export class LiveStoreChangeTrackingTester {
    * Print test results
    */
   private printResults(): void {
-    log.info('\n🧪 LiveStore Change Tracking Test Results:');
-    log.info('═'.repeat(60));
+    fileLog.info('\n🧪 LiveStore Change Tracking Test Results:');
+    fileLog.info('═'.repeat(60));
 
     let passed = 0;
     let failed = 0;
 
     this.testResults.forEach(result => {
       if (result.passed) {
-        log.info(`✅ ${result.test}`);
+        fileLog.info(`✅ ${result.test}`);
         passed++;
       } else {
-        log.info(`❌ ${result.test}: ${result.error}`);
+        fileLog.info(`❌ ${result.test}: ${result.error}`);
         failed++;
       }
     });
 
-    log.info('═'.repeat(60));
-    log.info(`📊 Results: ${passed} passed, ${failed} failed`);
+    fileLog.info('═'.repeat(60));
+    fileLog.info(`📊 Results: ${passed} passed, ${failed} failed`);
     
     if (failed === 0) {
-      log.info('🎉 All change tracking tests passed!');
-      log.info('\n✅ Integration Status:');
-      log.info('- LiveStore operations → local_changes: WORKING');
-      log.info('- Change tracking enable/disable: WORKING');
-      log.info('- Sync integration: WORKING');
-      log.info('- Duplicate prevention: WORKING');
-      log.info('- Operations manager: WORKING');
+      fileLog.info('🎉 All change tracking tests passed!');
+      fileLog.info('\n✅ Integration Status:');
+      fileLog.info('- LiveStore operations → local_changes: WORKING');
+      fileLog.info('- Change tracking enable/disable: WORKING');
+      fileLog.info('- Sync integration: WORKING');
+      fileLog.info('- Duplicate prevention: WORKING');
+      fileLog.info('- Operations manager: WORKING');
     } else {
-      log.info('⚠️ Some tests failed. Check the implementation.');
+      fileLog.info('⚠️ Some tests failed. Check the implementation.');
     }
   }
 
@@ -493,5 +493,5 @@ export async function testLiveStoreChangeTracking(): Promise<void> {
 // Export for global usage
 if (typeof window !== 'undefined') {
   (window as any).testLiveStoreChangeTracking = testLiveStoreChangeTracking;
-  log.info('🧪 LiveStore change tracking test available as window.testLiveStoreChangeTracking()');
+  fileLog.info('🧪 LiveStore change tracking test available as window.testLiveStoreChangeTracking()');
 }

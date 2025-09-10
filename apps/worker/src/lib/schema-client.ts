@@ -1,5 +1,5 @@
-import { uiLog } from '@/logger';
-const log = uiLog('lib/schema-client.ts');
+import { log } from '@/logger';
+const fileLog = log('lib/schema-client.ts');
 /**
  * Client-Side Schema Loading
  * 
@@ -80,7 +80,7 @@ export class OrgSchemaClient {
           // Add delay for retries (exponential backoff)
           if (attempt > 0) {
             const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
-            log.info(`Retrying schema load for ${orgId} after ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+            fileLog.info(`Retrying schema load for ${orgId} after ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
             await new Promise(resolve => setTimeout(resolve, delay));
           }
 
@@ -100,7 +100,7 @@ export class OrgSchemaClient {
           // If we got here, the request succeeded - continue with normal processing
           const rawData = await response.json();
           
-          log.info('🔍 Schema client raw response:', rawData);
+          fileLog.info('🔍 Schema client raw response:', rawData);
           
           // Handle the new API format - check if it's the wrapped response format
           let schemaArray: any[];
@@ -145,7 +145,7 @@ export class OrgSchemaClient {
           
         } catch (error) {
           lastError = error as Error;
-          log.error(`Schema loading attempt ${attempt + 1} failed for org ${orgId}:`, error);
+          fileLog.error(`Schema loading attempt ${attempt + 1} failed for org ${orgId}:`, error);
           
           // If it's a network error and we have more retries, continue
           if (attempt < maxRetries - 1 && 
@@ -162,7 +162,7 @@ export class OrgSchemaClient {
       throw lastError || new Error('Schema loading failed after all retries');
       
     } catch (error) {
-      log.error('Failed to load org schema:', error);
+      fileLog.error('Failed to load org schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -185,7 +185,7 @@ export class OrgSchemaClient {
         // Handle both .fields (legacy format) and .allFields (new unified format)
         const fields = businessMetadata.fields || businessMetadata.allFields || [];
         
-        log.info('🔍 Schema processing debug:', {
+        fileLog.info('🔍 Schema processing debug:', {
           entityName: entity.entityName,
           hasFields: !!businessMetadata.fields,
           hasAllFields: !!businessMetadata.allFields,
@@ -259,7 +259,7 @@ export class OrgSchemaClient {
           syncableFields.updated_at = { type: 'timestamp', required: false, syncable: false };
         }
 
-        log.info('🔍 Processing entity with enhanced structure:', {
+        fileLog.info('🔍 Processing entity with enhanced structure:', {
           entityName: entity.entityName,
           tableName: entity.tableName,
           archetype: entity.archetype,
@@ -285,7 +285,7 @@ export class OrgSchemaClient {
         entities
       };
       
-      log.info('🔍 Schema client processed schema:', schema);
+      fileLog.info('🔍 Schema client processed schema:', schema);
       
       return schema;
   }
@@ -541,11 +541,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      log.info(`[Schema] Successfully added ${fields.length} fields to entity: ${entityName}`);
+      fileLog.info(`[Schema] Successfully added ${fields.length} fields to entity: ${entityName}`);
       return { success: true };
       
     } catch (error) {
-      log.error('Failed to add fields to entity:', error);
+      fileLog.error('Failed to add fields to entity:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -583,11 +583,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      log.info(`[Schema] Successfully removed field '${fieldName}' from entity: ${entityName}`);
+      fileLog.info(`[Schema] Successfully removed field '${fieldName}' from entity: ${entityName}`);
       return { success: true };
       
     } catch (error) {
-      log.error('Failed to remove field from entity:', error);
+      fileLog.error('Failed to remove field from entity:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -627,11 +627,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      log.info(`[Schema] Successfully created entity schema: ${entityData.name}`);
+      fileLog.info(`[Schema] Successfully created entity schema: ${entityData.name}`);
       return { success: true };
       
     } catch (error) {
-      log.error('Failed to create entity schema:', error);
+      fileLog.error('Failed to create entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -669,14 +669,14 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      log.info(`[Schema] Successfully soft deleted entity schema: ${entityName} (recoverable)`);
+      fileLog.info(`[Schema] Successfully soft deleted entity schema: ${entityName} (recoverable)`);
       return { 
         success: true, 
         softDeleted: result.softDeleted,
       };
       
     } catch (error) {
-      log.error('Failed to delete entity schema:', error);
+      fileLog.error('Failed to delete entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -714,11 +714,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      log.info(`[Schema] Successfully restored entity schema: ${entityName}`);
+      fileLog.info(`[Schema] Successfully restored entity schema: ${entityName}`);
       return { success: true };
       
     } catch (error) {
-      log.error('Failed to restore entity schema:', error);
+      fileLog.error('Failed to restore entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -756,11 +756,11 @@ export class OrgSchemaClient {
       // Clear cache to force reload of schema on next access
       this.clearCache(orgId);
       
-      log.info(`[Schema] Successfully permanently deleted entity schema: ${entityName} (irreversible)`);
+      fileLog.info(`[Schema] Successfully permanently deleted entity schema: ${entityName} (irreversible)`);
       return { success: true };
       
     } catch (error) {
-      log.error('Failed to permanently delete entity schema:', error);
+      fileLog.error('Failed to permanently delete entity schema:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -795,14 +795,14 @@ export class OrgSchemaClient {
         };
       }
 
-      log.info(`[Schema] Successfully listed ${result.data.total} deleted entities`);
+      fileLog.info(`[Schema] Successfully listed ${result.data.total} deleted entities`);
       return { 
         success: true,
         entities: result.data.entities
       };
       
     } catch (error) {
-      log.error('Failed to list trash entities:', error);
+      fileLog.error('Failed to list trash entities:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

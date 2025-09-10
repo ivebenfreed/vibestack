@@ -1,7 +1,7 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/vibegrid/overlays/DragPreviewOverlayDOM.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/vibegrid/overlays/DragPreviewOverlayDOM.ts');
 
 // ====================================
 // DRAG PREVIEW OVERLAY - DOM Implementation
@@ -114,7 +114,7 @@ export class DragPreviewOverlayDOM {
       transition: 'all 100ms ease-out'
     });
     
-    log.info('DragPreviewOverlayDOM: Preview shown', { x, y, width, height });
+    fileLog.info('DragPreviewOverlayDOM: Preview shown', { x, y, width, height });
   }
   
   /**

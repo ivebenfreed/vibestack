@@ -10,12 +10,12 @@ import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
-import { authLog } from '@/logger'
+import { log } from '@/logger'
 
 // Removed session tracking - components handle their own initialization state
 
 // Create logger instance for this file
-const log = authLog('routes/_authenticated/route.tsx');
+const myLog = log('routes/_authenticated/route.tsx');
 
 export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/_authenticated')({
     // If auth machine is still checking, wait for it to resolve
     const currentSnapshot = authActor.getSnapshot()
     if (currentSnapshot.matches('checking')) {
-      log.info('Waiting for auth resolution...')
+      myLog.info('Waiting for auth resolution...')
       
       await new Promise<void>((resolve) => {
         let resolved = false
@@ -57,7 +57,7 @@ export const Route = createFileRoute('/_authenticated')({
     
     // Check final auth state
     const finalAuthSnapshot = authActor.getSnapshot()
-    log.info('Final auth state check:', {
+    myLog.info('Final auth state check:', {
       matches: finalAuthSnapshot.value,
       user: !!finalAuthSnapshot.context.user,
       authError: finalAuthSnapshot.context.authError,
@@ -67,13 +67,13 @@ export const Route = createFileRoute('/_authenticated')({
     
     // Allow errorRecovery state - don't redirect immediately
     if (finalAuthSnapshot.matches('errorRecovery')) {
-      log.info('In error recovery state, allowing access with persisted auth')
+      myLog.info('In error recovery state, allowing access with persisted auth')
       // The error recovery state will handle retries and eventual redirect if needed
       return
     }
     
     if (!finalAuthSnapshot.matches('authenticated') || !finalAuthSnapshot.context.user) {
-      log.info('Redirecting to sign-in from:', window.location.pathname)
+      myLog.info('Redirecting to sign-in from:', window.location.pathname)
       throw redirect({
         to: '/sign-in',
         search: { redirect: location.pathname },
@@ -92,13 +92,13 @@ export const Route = createFileRoute('/_authenticated')({
                          finalAuthSnapshot.matches('authenticated.upgradingSubscription');
 
     if (isInOrgSetup) {
-      log.info('In organization setup phase, skipping system readiness check')
+      myLog.info('In organization setup phase, skipping system readiness check')
       return
     }
     
     // FIXED: Removed blocking Legend State check from beforeLoad to prevent white screen
     // Components will handle their own loading states using UnifiedLoadingScreen
-    log.info('Route loading - components will handle Legend State initialization')
+    myLog.info('Route loading - components will handle Legend State initialization')
   },
   component: RouteComponent,
 })
@@ -112,7 +112,7 @@ function RouteComponent() {
 }
 
 const AuthenticatedContent = observer(function AuthenticatedContent() {
-  log.info('AuthenticatedContent Rendering at', Date.now());
+  myLog.info('AuthenticatedContent Rendering at', Date.now());
   const { 
     isCheckingAuth,
     needsOrganizationSetup, 
@@ -123,7 +123,7 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
     user
   } = useAuth();
   
-  log.info('AuthenticatedContent Auth states:', {
+  myLog.info('AuthenticatedContent Auth states:', {
     isCheckingAuth,
     isLoadingOrganizations,
     isAuthenticatedAndReady,

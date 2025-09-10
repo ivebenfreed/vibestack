@@ -1,7 +1,7 @@
 import { createStore } from '@xstate/store'
 import { useSelector } from '@xstate/store/react'
-import { stateLog } from '@/logger';
-const log = stateLog('stores/layoutStore.ts');
+import { log } from '@/logger';
+const fileLog = log('stores/layoutStore.ts');
 
 // Simple debounce implementation
 function debounce<T extends (...args: any[]) => any>(
@@ -45,7 +45,7 @@ export const layoutStore = createStore({
     setActiveSection: (context, event: { section: ActiveSection }) => {
       if (context.activeSection !== event.section) {
         if (import.meta.env.DEV) {
-          log.info('[LayoutStore] Setting active section:', event.section)
+          fileLog.info('[LayoutStore] Setting active section:', event.section)
         }
         return {
           ...context,
@@ -63,7 +63,7 @@ export const layoutStore = createStore({
       }
       
       if (import.meta.env.DEV) {
-        log.info('[LayoutStore] Setting pending section for immediate animation:', event.section)
+        fileLog.info('[LayoutStore] Setting pending section for immediate animation:', event.section)
       }
       return {
         ...context,
@@ -99,7 +99,7 @@ export const layoutStore = createStore({
       // If we have a pending section and it matches the route, confirm it
       if (context.pendingSection === newSection) {
         if (import.meta.env.DEV) {
-          log.info('[LayoutStore] Route confirmed pending section:', newSection)
+          fileLog.info('[LayoutStore] Route confirmed pending section:', newSection)
         }
         return {
           ...context,
@@ -108,7 +108,7 @@ export const layoutStore = createStore({
         }
       } else if (context.activeSection !== newSection) {
         if (import.meta.env.DEV) {
-          log.info('[LayoutStore] Route changed, updating section:', pathname, '->', newSection)
+          fileLog.info('[LayoutStore] Route changed, updating section:', pathname, '->', newSection)
         }
         return {
           ...context,
@@ -189,7 +189,7 @@ export const useLayoutStore = {
       // 🎯 DISABLED: Let SidebarInset handle transitions natively with CSS
       // No need to observe sidebar state changes when using pure CSS approach
       if (import.meta.env.DEV) {
-        log.info('[LayoutStore] Sidebar observer disabled - using native CSS transitions')
+        fileLog.info('[LayoutStore] Sidebar observer disabled - using native CSS transitions')
       }
     }
     

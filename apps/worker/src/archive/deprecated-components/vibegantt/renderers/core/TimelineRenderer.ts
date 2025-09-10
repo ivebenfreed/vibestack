@@ -2,8 +2,8 @@ import { TimeScaleEngine } from '../engines/TimeScaleEngine';
 import type { DateRange, TimeScale } from '../../types';
 import { GANTT_COLORS } from '../../constants';
 import { format, isToday } from 'date-fns';
-import { debugLog } from '@/logger';
-const log = debugLog('archive/deprecated-components/vibegantt/renderers/core/TimelineRenderer.ts');
+import { log } from '@/logger';
+const fileLog = log('archive/deprecated-components/vibegantt/renderers/core/TimelineRenderer.ts');
 
 interface TimelineRenderOptions {
   dateRange: DateRange;
@@ -69,7 +69,7 @@ export class TimelineRenderer {
     this.clear();
     
     // Note: Don't call setZoomLevel here as it's already set in GanttRenderer with proper pixels per day
-    log.info('TimelineRenderer: Rendering with', {
+    fileLog.info('TimelineRenderer: Rendering with', {
       zoomLevel: options.zoomLevel,
       dayWidth: this.timeScaleEngine.getDayWidth(),
       dateRange: {
@@ -83,7 +83,7 @@ export class TimelineRenderer {
     const headerUnits = this.timeScaleEngine.getHeaderUnits(options.dateRange);
     
     // Debug: Log rendering details
-    log.info('TimelineRenderer: Units generated', {
+    fileLog.info('TimelineRenderer: Units generated', {
       zoomLevel: options.zoomLevel,
       unitsCount: units.length,
       headerUnitsCount: headerUnits.length,
@@ -97,7 +97,7 @@ export class TimelineRenderer {
     
     // Debug: Log if no units are generated
     if (units.length === 0) {
-      log.warn('TimelineRenderer: No units generated for date range:', options.dateRange);
+      fileLog.warn('TimelineRenderer: No units generated for date range:', options.dateRange);
     }
     
     // Render grid lines
@@ -159,7 +159,7 @@ export class TimelineRenderer {
     
     // Debug: Only log if there are rendering issues
     if (units.length === 0 || headerUnits.length === 0) {
-      log.warn('TimelineRenderer: Missing units for label rendering', {
+      fileLog.warn('TimelineRenderer: Missing units for label rendering', {
         units: units.length,
         headerUnits: headerUnits.length
       });

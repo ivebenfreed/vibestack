@@ -5,8 +5,8 @@
 
 import { observable } from '@legendapp/state'
 import type { Column } from '@/components/custom/vibegrid/column-types'
-import { stateLog } from '@/logger';
-const log = stateLog('legend-state/hooks/use-precomputed-entity-columns.ts');
+import { log } from '@/logger';
+const fileLog = log('legend-state/hooks/use-precomputed-entity-columns.ts');
 
 // Precomputed column configurations for each entity
 const entityColumnsCache = new Map<string, any>()
@@ -231,7 +231,7 @@ export function getPrecomputedEntityColumns$<T = any>(entityName: string) {
     const columns$ = observable(getBasicColumns<T>())
     entityColumnsCache.set(cacheKey, columns$)
     
-    log.info(`[getPrecomputedEntityColumns$] Created basic columns fallback for ${entityName}`)
+    fileLog.info(`[getPrecomputedEntityColumns$] Created basic columns fallback for ${entityName}`)
   }
   
   return entityColumnsCache.get(cacheKey)
@@ -261,5 +261,5 @@ export function usePrecomputedEntityColumns<T = any>(entityName: string, schema?
  */
 export function clearEntityColumnsCache() {
   entityColumnsCache.clear()
-  log.info('[clearEntityColumnsCache] Cleared all cached entity column observables')
+  fileLog.info('[clearEntityColumnsCache] Cleared all cached entity column observables')
 }

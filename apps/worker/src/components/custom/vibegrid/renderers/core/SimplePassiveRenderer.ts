@@ -6,7 +6,7 @@
  */
 
 import { observe } from '@legendapp/state';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 import type { 
   TableCore$, 
   TableInteraction$, 
@@ -19,7 +19,7 @@ import { SelectionManager } from '../managers/SelectionManager';
 import type { ViewportInfo, TableRow } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 
-const log = uiLog('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
+const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
 const ROW_HEIGHT = 40;
 const HEADER_HEIGHT = 48;
@@ -78,7 +78,7 @@ export class SimplePassiveRenderer {
   private selectAllCheckbox: HTMLInputElement | null = null;
   
   constructor(private options: SimplePassiveRendererOptions) {
-    log.info('🎯 SimplePassiveRenderer: Initializing');
+    fileLog.info('🎯 SimplePassiveRenderer: Initializing');
     
     this.container = options.container;
     this.tableCore$ = options.tableCore$;
@@ -95,7 +95,7 @@ export class SimplePassiveRenderer {
    * Initialize overlay components
    */
   private initOverlays(): void {
-    log.info('🎨 Initializing overlays');
+    fileLog.info('🎨 Initializing overlays');
     
     // Create complete canvas overlay system
     this.canvasOverlay = new CanvasOverlayDOM(
@@ -107,7 +107,7 @@ export class SimplePassiveRenderer {
         cellWidth: 150 // Default width, will be updated by coordinate mapping
       },
       (event) => {
-        log.info('📋 Canvas overlay event:', event);
+        fileLog.info('📋 Canvas overlay event:', event);
         // Handle fill events from the overlay system
       }
     );
@@ -156,7 +156,7 @@ export class SimplePassiveRenderer {
     // Create context menu manager
     this.contextMenu = new ContextMenuManager(this.container);
     
-    log.info('✅ Canvas overlay system initialized');
+    fileLog.info('✅ Canvas overlay system initialized');
   }
   
   /**
@@ -235,19 +235,19 @@ export class SimplePassiveRenderer {
       }
     }, 0);
     
-    log.info('✅ DOM structure created');
+    fileLog.info('✅ DOM structure created');
   }
   
   /**
    * Setup reactive observers
    */
   private setupObservers(): void {
-    log.info('🔍 Setting up observers');
+    fileLog.info('🔍 Setting up observers');
     
     // Observe columns changes
     const columnsDisposer = observe(() => {
       const columns = this.tableCore$.columns.get();
-      log.info('📊 Columns changed', { count: columns.length });
+      fileLog.info('📊 Columns changed', { count: columns.length });
       this.renderHeader();
       this.renderBody();
     });
@@ -257,7 +257,7 @@ export class SimplePassiveRenderer {
     const columnVisibilityDisposer = observe(() => {
       const columnVisibility = this.tableCore$.columnVisibility.get();
       const hiddenCount = Object.values(columnVisibility).filter(visible => visible === false).length;
-      log.info('👁️ Column visibility changed', { hiddenCount });
+      fileLog.info('👁️ Column visibility changed', { hiddenCount });
       // Only re-render header and body - both need to filter columns
       this.renderHeader();
       this.renderBody();
@@ -267,7 +267,7 @@ export class SimplePassiveRenderer {
     // Observe processed rows changes
     const rowsDisposer = observe(() => {
       const rows = this.tableCore$.processedRows.get();
-      log.info('📋 Rows changed', { count: rows.length });
+      fileLog.info('📋 Rows changed', { count: rows.length });
       this.renderBody();
     });
     this.disposers.push(rowsDisposer);
@@ -279,7 +279,7 @@ export class SimplePassiveRenderer {
       const viewportWidth = this.tableViewport$.viewportWidth.get();
       const viewportHeight = this.tableViewport$.viewportHeight.get();
       
-      log.info('🖼️ Viewport changed', { 
+      fileLog.info('🖼️ Viewport changed', { 
         scrollTop, 
         scrollLeft, 
         viewportWidth, 
@@ -296,7 +296,7 @@ export class SimplePassiveRenderer {
       const scrollLeft = this.tableViewport$.scrollLeft.get();
       const viewportHeight = this.tableViewport$.viewportHeight.get();
       
-      log.info('🎯 Selection changed', { 
+      fileLog.info('🎯 Selection changed', { 
         selectedCount: selectedCells.size,
         scrollTop,
         viewportHeight 
@@ -379,7 +379,7 @@ export class SimplePassiveRenderer {
             
             const cell = { rowId, columnId };
             
-            log.debug('🖊️ Showing edit overlay', {
+            fileLog.debug('🖊️ Showing edit overlay', {
               editingCell,
               position,
               cell,
@@ -452,7 +452,7 @@ export class SimplePassiveRenderer {
     // Sort observer - updates sort indicators when sort state changes
     const sortDisposer = observe(() => {
       const sortBy = this.tableCore$.sortBy.get();
-      log.debug('🔄 Sort state changed, updating indicators', { sortBy });
+      fileLog.debug('🔄 Sort state changed, updating indicators', { sortBy });
       
       // Update sort indicators after a small delay to ensure header is rendered
       requestAnimationFrame(() => {
@@ -464,7 +464,7 @@ export class SimplePassiveRenderer {
     // Setup context menu event handler
     this.setupContextMenu();
     
-    log.info('✅ All observers and event handlers set up');
+    fileLog.info('✅ All observers and event handlers set up');
   }
 
   /**
@@ -555,7 +555,7 @@ export class SimplePassiveRenderer {
       e.preventDefault();
       e.stopPropagation();
       
-      log.info('🎯 Group header clicked', { 
+      fileLog.info('🎯 Group header clicked', { 
         groupId: groupRow.id, 
         currentlyExpanded: isExpanded 
       });
@@ -580,7 +580,7 @@ export class SimplePassiveRenderer {
         const rowId = cellElement.dataset.rowId;
         const columnId = cellElement.dataset.columnId;
         
-        log.info('🖱️ Context menu triggered', { rowId, columnId });
+        fileLog.info('🖱️ Context menu triggered', { rowId, columnId });
         
         // Show context menu
         this.contextMenu.show({
@@ -600,27 +600,27 @@ export class SimplePassiveRenderer {
             this.contextMenu?.hide();
           },
           onCopy: () => {
-            log.info('📋 Copy action');
+            fileLog.info('📋 Copy action');
             // Implement copy logic via tableInteraction$
             this.contextMenu?.hide();
           },
           onPaste: () => {
-            log.info('📋 Paste action');
+            fileLog.info('📋 Paste action');
             // Implement paste logic via tableInteraction$
             this.contextMenu?.hide();
           },
           onCut: () => {
-            log.info('✂️ Cut action');
+            fileLog.info('✂️ Cut action');
             // Implement cut logic via tableInteraction$
             this.contextMenu?.hide();
           },
           onInsertRow: () => {
-            log.info('➕ Insert row action');
+            fileLog.info('➕ Insert row action');
             // Implement insert row logic via tableCore$
             this.contextMenu?.hide();
           },
           onDeleteRow: () => {
-            log.info('➖ Delete row action');
+            fileLog.info('➖ Delete row action');
             // Implement delete row logic via tableCore$
             this.contextMenu?.hide();
           }
@@ -637,7 +637,7 @@ export class SimplePassiveRenderer {
     
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
-    log.info('🎨 Rendering header', { columnCount: columns.length });
+    fileLog.info('🎨 Rendering header', { columnCount: columns.length });
     
     this.headerContainer.innerHTML = '';
     
@@ -689,7 +689,7 @@ export class SimplePassiveRenderer {
         });
         const totalCells = processedRows.length * visibleColumns.length;
         
-        log.info('🎯 Select all checkbox clicked', {
+        fileLog.info('🎯 Select all checkbox clicked', {
           currentSelection: selectedCells.size,
           totalCells,
           checkboxChecked: this.selectAllCheckbox!.checked
@@ -699,10 +699,10 @@ export class SimplePassiveRenderer {
         // If we have no selection, select all
         if (selectedCells.size > 0) {
           this.tableInteraction$.clearSelection();
-          log.info('🎯 Select all checkbox - clearing selection');
+          fileLog.info('🎯 Select all checkbox - clearing selection');
         } else {
           this.selectAllCells();
-          log.info('🎯 Select all checkbox - selecting all');
+          fileLog.info('🎯 Select all checkbox - selecting all');
         }
       });
       
@@ -720,7 +720,7 @@ export class SimplePassiveRenderer {
     const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
     const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
     
-    log.info('🎨 Rendering header with column virtual scrolling', { 
+    fileLog.info('🎨 Rendering header with column virtual scrolling', { 
       totalColumns: columns.length,
       allVisibleColumns: allVisibleColumns.length,
       virtualRange: `${startColIndex}-${endColIndex}`,
@@ -876,13 +876,13 @@ export class SimplePassiveRenderer {
           // Ctrl+Click on header - select entire column
           e.preventDefault();
           this.selectColumn(column.id);
-          log.info('🎯 Column selected', { columnId: column.id });
+          fileLog.info('🎯 Column selected', { columnId: column.id });
         } else {
           // Regular click or Shift+click - toggle sort
           // Shift+click enables multi-column sorting
           const isMultiSort = isShiftKey;
           
-          log.info('🔄 Column header clicked for sort', { 
+          fileLog.info('🔄 Column header clicked for sort', { 
             columnId: column.id, 
             field: column.field,
             usingField: column.field || column.id,
@@ -901,7 +901,7 @@ export class SimplePassiveRenderer {
     
     this.headerContainer.appendChild(headerRow);
     this.coordinateMapping.version++;
-    log.info('✅ Header rendered');
+    fileLog.info('✅ Header rendered');
   }
   
   /**
@@ -914,7 +914,7 @@ export class SimplePassiveRenderer {
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
     
-    log.info('🎨 Rendering body', { 
+    fileLog.info('🎨 Rendering body', { 
       rowCount: rows.length, 
       columnCount: columns.length 
     });
@@ -934,7 +934,7 @@ export class SimplePassiveRenderer {
     const endIndex = Math.min(rows.length, visibleRange.end);
     const visibleRows = rows.slice(startIndex, endIndex);
     
-    log.debug('🎨 Virtual scrolling', { 
+    fileLog.debug('🎨 Virtual scrolling', { 
       totalRows: rows.length, 
       visibleRange: `${startIndex}-${endIndex}`,
       rendering: visibleRows.length
@@ -978,7 +978,7 @@ export class SimplePassiveRenderer {
     });
     
     this.coordinateMapping.version++;
-    log.info('✅ Body rendered', { totalHeight });
+    fileLog.info('✅ Body rendered', { totalHeight });
   }
   
   /**
@@ -1002,7 +1002,7 @@ export class SimplePassiveRenderer {
       }
     });
     
-    log.info('✅ DOM selection classes updated', { selectedCount: selectedCells.size });
+    fileLog.info('✅ DOM selection classes updated', { selectedCount: selectedCells.size });
   }
   
   /**
@@ -1031,7 +1031,7 @@ export class SimplePassiveRenderer {
       }
     });
     
-    log.info('✅ Visual cell positions calculated', { 
+    fileLog.info('✅ Visual cell positions calculated', { 
       selectedCount: selectedCells.size,
       visualCount: visualCells.length 
     });
@@ -1121,7 +1121,7 @@ export class SimplePassiveRenderer {
         const checkbox = target as HTMLInputElement;
         const isShiftKey = e.shiftKey;
         
-        log.debug('🔘 Checkbox click detected', {
+        fileLog.debug('🔘 Checkbox click detected', {
           rowId: row.id,
           isShiftKey,
           lastSelectedRowId: this.lastSelectedRowId,
@@ -1130,14 +1130,14 @@ export class SimplePassiveRenderer {
         
         if (isShiftKey && this.lastSelectedRowId) {
           // Shift+Click for row range selection
-          log.debug('🎯 Shift+Click detected - calling selectRowRange', {
+          fileLog.debug('🎯 Shift+Click detected - calling selectRowRange', {
             from: this.lastSelectedRowId,
             to: row.id
           });
           this.selectRowRange(this.lastSelectedRowId, row.id);
         } else {
           // Use toggleRowSelection for proper multi-row behavior
-          log.debug('🔘 Regular click - calling toggleRowSelection', {
+          fileLog.debug('🔘 Regular click - calling toggleRowSelection', {
             rowId: row.id
           });
           this.toggleRowSelection(row.id);
@@ -1157,7 +1157,7 @@ export class SimplePassiveRenderer {
         this.selectRow(row.id);
       }
       
-      log.info('🎯 Row header clicked', { rowId: row.id, isCtrlKey });
+      fileLog.info('🎯 Row header clicked', { rowId: row.id, isCtrlKey });
     });
     
     rowElement.appendChild(rowHeader);
@@ -1259,7 +1259,7 @@ export class SimplePassiveRenderer {
       e.stopPropagation();
       const cellId = `${row.id}:${column.id}`;
       
-      log.info('📝 Content clicked - entering edit mode', {
+      fileLog.info('📝 Content clicked - entering edit mode', {
         rowId: row.id,
         columnId: column.id,
         value,
@@ -1283,13 +1283,13 @@ export class SimplePassiveRenderer {
           target.classList.contains('vibegridx-cell-number-editable') ||
           target.classList.contains('vibegridx-cell-boolean-editable') ||
           target.classList.contains('vibegridx-cell-empty-editable'))) {
-        log.info('📝 Content element clicked, ignoring for selection');
+        fileLog.info('📝 Content element clicked, ignoring for selection');
         return; // Content clicks are handled separately for editing
       }
       
       // Only proceed for cell background clicks (whitespace)
       if (target !== cellElement) {
-        log.info('🖱️ Click not on cell element, ignoring', {
+        fileLog.info('🖱️ Click not on cell element, ignoring', {
           targetElement: (target as HTMLElement)?.tagName,
           targetClass: (target as HTMLElement)?.className
         });
@@ -1300,7 +1300,7 @@ export class SimplePassiveRenderer {
       const isShiftKey = e.shiftKey;
       const cellId = `${row.id}:${column.id}`;
       
-      log.info('🖱️ Cell whitespace clicked - selection mode', { 
+      fileLog.info('🖱️ Cell whitespace clicked - selection mode', { 
         rowId: row.id, 
         columnId: column.id,
         ctrl: isCtrlKey,
@@ -1350,7 +1350,7 @@ export class SimplePassiveRenderer {
       };
       
       const handleMouseUp = (e: MouseEvent) => {
-        log.info('🖱️ Mouse up - ending drag selection');
+        fileLog.info('🖱️ Mouse up - ending drag selection');
         this.tableInteraction$.endDragSelection();
         
         // Clean up listeners
@@ -1594,7 +1594,7 @@ export class SimplePassiveRenderer {
     const viewportHeight = this.tableViewport$.viewportHeight.get();
     const visibleRange = this.tableViewport$.visibleRange.get();
     
-    log.debug('📐 Viewport updated', { 
+    fileLog.debug('📐 Viewport updated', { 
       scrollTop, 
       scrollLeft, 
       viewportWidth, 
@@ -1617,7 +1617,7 @@ export class SimplePassiveRenderer {
    * Destroy the renderer
    */
   destroy(): void {
-    log.info('🧹 Destroying SimplePassiveRenderer');
+    fileLog.info('🧹 Destroying SimplePassiveRenderer');
     
     // Clean up observers
     this.disposers.forEach(dispose => dispose());
@@ -1653,7 +1653,7 @@ export class SimplePassiveRenderer {
     this.editingOverlay = null;
     this.contextMenu = null;
     
-    log.info('✅ SimplePassiveRenderer destroyed with all 5 overlays cleaned up');
+    fileLog.info('✅ SimplePassiveRenderer destroyed with all 5 overlays cleaned up');
   }
   
   /**
@@ -1676,7 +1676,7 @@ export class SimplePassiveRenderer {
     this.tableInteraction$.selectedCells.set(allCells);
     this.tableInteraction$.selectionMode.set('multi');
     
-    log.info('🎯 Selected all cells', { 
+    fileLog.info('🎯 Selected all cells', { 
       rowCount: processedRows.length,
       columnCount: visibleColumns.length,
       totalSelected: allCells.size
@@ -1697,7 +1697,7 @@ export class SimplePassiveRenderer {
     this.tableInteraction$.selectedCells.set(columnCells);
     this.tableInteraction$.selectionMode.set('column');
     
-    log.info('🎯 Selected column', { 
+    fileLog.info('🎯 Selected column', { 
       columnId,
       rowCount: processedRows.length,
       selectedCells: columnCells.size
@@ -1721,7 +1721,7 @@ export class SimplePassiveRenderer {
     this.tableInteraction$.selectedCells.set(rowCells);
     this.tableInteraction$.selectionMode.set('row');
     
-    log.info('🎯 Selected row', { 
+    fileLog.info('🎯 Selected row', { 
       rowId,
       columnCount: visibleColumns.length,
       selectedCells: rowCells.size
@@ -1751,7 +1751,7 @@ export class SimplePassiveRenderer {
       for (const cellId of rowCells) {
         currentSelection.delete(cellId);
       }
-      log.info('🎯 Deselected row', { 
+      fileLog.info('🎯 Deselected row', { 
         rowId,
         columnCount: visibleColumns.length,
         remainingCells: currentSelection.size
@@ -1761,7 +1761,7 @@ export class SimplePassiveRenderer {
       for (const cellId of rowCells) {
         currentSelection.add(cellId);
       }
-      log.info('🎯 Selected row', { 
+      fileLog.info('🎯 Selected row', { 
         rowId,
         columnCount: visibleColumns.length,
         totalCells: currentSelection.size
@@ -1776,14 +1776,14 @@ export class SimplePassiveRenderer {
    * Select range of rows (for Shift+Click on row checkboxes)
    */
   private selectRowRange(startRowId: string, endRowId: string): void {
-    log.debug('🎯 selectRowRange called', { startRowId, endRowId });
+    fileLog.debug('🎯 selectRowRange called', { startRowId, endRowId });
     
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
     const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
-    log.debug('🎯 selectRowRange - data retrieved', {
+    fileLog.debug('🎯 selectRowRange - data retrieved', {
       processedRowsCount: processedRows.length,
       visibleColumnsCount: visibleColumns.length
     });
@@ -1793,7 +1793,7 @@ export class SimplePassiveRenderer {
     const endRowIndex = processedRows.findIndex((row: any) => row.id === endRowId);
 
     if (startRowIndex === -1 || endRowIndex === -1) {
-      log.warn('🔴 Row range selection failed - invalid row IDs', { startRowId, endRowId });
+      fileLog.warn('🔴 Row range selection failed - invalid row IDs', { startRowId, endRowId });
       return;
     }
 
@@ -1818,7 +1818,7 @@ export class SimplePassiveRenderer {
     const selectedRowCount = maxRowIndex - minRowIndex + 1;
     const selectedCellCount = selectedRowCount * visibleColumns.length;
 
-    log.info('🎯 Selected row range', {
+    fileLog.info('🎯 Selected row range', {
       startRowId,
       endRowId,
       rowCount: selectedRowCount,
@@ -1831,7 +1831,7 @@ export class SimplePassiveRenderer {
    * Handle arrow key navigation and range selection
    */
   private handleArrowKey(direction: 'up' | 'down' | 'left' | 'right', isShiftKey: boolean): void {
-    log.debug('⌨️ Arrow key pressed', { direction, isShiftKey, focusedCell: this.focusedCell });
+    fileLog.debug('⌨️ Arrow key pressed', { direction, isShiftKey, focusedCell: this.focusedCell });
 
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
@@ -1839,7 +1839,7 @@ export class SimplePassiveRenderer {
     const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
 
     if (processedRows.length === 0 || visibleColumns.length === 0) {
-      log.debug('⌨️ No data to navigate');
+      fileLog.debug('⌨️ No data to navigate');
       return;
     }
 
@@ -1847,7 +1847,7 @@ export class SimplePassiveRenderer {
     if (!this.focusedCell) {
       this.focusedCell = `${processedRows[0].id}:${visibleColumns[0].id}`;
       this.selectionAnchor = this.focusedCell;
-      log.debug('⌨️ Starting focus at first cell', { focusedCell: this.focusedCell });
+      fileLog.debug('⌨️ Starting focus at first cell', { focusedCell: this.focusedCell });
     }
 
     // Parse current focused cell
@@ -1856,7 +1856,7 @@ export class SimplePassiveRenderer {
     const currentColIndex = visibleColumns.findIndex(col => col.id === currentColumnId);
 
     if (currentRowIndex === -1 || currentColIndex === -1) {
-      log.debug('⌨️ Current focused cell not found in data');
+      fileLog.debug('⌨️ Current focused cell not found in data');
       return;
     }
 
@@ -1886,7 +1886,7 @@ export class SimplePassiveRenderer {
 
     this.focusedCell = newFocusedCell;
 
-    log.debug('⌨️ New focused cell', {
+    fileLog.debug('⌨️ New focused cell', {
       from: `${currentRowId}:${currentColumnId}`,
       to: newFocusedCell,
       isShiftKey
@@ -1898,7 +1898,7 @@ export class SimplePassiveRenderer {
         this.selectionAnchor = `${currentRowId}:${currentColumnId}`;
       }
       
-      log.debug('⌨️ Extending range selection', {
+      fileLog.debug('⌨️ Extending range selection', {
         anchor: this.selectionAnchor,
         focus: newFocusedCell
       });
@@ -1908,7 +1908,7 @@ export class SimplePassiveRenderer {
       // Single cell selection - clear previous and select new
       this.selectionAnchor = newFocusedCell;
       this.tableInteraction$.selectCell(newFocusedCell, false); // false = replace selection
-      log.debug('⌨️ Single cell selected', { cell: newFocusedCell });
+      fileLog.debug('⌨️ Single cell selected', { cell: newFocusedCell });
     }
   }
 
@@ -1916,7 +1916,7 @@ export class SimplePassiveRenderer {
    * Select rectangular range between two cells (for keyboard range selection)
    */
   private selectKeyboardRange(startCell: string, endCell: string): void {
-    log.debug('⌨️ Keyboard range selection', { startCell, endCell });
+    fileLog.debug('⌨️ Keyboard range selection', { startCell, endCell });
     
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
@@ -1934,7 +1934,7 @@ export class SimplePassiveRenderer {
     const endColIndex = visibleColumns.findIndex(col => col.id === endColId);
 
     if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-      log.debug('⌨️ Invalid cell coordinates for range selection');
+      fileLog.debug('⌨️ Invalid cell coordinates for range selection');
       return;
     }
 
@@ -1960,7 +1960,7 @@ export class SimplePassiveRenderer {
     const rowCount = maxRowIndex - minRowIndex + 1;
     const colCount = maxColIndex - minColIndex + 1;
 
-    log.info('⌨️ Keyboard range selected', {
+    fileLog.info('⌨️ Keyboard range selected', {
       anchor: startCell,
       focus: endCell,
       rowCount,
@@ -1975,7 +1975,7 @@ export class SimplePassiveRenderer {
   private updateSelectAllCheckboxVisual(state: { checked: boolean; indeterminate: boolean }): void {
     if (!this.selectAllCheckbox) return;
 
-    log.debug('📋 Updating select all checkbox visual state', {
+    fileLog.debug('📋 Updating select all checkbox visual state', {
       newState: state,
       previousChecked: this.selectAllCheckbox.checked,
       previousIndeterminate: this.selectAllCheckbox.indeterminate
@@ -1995,7 +1995,7 @@ export class SimplePassiveRenderer {
   private setupScrollHandling(): void {
     if (!this.viewport) return;
     
-    log.info('📜 Setting up scroll coordination');
+    fileLog.info('📜 Setting up scroll coordination');
     
     // Direct DOM event binding → Observable updates (as planned in docs)
     this.viewport.addEventListener('scroll', (e) => {
@@ -2009,7 +2009,7 @@ export class SimplePassiveRenderer {
       // Sync header scroll with requestAnimationFrame optimization
       this.syncHeaderScroll(scrollLeft);
       
-      log.debug('📜 Scroll event processed', { scrollTop, scrollLeft });
+      fileLog.debug('📜 Scroll event processed', { scrollTop, scrollLeft });
     });
     
     // Add click-outside handler to clear selection
@@ -2021,7 +2021,7 @@ export class SimplePassiveRenderer {
       // Only clear selection if click is in the viewport area but not on a cell or header
       // This prevents clearing when clicking on cells (event bubbling) or outside the table entirely
       if (viewportElement && !cellElement && !headerElement) {
-        log.info('🖱️ Click outside cells - clearing selection');
+        fileLog.info('🖱️ Click outside cells - clearing selection');
         this.tableInteraction$.clearSelection();
       }
     });
@@ -2031,7 +2031,7 @@ export class SimplePassiveRenderer {
       const isCtrlKey = e.ctrlKey || e.metaKey;
       const isShiftKey = e.shiftKey;
       
-      log.debug('⌨️ Keyboard event', { key: e.key, shiftKey: isShiftKey, ctrlKey: isCtrlKey, focusedCell: this.focusedCell });
+      fileLog.debug('⌨️ Keyboard event', { key: e.key, shiftKey: isShiftKey, ctrlKey: isCtrlKey, focusedCell: this.focusedCell });
       
       switch (e.key) {
         case 'a':
@@ -2039,7 +2039,7 @@ export class SimplePassiveRenderer {
           if (isCtrlKey) {
             e.preventDefault();
             this.selectAllCells();
-            log.info('⌨️ Ctrl+A - Select all cells');
+            fileLog.info('⌨️ Ctrl+A - Select all cells');
           }
           break;
         case 'Escape':
@@ -2047,7 +2047,7 @@ export class SimplePassiveRenderer {
           this.tableInteraction$.clearSelection();
           this.focusedCell = null;
           this.selectionAnchor = null;
-          log.info('⌨️ Escape - Clear selection and focus');
+          fileLog.info('⌨️ Escape - Clear selection and focus');
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -2075,7 +2075,7 @@ export class SimplePassiveRenderer {
     this.container.tabIndex = 0; // Changed from -1 to 0 to make it focusable
     this.container.style.outline = 'none';
     
-    log.info('✅ Scroll coordination setup complete');
+    fileLog.info('✅ Scroll coordination setup complete');
   }
   
   /**
@@ -2087,7 +2087,7 @@ export class SimplePassiveRenderer {
       this._scrollRAF = requestAnimationFrame(() => {
         if (this.headerViewport) {
           this.headerViewport.scrollLeft = scrollLeft;
-          log.debug('📜 Header scroll synced', { scrollLeft });
+          fileLog.debug('📜 Header scroll synced', { scrollLeft });
         }
         this._scrollRAF = null;
       });
@@ -2129,7 +2129,7 @@ export class SimplePassiveRenderer {
       }
     });
     
-    log.debug('🔄 Sort indicators updated', { 
+    fileLog.debug('🔄 Sort indicators updated', { 
       sortBy: sortBy.map(s => `${s.field}:${s.direction}`)
     });
   }
@@ -2162,14 +2162,14 @@ export class SimplePassiveRenderer {
       );
       headerCell.style.cssText = updatedStyle;
       
-      log.debug('📏 Updated header cell width', {
+      fileLog.debug('📏 Updated header cell width', {
         columnId,
         newWidth,
         previousStyle: currentStyle.match(/flex:\s*0\s+0\s+\d+px/)?.[0],
         updatedStyle: `flex: 0 0 ${newWidth}px`
       });
     } else {
-      log.warn('⚠️ Header cell not found for width update', { columnId });
+      fileLog.warn('⚠️ Header cell not found for width update', { columnId });
     }
   }
 
@@ -2244,7 +2244,7 @@ export class SimplePassiveRenderer {
       // Add click handler for individual tag editing
       tagBadge.addEventListener('click', (e) => {
         e.stopPropagation();
-        log.info('🏷️ Tag badge clicked - editing entire tags field', { tag, index, allTags: tags });
+        fileLog.info('🏷️ Tag badge clicked - editing entire tags field', { tag, index, allTags: tags });
         // Edit the entire tags field, not individual tags
         this.editTagsField(value, row, column);
       });
@@ -2255,7 +2255,7 @@ export class SimplePassiveRenderer {
     // Add click handler for the container (for editing tags)
     container.addEventListener('click', (e) => {
       if (e.target === container) {
-        log.info('🏷️ Tags container clicked - editing tags field', { currentTags: tags });
+        fileLog.info('🏷️ Tags container clicked - editing tags field', { currentTags: tags });
         this.editTagsField(value, row, column);
       }
     });
@@ -2268,7 +2268,7 @@ export class SimplePassiveRenderer {
    */
   private editTagsField(currentValue: string, row: any, column: any): void {
     const cellId = `${row.id}:${column.id}`;
-    log.info('🏷️ Starting tags field edit mode', {
+    fileLog.info('🏷️ Starting tags field edit mode', {
       cellId,
       currentValue,
       rowId: row.id,

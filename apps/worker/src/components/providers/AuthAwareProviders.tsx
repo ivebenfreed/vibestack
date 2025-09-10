@@ -2,17 +2,17 @@ import React, { useEffect } from 'react'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 import { useAuth } from '@/state-machines'
-import { authLog } from '@/logger'
+import { log } from '@/logger'
 import { universeHelpers } from '@/legend-state'
 
 // Create logger instance for this file
-const log = authLog('components/providers/AuthAwareProviders.tsx');
+const myLog = log('components/providers/AuthAwareProviders.tsx');
 
 // Auth-aware wrapper component - LiveStore is initialized globally by app init machine
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isCheckingAuth, isSigningOut } = useAuth()
   
-  log.info('Auth state:', { 
+  myLog.info('Auth state:', { 
     isAuthenticated, 
     isCheckingAuth,
     isSigningOut
@@ -43,13 +43,13 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeUniverse = () => {
       try {
-        log.info('Setting authentication state for synced observables...');
+        myLog.info('Setting authentication state for synced observables...');
         // Set authentication state to trigger synced data loading
         // This will automatically trigger the workspace API calls via syncedCrud
         universeHelpers.setAuthenticated(true, 'current-user-id');
-        log.info('Authentication state set - synced observables will load data automatically');
+        myLog.info('Authentication state set - synced observables will load data automatically');
       } catch (error) {
-        log.error('Failed to set authentication state:', error);
+        myLog.error('Failed to set authentication state:', error);
       }
     };
     

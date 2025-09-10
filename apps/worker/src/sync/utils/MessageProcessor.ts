@@ -13,8 +13,8 @@
 
 import { syncLogger } from './SyncLogger';
 import type { SyncMachineV3Context } from '../../state-machines/machines/sync-machine-v3';
-import { syncLog } from '@/logger';
-const log = syncLog('sync/utils/MessageProcessor.ts');
+import { log } from '@/logger';
+const fileLog = log('sync/utils/MessageProcessor.ts');
 
 export interface MessageProcessorServices {
   webSocket: any;
@@ -38,7 +38,7 @@ export class MessageProcessor {
     sendEvent: (event: any) => void
   ): void {
     if (!message) {
-      log.info(`[MessageProcessor] ⚠️ Missing message`);
+      fileLog.info(`[MessageProcessor] ⚠️ Missing message`);
       return;
     }
 
@@ -46,9 +46,9 @@ export class MessageProcessor {
     
     // Only log non-heartbeat message types to reduce noise
     if (messageType !== 'srv_heartbeat') {
-      log.info(`[MessageProcessor] 📨 Processing message type: ${messageType}`);
+      fileLog.info(`[MessageProcessor] 📨 Processing message type: ${messageType}`);
       if (messageType === 'srv_integrity_validation_response') {
-        log.info(`[MessageProcessor] 🔍 Integrity validation response:`, {
+        fileLog.info(`[MessageProcessor] 🔍 Integrity validation response:`, {
           isValid: message.isValid,
           issues: message.issues?.length || 0,
           recommendedAction: message.recommendedAction,
@@ -62,7 +62,7 @@ export class MessageProcessor {
       
       // Only log heartbeats with LSN changes or every 1000th heartbeat to reduce noise
       if (hasLSN && message.serverLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 💓 Heartbeat LSN drift - Server: ${message.serverLSN}, Client: ${context.currentLSN}`);
+        fileLog.info(`[MessageProcessor] 💓 Heartbeat LSN drift - Server: ${message.serverLSN}, Client: ${context.currentLSN}`);
       }
     }
 
@@ -125,7 +125,7 @@ export class MessageProcessor {
   ): void {
     const changes = message.changes || [];
     
-    log.info(`[MessageProcessor] 📥 Sending INCOMING_CHANGES event for ${changes.length} changes (${messageType})`);
+    fileLog.info(`[MessageProcessor] 📥 Sending INCOMING_CHANGES event for ${changes.length} changes (${messageType})`);
     
     // Send INCOMING_CHANGES event to state machine for all change types (including empty chunks)
     // Empty chunks still need acknowledgments during initial sync
@@ -140,7 +140,7 @@ export class MessageProcessor {
     // Only update LSN immediately for live changes (real-time sync)
     // Initial and catchup sync LSN updates happen at completion events
     if (messageType === 'srv_live_changes') {
-      log.info(`[MessageProcessor] 🔍 LSN check for ${messageType}:`, {
+      fileLog.info(`[MessageProcessor] 🔍 LSN check for ${messageType}:`, {
         hasServerLSN: !!message.serverLSN,
         serverLSN: message.serverLSN,
         currentLSN: context.currentLSN,
@@ -149,16 +149,16 @@ export class MessageProcessor {
       });
       
       if (message.serverLSN && message.serverLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 📊 LSN update from ${messageType}: ${context.currentLSN} → ${message.serverLSN}`);
+        fileLog.info(`[MessageProcessor] 📊 LSN update from ${messageType}: ${context.currentLSN} → ${message.serverLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: messageType });
       } else if (!message.serverLSN) {
-        log.warn(`[MessageProcessor] ⚠️ ${messageType} message missing serverLSN field!`);
+        fileLog.warn(`[MessageProcessor] ⚠️ ${messageType} message missing serverLSN field!`);
       } else {
-        log.info(`[MessageProcessor] ✅ LSN already current for ${messageType}: ${message.serverLSN}`);
+        fileLog.info(`[MessageProcessor] ✅ LSN already current for ${messageType}: ${message.serverLSN}`);
       }
     } else if (messageType === 'srv_catchup_changes' || messageType === 'srv_init_changes') {
       // Log LSN info but don't update until completion
-      log.info(`[MessageProcessor] 📋 ${messageType} received with LSN ${message.serverLSN || 'none'} (will update on completion)`);
+      fileLog.info(`[MessageProcessor] 📋 ${messageType} received with LSN ${message.serverLSN || 'none'} (will update on completion)`);
     }
     
     // CRITICAL: Send immediate chunk acknowledgment for catchup changes
@@ -174,7 +174,7 @@ export class MessageProcessor {
       };
       
       services.webSocket.send(ackMessage);
-      log.info(`[MessageProcessor] 📤 Sent catchup chunk acknowledgment: chunk ${message.sequence.chunk}/${message.sequence.total}`);
+      fileLog.info(`[MessageProcessor] 📤 Sent catchup chunk acknowledgment: chunk ${message.sequence.chunk}/${message.sequence.total}`);
     }
     
     // Other acknowledgments will be sent by the state machine after processing completes
@@ -189,23 +189,23 @@ export class MessageProcessor {
     services: MessageProcessorServices,
     sendEvent: (event: any) => void
   ): void {
-    log.info(`[MessageProcessor] 🔍 Skipping integrity validation - TypeORM services disabled`);
+    fileLog.info(`[MessageProcessor] 🔍 Skipping integrity validation - TypeORM services disabled`);
     
     // DISABLED: IntegrityService calls - TypeORM removal
     // try {
     //   services.integrity.handleValidationResponse(message).then((result: any) => {
-    //     log.info(`[MessageProcessor] ✅ Integrity validation response processed:`, {
+    //     fileLog.info(`[MessageProcessor] ✅ Integrity validation response processed:`, {
     //       isValid: result.isValid,
     //       issueCount: result.issues.length,
     //       recommendedAction: result.recommendedAction
     //     });
     //   }).catch((error: any) => {
-    //     log.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
+    //     fileLog.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
     //     syncLogger.serviceError('IntegrityService', error as Error, 'validation response routing');
     //     sendEvent({ type: 'SERVICE_ERROR', service: 'integrity', error: error as Error });
     //   });
     // } catch (error) {
-    //   log.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
+    //   fileLog.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
     //   syncLogger.serviceError('IntegrityService', error as Error, 'validation response routing');
     //   sendEvent({ type: 'SERVICE_ERROR', service: 'integrity', error: error as Error });
     // }
@@ -219,7 +219,7 @@ export class MessageProcessor {
     services: MessageProcessorServices,
     sendEvent: (event: any) => void
   ): void {
-    log.info(`[MessageProcessor] 🚨 Skipping integrity reset - TypeORM services disabled`);
+    fileLog.info(`[MessageProcessor] 🚨 Skipping integrity reset - TypeORM services disabled`);
     
     // DISABLED: IntegrityService calls - TypeORM removal
     // try {
@@ -258,7 +258,7 @@ export class MessageProcessor {
             // Try to parse structured error information
             const errorInfo = typeof message.error === 'string' ? JSON.parse(message.error) : message.error;
             
-            log.error('[MessageProcessor] ❌ Server failed to apply changes:', {
+            fileLog.error('[MessageProcessor] ❌ Server failed to apply changes:', {
               message: errorInfo.message,
               type: errorInfo.type,
               affectedTables: errorInfo.details?.affectedTables,
@@ -269,7 +269,7 @@ export class MessageProcessor {
             
             // Log stack trace in development mode
             if (errorInfo.details?.stack) {
-              log.error('[MessageProcessor] Stack trace:', errorInfo.details.stack);
+              fileLog.error('[MessageProcessor] Stack trace:', errorInfo.details.stack);
             }
             
             syncLogger.error('message', `Server changes failed: ${errorInfo.message}`, {
@@ -279,22 +279,22 @@ export class MessageProcessor {
             });
           } catch (parseError) {
             // Fallback for non-JSON error messages
-            log.error('[MessageProcessor] ❌ Server failed to apply changes:', message.error);
+            fileLog.error('[MessageProcessor] ❌ Server failed to apply changes:', message.error);
             syncLogger.error('message', `Server changes failed: ${message.error}`);
           }
         } else {
           syncLogger.info('message', 'Server confirmed changes were applied');
-          log.info('[MessageProcessor] ✅ Server successfully applied changes');
+          fileLog.info('[MessageProcessor] ✅ Server successfully applied changes');
         }
         
-        log.info('[MessageProcessor] srv_changes_applied message full content:', JSON.stringify(message, null, 2));
-        log.info('[MessageProcessor] Services available:', {
+        fileLog.info('[MessageProcessor] srv_changes_applied message full content:', JSON.stringify(message, null, 2));
+        fileLog.info('[MessageProcessor] Services available:', {
           hasOutgoing: !!services.outgoing,
           hasDexieOutgoing: !!services.dexieOutgoing
         });
         
         if (services.outgoing) {
-          log.info('[MessageProcessor] Handling with old OutgoingChangeService');
+          fileLog.info('[MessageProcessor] Handling with old OutgoingChangeService');
           services.outgoing.handleChangesApplied(message)
             .catch((error: any) => {
               syncLogger.serviceError('OutgoingChanges', error, 'changes applied');
@@ -304,7 +304,7 @@ export class MessageProcessor {
         
         // Handle for Dexie system when old outgoing service is disabled
         if (services.dexieOutgoing) {
-          log.info('[MessageProcessor] Dexie system - checking srv_changes_applied message:', {
+          fileLog.info('[MessageProcessor] Dexie system - checking srv_changes_applied message:', {
             hasAppliedChanges: !!message.appliedChanges,
             appliedChangesCount: message.appliedChanges?.length,
             messageKeys: Object.keys(message)
@@ -314,29 +314,29 @@ export class MessageProcessor {
             try {
               // Extract record IDs from appliedChanges objects
               const recordIds = message.appliedChanges.map((change: any) => change.recordId).filter(Boolean);
-              log.info('[MessageProcessor] Extracted record IDs from server:', recordIds);
-              log.info('[MessageProcessor] Applied changes structure:', message.appliedChanges);
+              fileLog.info('[MessageProcessor] Extracted record IDs from server:', recordIds);
+              fileLog.info('[MessageProcessor] Applied changes structure:', message.appliedChanges);
               
               if (recordIds.length > 0) {
                 // Use the service's method to mark changes as processed based on record IDs
                 services.dexieOutgoing.markChangesAsProcessedByRecordIds(recordIds)
                   .then(() => {
-                    log.info('[MessageProcessor] Successfully marked Dexie changes as processed');
+                    fileLog.info('[MessageProcessor] Successfully marked Dexie changes as processed');
                   })
                   .catch((error: any) => {
-                    log.error('[MessageProcessor] Failed to mark Dexie changes as processed:', error);
+                    fileLog.error('[MessageProcessor] Failed to mark Dexie changes as processed:', error);
                   });
               } else {
-                log.warn('[MessageProcessor] No valid record IDs found in appliedChanges');
+                fileLog.warn('[MessageProcessor] No valid record IDs found in appliedChanges');
               }
             } catch (error) {
-              log.error('[MessageProcessor] Error processing Dexie change confirmations:', error);
+              fileLog.error('[MessageProcessor] Error processing Dexie change confirmations:', error);
             }
           } else {
-            log.info('[MessageProcessor] No appliedChanges array found in message');
+            fileLog.info('[MessageProcessor] No appliedChanges array found in message');
           }
         } else {
-          log.info('[MessageProcessor] No DexieOutgoingChangeService available');
+          fileLog.info('[MessageProcessor] No DexieOutgoingChangeService available');
         }
       } else if (messageType === 'srv_error' && message.context === 'outgoing_changes') {
         syncLogger.warn('message', 'Server reported error for outgoing changes');
@@ -362,11 +362,11 @@ export class MessageProcessor {
     sendEvent: (event: any) => void
   ): void {
     if (messageType === 'srv_init_start') {
-      log.info('[MessageProcessor] 🚀 Server started initial sync');
+      fileLog.info('[MessageProcessor] 🚀 Server started initial sync');
       
       // Log server LSN but don't update until completion
       if (message.serverLSN) {
-        log.info(`[MessageProcessor] 📋 Server LSN at init start: ${message.serverLSN} (client: ${context.currentLSN}) - will update on completion`);
+        fileLog.info(`[MessageProcessor] 📋 Server LSN at init start: ${message.serverLSN} (client: ${context.currentLSN}) - will update on completion`);
       }
       
       // Send acknowledgment
@@ -377,7 +377,7 @@ export class MessageProcessor {
         clientId: context.clientId
       };
       services.webSocket.send(ackMessage);
-      log.info(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
+      fileLog.info(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
       
       sendEvent({ type: 'START_INITIAL_SYNC' });
       
@@ -385,27 +385,27 @@ export class MessageProcessor {
       // If we're in initial_sync state and have already received data, complete the sync
       // This handles the case where srv_init_complete is never sent
       if (context.syncPhase === 'initial') {
-        log.info('[MessageProcessor] ⚠️ Received srv_init_start while already in initial sync phase');
-        log.info('[MessageProcessor] 🔧 This might indicate all data was already sent - will wait for srv_init_complete');
+        fileLog.info('[MessageProcessor] ⚠️ Received srv_init_start while already in initial sync phase');
+        fileLog.info('[MessageProcessor] 🔧 This might indicate all data was already sent - will wait for srv_init_complete');
         
         // Set a timeout to complete sync if we don't receive srv_init_complete
         setTimeout(() => {
-          log.info('[MessageProcessor] ⏱️ Timeout waiting for srv_init_complete - completing sync anyway');
+          fileLog.info('[MessageProcessor] ⏱️ Timeout waiting for srv_init_complete - completing sync anyway');
           sendEvent({ type: 'INITIAL_SYNC_COMPLETE' });
         }, 5000); // Wait 5 seconds for srv_init_complete
       }
       
     } else if (messageType === 'srv_init_complete') {
-      log.info('[MessageProcessor] ✅ Initial sync completed');
+      fileLog.info('[MessageProcessor] ✅ Initial sync completed');
       
       // CRITICAL: Update LSN to server's LSN at end of initial sync
       if (message.serverLSN && message.serverLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 📊 CRITICAL LSN update at init complete: ${context.currentLSN} → ${message.serverLSN}`);
+        fileLog.info(`[MessageProcessor] 📊 CRITICAL LSN update at init complete: ${context.currentLSN} → ${message.serverLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: 'init_complete' });
       } else if (message.serverLSN) {
-        log.info(`[MessageProcessor] ✅ LSN already matches server LSN: ${message.serverLSN}`);
+        fileLog.info(`[MessageProcessor] ✅ LSN already matches server LSN: ${message.serverLSN}`);
       } else {
-        log.warn(`[MessageProcessor] ⚠️ srv_init_complete missing serverLSN field`);
+        fileLog.warn(`[MessageProcessor] ⚠️ srv_init_complete missing serverLSN field`);
       }
       
       // Send acknowledgment
@@ -417,21 +417,21 @@ export class MessageProcessor {
         serverLSN: message.serverLSN || context.currentLSN
       };
       services.webSocket.send(ackMessage);
-      log.info(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
+      fileLog.info(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
       
       sendEvent({ type: 'INITIAL_SYNC_COMPLETE' });
       
     } else if (messageType === 'srv_catchup_completed') {
-      log.info('[MessageProcessor] ✅ Catchup sync completed');
+      fileLog.info('[MessageProcessor] ✅ Catchup sync completed');
       
       // Update LSN from server at end of catchup sync
       // Server sends 'endLSN' not 'serverLSN'
       const newLSN = message.endLSN || message.serverLSN;
       if (newLSN && newLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 📊 LSN update at catchup complete: ${context.currentLSN} → ${newLSN}`);
+        fileLog.info(`[MessageProcessor] 📊 LSN update at catchup complete: ${context.currentLSN} → ${newLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: newLSN, source: 'catchup_complete' });
       } else if (!newLSN) {
-        log.warn('[MessageProcessor] ⚠️ No LSN in catchup completed message');
+        fileLog.warn('[MessageProcessor] ⚠️ No LSN in catchup completed message');
       }
       
       // Send acknowledgment
@@ -443,31 +443,31 @@ export class MessageProcessor {
         serverLSN: newLSN || context.currentLSN
       };
       services.webSocket.send(ackMessage);
-      log.info(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
+      fileLog.info(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
       
       sendEvent({ type: 'CATCHUP_SYNC_COMPLETE' });
       
     } else if (messageType === 'srv_live_start') {
-      log.info('[MessageProcessor] 🔄 Server confirmed live sync start');
+      fileLog.info('[MessageProcessor] 🔄 Server confirmed live sync start');
       
       // Update LSN from server at start of live sync
       if (message.serverLSN && message.serverLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 📊 LSN update at live start: ${context.currentLSN} → ${message.serverLSN}`);
+        fileLog.info(`[MessageProcessor] 📊 LSN update at live start: ${context.currentLSN} → ${message.serverLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: 'live_start' });
       }
       
       sendEvent({ type: 'START_LIVE_SYNC' });
       
     } else if (messageType === 'srv_sync_completed') {
-      log.info('[MessageProcessor] ✅ Server reported sync completed');
+      fileLog.info('[MessageProcessor] ✅ Server reported sync completed');
       
       // Update LSN if provided
       if (message.serverLSN && message.serverLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 📊 LSN update from sync completion: ${context.currentLSN} → ${message.serverLSN}`);
+        fileLog.info(`[MessageProcessor] 📊 LSN update from sync completion: ${context.currentLSN} → ${message.serverLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: 'sync_completion' });
       }
     } else if (messageType === 'srv_state_change') {
-      log.info('[MessageProcessor] 📊 Server state change:', message);
+      fileLog.info('[MessageProcessor] 📊 Server state change:', message);
       
       // Don't send acknowledgment for state changes as they're informational only
       
@@ -489,14 +489,14 @@ export class MessageProcessor {
     if (messageType === 'srv_lsn_update') {
       const newLSN = message.lsn;
       if (newLSN && newLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 📊 LSN update: ${context.currentLSN} → ${newLSN}`);
+        fileLog.info(`[MessageProcessor] 📊 LSN update: ${context.currentLSN} → ${newLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: newLSN, source: 'server' });
       }
     } else if (messageType === 'srv_heartbeat' && message.serverLSN) {
       // Update LSN from heartbeat if provided and different
       const newLSN = message.serverLSN;
       if (newLSN && newLSN !== context.currentLSN) {
-        log.info(`[MessageProcessor] 💓 LSN update from heartbeat: ${context.currentLSN} → ${newLSN}`);
+        fileLog.info(`[MessageProcessor] 💓 LSN update from heartbeat: ${context.currentLSN} → ${newLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: newLSN, source: 'heartbeat' });
       }
       // Send heartbeat response if not already handled by WebSocketService

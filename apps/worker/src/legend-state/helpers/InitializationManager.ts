@@ -14,9 +14,9 @@
 import { observable, when } from '@legendapp/state'
 import { configureSynced } from '@legendapp/state/sync'
 import { createPersistenceManager, type PersistenceManager } from './PersistenceManager'
-import { stateLog } from '@/logger'
+import { log } from '@/logger'
 
-const log = stateLog('legend-state/helpers/InitializationManager.ts')
+const fileLog = log('legend-state/helpers/InitializationManager.ts')
 
 export interface InitializationState {
   status: 'idle' | 'initializing' | 'ready' | 'error'
@@ -78,13 +78,13 @@ class InitializationManager {
     if (this.persistenceContext?.isConfigured && 
         this.state$.userId.peek() === userId && 
         this.state$.status.peek() === 'ready') {
-      log.info(`[InitManager] Already initialized for user ${userId} in universe mode, returning existing context`)
+      fileLog.info(`[InitManager] Already initialized for user ${userId} in universe mode, returning existing context`)
       return this.persistenceContext
     }
 
     // If initialization is in progress, wait for it
     if (this.initializationPromise) {
-      log.info(`[InitManager] Initialization in progress, waiting...`)
+      fileLog.info(`[InitManager] Initialization in progress, waiting...`)
       await this.initializationPromise
       return this.persistenceContext
     }
@@ -103,7 +103,7 @@ class InitializationManager {
   private async performInitialization(orgId: string, userId: string, entityKeys: string[]): Promise<void> {
     // Always use universe mode since users can access multiple orgs
     const universalOrgId = 'universe'
-    log.info(`[InitManager] Starting universe initialization for user ${userId} with ${entityKeys.length} entities`)
+    fileLog.info(`[InitManager] Starting universe initialization for user ${userId} with ${entityKeys.length} entities`)
     
     // Update state to initializing
     this.state$.assign({
@@ -122,17 +122,17 @@ class InitializationManager {
 
     try {
       // Step 1: Persistence Setup
-      log.info(`[InitManager] Step 1: Setting up persistence`)
+      fileLog.info(`[InitManager] Step 1: Setting up persistence`)
       const persistenceManager = createPersistenceManager(universalOrgId, userId)
       
       // Create IndexedDB configuration with enhanced error recovery
       const indexedDBConfig = await persistenceManager.createIndexedDBConfig(entityKeys)
       
       this.state$.progress.persistenceSetup.set(true)
-      log.info(`[InitManager] ✅ Persistence setup complete`)
+      fileLog.info(`[InitManager] ✅ Persistence setup complete`)
 
       // Step 2: Sync Configuration (Legend State v3)
-      log.info(`[InitManager] Step 2: Configuring Legend State sync`)
+      fileLog.info(`[InitManager] Step 2: Configuring Legend State sync`)
       let persistOptions: any = null
       let entityTableMap: Record<string, string> = {}
 
@@ -141,24 +141,24 @@ class InitializationManager {
         persistOptions = configuredOptions
         entityTableMap = tableMap
         
-        log.info(`[InitManager] ✅ IndexedDB persistence configured with ${Object.keys(tableMap).length} entity mappings`)
+        fileLog.info(`[InitManager] ✅ IndexedDB persistence configured with ${Object.keys(tableMap).length} entity mappings`)
       } else {
-        log.info(`[InitManager] ⚠️  No IndexedDB persistence - using server-only sync`)
+        fileLog.info(`[InitManager] ⚠️  No IndexedDB persistence - using server-only sync`)
       }
       
       this.state$.progress.syncConfiguration.set(true)
-      log.info(`[InitManager] ✅ Sync configuration complete`)
+      fileLog.info(`[InitManager] ✅ Sync configuration complete`)
 
       // Step 3: Schema Validation
-      log.info(`[InitManager] Step 3: Validating entity schema`)
+      fileLog.info(`[InitManager] Step 3: Validating entity schema`)
       const validEntityKeys = this.validateEntitySchema(entityKeys)
       
       if (validEntityKeys.length !== entityKeys.length) {
-        log.warn(`[InitManager] Schema validation filtered ${entityKeys.length - validEntityKeys.length} invalid entities`)
+        fileLog.warn(`[InitManager] Schema validation filtered ${entityKeys.length - validEntityKeys.length} invalid entities`)
       }
       
       this.state$.progress.schemaValidation.set(true)
-      log.info(`[InitManager] ✅ Schema validation complete: ${validEntityKeys.length} valid entities`)
+      fileLog.info(`[InitManager] ✅ Schema validation complete: ${validEntityKeys.length} valid entities`)
 
       // Step 4: Create persistence context
       this.persistenceContext = {
@@ -169,16 +169,16 @@ class InitializationManager {
       }
       
       this.state$.progress.dataHydration.set(true)
-      log.info(`[InitManager] ✅ Data hydration setup complete`)
+      fileLog.info(`[InitManager] ✅ Data hydration setup complete`)
 
       // Mark as ready
       this.state$.status.set('ready')
       this.state$.timestamp.set(Date.now())
       
-      log.info(`[InitManager] 🎉 Universe initialization complete for user ${userId}`)
+      fileLog.info(`[InitManager] 🎉 Universe initialization complete for user ${userId}`)
 
     } catch (error) {
-      log.error(`[InitManager] ❌ Initialization failed:`, error)
+      fileLog.error(`[InitManager] ❌ Initialization failed:`, error)
       
       this.state$.assign({
         status: 'error',
@@ -197,13 +197,13 @@ class InitializationManager {
     return entityKeys.filter(entityName => {
       // Basic validation - entity name should be non-empty string
       if (!entityName || typeof entityName !== 'string') {
-        log.warn(`[InitManager] Invalid entity name: ${entityName}`)
+        fileLog.warn(`[InitManager] Invalid entity name: ${entityName}`)
         return false
       }
       
       // Check for special characters that could cause issues
       if (!/^[a-zA-Z0-9_-]+$/.test(entityName.replace(/^[a-f0-9-]{36}_/, ''))) {
-        log.warn(`[InitManager] Entity name contains invalid characters: ${entityName}`)
+        fileLog.warn(`[InitManager] Entity name contains invalid characters: ${entityName}`)
         return false
       }
       
@@ -239,7 +239,7 @@ class InitializationManager {
         }
         
         if (Date.now() - startTime > timeoutMs) {
-          log.warn(`[InitManager] Timeout waiting for initialization after ${timeoutMs}ms`)
+          fileLog.warn(`[InitManager] Timeout waiting for initialization after ${timeoutMs}ms`)
           resolve(false)
           return
         }
@@ -256,14 +256,14 @@ class InitializationManager {
    * Reset initialization (for testing or org switching)
    */
   reset(): void {
-    log.info(`[InitManager] Resetting initialization state`)
+    fileLog.info(`[InitManager] Resetting initialization state`)
     
     // Clear persistence context
     if (this.persistenceContext?.persistenceManager) {
       try {
         this.persistenceContext.persistenceManager.clearOrganizationData()
       } catch (error) {
-        log.warn(`[InitManager] Error clearing persistence data:`, error)
+        fileLog.warn(`[InitManager] Error clearing persistence data:`, error)
       }
     }
     
@@ -327,7 +327,7 @@ export function useInitializationState() {
  * Note: Always initializes in universe mode since users can access multiple orgs
  */
 export async function ensureLegendStateReady(orgId: string, userId: string, entityKeys: string[]): Promise<PersistenceContext | null> {
-  log.info(`[InitManager] Ensuring Legend State ready for user ${userId} (orgId: ${orgId})`)
+  fileLog.info(`[InitManager] Ensuring Legend State ready for user ${userId} (orgId: ${orgId})`)
   
   try {
     const context = await initializationManager.initialize(orgId, userId, entityKeys)
@@ -337,10 +337,10 @@ export async function ensureLegendStateReady(orgId: string, userId: string, enti
       throw new Error('Legend State initialization timeout')
     }
     
-    log.info(`[InitManager] ✅ Legend State is ready`)
+    fileLog.info(`[InitManager] ✅ Legend State is ready`)
     return context
   } catch (error) {
-    log.error(`[InitManager] ❌ Failed to ensure Legend State ready:`, error)
+    fileLog.error(`[InitManager] ❌ Failed to ensure Legend State ready:`, error)
     throw error
   }
 }

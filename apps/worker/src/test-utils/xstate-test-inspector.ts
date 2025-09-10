@@ -6,8 +6,8 @@
  */
 
 import type { InspectionEvent, Actor, AnyStateMachine } from 'xstate';
-import { debugLog } from '@/logger';
-const log = debugLog('test-utils/xstate-test-inspector.ts');
+import { log } from '@/logger';
+const fileLog = log('test-utils/xstate-test-inspector.ts');
 
 export interface StateTransition {
   timestamp: string;
@@ -102,7 +102,7 @@ class XStateTestInspector {
             this.transitions.push(transition);
             
             // Log state transitions
-            log.info(`[XState Transition] ${actorRef.id}: ${transition.from} → ${transition.to}`);
+            fileLog.info(`[XState Transition] ${actorRef.id}: ${transition.from} → ${transition.to}`);
             
             // Add automatic markers for key transitions
             this.addAutomaticMarkers(actorRef.id || '', transition);
@@ -124,7 +124,7 @@ class XStateTestInspector {
       data
     };
     this.markers.push(testMarker);
-    log.info(`[Test Marker] ${marker}`, data || '');
+    fileLog.info(`[Test Marker] ${marker}`, data || '');
   }
 
   /**
@@ -318,5 +318,5 @@ if (typeof window !== 'undefined') {
 export function attachInspector(actor: Actor<any>) {
   // XState v5 uses inspect option during creation
   // Actor must be created with inspect option
-  log.warn('Use: createActor(machine, { inspect: xstateTestInspector.inspect })');
+  fileLog.warn('Use: createActor(machine, { inspect: xstateTestInspector.inspect })');
 }

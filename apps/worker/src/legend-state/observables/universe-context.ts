@@ -7,9 +7,9 @@
  */
 
 import { observable, computed, type Observable } from '@legendapp/state';
-import { stateLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = stateLog('legend-state/universe-context.ts');
+const fileLog = log('legend-state/universe-context.ts');
 
 // Core business logic types (fixed schema)
 export interface Universe {
@@ -295,14 +295,14 @@ export const universeHelpers = {
     });
     
     if (isAuth) {
-      log.info('[UniverseHelpers] Authentication set, ready for data loading');
+      fileLog.info('[UniverseHelpers] Authentication set, ready for data loading');
       // Data loading is handled by universe-loader.ts when needed
     }
   },
 
   // Refresh workspace data (delegates to universe-loader)
   refresh: async () => {
-    log.info('[UniverseHelpers] Refresh requested - should be handled by universe-loader');
+    fileLog.info('[UniverseHelpers] Refresh requested - should be handled by universe-loader');
     // The actual refresh logic should be called from universe-loader.ts
     // This is just a placeholder - the loader should be imported and used
   },

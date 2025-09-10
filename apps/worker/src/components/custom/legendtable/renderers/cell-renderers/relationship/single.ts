@@ -1,6 +1,6 @@
 import type { Column } from '../../../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/legendtable/renderers/cell-renderers/relationship/single.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/legendtable/renderers/cell-renderers/relationship/single.ts');
 
 /**
  * Fast single relationship renderer - string version
@@ -12,7 +12,7 @@ export function relationshipSingle(
   rowData?: any
 ): string {
   // Debug logging disabled for performance
-  // log.info('🔍 relationshipSingle: Called', { columnId: column.id, value });
+  // fileLog.info('🔍 relationshipSingle: Called', { columnId: column.id, value });
   
   // First check for pre-resolved value from ViewActor
   if (rowData && rowData[`__resolved_${column.id}`]) {

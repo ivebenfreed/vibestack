@@ -7,21 +7,21 @@
 
 import { getPrecomputedEntityColumns$ } from '@/legend-state/hooks/use-precomputed-entity-columns';
 import type { Column } from '../types';
-import { uiLog } from '@/logger';
-const log = uiLog('components/custom/ultratable/utils/column-generator.ts');
+import { log } from '@/logger';
+const fileLog = log('components/custom/ultratable/utils/column-generator.ts');
 
 /**
  * Generate columns for an entity type using precomputed columns
  */
 export function generateColumns(entityType: string): Column[] {
   try {
-    log.info('[UltraTable] generateColumns called for', entityType);
+    fileLog.info('[UltraTable] generateColumns called for', entityType);
     
     // Use the same precomputed columns as VibeGrid
     const precomputedColumns$ = getPrecomputedEntityColumns$(entityType);
     
     if (!precomputedColumns$) {
-      log.warn('[UltraTable] Precomputed columns not available for', entityType, 'using fallback columns');
+      fileLog.warn('[UltraTable] Precomputed columns not available for', entityType, 'using fallback columns');
       return generateFallbackColumns(entityType);
     }
     
@@ -29,12 +29,12 @@ export function generateColumns(entityType: string): Column[] {
     const vibeGridColumns = precomputedColumns$.peek();
     
     if (!vibeGridColumns || vibeGridColumns.length === 0) {
-      log.warn('[UltraTable] No precomputed columns found for', entityType, 'using fallback columns');
+      fileLog.warn('[UltraTable] No precomputed columns found for', entityType, 'using fallback columns');
       return generateFallbackColumns(entityType);
     }
     
-    log.info('[UltraTable] Using precomputed columns for', entityType, 'column count:', vibeGridColumns.length);
-    log.info('[UltraTable] VibeGrid columns detail:', vibeGridColumns.map(c => ({ id: c.id, field: c.field, cellType: c.cellType })));
+    fileLog.info('[UltraTable] Using precomputed columns for', entityType, 'column count:', vibeGridColumns.length);
+    fileLog.info('[UltraTable] VibeGrid columns detail:', vibeGridColumns.map(c => ({ id: c.id, field: c.field, cellType: c.cellType })));
     
     // Convert VibeGrid columns to UltraTable column format
     const ultraColumns: Column[] = vibeGridColumns.map((vibeCol: any) => ({
@@ -51,14 +51,14 @@ export function generateColumns(entityType: string): Column[] {
       format: vibeCol.cellType === 'date' ? 'relative' : undefined
     }));
     
-    log.info('[UltraTable] Converted columns:', ultraColumns.map(c => `${c.id}:${c.field}:${c.type}`).join(', '));
+    fileLog.info('[UltraTable] Converted columns:', ultraColumns.map(c => `${c.id}:${c.field}:${c.type}`).join(', '));
     
     return ultraColumns;
     
   } catch (error) {
-    log.error('[UltraTable] Error generating columns for', entityType, error);
+    fileLog.error('[UltraTable] Error generating columns for', entityType, error);
     const fallbackColumns = generateFallbackColumns(entityType);
-    log.info('[UltraTable] Fallback columns:', fallbackColumns.map(c => `${c.id}:${c.field}:${c.type}`).join(', '));
+    fileLog.info('[UltraTable] Fallback columns:', fallbackColumns.map(c => `${c.id}:${c.field}:${c.type}`).join(', '));
     return fallbackColumns;
   }
 }

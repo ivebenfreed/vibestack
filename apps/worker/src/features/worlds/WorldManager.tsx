@@ -27,9 +27,9 @@ import { Plus, Globe, Building2, User, Users, Heart, Target } from 'lucide-react
 import { useAuth } from '@/lib/auth';
 import { universeHelpers, currentOrganizations$ } from '@/legend-state/observables/universe-context';
 import { WorldCard } from './WorldCard';
-import { uiLog } from '@/logger';
+import { log } from '@/logger';
 
-const log = uiLog('features/worlds/WorldManager.tsx');
+const fileLog = log('features/worlds/WorldManager.tsx');
 
 // World interface - organizations are worlds now
 interface World {
@@ -125,7 +125,7 @@ export const WorldManager = observer(function WorldManager() {
       setCanonInput('');
       setIsCreateDialogOpen(false);
       
-      log.info('Created new world:', newWorld);
+      fileLog.info('Created new world:', newWorld);
     } catch (error) {
       console.error('Failed to create world:', error);
       toast.error('Failed to create world');
@@ -170,7 +170,7 @@ export const WorldManager = observer(function WorldManager() {
       setCanonInput('');
       setIsCreateDialogOpen(false);
       
-      log.info('Updated world:', { id: editingWorld.id, updates });
+      fileLog.info('Updated world:', { id: editingWorld.id, updates });
     } catch (error) {
       console.error('Failed to update world:', error);
       toast.error('Failed to update world');
@@ -187,7 +187,7 @@ export const WorldManager = observer(function WorldManager() {
       console.log('Would leave/delete world/organization:', world.id);
       
       toast.success(`Left world "${world.name}" (API integration needed)`);
-      log.info('Left world:', world.id);
+      fileLog.info('Left world:', world.id);
     } catch (error) {
       console.error('Failed to leave world:', error);
       toast.error('Failed to leave world');
