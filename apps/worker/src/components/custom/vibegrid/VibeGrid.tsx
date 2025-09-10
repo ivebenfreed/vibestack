@@ -227,7 +227,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
       setIsInitialized(false);
       setIsPersistLoaded(false);
     };
-  }, [tableId, entityType, JSON.stringify(columns)]); // Re-initialize if essential props change
+  }, [tableId, entityType]); // Only re-initialize if table identity changes
+
 
   // ====================================
   // PUBLIC API METHODS
