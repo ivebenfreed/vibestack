@@ -183,13 +183,14 @@ export class SimplePassiveRenderer {
       left: 0;
       right: 0;
       height: ${HEADER_HEIGHT}px;
-      background: #f8f9fa;
-      border-bottom: 1px solid #e9ecef;
-      overflow-x: scroll;
+      background: hsl(var(--muted));
+      border-bottom: 1px solid hsl(var(--border));
+      overflow-x: auto;
       overflow-y: hidden;
       scrollbar-width: none; /* Firefox */
       -ms-overflow-style: none; /* IE/Edge */
       z-index: 10;
+      contain: layout style;
     `;
     
     // Hide webkit scrollbars for header viewport
@@ -201,6 +202,9 @@ export class SimplePassiveRenderer {
       position: relative;
       white-space: nowrap;
       height: 100%;
+      display: flex;
+      min-width: min-content;
+      width: max-content;
     `;
     
     // Viewport (scrollable area)
@@ -264,6 +268,21 @@ export class SimplePassiveRenderer {
       this.renderBody();
     });
     this.disposers.push(columnVisibilityDisposer);
+    
+    // Observe column resize changes to re-render cells with new widths
+    const columnResizeDisposer = observe(() => {
+      const resizeState = this.tableInteraction$.columnResize.get();
+      if (resizeState && resizeState.isResizing && resizeState.newWidth && resizeState.columnId) {
+        // Only update visual elements during resize, don't trigger re-renders
+        this.updateHeaderCellWidth(resizeState.columnId, resizeState.newWidth);
+        this.updateBodyCellWidths(resizeState.columnId, resizeState.newWidth);
+      } else if (resizeState === null) {
+        // Resize completed - only re-render if needed (columns observable will trigger this)
+        fileLog.info('📏 Column resize completed');
+        // Don't trigger additional re-render here - the columns observable change will handle it
+      }
+    });
+    this.disposers.push(columnResizeDisposer);
     
     // Observe processed rows changes
     const rowsDisposer = observe(() => {
@@ -769,15 +788,17 @@ export class SimplePassiveRenderer {
       
       // Create header content with text and sort icon (like HeaderEngine)
       const textGroup = this.createElement('div', 'vibegridx-header-text-group');
-      textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+      textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;';
       
       // Header text
       const headerText = this.createElement('span', 'vibegridx-header-text');
+      headerText.style.cssText = 'flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
       headerText.textContent = column.label;
       
       // Sort icon (if column is sortable)
       if (column.sortable !== false) {
         const sortIcon = this.createElement('span', 'vibegridx-sort-icon');
+        sortIcon.style.cssText = 'flex-shrink: 0; min-width: 16px; margin-left: 4px;';
         sortIcon.innerHTML = this.createSortIconSVG(null); // No sort initially
         textGroup.appendChild(headerText);
         textGroup.appendChild(sortIcon);
@@ -820,24 +841,38 @@ export class SimplePassiveRenderer {
         });
         
         // Add document-level listeners for resize
+        let resizeRAF: number | null = null;
         const handleMouseMove = (e: MouseEvent) => {
           if (!isResizing) return;
           
-          const deltaX = e.pageX - startX;
-          const newWidth = Math.max(50, startWidth + deltaX); // Min width 50px
-          
-          // Update resize state
-          this.tableInteraction$.columnResize.set({
-            isResizing: true,
-            columnId: column.id,
-            startWidth: startWidth,
-            newWidth: newWidth
-          });
+          // Throttle resize updates with requestAnimationFrame
+          if (!resizeRAF) {
+            resizeRAF = requestAnimationFrame(() => {
+              const deltaX = e.pageX - startX;
+              const newWidth = Math.max(50, startWidth + deltaX); // Min width 50px
+              
+              // Update resize state
+              this.tableInteraction$.columnResize.set({
+                isResizing: true,
+                columnId: column.id,
+                startWidth: startWidth,
+                newWidth: newWidth
+              });
+              
+              resizeRAF = null;
+            });
+          }
         };
         
         const handleMouseUp = () => {
           if (!isResizing) return;
           isResizing = false;
+          
+          // Cancel any pending resize RAF
+          if (resizeRAF) {
+            cancelAnimationFrame(resizeRAF);
+            resizeRAF = null;
+          }
           
           const resizeState = this.tableInteraction$.columnResize.get();
           if (resizeState && resizeState.newWidth) {
@@ -900,9 +935,19 @@ export class SimplePassiveRenderer {
       headerRow.appendChild(headerCell);
     });
     
+    // Calculate total width and set header container width for proper overflow handling
+    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
+    headerRow.style.width = `${totalHeaderWidth}px`;
+    headerRow.style.minWidth = `${totalHeaderWidth}px`;
+    
     this.headerContainer.appendChild(headerRow);
+    
+    // Update header container width to ensure proper scrolling
+    this.headerContainer.style.width = `${totalHeaderWidth}px`;
+    this.headerContainer.style.minWidth = `${totalHeaderWidth}px`;
+    
     this.coordinateMapping.version++;
-    fileLog.info('✅ Header rendered');
+    fileLog.info('✅ Header rendered with total width', { totalHeaderWidth });
   }
   
   /**
@@ -1167,6 +1212,14 @@ export class SimplePassiveRenderer {
       const cell = this.createCellElement(row, column, colIndex);
       rowElement.appendChild(cell);
     });
+    
+    // Calculate total width to ensure consistent scrolling with header
+    const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
+      this.tableCore$.columnVisibility.get()[col.id] !== false
+    );
+    const totalRowWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
+    rowElement.style.width = `${totalRowWidth}px`;
+    rowElement.style.minWidth = `${totalRowWidth}px`;
     
     return rowElement;
   }
@@ -2003,6 +2056,32 @@ export class SimplePassiveRenderer {
       });
     } else {
       fileLog.warn('⚠️ Header cell not found for width update', { columnId });
+    }
+  }
+
+  /**
+   * Update body cell widths to keep in sync with column resize
+   */
+  private updateBodyCellWidths(columnId: string, newWidth: number): void {
+    const bodyCells = this.bodyContainer?.querySelectorAll(`[data-column-id="${columnId}"]`) as NodeListOf<HTMLElement>;
+    if (bodyCells && bodyCells.length > 0) {
+      bodyCells.forEach((cell) => {
+        // Update the flex-basis style to match new width
+        const currentStyle = cell.style.cssText;
+        const updatedStyle = currentStyle.replace(
+          /flex:\s*0\s+0\s+\d+px/,
+          `flex: 0 0 ${newWidth}px`
+        );
+        cell.style.cssText = updatedStyle;
+      });
+      
+      fileLog.debug('📏 Updated body cell widths', {
+        columnId,
+        newWidth,
+        cellsUpdated: bodyCells.length
+      });
+    } else {
+      fileLog.debug('📏 No body cells found for width update', { columnId });
     }
   }
 

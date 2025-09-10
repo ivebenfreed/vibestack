@@ -684,11 +684,11 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         tableCore$.columnWidths.set(widths);
         
         // Update columns array
-        const columns = [...tableCore$.columns];
+        const columns = [...tableCore$.columns.get()];
         const colIndex = columns.findIndex(c => c.id === columnId);
         if (colIndex >= 0) {
           columns[colIndex] = { ...columns[colIndex], width };
-          tableCore$.columns = columns;
+          tableCore$.columns.set(columns);
         }
         
         // syncObservable automatically persists changes to localStorage

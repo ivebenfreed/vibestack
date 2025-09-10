@@ -84,8 +84,21 @@ export class ColumnResizeOverlayDOM {
       return;
     }
     
-    // Calculate new position based on resize
+    // Calculate new position based on resize (right edge of the column)
     const newX = column.offset + (resizeState.newWidth || column.width);
+    
+    // Account for horizontal scroll position - get from header viewport which handles horizontal scrolling
+    const headerViewport = this.container.querySelector('.vibegridx-header-viewport') as HTMLElement;
+    const bodyViewport = this.container.querySelector('.vibegridx-viewport') as HTMLElement;
+    const scrollLeft = headerViewport ? headerViewport.scrollLeft : (bodyViewport ? bodyViewport.scrollLeft : 0);
+    
+    fileLog.debug('ColumnResizeOverlayDOM: Scroll debugging', {
+      headerViewportFound: !!headerViewport,
+      bodyViewportFound: !!bodyViewport,
+      headerScrollLeft: headerViewport?.scrollLeft,
+      bodyScrollLeft: bodyViewport?.scrollLeft,
+      finalScrollLeft: scrollLeft
+    });
     
     // Create or update resize indicator
     if (!this.resizeIndicator) {
@@ -94,11 +107,12 @@ export class ColumnResizeOverlayDOM {
       this.overlayContainer?.appendChild(this.resizeIndicator);
     }
     
-    // Position indicator
+    // Position indicator (adjust for scroll position so it stays aligned with the column)
+    const adjustedX = newX - scrollLeft;
     Object.assign(this.resizeIndicator.style, {
       position: 'absolute',
-      left: `${newX - this.config.resizeIndicatorWidth! / 2}px`,
-      top: '0',
+      left: `${adjustedX - this.config.resizeIndicatorWidth! / 2}px`,
+      top: `${this.config.headerHeight}px`, // Start below the header
       width: `${this.config.resizeIndicatorWidth}px`,
       height: `${this.config.totalHeight}px`,
       backgroundColor: this.config.resizeIndicatorColor,
@@ -111,7 +125,9 @@ export class ColumnResizeOverlayDOM {
     fileLog.info('ColumnResizeOverlayDOM: Indicator updated', {
       columnId: resizeState.columnId,
       newWidth: resizeState.newWidth,
-      indicatorX: newX
+      indicatorX: newX,
+      scrollLeft: scrollLeft,
+      adjustedX: adjustedX
     });
   }
   

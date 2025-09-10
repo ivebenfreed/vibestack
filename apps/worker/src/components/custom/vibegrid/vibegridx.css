@@ -57,11 +57,14 @@
 
 /* Header */
 .vibegridx-header-viewport {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   position: relative;
   background: hsl(var(--muted));
   /* Allow drop indicator to be visible */
   z-index: 1;
+  /* Ensure proper containment */
+  contain: layout style;
 }
 
 /* Hide scrollbars for header viewport when scrolling programmatically */
@@ -70,7 +73,7 @@
 }
 
 .vibegridx-header {
-  display: inline-flex;
+  display: flex;
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
   font-weight: 600;
@@ -79,6 +82,9 @@
   position: relative;
   white-space: nowrap;
   transition: transform 0.1s ease-out;
+  /* Ensure proper width calculation */
+  min-width: min-content;
+  width: max-content;
 }
 
 .vibegridx-header-cell {
@@ -93,8 +99,13 @@
   user-select: none;
   transition: background-color 0.1s;
   flex-shrink: 0;
+  flex-grow: 0;
   box-sizing: border-box;
   position: relative;
+  /* Ensure width constraints are respected */
+  min-width: var(--cell-min-width, 60px);
+  max-width: var(--cell-max-width, 400px);
+  overflow: hidden;
 }
 
 /* Active state cursor handled programmatically */
@@ -119,6 +130,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
+  flex: 1;
+  min-width: 0; /* Allow text to shrink */
 }
 
 .vibegridx-sort-indicator {
@@ -137,7 +150,7 @@
 
 /* Sort dropdown icon */
 .vibegridx-sort-icon {
-  margin-left: 8px;
+  margin-left: 4px;
   /* opacity: 0; -- Removed, handled by inline styles based on sort state */
   transition: opacity 0.2s;
   color: hsl(var(--muted-foreground));
@@ -147,9 +160,10 @@
   flex-direction: column;
   gap: 0;
   cursor: pointer;
-  padding: 4px 6px;
+  padding: 2px 4px;
   border-radius: 4px;
   flex-shrink: 0;
+  min-width: 16px; /* Ensure sort icon always has space */
 }
 
 .vibegridx-header-cell:hover .vibegridx-sort-icon {
