@@ -5,7 +5,7 @@
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import { VibeGridPure } from '@/components/custom/vibegrid/VibeGridPure';
+import { VibeGrid } from '@/components/custom/vibegrid';
 import { uiLog } from '@/logger';
 import { createEntityColumnsObservable } from '@/legend-state/observables/table-columns';
 import { observer } from '@legendapp/state/react';
@@ -70,7 +70,7 @@ const TestVibeGridPure = observer(() => {
       
       <div className="flex-1 p-4">
         <div className="border rounded-lg bg-white" style={{ height: '500px' }}>
-          <VibeGridPure
+          <VibeGrid
             tableId="test-pure-vibegrid"
             entityType={`${orgId}_TaskV2`}
             columns={columns}

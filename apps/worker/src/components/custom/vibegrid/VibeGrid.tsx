@@ -8,13 +8,13 @@ import { uiLog } from '@/logger';
 // Import VibeGrid CSS styles
 import './vibegridx.css';
 
-const log = uiLog('components/VibeGridPure');
+const log = uiLog('components/VibeGrid');
 
 // ====================================
 // COMPONENT PROPS
 // ====================================
 
-interface VibeGridPureProps<T = any> {
+interface VibeGridProps<T = any> {
   tableId: string;  // Unique identifier for this table instance (required for persistence)
   entityType: string;  // Entity type (required - determines data source)
   
@@ -51,8 +51,8 @@ interface VibeGridPureProps<T = any> {
 // MAIN COMPONENT
 // ====================================
 
-export function VibeGridPure<T extends Record<string, any> = any>(
-  props: VibeGridPureProps<T>
+export function VibeGrid<T extends Record<string, any> = any>(
+  props: VibeGridProps<T>
 ): React.ReactElement {
   
   const {
@@ -362,5 +362,5 @@ export function VibeGridPure<T extends Record<string, any> = any>(
   );
 }
 
-export default VibeGridPure;
-export type { VibeGridPureProps };
+export default VibeGrid;
+export type { VibeGridProps };
