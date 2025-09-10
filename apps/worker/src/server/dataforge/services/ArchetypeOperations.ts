@@ -206,10 +206,7 @@ export class ArchetypeOperations {
         description: { type: 'text', required: false },
         status: { type: 'text', required: true },
         priority: { type: 'text', required: true },
-        due_date: { type: 'date', required: false },
-        start_date: { type: 'date', required: false },
-        label: { type: 'text', required: false },
-        tags: { type: 'jsonb', required: false }
+        due_date: { type: 'date', required: false }
       },
       document: {
         title: { type: 'text', required: true },

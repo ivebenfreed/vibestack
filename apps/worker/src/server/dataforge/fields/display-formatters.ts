@@ -361,15 +361,23 @@ function formatReferenceForDisplay(value: any, fieldType: string, options: Displ
 }
 
 /**
- * Format a single reference object
+ * Format a single reference object or ID
  */
 function formatSingleReference(ref: any): string {
   if (!ref) return '';
   
-  if (typeof ref === 'string') return ref;
+  // If it's a UUID/ID string, format it nicely
+  if (typeof ref === 'string') {
+    // Check if it looks like a UUID
+    if (ref.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      // For now, show a truncated version until we implement proper resolution
+      return `Task ${ref.substring(0, 8)}...`;
+    }
+    return ref;
+  }
   
   if (typeof ref === 'object') {
-    // Try common display fields
+    // Try common display fields for resolved objects
     return ref.name || ref.title || ref.label || ref.id || 'Reference';
   }
   

@@ -16,6 +16,136 @@ import { ArchetypeRegistry, type ArchetypeType } from '../dataforge/ArchetypeReg
 
 export const dataforgeRouter = new Hono<AppContext>();
 
+// Helper function to resolve relationship field IDs to display names
+async function resolveRelationships(
+  records: any[],
+  orgId: string,
+  entityName: string,
+  kysely: any
+): Promise<any[]> {
+  
+  // Helper function to extract display field from format string
+  function extractDisplayFieldFromFormat(displayFormat: string): string {
+    // Look for patterns like {name}, {title}, {email}
+    const match = displayFormat.match(/\{(\w+)\}/);
+    return match ? match[1] : 'name'; // default to 'name'
+  }
+  if (!records || records.length === 0) return records;
+
+  // Get entity schema to find relationship fields
+  const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
+  const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
+  
+  const rulesEngine = new JsonRulesEngine();
+  const entityManager = new DataForgeEntityManager({ kysely, rulesEngine } as any);
+  
+  const entityDetails = await entityManager.getEntityDetails(orgId, entityName);
+  if (!entityDetails.success) return records;
+  
+  // Find relationship fields in the entity schema
+  const relationshipFields: string[] = [];
+  const entity = entityDetails.data;
+  
+  // Check all fields for relationship types (fields property contains both archetype and custom fields)
+  if (entity.fields) {
+    for (const [fieldName, fieldDef] of Object.entries(entity.fields)) {
+      const fieldType = typeof fieldDef === 'string' ? fieldDef : (fieldDef as any)?.type;
+      if (fieldType === 'user_reference' || fieldType === 'entity_reference' || 
+          fieldType === 'custom_user_reference' || fieldType === 'custom_entity_reference') {
+        relationshipFields.push(fieldName);
+      }
+    }
+  }
+
+  if (relationshipFields.length === 0) return records;
+
+  // Load relationship field configurations to get proper display fields
+  const relationshipConfigs = await kysely
+    .selectFrom('dataforge_relationship_fields')
+    .select(['field_name', 'target_entity_type', 'display_format'])
+    .where('org_id', '=', orgId)
+    .where('entity_type', '=', entityName)
+    .execute();
+  
+  const fieldConfigMap = new Map(
+    relationshipConfigs.map(config => [config.field_name, config])
+  );
+
+  // Group IDs by target entity type and extract display field from configuration
+  const entityTypeInfo = new Map<string, { ids: Set<string>, displayField: string }>();
+  
+  for (const record of records) {
+    for (const fieldName of relationshipFields) {
+      const value = record[fieldName];
+      if (value && typeof value === 'string') {
+        const config = fieldConfigMap.get(fieldName);
+        if (!config) {
+          console.warn(`🔧 resolveRelationships: No relationship config found for ${fieldName} in ${entityName}`);
+          continue;
+        }
+        
+        const targetEntityType = config.target_entity_type;
+        const displayField = extractDisplayFieldFromFormat(config.display_format);
+        
+        if (!entityTypeInfo.has(targetEntityType)) {
+          entityTypeInfo.set(targetEntityType, { ids: new Set(), displayField });
+        }
+        entityTypeInfo.get(targetEntityType)!.ids.add(value);
+      }
+    }
+  }
+
+  if (entityTypeInfo.size === 0) return records;
+
+  // Query each target entity type separately and build lookup map
+  const lookupMap = new Map<string, string>();
+  
+  for (const [targetEntityType, { ids: idsToResolve, displayField }] of entityTypeInfo) {
+    if (idsToResolve.size === 0) continue;
+    
+    const tableName = `org_${orgId.replace(/-/g, '_')}_${targetEntityType.toLowerCase()}`;
+    
+    try {
+      // Use the specific display field from relationship configuration
+      const selectColumns = ['id', displayField];
+      
+      const referencedEntities = await kysely
+        .selectFrom(tableName)
+        .select(selectColumns)
+        .where('id', 'in', Array.from(idsToResolve))
+        .execute();
+
+      // Add to lookup map using the configured display field
+      for (const entity of referencedEntities) {
+        const displayName = entity[displayField] || entity.id;
+        lookupMap.set(entity.id, displayName);
+      }
+    } catch (error) {
+      console.error(`🔧 resolveRelationships: Error querying ${targetEntityType} with field ${displayField}:`, error);
+      // Continue with other entity types
+    }
+  }
+
+  // Resolve relationships in records
+  const resolvedRecords = records.map(record => {
+    const resolvedRecord = { ...record };
+      
+      for (const fieldName of relationshipFields) {
+        const value = record[fieldName];
+        
+        if (value && typeof value === 'string' && lookupMap.has(value)) {
+          // Replace the ID with resolved name, but keep original ID for reference
+          resolvedRecord[fieldName] = lookupMap.get(value);
+          resolvedRecord[`${fieldName}_id`] = value; // Keep original ID
+        }
+      }
+      
+      return resolvedRecord;
+    });
+
+  return resolvedRecords;
+}
+
 // Apply hybrid security middleware to all organization-scoped routes
 dataforgeRouter.use('/orgs/:orgId/*', hybridRLSOrgActorMiddleware);
 
@@ -328,22 +458,25 @@ dataforgeRouter.get('/orgs/:orgId/sync/:entityName',
       return c.json({ error: 'Failed to sync records', details: result.errors }, 500);
     }
     
-    // Calculate maxUpdatedAt for Legend State's next changesSince
+    // Resolve relationship fields for sync data
     const data = result.data || [];
-    const maxUpdatedAt = data.length > 0
-      ? Math.max(...data.map((r: any) => new Date(r.updated_at || r.created_at || 0).getTime()))
+    const resolvedData = await resolveRelationships(data, orgId, entityName, kysely);
+    
+    // Calculate maxUpdatedAt for Legend State's next changesSince
+    const maxUpdatedAt = resolvedData.length > 0
+      ? Math.max(...resolvedData.map((r: any) => new Date(r.updated_at || r.created_at || 0).getTime()))
       : changesSince 
         ? new Date(changesSince).getTime()
         : Date.now();
     
     return c.json({ 
       success: true, 
-      data: data,
+      data: resolvedData,
       // Metadata for Legend State sync tracking
       metadata: {
-        totalCount: result.total || data.length,
-        returnedCount: data.length,
-        hasMore: (result.total || data.length) > data.length,
+        totalCount: result.total || resolvedData.length,
+        returnedCount: resolvedData.length,
+        hasMore: (result.total || resolvedData.length) > resolvedData.length,
         maxUpdatedAt,
         changesSince,
         includeDeleted,
@@ -456,10 +589,13 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName',
     
     console.log(`[Container Permissions] ${archetype} filter: ${result.data?.length || 0} → ${filteredData.length} records accessible`);
     
+    // Resolve relationship fields to show actual entity names instead of IDs
+    const resolvedData = await resolveRelationships(filteredData, orgId, entityName, kysely);
+    
     return c.json({ 
       success: true, 
-      data: filteredData,
-      total: filteredData.length,
+      data: resolvedData,
+      total: resolvedData.length,
       archetype: archetype,
       containerModel: archetypePermissionService.getArchetypePermissionSummary(archetype)?.model
     });

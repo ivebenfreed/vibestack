@@ -18,6 +18,7 @@ export interface RelationshipFieldDefinition {
   targetEntityType?: string;  // For entity_reference, specify target type
   cardinality?: 'one-to-one' | 'one-to-many' | 'many-to-one' | 'many-to-many';
   properties?: Record<string, any>;  // Default properties for the relationship
+  displayField?: string;  // Field to use for display (e.g., 'name', 'title', 'email')
 }
 
 export class RelationshipFieldHandler {
@@ -43,14 +44,17 @@ export class RelationshipFieldHandler {
     // For custom relationship fields, use the configured relationship type and target
     let relationshipType: string;
     let targetEntityType: string;
+    let displayField: string | undefined;
     
     if (fieldDefinition && (fieldType === 'custom_user_reference' || fieldType === 'custom_entity_reference')) {
       relationshipType = fieldDefinition.relationshipType || this.inferRelationshipType(fieldName, fieldType);
       targetEntityType = fieldDefinition.targetEntityType || this.inferTargetEntityType(fieldName, fieldType);
+      displayField = fieldDefinition.displayField; // Extract display field from custom field definition
     } else {
       // For archetype reference fields, infer from field name
       relationshipType = this.inferRelationshipType(fieldName, fieldType);
       targetEntityType = this.inferTargetEntityType(fieldName, fieldType);
+      displayField = fieldDefinition?.displayField; // Also support display field for archetype fields
     }
     
     const cardinality = this.inferCardinality(fieldName, relationshipType);
@@ -61,7 +65,8 @@ export class RelationshipFieldHandler {
       relationshipType,
       targetEntityType,
       cardinality,
-      properties: this.getDefaultProperties(relationshipType)
+      properties: this.getDefaultProperties(relationshipType),
+      displayField
     };
   }
 
@@ -393,7 +398,9 @@ export class RelationshipFieldHandler {
         relationship_type: relationshipDef.relationshipType,
         target_entity_type: relationshipDef.targetEntityType,
         cardinality: relationshipDef.cardinality,
-        display_format: `{{source}} ${relationshipDef.relationshipType} {{target}}`,
+        display_format: relationshipDef.displayField 
+          ? `{${relationshipDef.displayField}}` 
+          : `{{source}} ${relationshipDef.relationshipType || 'relates_to'} {{target}}`,
         ui_config: JSON.stringify({
           icon: this.getRelationshipIcon(relationshipDef.relationshipType),
           color: this.getRelationshipColor(relationshipDef.relationshipType),

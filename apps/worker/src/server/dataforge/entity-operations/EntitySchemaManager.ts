@@ -223,10 +223,11 @@ export class EntitySchemaManager {
       console.log('[EntitySchemaManager] All fields:', JSON.stringify(baseFieldsForTable, null, 2));
       
       // Collect relationship fields for processing
-      const relationshipFields: Array<{name: string, type: string}> = [];
+      const relationshipFields: Array<{name: string, type: string, field: any}> = [];
       Object.entries(baseFieldsForTable).forEach(([fieldName, field]) => {
-        if (field.type === 'user_reference' || field.type === 'entity_reference') {
-          relationshipFields.push({ name: fieldName, type: field.type });
+        if (field.type === 'user_reference' || field.type === 'entity_reference' ||
+            field.type === 'custom_user_reference' || field.type === 'custom_entity_reference') {
+          relationshipFields.push({ name: fieldName, type: field.type, field });
         }
       });
       
@@ -255,7 +256,8 @@ export class EntitySchemaManager {
             const relationshipDef = RelationshipFieldHandler.convertToRelationshipMetadata(
               relField.name,
               relField.type,
-              normalizedEntityName
+              normalizedEntityName,
+              relField.field
             );
             
             // Store relationship field configuration
