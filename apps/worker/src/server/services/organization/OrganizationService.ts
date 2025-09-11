@@ -112,7 +112,28 @@ export class OrganizationService {
         createdBy
       );
 
-      // 5. Log audit event
+      // 5. Auto-create lore/canon collections for this World (Organization)
+      try {
+        const { LoreCanonCollectionManager } = await import('../../dataforge/services/LoreCanonCollectionManager');
+        const collectionManager = new LoreCanonCollectionManager(this.db);
+        
+        await collectionManager.createWorldCollections(
+          organization.id,
+          organization.id, // worldId is same as orgId
+          organization.name,
+          createdBy
+        );
+        
+        dbLogger.info('Created lore/canon collections for world', {
+          organizationId: organization.id,
+          name: organization.name
+        });
+      } catch (error) {
+        dbLogger.warn('Failed to create world collections:', error);
+        // Don't fail the entire operation if collection creation fails
+      }
+
+      // 6. Log audit event
       await this.logAuditEvent({
         organization_id: organization.id,
         action: 'organization_created',

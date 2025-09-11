@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict MnyIMaE7oCFT25dc4NHteUFh2MH6j8sJEWn1tCrA1s1pHfjQsaGVBTf4JacNyiQ
+\restrict IP4fbF1tFoXqbaGizLcaK99GGa01WqdvxaUWc8KwornvjtQbfR6dL5Lk9HbDdOz
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict MnyIMaE7oCFT25dc4NHteUFh2MH6j8sJEWn1tCrA1s1pHfjQsaGVBTf4JacNyiQ
+\unrestrict IP4fbF1tFoXqbaGizLcaK99GGa01WqdvxaUWc8KwornvjtQbfR6dL5Lk9HbDdOz
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict MmiFisL9buxKQopgUr7FWp8fS3gGMMia0wxYSnRCYDGMe6dfikecZNMWnzNOoUC
+\restrict HIi5uadnLVfDAzSYCye4iHokM7lD3o7kEucbPmPf7OrBsw44f3hXMpQuelePanc
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MmiFisL9buxKQopgUr7FWp8fS3gGMMia0wxYSnRCYDGMe6dfikecZNMWnzNOoUC
+\unrestrict HIi5uadnLVfDAzSYCye4iHokM7lD3o7kEucbPmPf7OrBsw44f3hXMpQuelePanc
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict YJR7oCNlUWpCxjJSZ1p5qQFQeC6PTusBq00uRFjIFrxtIgeVnujNM8Mh15FsNw3
+\restrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict YJR7oCNlUWpCxjJSZ1p5qQFQeC6PTusBq00uRFjIFrxtIgeVnujNM8Mh15FsNw3
+\unrestrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
 \connect elevra_dev
-\restrict YJR7oCNlUWpCxjJSZ1p5qQFQeC6PTusBq00uRFjIFrxtIgeVnujNM8Mh15FsNw3
+\restrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2751,6 +2751,27 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_clientmeeting R
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_clientmeeting OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_collection; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_collection (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    collection_type text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb,
+    status text DEFAULT 'draft'::text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_collection REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_collection OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_deliverable; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2775,6 +2796,35 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_deliverable REP
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_deliverable OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_enhancedfieldsdemo; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_enhancedfieldsdemo (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    contact_email text NOT NULL,
+    website_url text,
+    phone_number text,
+    brand_color text DEFAULT '#3b82f6'::text,
+    budget_amount jsonb DEFAULT '{"amount": 1000, "currency": "USD"}'::jsonb,
+    completion_rating text DEFAULT 3,
+    priority_level text DEFAULT 5,
+    meeting_datetime text,
+    notes text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_enhancedfieldsdemo REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_enhancedfieldsdemo OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE; Schema: public; Owner: postgres
@@ -2807,6 +2857,32 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice REPLICA
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoice OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_lorecanontestproject; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_lorecanontestproject (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    start_date date,
+    end_date date,
+    budget numeric,
+    progress_percentage integer DEFAULT 0,
+    lore_collection_id text,
+    canon_collection_id text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_lorecanontestproject REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_lorecanontestproject OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_projectmilestone; Type: TABLE; Schema: public; Owner: postgres
@@ -4945,7 +5021,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YJR7oCNlUWpCxjJSZ1p5qQFQeC6PTusBq00uRFjIFrxtIgeVnujNM8Mh15FsNw3
+\unrestrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
 
 --
 -- Database "postgres" dump
@@ -4957,7 +5033,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict DPG5xEpaihEWFY8lYaY3FBGYXFGkCAe7mfYYKenzUdYFTn8wOqF3gFNM2Lynvnp
+\restrict FTC3VTcFdzWe6PbYipqB8JtgTMkyYAGfYPyP9Nk3qPevraD52uLtB9ZfQDJLYA8
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -4978,7 +5054,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DPG5xEpaihEWFY8lYaY3FBGYXFGkCAe7mfYYKenzUdYFTn8wOqF3gFNM2Lynvnp
+\unrestrict FTC3VTcFdzWe6PbYipqB8JtgTMkyYAGfYPyP9Nk3qPevraD52uLtB9ZfQDJLYA8
 
 --
 -- PostgreSQL database cluster dump complete

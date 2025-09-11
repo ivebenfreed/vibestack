@@ -262,6 +262,35 @@ export class RecordManager {
         return { success: false, errors: ['Failed to create record'] };
       }
 
+      // Auto-create lore/canon collections for Project entities
+      if (config.archetype === 'project') {
+        try {
+          const { LoreCanonCollectionManager } = await import('../services/LoreCanonCollectionManager');
+          const collectionManager = new LoreCanonCollectionManager(this.config.kysely);
+          
+          const collections = await collectionManager.createProjectCollections(
+            orgId,
+            recordId,
+            finalData.name || 'Untitled Project',
+            userId
+          );
+          
+          // Update the project record with collection IDs
+          await collectionManager.updateProjectCollections(
+            orgId,
+            recordId,
+            collections.loreCollectionId,
+            collections.canonCollectionId,
+            entityName
+          );
+          
+          console.log(`✅ [RecordManager] Created lore/canon collections for project ${recordId}`);
+        } catch (error) {
+          console.warn('Failed to create project collections:', error);
+          // Don't fail the entire operation if collection creation fails
+        }
+      }
+
       // Create relationship records for any relationship fields
       if (Object.keys(relationshipData).length > 0 || userId) {
         const { RelationshipFieldHandler } = await import('../services/RelationshipFieldHandler');

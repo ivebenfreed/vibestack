@@ -21,6 +21,8 @@ export interface ProjectFields {
   owner_id?: string;
   budget?: number;
   progress_percentage?: number;
+  lore_collection_id?: string;
+  canon_collection_id?: string;
   created_at: Date;
   updated_at: Date;
   created_by?: string;
@@ -99,6 +101,20 @@ export class ProjectArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true  // 🔒 System-protected - required for audit trail
+    },
+    lore_collection_id: {
+      type: 'text',
+      required: false,
+      syncable: true,
+      serverOnly: false,
+      systemField: true  // 🔒 System-protected - auto-created collection for project lore
+    },
+    canon_collection_id: {
+      type: 'text', 
+      required: false,
+      syncable: true,
+      serverOnly: false,
+      systemField: true  // 🔒 System-protected - auto-created collection for project canon
     }
   } as const;
 

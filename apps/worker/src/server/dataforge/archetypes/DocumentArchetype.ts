@@ -17,6 +17,13 @@ export interface DocumentFields {
   status: 'draft' | 'review' | 'published' | 'archived';
   author_id?: string;
   parent_document_id?: string;
+  // Collection context fields
+  collection_type?: 'lore' | 'canon' | 'general';
+  parent_entity_type?: 'universe' | 'world' | 'project';
+  parent_entity_id?: string;
+  alignment_score?: number; // 0-100 alignment to parent lore/canon
+  purpose_description?: string;
+  ai_usage_tracking?: any; // JSON for AI reference tracking
   created_at: Date;
   updated_at: Date;
   created_by?: string;
@@ -65,6 +72,49 @@ export class DocumentArchetype {
       required: false, 
       syncable: true,
       serverOnly: false
+    },
+    collection_type: {
+      type: 'single-select',
+      required: false,
+      syncable: true,
+      serverOnly: false,
+      enum: ['lore', 'canon', 'general'],
+      defaultValue: 'general'
+    },
+    parent_entity_type: {
+      type: 'single-select',
+      required: false,
+      syncable: true,
+      serverOnly: false,
+      enum: ['universe', 'world', 'project']
+    },
+    parent_entity_id: {
+      type: 'text',
+      required: false,
+      syncable: true,
+      serverOnly: false
+    },
+    alignment_score: {
+      type: 'slider',
+      required: false,
+      syncable: true,
+      serverOnly: false,
+      min: 0,
+      max: 100,
+      defaultValue: 50
+    },
+    purpose_description: {
+      type: 'text',
+      required: false,
+      syncable: true,
+      serverOnly: false
+    },
+    ai_usage_tracking: {
+      type: 'json',
+      required: false,
+      syncable: false,  // AI tracking data doesn't need to sync
+      serverOnly: true,
+      defaultValue: {}
     }
   } as const;
 
