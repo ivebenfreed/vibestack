@@ -78,21 +78,26 @@ export class StatusSetManager {
    * Get a specific status set by ID
    */
   async getStatusSet(orgId: string, statusSetId: string): Promise<StatusSet | null> {
-    const result = await this.db
-      .selectFrom('dataforge_status_sets')
-      .selectAll()
-      .where('id', '=', statusSetId)
-      .where('organization_id', '=', orgId)
-      .executeTakeFirst();
+    try {
+      const result = await this.db
+        .selectFrom('dataforge_status_sets')
+        .selectAll()
+        .where('id', '=', statusSetId)
+        .where('organization_id', '=', orgId)
+        .executeTakeFirst();
 
-    if (!result) return null;
+      if (!result) return null;
 
-    return {
-      ...result,
-      status_values: Array.isArray(result.status_values) 
-        ? result.status_values 
-        : JSON.parse(result.status_values as string)
-    };
+      return {
+        ...result,
+        status_values: Array.isArray(result.status_values) 
+          ? result.status_values 
+          : JSON.parse(result.status_values as string)
+      };
+    } catch (error) {
+      console.error(`[StatusSetManager] Error fetching status set ${statusSetId}:`, error);
+      return null;
+    }
   }
 
   /**

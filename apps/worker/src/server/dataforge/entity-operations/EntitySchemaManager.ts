@@ -8,6 +8,7 @@
 import type { FieldDefinition } from '../json-rules-engine';
 import type { OrgEntityDefinition } from '../org-entity-schema';
 import { DDLGenerator } from '../DDLGenerator';
+import { StatusSetManager } from '../services/StatusSetManager';
 
 export interface DataForgeEntityManagerConfig {
   kysely: any; // Kysely instance
@@ -378,8 +379,7 @@ export class EntitySchemaManager {
     try {
       console.log(`[EntitySchemaManager] Auto-assigning status sets for entity: ${entityName} (${archetype})`);
       
-      // Import StatusSetManager with the same pattern as other services
-      const { StatusSetManager } = await import('../services/StatusSetManager');
+      // Use StatusSetManager with static import  
       const statusSetManager = new StatusSetManager(this.config.kysely);
       
       // Check all fields (base + custom) for status fields
@@ -771,6 +771,7 @@ export class EntitySchemaManager {
 
           // Process each regular field through enhanced field handlers
           const enhancedFields = await Promise.all(regularFields.map(async (field: any) => {
+            console.log(`[EntitySchemaManager] Processing regular field: ${field.name}, type: ${field.type}, statusSetId: ${field.statusSetId}`);
             try {
               const handler = getEnhancedFieldHandler(field.type);
               
@@ -842,19 +843,22 @@ export class EntitySchemaManager {
                 }
               }
 
+              // Debug: Log field information
+              if (field.type === 'status' || field.type === 'status_set') {
+                console.log(`[EntitySchemaManager] Found status field: ${field.name}, type: ${field.type}, statusSetId: ${field.statusSetId}`);
+              }
+
               // Special handling for status fields with status sets
               if ((field.type === 'status' || field.type === 'status_set') && field.statusSetId) {
                 try {
                   // Load status set values from the StatusSetManager
-                  const { StatusSetManager } = await import('../services/StatusSetManager');
                   const statusSetManager = new StatusSetManager(this.config.kysely);
-                  
                   const statusSet = await statusSetManager.getStatusSet(orgId, field.statusSetId);
                   
-                  if (statusSet && statusSet.statusValues) {
+                  if (statusSet && statusSet.status_values) {
                     // Create context with status set values for field handlers
                     const statusSetContext = {
-                      statusSetValues: statusSet.statusValues
+                      statusSetValues: statusSet.status_values
                     };
                     
                     // Re-generate metadata with status set context
@@ -866,8 +870,8 @@ export class EntitySchemaManager {
                       id: statusSet.id,
                       name: statusSet.name,
                       description: statusSet.description,
-                      entityType: statusSet.entityType,
-                      values: statusSet.statusValues
+                      entityType: statusSet.entity_type,
+                      values: statusSet.status_values
                     };
                     
                     console.log(`[EntitySchemaManager] Loaded status set ${statusSet.name} for field ${field.name}`);
