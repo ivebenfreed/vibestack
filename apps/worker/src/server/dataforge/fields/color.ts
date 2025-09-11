@@ -2,25 +2,22 @@
  * Color Field Handler
  * 
  * Validates color values in multiple formats (hex, rgb, hsl, named colors)
+ * Enhanced with rich UI metadata for color picker and visual preview
  */
 
-import type { FieldDefinition } from '../types';
+import type { FieldDefinition, ValidationResult, EnhancedFieldHandler, ValidationMetadata, DisplayMetadata, EditorMetadata, FieldCapabilities, AccessibilityMetadata } from '../types';
 
 export function getDefaultValue(definition: FieldDefinition): any {
   return definition.defaultValue || '#000000';
 }
 
-export function validate(value: any, definition: FieldDefinition, context: any): { valid: boolean; errors: any[]; transformedValue?: any } {
-  const errors: any[] = [];
+export function validate(value: any, definition: FieldDefinition, context: any): ValidationResult {
+  const errors: string[] = [];
   
   // Handle null/undefined
   if (value == null || value === '') {
     if (definition.required) {
-      errors.push({
-        field: definition.name,
-        code: 'REQUIRED',
-        message: `${definition.name} is required`
-      });
+      errors.push(`Field '${definition.name}' is required`);
     }
     return { valid: errors.length === 0, errors };
   }

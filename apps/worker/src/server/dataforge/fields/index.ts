@@ -23,6 +23,10 @@ import * as date from './date';
 import * as singleSelect from './single-select';
 import * as multiSelect from './multi-select';
 import * as number from './number';
+import * as integer from './integer';
+import * as decimal from './decimal';
+import * as percentage from './percentage';
+import * as time from './time';
 import * as boolean from './boolean';
 import * as email from './email';
 import * as url from './url';
@@ -42,6 +46,14 @@ import * as computedExpression from './computed_expression';
 import * as priority from './priority';
 import * as status from './status';
 import * as json from './json';
+import * as rating from './rating';
+import * as slider from './slider';
+import * as image from './image';
+import * as datetimeLocal from './datetime-local';
+import * as address from './address';
+import * as coordinates from './coordinates';
+import * as textarea from './textarea';
+import * as markdown from './markdown';
 
 // Import types for enhanced handlers
 import type { EnhancedFieldHandler } from './types';
@@ -59,8 +71,10 @@ export const fieldTypes = {
   'multi-select': multiSelect, 
   'multi_select': multiSelect,  // alias
   number,
-  integer: number,  // alias
-  decimal: number,  // alias
+  integer,  // dedicated integer handler
+  decimal,  // dedicated decimal handler  
+  percentage,  // dedicated percentage handler
+  time,  // dedicated time handler
   boolean,
   email,
   url,
@@ -82,7 +96,21 @@ export const fieldTypes = {
   status,
   'status_set': status,  // alias for archetype fields
   json,
-  jsonb: json  // alias
+  jsonb: json,  // alias
+  
+  // Phase 3: Visual interaction fields
+  rating,
+  slider,
+  image,
+  'datetime-local': datetimeLocal,
+  'datetime_local': datetimeLocal,  // alias
+  
+  // Phase 4: Specialized fields
+  address,
+  coordinates,
+  textarea,
+  longtext: textarea,  // alias for long text areas
+  markdown
 };
 
 export function getFieldHandler(type: string) {

@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict niyi5YLAgO5MdY9Jb65xzdhankLNFXsIoxOfWtZtDCvNovLDJhhmp3biDdaOpOz
+\restrict bKydM3gWcgD0uAuyL6NXHljqdLQPkGANTwBdsIsCRqGuFIa6nJJ8FrpcReFqemk
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict niyi5YLAgO5MdY9Jb65xzdhankLNFXsIoxOfWtZtDCvNovLDJhhmp3biDdaOpOz
+\unrestrict bKydM3gWcgD0uAuyL6NXHljqdLQPkGANTwBdsIsCRqGuFIa6nJJ8FrpcReFqemk
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict GEL1PNEdZY6VPua1gC3Kawd47difmuv5uol93kY2OZPkppKngqS7BQhPrvyJhex
+\restrict d6sAzbBrrCrzQGCsbI7ChycBeQScCMnejNyT0TWePJu0ntw3NqtNcuLJmr8LsHv
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GEL1PNEdZY6VPua1gC3Kawd47difmuv5uol93kY2OZPkppKngqS7BQhPrvyJhex
+\unrestrict d6sAzbBrrCrzQGCsbI7ChycBeQScCMnejNyT0TWePJu0ntw3NqtNcuLJmr8LsHv
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict G3dmUuyyn40Ebo17HTid6hcJW5lgwThU15L93G8I2jYrhtYlX1Q9lkzn9bdUUZF
+\restrict a6zkkDxPZBeqmvvqWidIRycxEeFE1uaO5BOxQQXuU9kllrVPFQPBR3fdFEGqXKu
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict G3dmUuyyn40Ebo17HTid6hcJW5lgwThU15L93G8I2jYrhtYlX1Q9lkzn9bdUUZF
+\unrestrict a6zkkDxPZBeqmvvqWidIRycxEeFE1uaO5BOxQQXuU9kllrVPFQPBR3fdFEGqXKu
 \connect elevra_dev
-\restrict G3dmUuyyn40Ebo17HTid6hcJW5lgwThU15L93G8I2jYrhtYlX1Q9lkzn9bdUUZF
+\restrict a6zkkDxPZBeqmvvqWidIRycxEeFE1uaO5BOxQQXuU9kllrVPFQPBR3fdFEGqXKu
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2691,6 +2691,33 @@ COMMENT ON COLUMN public.integration_sync_log.metadata IS 'JSON object containin
 
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_advancedfieldtester; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_advancedfieldtester (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    due_date timestamp without time zone,
+    active_task_count integer,
+    total_budget_sum numeric(15,2),
+    team_members_list text,
+    completion_average numeric(15,4),
+    computed_total text,
+    complex_formula text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_advancedfieldtester REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_advancedfieldtester OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_cleantestproject; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2734,6 +2761,118 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cleantesttask R
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantesttask OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    quantity integer DEFAULT 1 NOT NULL,
+    price numeric DEFAULT 0 NOT NULL,
+    discount_rate text DEFAULT 0,
+    meeting_time text DEFAULT '09:00'::text,
+    enhanced_color_test text DEFAULT '#3b82f6'::text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    test_integer integer DEFAULT 10 NOT NULL,
+    test_decimal numeric DEFAULT 99.99,
+    test_percentage text DEFAULT 75,
+    test_rating text DEFAULT 3,
+    test_slider text DEFAULT 5,
+    test_image text,
+    test_datetime text,
+    test_address text,
+    test_coordinates text,
+    test_textarea text,
+    test_markdown text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_fieldtypetester; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_fieldtypetester (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    sample_text text DEFAULT 'Sample text content'::text NOT NULL,
+    sample_rich_text text DEFAULT '<p>Rich <strong>text</strong> content</p>'::text,
+    contact_email text DEFAULT 'test@example.com'::text NOT NULL,
+    website_url text DEFAULT 'https://example.com'::text,
+    phone_number text DEFAULT '+1-555-123-4567'::text,
+    sample_number numeric DEFAULT 42 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    due_date date,
+    brand_color text DEFAULT '#3b82f6'::text,
+    budget jsonb DEFAULT '{"amount": 1500, "currency": "USD"}'::jsonb,
+    attachments jsonb,
+    priority text DEFAULT 'medium'::text NOT NULL,
+    tags text DEFAULT '{}'::text[]
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_fieldtypetester REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_fieldtypetester OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_phase1numberfields; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_phase1numberfields (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    item_quantity integer DEFAULT 1 NOT NULL,
+    unit_price numeric DEFAULT 0 NOT NULL,
+    tax_rate text DEFAULT 8.5
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_phase1numberfields REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_phase1numberfields OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_relationships; Type: TABLE; Schema: public; Owner: postgres
@@ -4898,7 +5037,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict G3dmUuyyn40Ebo17HTid6hcJW5lgwThU15L93G8I2jYrhtYlX1Q9lkzn9bdUUZF
+\unrestrict a6zkkDxPZBeqmvvqWidIRycxEeFE1uaO5BOxQQXuU9kllrVPFQPBR3fdFEGqXKu
 
 --
 -- Database "postgres" dump
@@ -4910,7 +5049,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict MkxpCdSKt0ykFoNa2f2erddJa0FcKUGT9NOkP6JmnOldRgh5QV9Hf45Dhjro3wg
+\restrict oXhSLnrhv8hgFWCzulwx6PUf4AX8UoLrgB8VxoksOxCe5hQf1a9DUZYk0mbgab8
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -4931,7 +5070,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MkxpCdSKt0ykFoNa2f2erddJa0FcKUGT9NOkP6JmnOldRgh5QV9Hf45Dhjro3wg
+\unrestrict oXhSLnrhv8hgFWCzulwx6PUf4AX8UoLrgB8VxoksOxCe5hQf1a9DUZYk0mbgab8
 
 --
 -- PostgreSQL database cluster dump complete
