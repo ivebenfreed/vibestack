@@ -1,11 +1,11 @@
 /**
  * Simple Logger System with File and Folder Level Overrides
  * 
- * This logger provides a simple 3-level logging system (info, error, debug)
+ * This logger provides a simple 4-level logging system (debug, info, warn, error)
  * with global configuration and file/folder level overrides.
  * 
  * Features:
- * - Three log levels: info, error, debug
+ * - Four log levels: debug, info, warn, error
  * - Global log level configuration
  * - File and folder level overrides
  * - Runtime configuration via logControl API
@@ -17,6 +17,7 @@
  * const myLog = log('MyComponent.tsx');
  * myLog.info('Component rendered', { props });
  * myLog.debug('Debug info', data);
+ * myLog.warn('Warning message', warning);
  * myLog.error('Error occurred', error);
  * 
  * // Runtime control (browser console)
@@ -26,7 +27,7 @@
  */
 
 // Log levels (in priority order)
-export type LogLevel = 'error' | 'info' | 'debug';
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
 // Log configuration interface
 interface LogConfig {
@@ -45,8 +46,9 @@ const DEFAULT_CONFIG: LogConfig = {
 // Log level priorities (lower number = higher priority)
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   error: 0,
-  info: 1,
-  debug: 2
+  warn: 1,
+  info: 2,
+  debug: 3
 };
 
 // Browser storage key
@@ -246,6 +248,11 @@ export const logControl = {
   info: () => config.setGlobalLevel('info'),
   
   /**
+   * Enable warn mode globally
+   */
+  warn: () => config.setGlobalLevel('warn'),
+  
+  /**
    * Enable error only mode globally
    */
   error: () => config.setGlobalLevel('error'),
@@ -289,6 +296,18 @@ function createLogger(filename: string) {
         console.info(
           `%c${prefix}%c ${message}`,
           'color: #3B82F6; font-weight: bold',
+          'color: inherit',
+          data !== undefined ? data : ''
+        );
+      }
+    },
+    
+    warn: (message: string, data?: any) => {
+      if (config.shouldLog('warn', normalizedPath)) {
+        const prefix = `⚠️ [WARN] ${normalizedPath}`;
+        console.warn(
+          `%c${prefix}%c ${message}`,
+          'color: #F59E0B; font-weight: bold',
           'color: inherit',
           data !== undefined ? data : ''
         );

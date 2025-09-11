@@ -97,11 +97,17 @@ export const universeUserId$ = observable(() => universeContext$.get().userId)
 export const universeSchema$ = observable(() => {
   const universe = universeContext$.get()
   const organizations = Object.values(universe.organizations)
+  const readyOrganizations = organizations.filter(org => !org.loading)
   
-  fileLog.info(`[UniverseSchema] Computing universe schema with ${organizations.length} organizations`)
+  fileLog.info(`[UniverseSchema] Computing universe schema with ${organizations.length} organizations (${readyOrganizations.length} ready, ${organizations.length - readyOrganizations.length} still loading)`)
   
   if (organizations.length === 0) {
-    fileLog.error(`[UniverseSchema] No organizations found, returning null`)
+    fileLog.debug(`[UniverseSchema] No organizations found, returning null`)
+    return null
+  }
+  
+  if (readyOrganizations.length === 0) {
+    fileLog.debug(`[UniverseSchema] All ${organizations.length} organizations still loading, returning null for now`)
     return null
   }
   
@@ -114,6 +120,12 @@ export const universeSchema$ = observable(() => {
     const orgId = org.orgId || org.id
     if (!orgId) {
       fileLog.error(`[UniverseSchema] Skipping org with missing orgId:`, org)
+      return
+    }
+    
+    // CRITICAL FIX: Skip organizations that are still loading
+    if (org.loading) {
+      fileLog.debug(`[UniverseSchema] Skipping org ${orgId} - still loading`)
       return
     }
     

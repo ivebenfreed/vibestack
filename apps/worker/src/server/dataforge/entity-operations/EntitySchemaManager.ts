@@ -764,8 +764,13 @@ export class EntitySchemaManager {
             storedFields = Object.values(archetypeFields);
           }
 
-          // Process each field through enhanced field handlers
-          const enhancedFields = await Promise.all(storedFields.map(async (field: any) => {
+          // Filter out relationship fields - these are handled by RelationshipFieldHandler, not regular field handlers
+          const regularFields = storedFields.filter((field: any) => {
+            return field.type !== 'user_reference' && field.type !== 'entity_reference';
+          });
+
+          // Process each regular field through enhanced field handlers
+          const enhancedFields = await Promise.all(regularFields.map(async (field: any) => {
             try {
               const handler = getEnhancedFieldHandler(field.type);
               
