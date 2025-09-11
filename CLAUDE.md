@@ -624,3 +624,248 @@ For testing WebSocket connection and sync functionality:
 - Organization ID: `01920000-1000-7000-8000-000000000001` 
 - 12 business entity tables available for sync testing
 - Login at: `http://localhost:4000/sign-in` (or check current dev server port with `pnpm dev`)
+
+## Session Planning & Tracking
+
+Claude should maintain session documentation in `sessions/YYYY-MM-DD/session-N/`:
+- **plan.md**: Track goals, progress, and next steps
+- **work-log.md**: Log activities and decisions
+- **session-summary.md**: Summarize accomplishments (auto-generated on Stop)
+
+### Session Configuration
+- **Session Port**: [AUTO-ASSIGNED] (note the port when starting dev server to avoid conflicts)
+
+### Working Guidelines
+1. Update plan.md when starting new tasks
+2. Mark goals with ✅ when completed
+3. Add discovered tasks as new goals
+4. Commit code after logical chunks of work
+
+
+## Project Configuration
+
+### Package Manager
+- [ ] npm
+- [ ] yarn
+- [ ] pnpm
+- [ ] pip
+- [ ] cargo
+- [ ] other: ___________
+
+### Framework & Stack
+- **Frontend**: _____________
+- **Backend**: _____________
+- **Database**: _____________
+- **Auth**: _____________
+- **Deployment**: _____________
+
+### Development Commands
+```bash
+# Install dependencies
+[FILL_IN]
+
+# Run development server
+[FILL_IN]
+
+# Run tests
+[FILL_IN]
+
+# Build for production
+[FILL_IN]
+
+# Lint and format
+[FILL_IN]
+
+# Type checking
+[FILL_IN]
+```
+
+### Ports & Services
+- **Frontend**: http://localhost:[PORT]
+- **Backend API**: http://localhost:[PORT]
+- **Database**: [PORT]
+- **Other services**: _____________
+
+
+## Testing Strategy
+
+### Test Structure
+```
+tests/
+├── unit/        # Unit tests
+├── integration/ # Integration tests
+├── e2e/         # End-to-end tests
+└── fixtures/    # Test data
+```
+
+### Testing Commands
+- **Unit tests**: `[COMMAND]`
+- **Integration tests**: `[COMMAND]`
+- **E2E tests**: `[COMMAND]`
+- **Coverage**: `[COMMAND]`
+
+**Note**: Use Playwright MCP tools for E2E browser testing on verified ports
+
+
+## Authentication & Security
+
+### Auth Implementation
+- **Method**: [ ] JWT [ ] Session [ ] OAuth [ ] Other: _____
+- **Provider**: [ ] Custom [ ] Auth0 [ ] Clerk [ ] Supabase [ ] Firebase
+- **MFA**: [ ] Enabled [ ] Optional [ ] Not implemented
+
+### Security Checklist
+- [ ] Input validation on all endpoints
+- [ ] SQL injection prevention
+- [ ] XSS protection
+- [ ] CSRF tokens
+- [ ] Rate limiting
+- [ ] Secure headers
+- [ ] Environment variables for secrets
+
+
+## API Structure
+
+### REST Endpoints
+```
+GET    /api/[resource]      # List
+GET    /api/[resource]/:id  # Get one
+POST   /api/[resource]      # Create
+PUT    /api/[resource]/:id  # Update
+DELETE /api/[resource]/:id  # Delete
+```
+
+### Response Format
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null,
+  "metadata": {}
+}
+```
+
+
+## Database Schema
+
+### Tables/Collections
+```
+[DEFINE YOUR SCHEMA HERE]
+```
+
+### Migrations
+- **Tool**: _____________
+- **Location**: _____________
+- **Command**: _____________
+
+
+## Environment Variables
+
+### Required Variables
+```env
+# Development
+NODE_ENV=development
+DATABASE_URL=[REQUIRED]
+API_KEY=[REQUIRED]
+
+# Add more as needed
+```
+
+### Setup Instructions
+1. Copy `.env.example` to `.env`
+2. Fill in required values
+3. Never commit `.env` files
+
+
+## Code Style & Conventions
+
+### Naming Conventions
+- **Files**: `kebab-case.ts`
+- **Components**: `PascalCase.tsx`
+- **Functions**: `camelCase`
+- **Constants**: `UPPER_SNAKE_CASE`
+- **CSS Classes**: `kebab-case`
+
+### File Organization
+```
+src/
+├── components/   # Reusable components
+├── pages/        # Route pages
+├── lib/          # Utilities
+├── hooks/        # Custom hooks
+├── types/        # TypeScript types
+├── styles/       # Global styles
+└── api/          # API routes/handlers
+```
+
+### Git Configuration
+- **Current Branch**: staging
+- **Main Branch**: main
+
+### Git Commit Format
+```
+[type]: brief description
+
+Types: feat, fix, docs, style, refactor, test, chore
+```
+
+
+## Deployment
+
+### Deployment Platform
+- [ ] Vercel
+- [ ] Netlify
+- [ ] AWS
+- [ ] Heroku
+- [ ] Railway
+- [ ] Other: _____________
+
+### CI/CD Pipeline
+- [ ] GitHub Actions
+- [ ] GitLab CI
+- [ ] CircleCI
+- [ ] Jenkins
+- [ ] Other: _____________
+
+### Production Checklist
+- [ ] Environment variables configured
+- [ ] Database migrations run
+- [ ] SSL certificates active
+- [ ] Monitoring setup
+- [ ] Error tracking enabled
+- [ ] Backups configured
+
+
+## Monitoring & Logging
+
+### Error Tracking
+- **Service**: [ ] Sentry [ ] Bugsnag [ ] Rollbar [ ] Custom
+- **DSN**: _____________
+
+### Analytics
+- **Service**: [ ] GA4 [ ] Posthog [ ] Mixpanel [ ] Plausible
+- **ID**: _____________
+
+### Logging
+- **Level**: [ ] Debug [ ] Info [ ] Warn [ ] Error
+- **Destination**: [ ] Console [ ] File [ ] Cloud service
+
+
+## Performance Requirements
+
+### Load Time Targets
+- **First Contentful Paint**: < 1.5s
+- **Time to Interactive**: < 3.5s
+- **Largest Contentful Paint**: < 2.5s
+
+### Optimization Checklist
+- [ ] Code splitting implemented
+- [ ] Images optimized
+- [ ] Lazy loading enabled
+- [ ] Caching strategy defined
+- [ ] Database queries optimized
+
+
+## Project-Specific Instructions
+
+[ADD YOUR PROJECT-SPECIFIC REQUIREMENTS HERE]

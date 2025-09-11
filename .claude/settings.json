@@ -2,16 +2,6 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/session-start.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "clear",
         "hooks": [
           {
             "type": "command",
@@ -42,6 +32,17 @@
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/autonomous-session-manager.sh Stop",
             "timeout": 90
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git add -A && git commit -m \"[TEMP] Session snapshot - $(date '+%Y-%m-%d %H:%M:%S')\" || true",
+            "timeout": 30
           }
         ]
       }
