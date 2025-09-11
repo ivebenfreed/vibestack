@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict 5Qi7oCCuSRfFmZGuiTsXYJExzDDFgDyuSiyOy3TyOjGK0CnW7XQzOBKykD6Ybau
+\restrict hFQB2a2QrjUs2tcUO33jNpLCUorNWbe6vwpiydVo0iGRc6Z4NeSxbtr9Bud4mXL
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict 5Qi7oCCuSRfFmZGuiTsXYJExzDDFgDyuSiyOy3TyOjGK0CnW7XQzOBKykD6Ybau
+\unrestrict hFQB2a2QrjUs2tcUO33jNpLCUorNWbe6vwpiydVo0iGRc6Z4NeSxbtr9Bud4mXL
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict KNqBxJHdT51xjonxVuE1gxU4PNVU3EXlSaYeL4DjxGLoVkkYjAoWmj75ayfHnHJ
+\restrict drZ1tCkF7nb9WhKgRIFauIorTao5nhYetBtq7BxccSb9gPSrOrSYeJBSjCm4XT4
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KNqBxJHdT51xjonxVuE1gxU4PNVU3EXlSaYeL4DjxGLoVkkYjAoWmj75ayfHnHJ
+\unrestrict drZ1tCkF7nb9WhKgRIFauIorTao5nhYetBtq7BxccSb9gPSrOrSYeJBSjCm4XT4
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict ajMmhOb4Fnhc0g5aSEXvC7XQad5o6vr3FvljWHaKAgzKsqGaYMaRYjLCp9DdzBd
+\restrict gIdIpDLUcWpByROYxfykVevZwOgez2rO6OEMcwO8ExsFhIOxqgiqHREeErnfWKu
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict ajMmhOb4Fnhc0g5aSEXvC7XQad5o6vr3FvljWHaKAgzKsqGaYMaRYjLCp9DdzBd
+\unrestrict gIdIpDLUcWpByROYxfykVevZwOgez2rO6OEMcwO8ExsFhIOxqgiqHREeErnfWKu
 \connect elevra_dev
-\restrict ajMmhOb4Fnhc0g5aSEXvC7XQad5o6vr3FvljWHaKAgzKsqGaYMaRYjLCp9DdzBd
+\restrict gIdIpDLUcWpByROYxfykVevZwOgez2rO6OEMcwO8ExsFhIOxqgiqHREeErnfWKu
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2691,37 +2691,128 @@ COMMENT ON COLUMN public.integration_sync_log.metadata IS 'JSON object containin
 
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_advancedfieldtester; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_client; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_advancedfieldtester (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_client (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    company_name text NOT NULL,
+    industry text,
+    company_size text,
+    website_url text,
+    primary_contact_email text NOT NULL,
+    phone_number text,
+    annual_contract_value jsonb DEFAULT '{"amount": 0, "currency": "USD"}'::jsonb,
+    client_since date NOT NULL,
+    headquarters_address text,
+    client_tier text,
+    satisfaction_rating text DEFAULT 4
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_client REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_client OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_clientmeeting; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_clientmeeting (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    activity_type text NOT NULL,
+    description text,
+    entity_type text,
+    entity_id text,
+    metadata jsonb,
+    status text DEFAULT 'scheduled'::text NOT NULL,
+    meeting_type text,
+    attendees text,
+    meeting_duration integer DEFAULT 60,
+    meeting_notes text,
+    action_items text,
+    next_meeting_date text,
+    client_satisfaction_rating text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_clientmeeting REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_clientmeeting OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_deliverable; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_deliverable (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     title text NOT NULL,
-    description text,
-    priority text,
-    status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone,
-    active_task_count integer,
-    total_budget_sum numeric(15,2),
-    team_members_list text,
-    completion_average numeric(15,4),
-    computed_total text,
-    complex_formula text
+    content text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    deliverable_type text,
+    file_url text,
+    file_size_mb numeric,
+    version_number text DEFAULT '1.0'::text,
+    review_status text,
+    delivery_date date NOT NULL,
+    client_approved boolean DEFAULT false
 );
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_advancedfieldtester REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_deliverable REPLICA IDENTITY FULL;
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_advancedfieldtester OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_deliverable OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_cleantestproject; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantestproject (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_invoice (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    invoice_number text NOT NULL,
+    invoice_date date NOT NULL,
+    due_date date NOT NULL,
+    subtotal jsonb NOT NULL,
+    tax_rate text DEFAULT 8.25,
+    tax_amount jsonb NOT NULL,
+    total_amount jsonb NOT NULL,
+    payment_status text,
+    payment_date date,
+    billing_period_start date NOT NULL,
+    billing_period_end date NOT NULL,
+    hours_billed numeric NOT NULL,
+    total_work_tasks integer
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_invoice OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_projectmilestone; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projectmilestone (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_at timestamp without time zone NOT NULL,
@@ -2733,146 +2824,53 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantestproject (
     start_date date,
     end_date date,
     budget numeric,
-    progress_percentage integer DEFAULT 0
+    progress_percentage integer DEFAULT 0,
+    milestone_type text,
+    deliverable_count integer,
+    milestone_value jsonb NOT NULL,
+    dependencies text,
+    acceptance_criteria text NOT NULL
 );
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cleantestproject REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projectmilestone REPLICA IDENTITY FULL;
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantestproject OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projectmilestone OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_cleantesttask; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_projectportfolio; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantesttask (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_projectportfolio (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
+    name text NOT NULL,
     description text,
     priority text,
     status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone
+    start_date date,
+    end_date date,
+    budget numeric,
+    progress_percentage integer DEFAULT 0,
+    project_type text,
+    contract_value jsonb NOT NULL,
+    target_completion date NOT NULL,
+    actual_completion date,
+    budget_allocated jsonb NOT NULL,
+    budget_spent jsonb DEFAULT '{"amount": 0, "currency": "USD"}'::jsonb,
+    completion_percentage text DEFAULT 0,
+    risk_level text,
+    client_satisfaction text,
+    total_milestones integer,
+    total_tasks integer
 );
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cleantesttask REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_projectportfolio REPLICA IDENTITY FULL;
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantesttask OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    name text NOT NULL,
-    description text,
-    status text DEFAULT 'draft'::text NOT NULL,
-    data jsonb,
-    quantity integer DEFAULT 1 NOT NULL,
-    price numeric DEFAULT 0 NOT NULL,
-    discount_rate text DEFAULT 0,
-    meeting_time text DEFAULT '09:00'::text,
-    enhanced_color_test text DEFAULT '#3b82f6'::text
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefielddemo OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    name text NOT NULL,
-    description text,
-    status text DEFAULT 'draft'::text NOT NULL,
-    data jsonb,
-    test_integer integer DEFAULT 10 NOT NULL,
-    test_decimal numeric DEFAULT 99.99,
-    test_percentage text DEFAULT 75,
-    test_rating text DEFAULT 3,
-    test_slider text DEFAULT 5,
-    test_image text,
-    test_datetime text,
-    test_address text,
-    test_coordinates text,
-    test_textarea text,
-    test_markdown text
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_comprehensivefieldtest OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_fieldtypetester; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_fieldtypetester (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    name text NOT NULL,
-    description text,
-    status text DEFAULT 'draft'::text NOT NULL,
-    data jsonb,
-    sample_text text DEFAULT 'Sample text content'::text NOT NULL,
-    sample_rich_text text DEFAULT '<p>Rich <strong>text</strong> content</p>'::text,
-    contact_email text DEFAULT 'test@example.com'::text NOT NULL,
-    website_url text DEFAULT 'https://example.com'::text,
-    phone_number text DEFAULT '+1-555-123-4567'::text,
-    sample_number numeric DEFAULT 42 NOT NULL,
-    is_active boolean DEFAULT true NOT NULL,
-    due_date date,
-    brand_color text DEFAULT '#3b82f6'::text,
-    budget jsonb DEFAULT '{"amount": 1500, "currency": "USD"}'::jsonb,
-    attachments jsonb,
-    priority text DEFAULT 'medium'::text NOT NULL,
-    tags text DEFAULT '{}'::text[]
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_fieldtypetester REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_fieldtypetester OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_phase1numberfields; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_phase1numberfields (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    name text NOT NULL,
-    description text,
-    status text DEFAULT 'draft'::text NOT NULL,
-    data jsonb,
-    item_quantity integer DEFAULT 1 NOT NULL,
-    unit_price numeric DEFAULT 0 NOT NULL,
-    tax_rate text DEFAULT 8.5
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_phase1numberfields REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_phase1numberfields OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_projectportfolio OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_relationships; Type: TABLE; Schema: public; Owner: postgres
@@ -2899,165 +2897,43 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_relationships (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_relationships OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_statustesttask; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_teammember; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
-    description text,
-    priority text,
-    status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_statustesttask REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_statustesttask2; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask2 (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
-    description text,
-    priority text,
-    status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_statustesttask2 REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask2 OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_task; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_task (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
-    description text,
-    priority text,
-    status text,
-    due_date timestamp without time zone
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_testcleanupentity; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcleanupentity (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
-    description text,
-    priority text,
-    status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone,
-    test_field text NOT NULL
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcleanupentity REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcleanupentity OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_testdataforgeentity; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdataforgeentity (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
-    description text,
-    priority text,
-    status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone,
-    test_field text NOT NULL,
-    notes text
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdataforgeentity REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdataforgeentity OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_testdocument; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument (
-    id text NOT NULL,
-    organization_id text NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    title text NOT NULL,
-    content text,
-    status text DEFAULT 'draft'::text NOT NULL,
-    document_type text NOT NULL,
-    word_count numeric
-);
-
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testdocument REPLICA IDENTITY FULL;
-
-
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testdocument OWNER TO postgres;
-
---
--- Name: org_01920000_1000_7000_8000_000000000001_testproject; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testproject (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_teammember (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     name text NOT NULL,
     description text,
-    priority text,
-    status text DEFAULT 'not_started'::text NOT NULL,
-    start_date date,
-    end_date date,
-    budget numeric,
-    progress_percentage integer DEFAULT 0,
-    client_name text NOT NULL,
-    budget_amount numeric
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    employee_id text NOT NULL,
+    full_name text NOT NULL,
+    role text,
+    seniority text,
+    email_address text NOT NULL,
+    phone_number text,
+    hire_date date NOT NULL,
+    hourly_rate jsonb NOT NULL,
+    availability_hours integer DEFAULT 40,
+    skills text,
+    current_utilization text DEFAULT 75,
+    performance_rating text DEFAULT 4,
+    office_location text
 );
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testproject REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teammember REPLICA IDENTITY FULL;
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testproject OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_teammember OWNER TO postgres;
 
 --
--- Name: org_01920000_1000_7000_8000_000000000001_workflowtask; Type: TABLE; Schema: public; Owner: postgres
+-- Name: org_01920000_1000_7000_8000_000000000001_worktask; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_workflowtask (
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_worktask (
     id text NOT NULL,
     organization_id text NOT NULL,
     created_at timestamp without time zone NOT NULL,
@@ -3066,13 +2942,21 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_workflowtask (
     description text,
     priority text,
     status text DEFAULT 'not_started'::text NOT NULL,
-    due_date timestamp without time zone
+    due_date timestamp without time zone,
+    task_type text,
+    estimated_hours numeric NOT NULL,
+    actual_hours numeric,
+    complexity text DEFAULT 3,
+    billable boolean DEFAULT true,
+    hourly_rate jsonb,
+    blocking_issues text,
+    code_review_required boolean DEFAULT false
 );
 
-ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_workflowtask REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_worktask REPLICA IDENTITY FULL;
 
 
-ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_workflowtask OWNER TO postgres;
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_worktask OWNER TO postgres;
 
 --
 -- Name: org_relationship_definitions; Type: TABLE; Schema: public; Owner: postgres
@@ -3780,11 +3664,35 @@ ALTER TABLE ONLY public.integration_sync_log
 
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_invoice org_01920000_1000_7000_8000_000000000001_inv_invoice_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_invoice
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_inv_invoice_number_key UNIQUE (invoice_number);
+
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_relationships org_01920000_1000_7000_8000_000000000001_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_relationships
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_relationships_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_teammember org_01920000_1000_7000_8000_000000000001_team_email_address_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teammember
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_team_email_address_key UNIQUE (email_address);
+
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_teammember org_01920000_1000_7000_8000_000000000001_teamme_employee_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teammember
+    ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_teamme_employee_id_key UNIQUE (employee_id);
 
 
 --
@@ -5037,7 +4945,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ajMmhOb4Fnhc0g5aSEXvC7XQad5o6vr3FvljWHaKAgzKsqGaYMaRYjLCp9DdzBd
+\unrestrict gIdIpDLUcWpByROYxfykVevZwOgez2rO6OEMcwO8ExsFhIOxqgiqHREeErnfWKu
 
 --
 -- Database "postgres" dump
@@ -5049,7 +4957,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict kszZtzhj6RWDPfMcQRv6dFRgSbkQ69ZB0DLRQzeOcUHZrC4yEvC6rRpEhuGToT3
+\restrict RSIb0ATZ5HUgulzQwpEMloK9dbhYuKQ5paWR77M7c65oD1N0K20zREcWchd4qvO
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5070,7 +4978,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kszZtzhj6RWDPfMcQRv6dFRgSbkQ69ZB0DLRQzeOcUHZrC4yEvC6rRpEhuGToT3
+\unrestrict RSIb0ATZ5HUgulzQwpEMloK9dbhYuKQ5paWR77M7c65oD1N0K20zREcWchd4qvO
 
 --
 -- PostgreSQL database cluster dump complete

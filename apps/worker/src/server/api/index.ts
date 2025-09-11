@@ -68,7 +68,7 @@ api.route('/file-import', fileImportApi)
 
 // Dependencies API
 import dependenciesApi from '../routes/dependencies-api'
-api.route('/dependencies', dependenciesApi)
+api.route('/', dependenciesApi)
 
 // Status Sets API
 import statusSetsApi from '../routes/status-sets-api'

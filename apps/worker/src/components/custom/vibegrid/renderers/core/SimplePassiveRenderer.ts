@@ -19,6 +19,10 @@ import { SelectionManager } from '../managers/SelectionManager';
 import type { ViewportInfo, TableRow } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
+// Smart cell system imports
+import { createDataLoadingStage$, createStageCallbacks } from '../../stores/data-loading-stages';
+import { createDependencyContext, getCellDependencies, checkCellReadiness } from '../../utils/cell-readiness';
+import { createLoadingCell, createErrorCell } from '../../components/LoadingCell';
 
 const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
@@ -77,6 +81,11 @@ export class SimplePassiveRenderer {
   
   // UI element references
   private selectAllCheckbox: HTMLInputElement | null = null;
+  
+  // Smart cell system
+  private dataLoadingStage$: any = null;
+  private relationshipResolver$: Map<string, any> = new Map();
+  private formattersReady: boolean = false;
   
   constructor(private options: SimplePassiveRendererOptions) {
     fileLog.info('🎯 SimplePassiveRenderer: Initializing');
@@ -1226,12 +1235,21 @@ export class SimplePassiveRenderer {
   
   /**
    * Create a cell element with proper CSS-based dual-target system
+   * Now enhanced with smart cell dependency checking
    */
   private createCellElement(
     row: any, 
     column: any, 
     colIndex: number
   ): HTMLElement {
+    // Check if smart cell system should handle this cell
+    const cellType = column.cellType || column.type || 'text';
+    
+    if (this.shouldUseSmartCell(cellType)) {
+      return this.createSmartCell(row, column, cellType);
+    }
+    
+    // Fall back to original cell creation for simple cell types
     const cellElement = this.createElement('div', 'vibegridx-cell');
     cellElement.dataset.rowId = row.id;
     cellElement.dataset.columnId = column.id;
@@ -1250,7 +1268,6 @@ export class SimplePassiveRenderer {
     
     // Get cell value and determine content type for proper CSS classes
     const value = row[column.id];
-    const cellType = column.cellType || column.type || 'text';
     
     // Create content element with proper CSS classes based on type
     // The content element should only take up the space it needs, not flex: 1
@@ -2248,5 +2265,166 @@ export class SimplePassiveRenderer {
     
     // Default: no specific color class (will use inline styles)
     return null;
+  }
+
+  /**
+   * Determine if a cell type should use the smart cell system
+   */
+  private shouldUseSmartCell(cellType: string): boolean {
+    // Use smart cells for types that have dependencies
+    const smartCellTypes = [
+      'relationship-single',
+      'relationship-multi', 
+      'rollup_count',
+      'rollup_sum',
+      'rollup_average',
+      'rollup_concat',
+      'computed_expression',
+      'computed_formula'
+    ];
+    
+    return smartCellTypes.includes(cellType);
+  }
+
+  /**
+   * Create a smart cell that checks dependencies before rendering
+   */
+  private createSmartCell(row: any, column: any, cellType: string): HTMLElement {
+    // Get dependencies for this cell type
+    const deps = getCellDependencies(cellType, column);
+    
+    // Create dependency context from current state
+    const context = createDependencyContext(
+      this.universeSchema$.get() !== null, // schemaLoaded
+      this.relationshipResolver$ || new Map(), // relationshipResolver
+      this.formattersReady, // formattersReady
+      this.dataLoadingStage$?.stage.get() || 'ready', // loadingStage
+      [] // existing errors
+    );
+    
+    // Check if cell is ready to render
+    const readiness = checkCellReadiness(column, row, deps, context);
+    
+    if (readiness.isReady) {
+      // Cell is ready - render normally using existing logic
+      return this.createReadyCell(row, column, cellType);
+    } else {
+      // Cell is not ready - show loading state
+      return createLoadingCell(cellType, column);
+    }
+  }
+
+  /**
+   * Create a ready cell using the original cell creation logic
+   */
+  private createReadyCell(row: any, column: any, cellType: string): HTMLElement {
+    const cellElement = this.createElement('div', 'vibegridx-cell');
+    cellElement.dataset.rowId = row.id;
+    cellElement.dataset.columnId = column.id;
+    cellElement.style.cssText = `
+      flex: 0 0 ${column.width}px;
+      height: 100%;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      border-right: 1px solid #f1f3f5;
+      overflow: hidden;
+      position: relative;
+      cursor: default;
+    `;
+    
+    // Get cell value and create content
+    const value = row[column.id];
+    let contentElement: HTMLElement;
+    
+    // Use the same content creation logic as the original method
+    if (cellType === 'enum' || cellType === 'select' || cellType === 'tags') {
+      contentElement = this.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
+      const displayValue = this.formatCellValue(value, cellType, column);
+      
+      if (displayValue.includes('<span')) {
+        contentElement.innerHTML = displayValue;
+      } else {
+        contentElement.textContent = displayValue;
+        contentElement.style.cssText = `
+          background-color: rgb(243, 244, 246);
+          color: rgb(75, 85, 99);
+          border: 1px solid rgb(209, 213, 219);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 500;
+          white-space: nowrap;
+        `;
+      }
+    } else if (this.isTagsField(column.id, value)) {
+      contentElement = this.createTagsElement(value, row, column);
+    } else if (['number', 'integer', 'float'].includes(cellType)) {
+      contentElement = this.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
+      contentElement.textContent = this.formatCellValue(value, cellType, column);
+    } else if (cellType === 'boolean') {
+      contentElement = this.createElement('span', 'vibegridx-boolean-text vibegridx-cell-boolean-editable');
+      contentElement.textContent = this.formatCellValue(value, cellType, column);
+    } else if (value == null || value === '') {
+      contentElement = this.createElement('span', 'vibegridx-cell-empty-editable');
+      contentElement.textContent = 'Click to edit';
+      contentElement.style.fontSize = '12px';
+      contentElement.style.opacity = '0.6';
+    } else {
+      contentElement = this.createElement('span', 'vibegridx-cell-text-editable');
+      contentElement.textContent = this.formatCellValue(value, cellType, column);
+    }
+    
+    // Add click handler for content area
+    contentElement.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cellId = `${row.id}:${column.id}`;
+      
+      fileLog.info('📝 Smart cell content clicked - entering edit mode', {
+        rowId: row.id,
+        columnId: column.id,
+        value,
+        cellType
+      });
+      
+      this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
+    });
+    
+    cellElement.appendChild(contentElement);
+    
+    // Add cell selection handler (same as original)
+    cellElement.addEventListener('mousedown', (e) => {
+      if ((e.target as HTMLElement) !== cellElement) {
+        fileLog.info('📝 Smart cell content element clicked, ignoring for selection');
+        return;
+      }
+      
+      const isCtrlKey = e.ctrlKey || e.metaKey;
+      const isShiftKey = e.shiftKey;
+      const cellId = `${row.id}:${column.id}`;
+      
+      this.focusedCell = cellId;
+      if (!isCtrlKey && !isShiftKey) {
+        this.selectionAnchor = cellId;
+      }
+      
+      this.container.focus();
+      e.preventDefault();
+      
+      if (isShiftKey && this.tableInteraction$.anchorCell.get()) {
+        this.tableInteraction$.selectRange(this.tableInteraction$.anchorCell.get()!, cellId);
+      } else if (isCtrlKey) {
+        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
+      } else {
+        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
+        this.tableInteraction$.startDragSelection(cellId);
+      }
+    });
+    
+    return cellElement;
   }
 }
