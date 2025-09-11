@@ -466,6 +466,109 @@ DataForge now provides custom relationship fields that follow the exact same UX 
 }
 ```
 
+### Hierarchical and Multiple Relationships
+
+**DataForge supports complex relationship hierarchies where entities can have multiple relationship fields with different relationship types and targets.**
+
+#### Multiple Relationships Per Entity
+
+Entities can simultaneously maintain multiple types of relationships:
+
+```typescript
+// Example: Task entity with multiple relationship types
+{
+  "entityName": "Task",
+  "customFields": [
+    {
+      "name": "project_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "belongs_to",      // Structural ownership
+      "targetEntityType": "Project"
+    },
+    {
+      "name": "milestone_id", 
+      "type": "custom_entity_reference",
+      "relationshipType": "contributes_to",  // Functional contribution
+      "targetEntityType": "Milestone"
+    },
+    {
+      "name": "predecessor_task_id",
+      "type": "custom_entity_reference", 
+      "relationshipType": "depends_on",      // Sequential dependency
+      "targetEntityType": "Task"
+    },
+    {
+      "name": "assigned_developer_id",
+      "type": "custom_user_reference",
+      "relationshipType": "assigned_to"      // Work assignment
+    }
+  ]
+}
+```
+
+#### Relationship Type Semantics
+
+**Different relationship types serve different purposes:**
+
+- **`belongs_to`**: Structural ownership and containment
+- **`contributes_to`**: Functional contribution without ownership
+- **`depends_on`**: Sequential or logical dependencies  
+- **`assigned_to`**: Work assignments and responsibilities
+- **`owned_by`**: Direct ownership relationships
+- **`created_by`**: Audit trail relationships
+
+#### Hierarchical Example: Project → Milestone → Task
+
+**A common hierarchical pattern using different relationship semantics:**
+
+```typescript
+// 1. Milestone belongs to Project (structural)
+{
+  "entityName": "Milestone",
+  "customFields": [
+    {
+      "name": "parent_project_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "belongs_to",
+      "targetEntityType": "Project"
+    }
+  ]
+}
+
+// 2. Task contributes to Milestone (functional) AND belongs to Project (structural)
+{
+  "entityName": "Task", 
+  "customFields": [
+    {
+      "name": "project_id",
+      "type": "custom_entity_reference",
+      "relationshipType": "belongs_to",     // Direct project membership
+      "targetEntityType": "Project"
+    },
+    {
+      "name": "milestone_id",
+      "type": "custom_entity_reference", 
+      "relationshipType": "contributes_to", // Milestone contribution
+      "targetEntityType": "Milestone"
+    }
+  ]
+}
+```
+
+**This creates a flexible hierarchy where:**
+- **Projects** contain both Milestones and Tasks directly
+- **Milestones** can organize Tasks functionally within a Project
+- **Tasks** can belong to a Project AND contribute to specific Milestones
+- **Different semantics** allow for rich querying and UI organization
+
+#### Cardinality Flexibility
+
+**Each relationship can have different cardinality:**
+- **One-to-many**: Project → Tasks (`belongs_to` from Task perspective)
+- **Many-to-many**: Tasks → Milestones (`contributes_to` allows multiple)
+- **Many-to-one**: Tasks → Project (single project ownership)
+- **One-to-one**: User → Profile (unique relationships)
+
 ### Architecture Integration
 
 1. **Same UX**: Custom relationship and rollup fields use identical definition patterns as other custom fields
@@ -473,6 +576,7 @@ DataForge now provides custom relationship fields that follow the exact same UX 
 3. **Automatic Processing**: Relationships stored in per-org relationship tables automatically
 4. **Rollup Calculations**: Automatic rollup field updates when relationships change
 5. **SQL Type Safety**: Proper SQL type mapping for rollup fields while excluding relationship fields from table creation
+6. **Hierarchical Support**: Multiple relationship fields per entity with different semantics and targets
 
 ### RollupEngine Service
 

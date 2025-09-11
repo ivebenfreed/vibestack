@@ -7,7 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
-import { FieldSetManager } from '../services/FieldSetManager';
+// Removed: import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface TaskFields {
   id: string;
@@ -42,8 +42,24 @@ export class TaskArchetype {
       syncable: true,
       serverOnly: false
     },
-    priority: FieldSetManager.convertFieldToFieldSet('priority', 'task'),
-    status: FieldSetManager.convertFieldToFieldSet('status', 'task'),
+    priority: { 
+      type: 'custom_option_reference', 
+      required: false, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for task business logic
+      optionSetType: 'priority',
+      archetype: 'task'
+    },
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for task workflow logic
+      defaultValue: 'not_started',
+      enum: ['not_started', 'active', 'done', 'blocked', 'cancelled']
+    },
     assignee_id: { 
       type: 'user_reference', 
       required: false, 

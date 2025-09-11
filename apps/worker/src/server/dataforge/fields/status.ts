@@ -1,8 +1,12 @@
 /**
- * Status Field Handler
+ * Status Field Type
  * 
- * Handles status fields with workflow states and enhanced UI integration.
- * Uses single-select pattern with semantic status states.
+ * Universal workflow status field with semantic categories.
+ * Unlike custom_option_reference, status has built-in workflow logic:
+ * - not_active: not_started, draft, scheduled, uploading, open
+ * - in_progress: active, review, processing, paused
+ * - done: done, published, completed, available, complete, resolved
+ * - closed: cancelled, archived, closed, blocked, inactive
  */
 
 import type { FieldDefinition } from '../types';
@@ -89,11 +93,15 @@ export function getValidationMetadata(definition: FieldDefinition): ValidationMe
   
   return {
     enum: allowedStatuses,
+    isStatus: true,
+    hasWorkflowLogic: true,
+    workflowCategories: ['not_active', 'in_progress', 'done', 'closed'],
     messages: {
-      required: `${definition.name} is required`,
+      required: `${definition.name} status is required`,
       enum: 'Please select a valid status',
       custom: {
-        INVALID_STATUS: `${definition.name} must be a valid status`
+        INVALID_STATUS: `${definition.name} must be a valid status`,
+        INVALID_TRANSITION: 'Invalid workflow transition'
       }
     }
   };
@@ -143,16 +151,22 @@ export function getEditorMetadata(definition: FieldDefinition): EditorMetadata {
       label: statusConfig.label,
       color: statusConfig.color,
       backgroundColor: statusConfig.backgroundColor,
-      icon: statusConfig.icon
+      icon: statusConfig.icon,
+      workflowCategory: getWorkflowCategory(status)
     };
   });
   
   return {
-    type: 'select',
+    type: 'status-select',
     searchable: false,
     clearable: !definition.required,
     showValidationOnBlur: true,
-    options: statusOptions
+    showStatusColors: true,
+    showStatusIcons: true,
+    groupByWorkflowCategory: true,
+    showWorkflowTransitions: true,
+    options: statusOptions,
+    placeholder: 'Select status...'
   };
 }
 
@@ -162,6 +176,9 @@ export function getCapabilities(): FieldCapabilities {
     supportsFiltering: true,
     supportsGrouping: true,
     supportsAggregation: false,
+    isStatus: true,
+    hasWorkflowLogic: true,
+    supportsTransitions: true,
     requiresSpecialEditor: true, // Needs status selector with colors
     hasRichDisplay: true, // Color-coded display with badges
     supportsValidation: true,
@@ -202,6 +219,76 @@ function getStatusConfig(status: string): { label: string; color: string; backgr
   };
   
   return statusConfigs[status] || { label: status.charAt(0).toUpperCase() + status.slice(1), color: '#6b7280', backgroundColor: '#f3f4f6', icon: 'circle' };
+}
+
+/**
+ * Get workflow category for a status value
+ * This enables universal workflow queries across all entity types
+ */
+export function getWorkflowCategory(statusValue: string): 'not_active' | 'in_progress' | 'done' | 'closed' {
+  // Universal workflow category mapping
+  const categoryMap: Record<string, 'not_active' | 'in_progress' | 'done' | 'closed'> = {
+    // Not Active
+    'not_started': 'not_active',
+    'draft': 'not_active',
+    'scheduled': 'not_active',
+    'uploading': 'not_active',
+    'open': 'not_active',
+    
+    // In Progress
+    'active': 'in_progress',
+    'review': 'in_progress',
+    'processing': 'in_progress',
+    'paused': 'in_progress',
+    
+    // Done
+    'done': 'done',
+    'published': 'done',
+    'completed': 'done',
+    'available': 'done',
+    'complete': 'done',
+    'resolved': 'done',
+    
+    // Closed
+    'cancelled': 'closed',
+    'archived': 'closed',
+    'closed': 'closed',
+    'blocked': 'closed',
+    'inactive': 'closed'
+  };
+  
+  return categoryMap[statusValue] || 'not_active';
+}
+
+/**
+ * Get valid transition targets for workflow logic
+ */
+export function getValidTransitions(fromStatus: string): string[] {
+  const fromCategory = getWorkflowCategory(fromStatus);
+  
+  // Define valid workflow transitions
+  const transitions: Record<string, string[]> = {
+    'not_active': ['in_progress', 'closed'],
+    'in_progress': ['done', 'closed'],
+    'done': ['closed'],
+    'closed': ['not_active'] // Allow reopening
+  };
+  
+  return transitions[fromCategory] || [];
+}
+
+/**
+ * Query helper for universal workflow filtering
+ */
+export function getStatusesByCategory(category: 'not_active' | 'in_progress' | 'done' | 'closed'): string[] {
+  const statusesByCategory = {
+    'not_active': ['not_started', 'draft', 'scheduled', 'uploading', 'open'],
+    'in_progress': ['active', 'review', 'processing', 'paused'],
+    'done': ['done', 'published', 'completed', 'available', 'complete', 'resolved'],
+    'closed': ['cancelled', 'archived', 'closed', 'blocked', 'inactive']
+  };
+  
+  return statusesByCategory[category] || [];
 }
 
 // Export as enhanced field handler

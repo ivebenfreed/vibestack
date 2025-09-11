@@ -7,7 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
-import { FieldSetManager } from '../services/FieldSetManager';
+// Removed: import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface ProjectFields {
   id: string;
@@ -43,8 +43,24 @@ export class ProjectArchetype {
       syncable: true,
       serverOnly: false
     },
-    priority: FieldSetManager.convertFieldToFieldSet('priority', 'project'),
-    status: FieldSetManager.convertFieldToFieldSet('status', 'project'),
+    priority: { 
+      type: 'custom_option_reference', 
+      required: false, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for project business logic
+      optionSetType: 'priority',
+      archetype: 'project'
+    },
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for project workflow logic
+      defaultValue: 'not_started',
+      enum: ['not_started', 'active', 'paused', 'done', 'cancelled']
+    },
     start_date: { 
       type: 'date', 
       required: false, 

@@ -7,7 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
-import { FieldSetManager } from '../services/FieldSetManager';
+// Removed: import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface DocumentFields {
   id: string;
@@ -39,7 +39,15 @@ export class DocumentArchetype {
       syncable: true,
       serverOnly: false
     },
-    status: FieldSetManager.convertFieldToFieldSet('status', 'document'),
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for document workflow logic
+      defaultValue: 'draft',
+      enum: ['draft', 'review', 'published', 'archived']
+    },
     author_id: { 
       type: 'user_reference', 
       required: false, 

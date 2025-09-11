@@ -717,8 +717,8 @@ export class EntitySchemaManager {
                 ...field
               };
 
-              // Special handling for field set fields (priority, status, etc.)
-              if (field.isFieldSet && field.fieldSetType && field.fieldSetRef) {
+              // Special handling for custom option reference fields (priority, status, etc.)
+              if (field.type === 'custom_option_reference' && field.optionSetType && field.archetype) {
                 try {
                   // Load options from the options API (using same query as options endpoint)
                   const options = await this.config.kysely
@@ -733,7 +733,7 @@ export class EntitySchemaManager {
                       'custom_options.sort_order'
                     ])
                     .where('custom_option_sets.org_id', '=', orgId)
-                    .where('custom_option_sets.option_set_type', '=', field.fieldSetType)
+                    .where('custom_option_sets.option_set_type', '=', field.optionSetType)
                     .where('custom_options.is_active', '=', true)
                     .orderBy('custom_options.sort_order', 'asc')
                     .orderBy('custom_options.label', 'asc')

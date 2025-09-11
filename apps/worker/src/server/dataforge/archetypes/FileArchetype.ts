@@ -7,7 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
-import { FieldSetManager } from '../services/FieldSetManager';
+// Removed: import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface FileFields {
   id: string;
@@ -52,7 +52,15 @@ export class FileArchetype {
       syncable: true,
       serverOnly: false
     },
-    status: FieldSetManager.convertFieldToFieldSet('status', 'file'),
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for file lifecycle logic
+      defaultValue: 'uploading',
+      enum: ['uploading', 'available', 'processing', 'archived']
+    },
     uploaded_by: { 
       type: 'user_reference', 
       required: false, 

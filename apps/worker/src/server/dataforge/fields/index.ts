@@ -32,6 +32,7 @@ import * as currency from './currency';
 import * as color from './color';
 import * as customUserReference from './custom_user_reference';
 import * as customEntityReference from './custom_entity_reference';
+import * as customOptionReference from './custom_option_reference';
 import * as rollupCount from './rollup_count';
 import * as rollupSum from './rollup_sum';
 import * as rollupAverage from './rollup_average';
@@ -69,6 +70,7 @@ export const fieldTypes = {
   color,
   'custom_user_reference': customUserReference,
   'custom_entity_reference': customEntityReference,
+  'custom_option_reference': customOptionReference,
   'rollup_count': rollupCount,
   'rollup_sum': rollupSum,
   'rollup_average': rollupAverage,

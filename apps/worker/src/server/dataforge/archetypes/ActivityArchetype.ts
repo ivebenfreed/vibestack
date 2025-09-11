@@ -63,6 +63,15 @@ export class ActivityArchetype {
       syncable: true,
       serverOnly: false
     },
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for activity lifecycle logic
+      defaultValue: 'scheduled',
+      enum: ['scheduled', 'active', 'completed', 'cancelled']
+    },
     created_by: { 
       type: 'user_reference', 
       required: false, 
@@ -79,7 +88,7 @@ export class ActivityArchetype {
     displayName: 'Activity',
     description: 'Events, logs, and activity tracking',
     icon: 'activity',
-    defaultStatus: undefined, // Activities don't have status by default
+    defaultStatus: 'scheduled', // Activities start as scheduled
     supportsSoftDelete: false,
     supportsVersioning: false,
     supportsAttachments: false,

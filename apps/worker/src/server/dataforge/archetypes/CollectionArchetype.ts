@@ -57,6 +57,15 @@ export class CollectionArchetype {
       syncable: true,
       serverOnly: false
     },
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for collection lifecycle logic
+      defaultValue: 'draft',
+      enum: ['draft', 'active', 'complete', 'archived']
+    },
     created_by: { 
       type: 'user_reference', 
       required: false, 
@@ -73,7 +82,7 @@ export class CollectionArchetype {
     displayName: 'Collection',
     description: 'Groups and collections of related items',
     icon: 'layers',
-    defaultStatus: undefined, // Collections don't have status by default
+    defaultStatus: 'draft', // Collections start as draft
     supportsSoftDelete: true,
     supportsVersioning: true,
     supportsAttachments: false,

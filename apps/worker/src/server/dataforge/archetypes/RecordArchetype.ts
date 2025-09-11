@@ -7,7 +7,7 @@
 
 import type { ContainerPermissionSpec } from '../container-permissions';
 import { AccessPatterns } from '../container-permissions';
-import { FieldSetManager } from '../services/FieldSetManager';
+// Removed: import { FieldSetManager } from '../services/FieldSetManager';
 
 export interface RecordFields {
   id: string;
@@ -40,7 +40,15 @@ export class RecordArchetype {
       syncable: true,
       serverOnly: false
     },
-    status: FieldSetManager.convertFieldToFieldSet('status', 'record'),
+    status: { 
+      type: 'status', 
+      required: true, 
+      syncable: true,
+      serverOnly: false,
+      systemField: true,  // 🔒 System-protected - required for record workflow logic
+      defaultValue: 'draft',
+      enum: ['draft', 'active', 'inactive', 'archived']
+    },
     data: { 
       type: 'json', 
       required: false, 
