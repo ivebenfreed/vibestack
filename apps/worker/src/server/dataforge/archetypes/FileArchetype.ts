@@ -58,8 +58,8 @@ export class FileArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for file lifecycle logic
-      defaultValue: 'uploading',
-      enum: ['uploading', 'available', 'processing', 'archived']
+      defaultValue: 'uploading'
+      // enum removed - now uses status sets
     },
     uploaded_by: { 
       type: 'user_reference', 

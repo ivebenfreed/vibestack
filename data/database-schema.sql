@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict res6rHw7ND65DgcZsvE5L1YmeN8S5k403bjZi268bkrSfmV5pBUp2PYfHwoK9eX
+\restrict pIYVHmnhHp8QhPnJcyrhPd6aitEbNpkhv31PVqLs4zGipT77QxkHOCocUmOWNyW
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict res6rHw7ND65DgcZsvE5L1YmeN8S5k403bjZi268bkrSfmV5pBUp2PYfHwoK9eX
+\unrestrict pIYVHmnhHp8QhPnJcyrhPd6aitEbNpkhv31PVqLs4zGipT77QxkHOCocUmOWNyW
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict XGrspnWSIjROcUC1PahfC2dhG5dH4MuHJGjtx2qJE7IhPs9feJOuSVhBDr3CBbq
+\restrict KDSS4tihzS8QBgQEMcYweN5JWYEojnp5LWEF9XCVaF2orFMz59CBVJq69wvtTnt
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XGrspnWSIjROcUC1PahfC2dhG5dH4MuHJGjtx2qJE7IhPs9feJOuSVhBDr3CBbq
+\unrestrict KDSS4tihzS8QBgQEMcYweN5JWYEojnp5LWEF9XCVaF2orFMz59CBVJq69wvtTnt
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict CDexJOV1izbpqCcaf67dxmllyU53vFycdECFl8dGczpvfG5UTowmq9AzanHYiAB
+\restrict XTJdoqnERXx6kMfaNcFrXdGrmRBoiDp7UYqbLNLm7iz4qdTu7TndW1ulXBHegvG
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict CDexJOV1izbpqCcaf67dxmllyU53vFycdECFl8dGczpvfG5UTowmq9AzanHYiAB
+\unrestrict XTJdoqnERXx6kMfaNcFrXdGrmRBoiDp7UYqbLNLm7iz4qdTu7TndW1ulXBHegvG
 \connect elevra_dev
-\restrict CDexJOV1izbpqCcaf67dxmllyU53vFycdECFl8dGczpvfG5UTowmq9AzanHYiAB
+\restrict XTJdoqnERXx6kMfaNcFrXdGrmRBoiDp7UYqbLNLm7iz4qdTu7TndW1ulXBHegvG
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -529,6 +529,40 @@ $$;
 
 
 ALTER FUNCTION public.clear_rls_context() OWNER TO postgres;
+
+--
+-- Name: copy_system_status_sets_to_org(text, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.copy_system_status_sets_to_org(target_org_id text, entity_type_filter text DEFAULT NULL::text) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  inserted_count INTEGER := 0;
+  row_count_val INTEGER;
+  status_set_record RECORD;
+BEGIN
+  FOR status_set_record IN 
+    SELECT name, description, entity_type, status_values 
+    FROM dataforge_status_sets 
+    WHERE organization_id = '*' 
+      AND is_system_default = true
+      AND (entity_type_filter IS NULL OR entity_type = entity_type_filter)
+  LOOP
+    INSERT INTO dataforge_status_sets (organization_id, name, description, entity_type, status_values, is_system_default)
+    VALUES (target_org_id, status_set_record.name, status_set_record.description, status_set_record.entity_type, status_set_record.status_values, false)
+    ON CONFLICT (organization_id, name, entity_type) DO NOTHING;
+    
+    GET DIAGNOSTICS row_count_val = ROW_COUNT;
+    inserted_count = inserted_count + row_count_val;
+  END LOOP;
+  
+  RETURN inserted_count;
+END;
+$$;
+
+
+ALTER FUNCTION public.copy_system_status_sets_to_org(target_org_id text, entity_type_filter text) OWNER TO postgres;
 
 --
 -- Name: count_organization_entities(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -2253,6 +2287,23 @@ ALTER SEQUENCE public.dataforge_computed_fields_id_seq OWNED BY public.dataforge
 
 
 --
+-- Name: dataforge_entity_status_sets; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_entity_status_sets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    entity_name text NOT NULL,
+    status_set_id uuid NOT NULL,
+    field_name text DEFAULT 'status'::text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    created_by uuid
+);
+
+
+ALTER TABLE public.dataforge_entity_status_sets OWNER TO postgres;
+
+--
 -- Name: dataforge_relationship_fields; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2297,6 +2348,29 @@ CREATE TABLE public.dataforge_rollup_fields (
 
 
 ALTER TABLE public.dataforge_rollup_fields OWNER TO postgres;
+
+--
+-- Name: dataforge_status_sets; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dataforge_status_sets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    name text NOT NULL,
+    description text,
+    entity_type text,
+    status_values jsonb NOT NULL,
+    is_system_default boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    created_by uuid,
+    CONSTRAINT non_empty_status_values CHECK ((jsonb_array_length(status_values) > 0)),
+    CONSTRAINT valid_status_values CHECK ((jsonb_typeof(status_values) = 'array'::text))
+);
+
+
+ALTER TABLE public.dataforge_status_sets OWNER TO postgres;
 
 --
 -- Name: fields_trash; Type: TABLE; Schema: public; Owner: postgres
@@ -2617,6 +2691,51 @@ COMMENT ON COLUMN public.integration_sync_log.metadata IS 'JSON object containin
 
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_cleantestproject; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantestproject (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    start_date date,
+    end_date date,
+    budget numeric,
+    progress_percentage integer DEFAULT 0
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cleantestproject REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantestproject OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_cleantesttask; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_cleantesttask (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    due_date timestamp without time zone
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_cleantesttask REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_cleantesttask OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_relationships; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2641,6 +2760,48 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_relationships (
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_relationships OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_statustesttask; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    due_date timestamp without time zone
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_statustesttask REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_statustesttask2; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask2 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    due_date timestamp without time zone
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_statustesttask2 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_statustesttask2 OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_task; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2660,6 +2821,28 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_task REPLICA ID
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_task OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testcleanupentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testcleanupentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    due_date timestamp without time zone,
+    test_field text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testcleanupentity REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testcleanupentity OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_testdocument; Type: TABLE; Schema: public; Owner: postgres
@@ -3291,6 +3474,22 @@ ALTER TABLE ONLY public.dataforge_computed_fields
 
 
 --
+-- Name: dataforge_entity_status_sets dataforge_entity_status_sets_organization_id_entity_name_fi_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_entity_status_sets
+    ADD CONSTRAINT dataforge_entity_status_sets_organization_id_entity_name_fi_key UNIQUE (organization_id, entity_name, field_name);
+
+
+--
+-- Name: dataforge_entity_status_sets dataforge_entity_status_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_entity_status_sets
+    ADD CONSTRAINT dataforge_entity_status_sets_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: dataforge_relationship_fields dataforge_relationship_fields_org_id_entity_type_field_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3320,6 +3519,22 @@ ALTER TABLE ONLY public.dataforge_rollup_fields
 
 ALTER TABLE ONLY public.dataforge_rollup_fields
     ADD CONSTRAINT dataforge_rollup_fields_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dataforge_status_sets dataforge_status_sets_organization_id_name_entity_type_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_status_sets
+    ADD CONSTRAINT dataforge_status_sets_organization_id_name_entity_type_key UNIQUE (organization_id, name, entity_type);
+
+
+--
+-- Name: dataforge_status_sets dataforge_status_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_status_sets
+    ADD CONSTRAINT dataforge_status_sets_pkey PRIMARY KEY (id);
 
 
 --
@@ -3787,6 +4002,13 @@ CREATE INDEX idx_entity_schemas_table_name ON public.entity_schemas USING btree 
 
 
 --
+-- Name: idx_entity_status_sets_org_entity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_entity_status_sets_org_entity ON public.dataforge_entity_status_sets USING btree (organization_id, entity_name);
+
+
+--
 -- Name: idx_fields_trash_deleted_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -3973,6 +4195,27 @@ CREATE INDEX idx_projects_team ON public.projects USING btree (team_id);
 --
 
 CREATE INDEX idx_secure_config_key ON public.secure_config USING btree (key);
+
+
+--
+-- Name: idx_status_sets_active; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_status_sets_active ON public.dataforge_status_sets USING btree (organization_id, is_active);
+
+
+--
+-- Name: idx_status_sets_entity_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_status_sets_entity_type ON public.dataforge_status_sets USING btree (entity_type);
+
+
+--
+-- Name: idx_status_sets_org; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_status_sets_org ON public.dataforge_status_sets USING btree (organization_id);
 
 
 --
@@ -4205,6 +4448,14 @@ ALTER TABLE ONLY public.dataforge_computed_field_calculations
 
 ALTER TABLE ONLY public.dataforge_computed_field_dependencies
     ADD CONSTRAINT dataforge_computed_field_dependencies_computed_field_id_fkey FOREIGN KEY (computed_field_id) REFERENCES public.dataforge_computed_fields(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dataforge_entity_status_sets dataforge_entity_status_sets_status_set_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dataforge_entity_status_sets
+    ADD CONSTRAINT dataforge_entity_status_sets_status_set_id_fkey FOREIGN KEY (status_set_id) REFERENCES public.dataforge_status_sets(id) ON DELETE RESTRICT;
 
 
 --
@@ -4624,7 +4875,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CDexJOV1izbpqCcaf67dxmllyU53vFycdECFl8dGczpvfG5UTowmq9AzanHYiAB
+\unrestrict XTJdoqnERXx6kMfaNcFrXdGrmRBoiDp7UYqbLNLm7iz4qdTu7TndW1ulXBHegvG
 
 --
 -- Database "postgres" dump
@@ -4636,7 +4887,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict zm16yWJN6rEjpzdr7vYva9cAY0jP2RTPGVf97tMFFE4RusuC5vr9dQgwfo2NkaF
+\restrict cpHM6xUUCjndgYS30cZHo9QawLxnUiAx262kEwpntJKVENNynxg8TrrKhPsItkz
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -4657,7 +4908,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zm16yWJN6rEjpzdr7vYva9cAY0jP2RTPGVf97tMFFE4RusuC5vr9dQgwfo2NkaF
+\unrestrict cpHM6xUUCjndgYS30cZHo9QawLxnUiAx262kEwpntJKVENNynxg8TrrKhPsItkz
 
 --
 -- PostgreSQL database cluster dump complete

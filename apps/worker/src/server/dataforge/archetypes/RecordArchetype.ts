@@ -46,8 +46,8 @@ export class RecordArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for record workflow logic
-      defaultValue: 'draft',
-      enum: ['draft', 'active', 'inactive', 'archived']
+      defaultValue: 'draft'
+      // enum removed - now uses status sets
     },
     data: { 
       type: 'json', 

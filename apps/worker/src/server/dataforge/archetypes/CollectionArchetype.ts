@@ -63,8 +63,8 @@ export class CollectionArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for collection lifecycle logic
-      defaultValue: 'draft',
-      enum: ['draft', 'active', 'complete', 'archived']
+      defaultValue: 'draft'
+      // enum removed - now uses status sets
     },
     created_by: { 
       type: 'user_reference', 

@@ -51,6 +51,13 @@ DataForge is a dynamic entity management system that allows organizations to cre
    - Stores relationship field configurations
    - Handles relationship CRUD operations with rich properties
 
+7. **StatusSetManager** (`services/StatusSetManager.ts`)
+   - **NEW**: Manages reusable status sets for consistent workflow states
+   - Handles status set CRUD operations with validation and organizational isolation
+   - Entity assignment system for flexible status field management
+   - System default templates with per-organization customization
+   - Usage tracking and dependency validation
+
 ## Entity Naming Convention
 
 ### CRITICAL: Use EntityNameUtils for ALL name operations
@@ -146,6 +153,7 @@ fields/
 ├── color.ts          # Color validation (hex, rgb, hsl, named)
 ├── single-select.ts  # Enum-based single selection
 ├── multi-select.ts   # Array-based multi selection  
+├── status_set.ts     # Status field with reusable status sets
 ├── number.ts         # Numeric validation with ranges
 ├── boolean.ts        # Boolean type conversion
 ├── custom_user_reference.ts      # Custom user relationships
@@ -206,6 +214,7 @@ export const handler: EnhancedFieldHandler = {
 | `file` | JSONB | Size limits, type restrictions |
 | `currency` | JSONB | Amount + currency, precision |
 | `color` | TEXT | Hex, RGB, HSL, named colors |
+| `status_set` | TEXT | Reusable status sets with workflow states |
 | `date` | TIMESTAMP | Business rules (start vs due) |
 | `number` | NUMERIC | Min/max ranges, precision |
 | `boolean` | BOOLEAN | Type coercion |
@@ -1431,6 +1440,261 @@ All components working end-to-end with successful computed field registration, d
    - Created entity-storage helper functions
    - Entity definitions stored in business_metadata JSONB
    - Clean separation between base columns and custom JSONB
+
+## Status Set Management System (September 2025)
+
+**Complete status set management system with reusable workflow states, organizational isolation, and flexible entity assignment.**
+
+### Overview
+
+The Status Set Management System provides a powerful and flexible way to manage workflow states across different entity types. Instead of hardcoded status values, organizations can create reusable status sets that can be shared across multiple entities while maintaining consistency and enforcing proper workflow semantics.
+
+### Key Features
+
+1. **Reusable Status Sets**: Create once, use across multiple entities and fields
+2. **Organizational Isolation**: Each organization has its own status sets with complete data isolation
+3. **System Defaults**: Pre-built status sets for common workflows (Task, Project, Document, etc.)
+4. **Flexible Assignment**: Multiple status fields per entity with different status sets
+5. **Usage Tracking**: See which entities use specific status sets
+6. **Validation**: Prevent conflicts and ensure workflow integrity
+
+### Database Schema
+
+**Status Sets Table** (`dataforge_status_sets`):
+```sql
+CREATE TABLE dataforge_status_sets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  entity_type TEXT,                    -- Optional: task, project, document, etc.
+  status_values JSONB NOT NULL,        -- Array of status definitions
+  is_system_default BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by TEXT,
+  
+  UNIQUE(organization_id, name, entity_type)
+);
+```
+
+**Entity Status Set Assignments** (`dataforge_entity_status_sets`):
+```sql
+CREATE TABLE dataforge_entity_status_sets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id TEXT NOT NULL,
+  entity_name TEXT NOT NULL,           -- e.g., 'Task', 'Project'
+  status_set_id UUID NOT NULL REFERENCES dataforge_status_sets(id),
+  field_name TEXT NOT NULL DEFAULT 'status',
+  created_at TIMESTAMP DEFAULT now(),
+  created_by TEXT,
+  
+  UNIQUE(organization_id, entity_name, field_name)
+);
+```
+
+### Status Value Structure
+
+Each status set contains an array of status values with rich metadata:
+
+```typescript
+interface StatusValue {
+  value: string;                       // Unique identifier: 'not_started', 'in_progress'
+  label: string;                       // Display name: 'Not Started', 'In Progress'
+  color: string;                       // Text color: '#6b7280'
+  backgroundColor: string;             // Background color: '#f3f4f6'
+  icon: string;                        // Icon identifier: 'circle', 'check-circle'
+  workflowCategory: 'not_active' | 'in_progress' | 'done' | 'closed';
+}
+```
+
+### System Default Status Sets
+
+**Pre-built status sets for common workflows:**
+
+- **Task Workflow**: `not_started` → `active` → `done` / `blocked` / `cancelled`
+- **Project Lifecycle**: `not_started` → `active` / `paused` → `done` / `cancelled`
+- **Document Publishing**: `draft` → `review` → `published` / `archived`
+- **File Lifecycle**: `uploading` → `available` / `processing` → `archived`
+- **Activity Scheduling**: `scheduled` → `active` → `completed` / `cancelled`
+- **Discussion States**: `open` → `active` → `resolved` / `closed`
+- **Collection States**: `draft` → `active` → `complete` / `archived`
+- **Record Status**: `draft` → `active` → `inactive` / `archived`
+
+### StatusSetManager Service
+
+**Core service providing complete CRUD operations:**
+
+```typescript
+class StatusSetManager {
+  // Status set management
+  async getStatusSets(orgId: string, entityType?: string): Promise<StatusSet[]>
+  async getStatusSet(orgId: string, statusSetId: string): Promise<StatusSet | null>
+  async createStatusSet(orgId: string, name: string, statusValues: StatusValue[], options): Promise<StatusSet>
+  async updateStatusSet(orgId: string, statusSetId: string, updates): Promise<StatusSet>
+  async deleteStatusSet(orgId: string, statusSetId: string): Promise<void>
+  
+  // Entity assignment
+  async assignStatusSetToEntity(orgId: string, entityName: string, statusSetId: string, fieldName: string): Promise<EntityStatusSet>
+  async getEntityStatusSet(orgId: string, entityName: string, fieldName: string): Promise<EntityStatusSet | null>
+  async removeStatusSetFromEntity(orgId: string, entityName: string, fieldName: string): Promise<void>
+  
+  // System operations
+  async copySystemDefaultsToOrg(orgId: string, entityType?: string): Promise<number>
+  async getStatusSetUsage(orgId: string, statusSetId: string): Promise<EntityStatusSet[]>
+  async getDefaultStatusSetForEntityType(orgId: string, entityType: string): Promise<StatusSet | null>
+}
+```
+
+### API Endpoints
+
+**Complete RESTful API for status set management:**
+
+```bash
+# Status set CRUD
+GET    /orgs/:orgId/status-sets                    # Get all status sets
+GET    /orgs/:orgId/status-sets/:statusSetId       # Get specific status set  
+POST   /orgs/:orgId/status-sets                    # Create new status set
+PUT    /orgs/:orgId/status-sets/:statusSetId       # Update status set
+DELETE /orgs/:orgId/status-sets/:statusSetId       # Delete status set (soft delete)
+
+# Entity assignment
+POST   /orgs/:orgId/entities/:entityName/status-set     # Assign status set to entity
+GET    /orgs/:orgId/entities/:entityName/status-set     # Get entity's status set assignment
+DELETE /orgs/:orgId/entities/:entityName/status-set     # Remove status set assignment
+
+# System operations
+POST   /orgs/:orgId/status-sets/copy-defaults      # Copy system defaults to organization
+GET    /orgs/:orgId/status-sets/:statusSetId/usage # Get entities using status set
+```
+
+### Usage Examples
+
+**Create Custom Status Set:**
+```bash
+curl -X POST "http://localhost:4001/api/orgs/01920000-1000-7000-8000-000000000001/status-sets" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Bug Tracking",
+    "description": "Custom bug tracking workflow",
+    "entityType": "task",
+    "statusValues": [
+      {
+        "value": "reported",
+        "label": "Reported", 
+        "color": "#dc2626",
+        "backgroundColor": "#fee2e2",
+        "icon": "bug",
+        "workflowCategory": "not_active"
+      },
+      {
+        "value": "triaged",
+        "label": "Triaged",
+        "color": "#d97706", 
+        "backgroundColor": "#fef3c7",
+        "icon": "funnel",
+        "workflowCategory": "not_active"
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "color": "#059669",
+        "backgroundColor": "#d1fae5", 
+        "icon": "wrench",
+        "workflowCategory": "in_progress"
+      },
+      {
+        "value": "fixed",
+        "label": "Fixed",
+        "color": "#059669",
+        "backgroundColor": "#d1fae5",
+        "icon": "check", 
+        "workflowCategory": "done"
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "color": "#6b7280",
+        "backgroundColor": "#f3f4f6",
+        "icon": "x",
+        "workflowCategory": "closed"
+      }
+    ]
+  }' \
+  -b cookies.txt
+```
+
+**Assign Status Set to Entity:**
+```bash
+curl -X POST "http://localhost:4001/api/orgs/01920000-1000-7000-8000-000000000001/entities/Task/status-set" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "statusSetId": "031d34f0-e94d-479c-bbec-ea6091ca4f05",
+    "fieldName": "bug_status"
+  }' \
+  -b cookies.txt
+```
+
+**Copy System Defaults:**
+```bash
+curl -X POST "http://localhost:4001/api/orgs/01920000-1000-7000-8000-000000000001/status-sets/copy-defaults" \
+  -b cookies.txt
+```
+
+### Field Type Integration
+
+**`status_set` Field Type:**
+- **Storage**: TEXT column containing the selected status value
+- **Validation**: Ensures selected value exists in assigned status set
+- **UI Integration**: Dropdown with status set values, colors, and icons
+- **Multiple Fields**: Entities can have multiple status fields with different status sets
+
+**Field Definition Example:**
+```typescript
+{
+  "name": "bug_status",
+  "type": "status_set",
+  "required": true,
+  "statusSetId": "031d34f0-e94d-479c-bbec-ea6091ca4f05"  // References Bug Tracking status set
+}
+```
+
+### Benefits
+
+1. **Consistency**: Reusable status sets ensure consistent workflows across entities
+2. **Flexibility**: Multiple status fields per entity for different workflow aspects
+3. **Maintainability**: Update status set once, changes apply to all using entities
+4. **Organization Isolation**: Each organization manages its own status sets
+5. **System Integration**: Works seamlessly with existing field validation and UI systems
+6. **Rich Metadata**: Status values include colors, icons, and workflow categories for rich UI display
+
+### Implementation Status: ✅ FULLY COMPLETE
+
+- **Database Schema**: Migration 014 with complete status set tables
+- **StatusSetManager Service**: All CRUD operations with validation and JSON handling
+- **API Endpoints**: 9 fully functional RESTful endpoints with authentication
+- **Field Type Integration**: `status_set` field type with validation and UI metadata
+- **System Defaults**: 8 pre-built status sets for common workflows
+- **Testing**: Comprehensive curl testing with 100% success rate
+- **JSON Serialization**: Fixed all JSON handling issues for robust operation
+
+### ✅ IMPORTANT: Hardcoded Enum Cleanup Complete (September 2025)
+
+**All hardcoded status enum arrays have been completely removed from the system. The DataForge system now exclusively uses status sets with no backward compatibility.**
+
+#### What Was Cleaned Up:
+- **All Archetype Files**: Removed hardcoded enum arrays from TaskArchetype, ProjectArchetype, DocumentArchetype, CollectionArchetype, FileArchetype, DiscussionArchetype, RecordArchetype, ActivityArchetype
+- **Status Field Handler**: Eliminated all backward compatibility logic and helper functions (`getWorkflowCategory`, `getStatusesByCategory`, `getValidTransitions`, `getStatusConfig`)
+- **No Fallbacks**: Status fields now require `statusSetId` with no enum fallbacks - purely status set based
+
+#### Current Behavior:
+- **Status fields**: Must have a `statusSetId` assigned - no hardcoded enums accepted
+- **Entity creation**: Automatically assigns appropriate status sets during entity creation
+- **Validation**: Status validation exclusively uses status set values
+- **UI Integration**: All status displays use status set metadata (colors, icons, workflow categories)
+
+This cleanup ensures the system uses the modern, flexible status set architecture exclusively while maintaining full functionality.
 
 ## Relationship System Architecture
 

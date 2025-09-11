@@ -70,6 +70,10 @@ api.route('/file-import', fileImportApi)
 import dependenciesApi from '../routes/dependencies-api'
 api.route('/dependencies', dependenciesApi)
 
+// Status Sets API
+import statusSetsApi from '../routes/status-sets-api'
+api.route('/', statusSetsApi)
+
 // Test Parser API (development only)
 import testParserApi from '../routes/test-parser'
 api.route('/test-parser', testParserApi)

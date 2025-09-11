@@ -39,6 +39,13 @@ export interface ValidationMetadata {
   fileMaxSize?: number;
   fileAllowedTypes?: string[];
   
+  // Status field specific
+  enum?: string[];
+  isStatus?: boolean;
+  hasWorkflowLogic?: boolean;
+  workflowCategories?: string[];
+  statusSetId?: string;
+  
   // Business logic validation
   businessRules?: {
     mustBeBefore?: string;
@@ -56,6 +63,7 @@ export interface ValidationMetadata {
     pattern?: string;
     min?: string;
     max?: string;
+    enum?: string;
     custom?: Record<string, string>;
   };
 }

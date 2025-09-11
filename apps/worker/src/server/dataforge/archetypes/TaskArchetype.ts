@@ -57,8 +57,8 @@ export class TaskArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for task workflow logic
-      defaultValue: 'not_started',
-      enum: ['not_started', 'active', 'done', 'blocked', 'cancelled']
+      defaultValue: 'not_started'
+      // enum removed - now uses status sets
     },
     assignee_id: { 
       type: 'user_reference', 

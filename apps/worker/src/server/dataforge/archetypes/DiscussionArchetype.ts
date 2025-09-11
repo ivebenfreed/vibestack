@@ -46,8 +46,8 @@ export class DiscussionArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for discussion workflow logic
-      defaultValue: 'open',
-      enum: ['open', 'active', 'resolved', 'closed']
+      defaultValue: 'open'
+      // enum removed - now uses status sets
     },
     discussion_type: { 
       type: 'discussion_type_option', 

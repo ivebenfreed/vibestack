@@ -45,8 +45,8 @@ export class DocumentArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for document workflow logic
-      defaultValue: 'draft',
-      enum: ['draft', 'review', 'published', 'archived']
+      defaultValue: 'draft'
+      // enum removed - now uses status sets
     },
     author_id: { 
       type: 'user_reference', 

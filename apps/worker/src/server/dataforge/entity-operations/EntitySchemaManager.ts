@@ -178,6 +178,9 @@ export class EntitySchemaManager {
         }
       );
       
+      // Auto-assign status sets to status fields BEFORE table creation
+      await this.autoAssignStatusSets(orgId, normalizedEntityName, archetype, mergedFields);
+      
       // Get system fields that all tables need
       const systemFields = await this.getArchetypeFields('base_system');
       
@@ -360,6 +363,73 @@ export class EntitySchemaManager {
         success: false,
         errors: [`Failed to create entity: ${error instanceof Error ? error.message : 'Unknown error'}`]
       };
+    }
+  }
+
+  /**
+   * Auto-assign status sets to status fields during entity creation
+   */
+  private async autoAssignStatusSets(
+    orgId: string, 
+    entityName: string, 
+    archetype: string, 
+    mergedFields: any
+  ): Promise<void> {
+    try {
+      console.log(`[EntitySchemaManager] Auto-assigning status sets for entity: ${entityName} (${archetype})`);
+      
+      // Import StatusSetManager with the same pattern as other services
+      const { StatusSetManager } = await import('../services/StatusSetManager');
+      const statusSetManager = new StatusSetManager(this.config.kysely);
+      
+      // Check all fields (base + custom) for status fields
+      const allFieldMaps = [mergedFields.baseFields, mergedFields.customFields];
+      
+      for (const fieldMap of allFieldMaps) {
+        for (const [fieldName, fieldDef] of fieldMap) {
+          // Look for status fields (both legacy 'status' and new 'status_set' types)
+          if (fieldDef.type === 'status' || fieldDef.type === 'status_set') {
+            console.log(`[EntitySchemaManager] Found status field: ${fieldName} (type: ${fieldDef.type})`);
+            
+            // Skip if status set is already assigned
+            if (fieldDef.statusSetId) {
+              console.log(`[EntitySchemaManager] Status field ${fieldName} already has statusSetId: ${fieldDef.statusSetId}`);
+              continue;
+            }
+            
+            // Get or create appropriate status set for this archetype
+            let statusSet = await statusSetManager.getDefaultStatusSetForEntityType(orgId, archetype);
+            
+            if (!statusSet) {
+              console.log(`[EntitySchemaManager] No default status set found for archetype ${archetype}, copying system defaults`);
+              // Copy system defaults for this archetype if they don't exist
+              await statusSetManager.copySystemDefaultsToOrg(orgId, archetype);
+              
+              // Try again to get the status set
+              statusSet = await statusSetManager.getDefaultStatusSetForEntityType(orgId, archetype);
+            }
+            
+            if (statusSet) {
+              console.log(`[EntitySchemaManager] Assigning status set ${statusSet.name} (${statusSet.id}) to field ${fieldName}`);
+              
+              // Assign the status set to this entity field
+              await statusSetManager.assignStatusSetToEntity(orgId, entityName, statusSet.id, fieldName);
+              
+              // Update the field definition to include the statusSetId for validation
+              fieldDef.statusSetId = statusSet.id;
+              
+              console.log(`[EntitySchemaManager] Successfully assigned status set to ${fieldName}`);
+            } else {
+              console.warn(`[EntitySchemaManager] Could not find or create status set for archetype ${archetype}`);
+            }
+          }
+        }
+      }
+      
+      console.log(`[EntitySchemaManager] Completed status set auto-assignment for entity: ${entityName}`);
+    } catch (error) {
+      console.error(`[EntitySchemaManager] Error auto-assigning status sets:`, error);
+      // Don't fail entity creation if status set assignment fails
     }
   }
 
@@ -764,6 +834,43 @@ export class EntitySchemaManager {
                   }
                 } catch (optionsError) {
                   console.warn(`[EntitySchemaManager] Failed to load options for field ${field.name}:`, optionsError);
+                }
+              }
+
+              // Special handling for status fields with status sets
+              if ((field.type === 'status' || field.type === 'status_set') && field.statusSetId) {
+                try {
+                  // Load status set values from the StatusSetManager
+                  const { StatusSetManager } = await import('../services/StatusSetManager');
+                  const statusSetManager = new StatusSetManager(this.config.kysely);
+                  
+                  const statusSet = await statusSetManager.getStatusSet(orgId, field.statusSetId);
+                  
+                  if (statusSet && statusSet.statusValues) {
+                    // Create context with status set values for field handlers
+                    const statusSetContext = {
+                      statusSetValues: statusSet.statusValues
+                    };
+                    
+                    // Re-generate metadata with status set context
+                    enhancedField.validation = handler.getValidationMetadata ? handler.getValidationMetadata(field, statusSetContext) : {};
+                    enhancedField.editor = handler.getEditorMetadata ? handler.getEditorMetadata(field, statusSetContext) : {};
+                    
+                    // Add status set metadata for frontend
+                    enhancedField.statusSet = {
+                      id: statusSet.id,
+                      name: statusSet.name,
+                      description: statusSet.description,
+                      entityType: statusSet.entityType,
+                      values: statusSet.statusValues
+                    };
+                    
+                    console.log(`[EntitySchemaManager] Loaded status set ${statusSet.name} for field ${field.name}`);
+                  } else {
+                    console.warn(`[EntitySchemaManager] Status set not found for field ${field.name} with statusSetId ${field.statusSetId}`);
+                  }
+                } catch (statusSetError) {
+                  console.warn(`[EntitySchemaManager] Failed to load status set for field ${field.name}:`, statusSetError);
                 }
               }
 

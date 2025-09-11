@@ -311,8 +311,5 @@ export const handler: EnhancedFieldHandler = {
   getDisplayMetadata,
   getEditorMetadata,
   getCapabilities,
-  getAccessibilityMetadata,
-  // Additional currency-specific helpers
-  formatCurrencyForDisplay,
-  getCurrencySymbol
+  getAccessibilityMetadata
 };

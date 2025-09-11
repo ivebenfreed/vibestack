@@ -69,8 +69,8 @@ export class ActivityArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for activity lifecycle logic
-      defaultValue: 'scheduled',
-      enum: ['scheduled', 'active', 'completed', 'cancelled']
+      defaultValue: 'scheduled'
+      // enum removed - now uses status sets
     },
     created_by: { 
       type: 'user_reference', 

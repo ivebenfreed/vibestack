@@ -58,8 +58,8 @@ export class ProjectArchetype {
       syncable: true,
       serverOnly: false,
       systemField: true,  // 🔒 System-protected - required for project workflow logic
-      defaultValue: 'not_started',
-      enum: ['not_started', 'active', 'paused', 'done', 'cancelled']
+      defaultValue: 'not_started'
+      // enum removed - now uses status sets
     },
     start_date: { 
       type: 'date', 

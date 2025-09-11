@@ -15,6 +15,7 @@ import {
   requireOwner
 } from '../middleware/hybrid-rls-org-actor';
 import { apiLogger } from '../middleware/logger';
+import statusSetsApi from './status-sets-api';
 
 // Legacy context validation imports kept for backward compatibility
 import { 
@@ -210,6 +211,9 @@ export function mountProtectedRoutes(app: Hono<AppContext>) {
   // Organization and admin routes now use /:orgId pattern for automatic context extraction
   app.route('/api/org', orgRoutes);  
   app.route('/api/admin', adminRoutes);
+  
+  // Status set management API (requires organization context)
+  app.route('/api', statusSetsApi);
   
   // Sync routes use special handling for WebSocket upgrades
   app.route('/api/sync', syncRoutes);

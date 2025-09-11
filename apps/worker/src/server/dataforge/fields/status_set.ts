@@ -1,12 +1,8 @@
 /**
- * Status Field Type
+ * Status Set Field Type
  * 
- * Universal workflow status field with semantic categories.
- * Unlike custom_option_reference, status has built-in workflow logic:
- * - not_active: not_started, draft, scheduled, uploading, open
- * - in_progress: active, review, processing, paused
- * - done: done, published, completed, available, complete, resolved
- * - closed: cancelled, archived, closed, blocked, inactive
+ * Field type that references a reusable status set for consistent workflow states.
+ * This provides better semantic separation from legacy inline status values.
  */
 
 import type { FieldDefinition } from '../types';
@@ -20,7 +16,7 @@ import type {
 } from './types';
 
 export function getDefaultValue(definition: FieldDefinition): any {
-  return definition.defaultValue || 'draft';
+  return definition.defaultValue || null;
 }
 
 export function validate(value: any, definition: FieldDefinition, context: any): { 
@@ -50,7 +46,7 @@ export function validate(value: any, definition: FieldDefinition, context: any):
     status = String(value).toLowerCase();
   }
 
-  // Status fields now require status sets - no backward compatibility
+  // Status set field requires statusSetId and statusSetValues from context
   if (!definition.statusSetId) {
     errors.push({
       field: definition.name,
@@ -69,6 +65,7 @@ export function validate(value: any, definition: FieldDefinition, context: any):
     return { valid: false, errors };
   }
 
+  // Validate against status set values
   const allowedStatuses = context.statusSetValues.map((sv: any) => sv.value);
   
   if (!allowedStatuses.includes(status)) {
@@ -77,7 +74,8 @@ export function validate(value: any, definition: FieldDefinition, context: any):
       code: 'INVALID_STATUS',
       message: `${definition.name} must be one of: ${allowedStatuses.join(', ')}`,
       value: status,
-      allowedValues: allowedStatuses
+      allowedValues: allowedStatuses,
+      statusSetId: definition.statusSetId
     });
     return { valid: false, errors };
   }
@@ -94,28 +92,33 @@ export function getSqlType(definition: FieldDefinition): string {
 }
 
 export function getSqlDefault(definition: FieldDefinition): string | null {
-  const defaultValue = definition.defaultValue || 'draft';
-  return `'${defaultValue}'`;
+  if (definition.defaultValue) {
+    return `'${definition.defaultValue}'`;
+  }
+  return null;
 }
 
 // Enhanced metadata methods for UI integration
 export function getValidationMetadata(definition: FieldDefinition, context?: any): ValidationMetadata {
-  // Status fields require status sets - no fallbacks
-  const allowedStatuses = context?.statusSetValues ? 
-    context.statusSetValues.map((sv: any) => sv.value) : [];
+  let allowedStatuses: string[] = [];
+  
+  if (context?.statusSetValues) {
+    allowedStatuses = context.statusSetValues.map((sv: any) => sv.value);
+  }
   
   return {
     enum: allowedStatuses,
     isStatus: true,
     hasWorkflowLogic: true,
-    workflowCategories: ['not_active', 'in_progress', 'done', 'closed'],
     statusSetId: definition.statusSetId,
+    requiresStatusSet: true,
     messages: {
       required: `${definition.name} status is required`,
-      enum: 'Please select a valid status',
+      enum: 'Please select a valid status from the status set',
       custom: {
-        INVALID_STATUS: `${definition.name} must be a valid status`,
-        INVALID_TRANSITION: 'Invalid workflow transition'
+        INVALID_STATUS: `${definition.name} must be a valid status from the assigned status set`,
+        MISSING_STATUS_SET: `${definition.name} requires a status set assignment`,
+        MISSING_STATUS_SET_VALUES: 'Status set values could not be loaded'
       }
     }
   };
@@ -126,48 +129,33 @@ export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata
     width: 130,
     minWidth: 110,
     textAlign: 'center',
-    format: 'status',
+    format: 'status-set',
     showTooltip: true,
     placeholder: 'Select status',
-    // Status-specific styling
-    conditionalFormatting: [
-      // Active/Success states
-      { condition: 'value === "active"', className: 'status-active', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      { condition: 'value === "done"', className: 'status-done', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      { condition: 'value === "completed"', className: 'status-completed', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      { condition: 'value === "published"', className: 'status-published', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      
-      // Warning/Progress states
-      { condition: 'value === "review"', className: 'status-review', style: { color: '#d97706', backgroundColor: '#fef3c7' } },
-      { condition: 'value === "paused"', className: 'status-paused', style: { color: '#d97706', backgroundColor: '#fef3c7' } },
-      { condition: 'value === "blocked"', className: 'status-blocked', style: { color: '#dc2626', backgroundColor: '#fee2e2' } },
-      
-      // Inactive/Draft states
-      { condition: 'value === "draft"', className: 'status-draft', style: { color: '#6b7280', backgroundColor: '#f3f4f6' } },
-      { condition: 'value === "inactive"', className: 'status-inactive', style: { color: '#6b7280', backgroundColor: '#f3f4f6' } },
-      { condition: 'value === "not_started"', className: 'status-not-started', style: { color: '#6b7280', backgroundColor: '#f3f4f6' } },
-      
-      // End states
-      { condition: 'value === "archived"', className: 'status-archived', style: { color: '#4b5563', backgroundColor: '#e5e7eb' } },
-      { condition: 'value === "cancelled"', className: 'status-cancelled', style: { color: '#6b7280', backgroundColor: '#f9fafb' } }
-    ]
+    statusSetId: definition.statusSetId,
+    showStatusColors: true,
+    showStatusIcons: true,
+    groupByWorkflowCategory: true
   };
 }
 
 export function getEditorMetadata(definition: FieldDefinition, context?: any): EditorMetadata {
-  // Status fields require status sets - generate options from status set values only
-  const statusOptions = context?.statusSetValues ? 
-    context.statusSetValues.map((sv: any) => ({
+  // Generate status options from status set values
+  let statusOptions: any[] = [];
+  
+  if (context?.statusSetValues) {
+    statusOptions = context.statusSetValues.map((sv: any) => ({
       value: sv.value,
       label: sv.label,
       color: sv.color,
       backgroundColor: sv.backgroundColor,
       icon: sv.icon,
       workflowCategory: sv.workflowCategory
-    })) : [];
+    }));
+  }
   
   return {
-    type: 'status-select',
+    type: 'status-set-select',
     searchable: false,
     clearable: !definition.required,
     showValidationOnBlur: true,
@@ -177,7 +165,8 @@ export function getEditorMetadata(definition: FieldDefinition, context?: any): E
     showWorkflowTransitions: true,
     statusSetId: definition.statusSetId,
     options: statusOptions,
-    placeholder: 'Select status...'
+    placeholder: 'Select status...',
+    requiresStatusSetAssignment: !definition.statusSetId
   };
 }
 
@@ -190,26 +179,21 @@ export function getCapabilities(): FieldCapabilities {
     isStatus: true,
     hasWorkflowLogic: true,
     supportsTransitions: true,
-    requiresSpecialEditor: true, // Needs status selector with colors
+    requiresSpecialEditor: true, // Needs status set selector
     hasRichDisplay: true, // Color-coded display with badges
     supportsValidation: true,
-    supportsFormatting: true
+    supportsFormatting: true,
+    requiresStatusSet: true // Key distinction from basic status field
   };
 }
 
 export function getAccessibilityMetadata(definition: FieldDefinition): AccessibilityMetadata {
   return {
-    ariaLabel: `${definition.name} status`,
-    ariaDescription: 'Select status from available workflow states',
+    ariaLabel: `${definition.name} status from status set`,
+    ariaDescription: 'Select status from assigned status set workflow states',
     role: 'combobox'
   };
 }
-
-// NOTE: getStatusConfig helper function removed - 
-// Status sets now provide canonical status configuration (label, color, icon, etc.)
-
-// NOTE: Workflow category and transition functions removed - 
-// Status sets now provide canonical workflowCategory information
 
 // Export as enhanced field handler
 export const handler: EnhancedFieldHandler = {

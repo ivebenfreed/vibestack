@@ -24,6 +24,8 @@ export interface FieldDefinition {
   pattern?: string;
   description?: string;
   validation?: any;
+  // Status field specific properties
+  statusSetId?: string; // Reference to status set for reusable status management
 }
 
 export interface CustomFieldDefinition extends FieldDefinition {
@@ -163,6 +165,32 @@ export class FieldManager {
       }
 
       processedFields.set(field.name, field);
+    }
+
+    // Check for multiple status fields (archetype + custom combined)
+    const statusFields = [];
+    
+    // Count status fields from archetype
+    for (const [name, field] of baseFields) {
+      if (field.type === 'status') {
+        statusFields.push({ name, source: 'archetype' });
+      }
+    }
+    
+    // Count status fields from custom fields
+    for (const [name, field] of processedFields) {
+      if (field.type === 'status') {
+        statusFields.push({ name, source: 'custom' });
+      }
+    }
+    
+    // Validate: maximum one status field per entity
+    if (statusFields.length > 1) {
+      errors.push(
+        `Entity cannot have multiple status fields. Found: ${
+          statusFields.map(f => `${f.name} (${f.source})`).join(', ')
+        }. Each entity can only have one status field.`
+      );
     }
 
     return {
