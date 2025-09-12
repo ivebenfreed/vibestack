@@ -5,7 +5,7 @@
  * Tracks state transitions, events, and provides markers for testing.
  */
 
-import type { InspectionEvent, Actor, AnyStateMachine } from 'xstate';
+import type { InspectionEvent, Actor } from 'xstate';
 import { log } from '@/logger';
 const fileLog = log('test-utils/xstate-test-inspector.ts');
 
@@ -52,15 +52,16 @@ class XStateTestInspector {
   inspect = (inspectionEvent: InspectionEvent) => {
     if (!this.enabled) return;
 
-    const { type, actorRef, event: evt } = inspectionEvent;
+    const { type, actorRef } = inspectionEvent;
+    const evt = (inspectionEvent as any).event;
     const timestamp = new Date().toISOString();
 
     switch (type) {
       case '@xstate.actor':
         // Actor created
         if (actorRef) {
-          const id = actorRef.id || 'unknown';
-          this.actors.set(id, actorRef);
+          const id = (actorRef as any).id || 'unknown';
+          this.actors.set(id, actorRef as any); // TODO: Fix XState v5 ActorRefLike type
           // Silent actor registration
         }
         break;
@@ -68,10 +69,10 @@ class XStateTestInspector {
       case '@xstate.event':
         // Event sent to actor
         if (actorRef && evt) {
-          const state = actorRef.getSnapshot?.()?.value;
+          const state = (actorRef as any).getSnapshot?.()?.value; // TODO: Fix XState v5 ActorRefLike type
           const eventLog: EventLog = {
             timestamp,
-            machineId: actorRef.id || 'unknown',
+            machineId: (actorRef as any).id || 'unknown', // TODO: Fix XState v5 ActorRefLike type
             event: evt,
             state: typeof state === 'string' ? state : JSON.stringify(state)
           };

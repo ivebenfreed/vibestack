@@ -1,34 +1,4 @@
-import type { 
-  CltMessageType, 
-  SrvMessageType,
-  BaseMessage,
-  ServerMessage,
-  ServerChangesMessage,
-  ServerInitChangesMessage,
-  ServerInitStartMessage,
-  ServerInitCompleteMessage,
-  ServerLSNUpdateMessage,
-  ServerReceivedMessage,
-  ServerAppliedMessage,
-  ServerSyncCompletedMessage,
-  ServerLiveStartMessage,
-  ServerCatchupCompletedMessage,
-  ServerSyncStatsMessage,
-  ServerHeartbeatMessage,
-  ServerIntegrityResetMessage,
-  ServerIntegrityValidationResponseMessage,
-  ServerTableChangeNotificationMessage,
-  ClientMessage,
-  ClientChangesMessage,
-  ClientHeartbeatMessage,
-  ClientReceivedMessage,
-  ClientAppliedMessage,
-  ClientInitReceivedMessage,
-  ClientInitProcessedMessage
-  // ClientIntegrityValidationMessage, // DEPRECATED - removed with integrity system
-  // ClientIntegrityResetAckMessage,   // DEPRECATED - removed with integrity system  
-  // Message                           // DEPRECATED - unused generic type
-} from './messages';
+import type { CltMessageType } from './messages';
 
 // Export enhanced types from table-changes
 export type { TableChange, RelationshipUpdate } from './table-changes';
@@ -63,38 +33,8 @@ export interface ExecutionResult {
   skipped?: boolean;
 }
 
-// Export message types and interfaces
-export type {
-  CltMessageType,
-  SrvMessageType,
-  BaseMessage,
-  ServerMessage,
-  ServerChangesMessage,
-  ServerInitChangesMessage,
-  ServerInitStartMessage,
-  ServerInitCompleteMessage,
-  ServerLSNUpdateMessage,
-  ServerReceivedMessage,
-  ServerAppliedMessage,
-  ServerSyncCompletedMessage,
-  ServerLiveStartMessage,
-  ServerCatchupCompletedMessage,
-  ServerSyncStatsMessage,
-  ServerHeartbeatMessage,
-  ServerIntegrityResetMessage,
-  ServerIntegrityValidationResponseMessage,
-  ServerTableChangeNotificationMessage,
-  ClientMessage,
-  ClientChangesMessage,
-  ClientHeartbeatMessage,
-  ClientReceivedMessage,
-  ClientAppliedMessage,
-  ClientInitReceivedMessage,
-  ClientInitProcessedMessage
-  // ClientIntegrityValidationMessage, // DEPRECATED - removed with integrity system
-  // ClientIntegrityResetAckMessage,   // DEPRECATED - removed with integrity system  
-  // Message                           // DEPRECATED - unused generic type
-} from './messages';
+// Note: Only re-export message types that are actually used elsewhere
+// Removed unused message type exports to fix build warnings
 
 /**
  * Client registration types for managing sync clients

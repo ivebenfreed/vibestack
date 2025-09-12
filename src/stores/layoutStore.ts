@@ -108,7 +108,7 @@ export const layoutStore = createStore({
         }
       } else if (context.activeSection !== newSection) {
         if (import.meta.env.DEV) {
-          fileLog.info('[LayoutStore] Route changed, updating section:', pathname, '->', newSection)
+          fileLog.info(`[LayoutStore] Route changed, updating section: ${pathname} -> ${newSection}`)
         }
         return {
           ...context,
@@ -175,15 +175,16 @@ export const useLayoutStore = {
     // Add resize listener
     window.addEventListener('resize', updateViewport)
     
-    // Watch for sidebar state changes using MutationObserver
-    const sidebarObserver: MutationObserver | null = null
+    // TODO: Watch for sidebar state changes using MutationObserver
+    // const sidebarObserver: MutationObserver | null = null
     
-    // 🎯 SMOOTH TRANSITIONS: Minimal debounce to update content width right after sidebar transition
-    const debouncedSidebarUpdate = debounce(() => {
-      // Invalidate cache so next layout calculation gets fresh state
-      sidebarStateCache = null
-      layoutStore.trigger.triggerLayoutChange()
-    }, 50) // Minimal delay - just enough to batch rapid mutations but fast enough for smooth transitions
+    // 🎯 SMOOTH TRANSITIONS: Minimal debounce to update content width right after sidebar transition  
+    // TODO: Re-enable when sidebar observer is implemented
+    // const debouncedSidebarUpdate = debounce(() => {
+    //   // Invalidate cache so next layout calculation gets fresh state
+    //   sidebarStateCache = null
+    //   layoutStore.trigger.triggerLayoutChange()
+    // }, 50) // Minimal delay - just enough to batch rapid mutations but fast enough for smooth transitions
     
     const setupSidebarObserver = () => {
       // 🎯 DISABLED: Let SidebarInset handle transitions natively with CSS

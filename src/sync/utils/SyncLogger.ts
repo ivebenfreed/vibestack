@@ -46,7 +46,7 @@ export class SyncLogger {
     return messageLevelIndex >= currentLevelIndex;
   }
 
-  private formatMessage(level: LogLevel, category: string, message: string, data?: any): string {
+  private formatMessage(level: LogLevel, category: string, message: string, _data?: any): string {
     const timestamp = this.config.enableTimestamps ? new Date().toISOString() : '';
     const levelIcon = this.getLevelIcon(level);
     const categoryIcon = this.getCategoryIcon(category);
