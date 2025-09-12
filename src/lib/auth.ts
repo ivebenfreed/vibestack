@@ -29,7 +29,7 @@ export const authClient = createAuthClient({
   headers: {
     'Content-Type': 'application/json',
   },
-  mode: 'cors',
+  mode: 'same-origin',
   plugins: [
     adminClient(),
     emailOTPClient()
