@@ -58,6 +58,13 @@ DataForge is a dynamic entity management system that allows organizations to cre
    - System default templates with per-organization customization
    - Usage tracking and dependency validation
 
+8. **LoreCanonService** (`services/LoreCanonService.ts`)
+   - **NEW**: Dedicated system entities for AI-powered knowledge management
+   - **Lore entities**: Purpose, meaning, culture ("why this matters")
+   - **Canon entities**: Rules, standards, processes ("how things work")
+   - Semantic fields for AI clarity and context understanding
+   - Parent relationship support (universe/world/project/task)
+
 ## Entity Naming Convention
 
 ### CRITICAL: Use EntityNameUtils for ALL name operations
@@ -1622,6 +1629,226 @@ All components working end-to-end with successful computed field registration, d
    - Created entity-storage helper functions
    - Entity definitions stored in business_metadata JSONB
    - Clean separation between base columns and custom JSONB
+
+## Lore and Canon System Entities (September 2025)
+
+**Complete dedicated system entities for AI-powered knowledge management with semantic clarity and context understanding.**
+
+### Overview
+
+The Lore and Canon system provides dedicated system entities (like User) that are not exposed to users for manipulation but provide clear semantic meaning for AI extensions and knowledge management. These entities capture two fundamental types of organizational knowledge:
+
+- **Lore entities**: Purpose, meaning, culture, emotional significance ("why this matters")
+- **Canon entities**: Rules, standards, processes, operational requirements ("how things work")
+
+### Key Features
+
+1. **System Entities**: Like User entities, these are system-managed and not customizable by users
+2. **Semantic Clarity**: Rich semantic fields specific to each entity type for AI context
+3. **Parent Relationships**: Support for universe/world/project/task hierarchies
+4. **AI Integration**: AI usage tracking and alignment scoring for context optimization
+5. **Organizational Isolation**: Complete data isolation per organization
+
+### Database Schema
+
+**Lore Table** (`lore`):
+```sql
+CREATE TABLE lore (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT,
+  parent_entity_type TEXT NOT NULL CHECK (parent_entity_type IN ('universe', 'world', 'project', 'task')),
+  parent_entity_id TEXT NOT NULL,
+  
+  -- Lore-specific semantic fields
+  cultural_significance INTEGER CHECK (cultural_significance >= 0 AND cultural_significance <= 100) DEFAULT 50,
+  emotional_resonance TEXT CHECK (emotional_resonance IN ('inspiring', 'grounding', 'motivating', 'cautionary', 'celebratory')) DEFAULT 'grounding',
+  purpose_clarity INTEGER CHECK (purpose_clarity >= 0 AND purpose_clarity <= 100) DEFAULT 50,
+  
+  -- Common AI fields
+  alignment_score INTEGER CHECK (alignment_score >= 0 AND alignment_score <= 100) DEFAULT 50,
+  ai_usage_count INTEGER DEFAULT 0,
+  
+  -- Audit fields
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by TEXT
+);
+```
+
+**Canon Table** (`canon`):
+```sql
+CREATE TABLE canon (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT,
+  parent_entity_type TEXT NOT NULL CHECK (parent_entity_type IN ('universe', 'world', 'project', 'task')),
+  parent_entity_id TEXT NOT NULL,
+  
+  -- Canon-specific semantic fields
+  rule_type TEXT CHECK (rule_type IN ('process', 'standard', 'requirement', 'boundary', 'guideline')) DEFAULT 'guideline',
+  enforcement_level TEXT CHECK (enforcement_level IN ('must', 'should', 'may', 'must_not')) DEFAULT 'should',
+  violation_consequence TEXT,
+  compliance_level INTEGER CHECK (compliance_level >= 0 AND compliance_level <= 100) DEFAULT 80,
+  
+  -- Common AI fields
+  alignment_score INTEGER CHECK (alignment_score >= 0 AND alignment_score <= 100) DEFAULT 50,
+  ai_usage_count INTEGER DEFAULT 0,
+  
+  -- Audit fields
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by TEXT
+);
+```
+
+### LoreCanonService API
+
+**Complete service providing CRUD operations and AI integration:**
+
+```typescript
+class LoreCanonService {
+  // Lore operations
+  async createLore(organizationId: string, data: CreateLoreRequest, userId?: string): Promise<LoreEntity>
+  async getLoreById(organizationId: string, loreId: string): Promise<LoreEntity | null>
+  async getLoreByParent(organizationId: string, parentType: string, parentId: string, query?: LoreCanonQuery): Promise<LoreEntity[]>
+  async updateLore(organizationId: string, loreId: string, data: Partial<UpdateLoreRequest>): Promise<LoreEntity>
+  async deleteLore(organizationId: string, loreId: string): Promise<void>
+  
+  // Canon operations
+  async createCanon(organizationId: string, data: CreateCanonRequest, userId?: string): Promise<CanonEntity>
+  async getCanonById(organizationId: string, canonId: string): Promise<CanonEntity | null>
+  async getCanonByParent(organizationId: string, parentType: string, parentId: string, query?: LoreCanonQuery): Promise<CanonEntity[]>
+  async updateCanon(organizationId: string, canonId: string, data: Partial<UpdateCanonRequest>): Promise<CanonEntity>
+  async deleteCanon(organizationId: string, canonId: string): Promise<void>
+  
+  // Combined operations
+  async getLoreAndCanonByParent(organizationId: string, parentType: string, parentId: string, query?: LoreCanonQuery): Promise<{ lore: LoreEntity[], canon: CanonEntity[] }>
+  async getKnowledgeStats(organizationId: string, parentType?: string, parentId?: string): Promise<KnowledgeStats>
+  
+  // AI integration
+  async incrementAIUsage(organizationId: string, entityType: 'lore' | 'canon', entityId: string): Promise<void>
+}
+```
+
+### REST API Endpoints
+
+**Complete RESTful API for knowledge management:**
+
+```bash
+# Lore CRUD
+POST   /orgs/:orgId/lore                    # Create lore entity
+GET    /orgs/:orgId/lore/:loreId            # Get specific lore
+GET    /orgs/:orgId/lore                    # Get lore by parent (requires parent_entity_type & parent_entity_id)
+PUT    /orgs/:orgId/lore/:loreId            # Update lore
+DELETE /orgs/:orgId/lore/:loreId            # Delete lore
+
+# Canon CRUD
+POST   /orgs/:orgId/canon                   # Create canon entity
+GET    /orgs/:orgId/canon/:canonId          # Get specific canon
+GET    /orgs/:orgId/canon                   # Get canon by parent (requires parent_entity_type & parent_entity_id)
+PUT    /orgs/:orgId/canon/:canonId          # Update canon
+DELETE /orgs/:orgId/canon/:canonId          # Delete canon
+
+# Combined operations
+GET    /orgs/:orgId/knowledge               # Get both lore and canon (requires parent params)
+GET    /orgs/:orgId/knowledge/stats         # Get knowledge statistics
+POST   /orgs/:orgId/knowledge/:entityType/:entityId/increment-usage  # Increment AI usage
+```
+
+### Semantic Field Definitions
+
+**Lore Fields (Purpose & Meaning):**
+- **`cultural_significance`**: 0-100 scale of cultural importance within the organization
+- **`emotional_resonance`**: Type of emotional impact (inspiring, grounding, motivating, cautionary, celebratory)
+- **`purpose_clarity`**: 0-100 scale of how clearly the purpose/meaning is defined
+- **`alignment_score`**: 0-100 scale of alignment with parent entity goals
+
+**Canon Fields (Rules & Standards):**
+- **`rule_type`**: Category of rule (process, standard, requirement, boundary, guideline)
+- **`enforcement_level`**: RFC-style enforcement (must, should, may, must_not)
+- **`violation_consequence`**: Description of what happens when rule is violated
+- **`compliance_level`**: 0-100 expected compliance rate
+- **`alignment_score`**: 0-100 scale of alignment with parent entity operations
+
+### Frontend Integration
+
+**Knowledge Tab Component:** Updated to use dedicated Lore/Canon APIs with semantic field display:
+
+```typescript
+// Shows lore-specific fields
+<div className="flex items-center gap-4 text-xs text-muted-foreground">
+  <span>Cultural: {entity.cultural_significance}%</span>
+  <span className="capitalize">{entity.emotional_resonance}</span>
+  <span>Purpose: {entity.purpose_clarity}%</span>
+</div>
+
+// Shows canon-specific fields
+<div className="flex items-center gap-4 text-xs text-muted-foreground">
+  <span className="capitalize">{entity.rule_type}</span>
+  <span className="capitalize font-medium">{entity.enforcement_level}</span>
+  <span>Compliance: {entity.compliance_level}%</span>
+</div>
+```
+
+### Usage Examples
+
+**Create Lore Entity (Organizational Purpose):**
+```bash
+curl -X POST "/api/orgs/01920000-1000-7000-8000-000000000001/lore" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Wide Corp Core Values",
+    "content": "At Wide Corp, we believe in innovation, integrity, and impact...",
+    "parent_entity_type": "world",
+    "parent_entity_id": "01920000-1000-7000-8000-000000000001",
+    "cultural_significance": 95,
+    "emotional_resonance": "inspiring",
+    "purpose_clarity": 90,
+    "alignment_score": 98
+  }'
+```
+
+**Create Canon Entity (Operational Rules):**
+```bash
+curl -X POST "/api/orgs/01920000-1000-7000-8000-000000000001/canon" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Code Review Standards", 
+    "content": "All code must pass peer review before merging...",
+    "parent_entity_type": "world",
+    "parent_entity_id": "01920000-1000-7000-8000-000000000001",
+    "rule_type": "standard",
+    "enforcement_level": "must",
+    "violation_consequence": "Code will be blocked from deployment",
+    "compliance_level": 95,
+    "alignment_score": 92
+  }'
+```
+
+**Get Combined Knowledge:**
+```bash
+curl -X GET "/api/orgs/01920000-1000-7000-8000-000000000001/knowledge?parent_entity_type=world&parent_entity_id=01920000-1000-7000-8000-000000000001"
+# Returns: {"data": {"lore": [...], "canon": [...]}, "counts": {"lore": 1, "canon": 1, "total": 2}}
+```
+
+### AI Integration Benefits
+
+1. **Semantic Clarity**: AI systems can understand the difference between purpose (lore) and rules (canon)
+2. **Context Awareness**: Rich semantic fields provide nuanced context for AI decision-making
+3. **Usage Tracking**: Monitor which knowledge entities are most valuable to AI systems
+4. **Alignment Scoring**: Measure how well knowledge aligns with organizational goals
+5. **Hierarchical Context**: Parent relationships provide organizational structure context
+
+### Implementation Status: ✅ FULLY COMPLETE
+
+- **Database Schema**: Migration 015 with complete lore and canon tables
+- **Service Layer**: LoreCanonService with full CRUD operations and AI integration
+- **REST API**: Complete API endpoints with validation and error handling
+- **Frontend Integration**: Knowledge Tab updated to use dedicated entities
+- **Testing**: Working with Wide Corp test data and verified API functionality
 
 ## Status Set Management System (September 2025)
 
