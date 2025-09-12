@@ -1,7 +1,7 @@
 name = "elevra-worker"
 main = "worker.ts"
 compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "do_not_set_tostring_tag"]
 account_id = "c5f1240efb99747bc33b0fa1f70dcfb3"
 
 # Enable observability logging for all environments
@@ -79,7 +79,7 @@ crons = ["0 0 * * *"]  # Run once daily at midnight UTC
 # Hyperdrive configuration for PostgreSQL connection pooling
 [[hyperdrive]]
 binding = "HYPERDRIVE_DB"
-id = "placeholder-hyperdrive-id"
+id = "placeholder-hyperdrive-id"  # Used for local development only
 localConnectionString = "postgresql://postgres:postgres@localhost:5432/elevra_dev"
 
 # KV namespace configuration
@@ -93,17 +93,60 @@ binding = "SESSIONS"
 id = "b35f1142406543d79f9445f1af5c6abc"
 preview_id = "b35f1142406543d79f9445f1af5c6abc"
 
-# Staging environment
+# Production environment (using staging slot)
 [env.staging]
 name = "elevra-worker-staging"
 
+# Custom domain routes
+[[env.staging.routes]]
+pattern = "dev.getelevra.com/*"
+zone_name = "getelevra.com"
+
 [env.staging.vars]
-ENVIRONMENT = "staging"
-NODE_ENV = "staging"
-TYPEORM_LOGGING = true
+ENVIRONMENT = "production"
+NODE_ENV = "production"
+TYPEORM_LOGGING = false
 BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
-BETTER_AUTH_URL = "https://vibestack-staging.pages.dev"
+BETTER_AUTH_URL = "https://dev.getelevra.com"
 RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
+USE_KV_SESSIONS = true
+
+# Production AI binding
+[env.staging.ai]
+binding = "AI"
+
+# Production Durable Objects configuration
+[[env.staging.durable_objects.bindings]]
+name = "SYNC"
+class_name = "SyncDO"
+
+[[env.staging.durable_objects.bindings]]
+name = "REPLICATION"
+class_name = "ReplicationDO"
+
+[[env.staging.durable_objects.bindings]]
+name = "ORGANIZATION_ACTOR"
+class_name = "OrganizationActor"
+
+[[env.staging.durable_objects.bindings]]
+name = "EMBEDDING_GENERATOR"
+class_name = "EmbeddingGeneratorDO"
+
+# Production KV namespaces
+[[env.staging.kv_namespaces]]
+binding = "CLIENT_REGISTRY"
+id = "a794cee3a313416993643848fc738281"
+preview_id = "a794cee3a313416993643848fc738281"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "b35f1142406543d79f9445f1af5c6abc"
+preview_id = "b35f1142406543d79f9445f1af5c6abc"
+
+# Production hyperdrive configuration
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE_DB"
+id = "a6d6379243d648679a02bc01160f8bc4"
 
 # Production environment
 [env.production]
@@ -113,3 +156,41 @@ name = "elevra-worker-production"
 ENVIRONMENT = "production"
 NODE_ENV = "production"
 TYPEORM_LOGGING = false
+USE_KV_SESSIONS = true
+
+# Production AI binding
+[env.production.ai]
+binding = "AI"
+
+# Production Durable Objects configuration
+[[env.production.durable_objects.bindings]]
+name = "SYNC"
+class_name = "SyncDO"
+
+[[env.production.durable_objects.bindings]]
+name = "REPLICATION"
+class_name = "ReplicationDO"
+
+[[env.production.durable_objects.bindings]]
+name = "ORGANIZATION_ACTOR"
+class_name = "OrganizationActor"
+
+[[env.production.durable_objects.bindings]]
+name = "EMBEDDING_GENERATOR"
+class_name = "EmbeddingGeneratorDO"
+
+# Production KV namespaces
+[[env.production.kv_namespaces]]
+binding = "CLIENT_REGISTRY"
+id = "a794cee3a313416993643848fc738281"
+preview_id = "a794cee3a313416993643848fc738281"
+
+[[env.production.kv_namespaces]]
+binding = "SESSIONS"
+id = "b35f1142406543d79f9445f1af5c6abc"
+preview_id = "b35f1142406543d79f9445f1af5c6abc"
+
+# Production hyperdrive configuration
+[[env.production.hyperdrive]]
+binding = "HYPERDRIVE_DB"
+id = "a6d6379243d648679a02bc01160f8bc4"

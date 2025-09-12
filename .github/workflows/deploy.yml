@@ -77,7 +77,7 @@ jobs:
     
     environment:
       name: staging
-      url: https://vibestack-worker-staging.codevibesmatter.workers.dev
+      url: https://dev.getelevra.com
     
     steps:
       - name: Checkout code
@@ -157,6 +157,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ENV: staging
         run: |
           echo "🔍 Validating wrangler configuration..."
           npx wrangler --version
@@ -165,17 +166,18 @@ jobs:
           ls -la
           echo "🔧 Checking wrangler.toml..."
           head -20 wrangler.toml
-          echo "🏗️ Building unified worker application..."
-          pnpm run build
+          echo "🏗️ Building unified worker application with staging environment..."
+          CLOUDFLARE_ENV=staging pnpm run build
           echo "🚀 Deploying unified worker to staging..."
           echo "🔑 Environment variables set:"
           echo "CLOUDFLARE_API_TOKEN length: ${#CLOUDFLARE_API_TOKEN}"
           echo "CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID"
+          echo "CLOUDFLARE_ENV: $CLOUDFLARE_ENV"
           echo "🧪 Testing wrangler auth first..."
           npx wrangler whoami || echo "❌ Wrangler auth failed"
-          echo "📦 Starting deployment..."
+          echo "📦 Starting deployment with built artifacts..."
           set -e  # Exit on any error
-          npx wrangler deploy --env staging --compatibility-date=2024-09-23 2>&1 | tee deploy-output.log || {
+          npx wrangler deploy --outdir dist/elevra_worker --compatibility-date=2024-09-23 2>&1 | tee deploy-output.log || {
             echo "❌ Deployment failed with exit code $?"
             echo "📋 Full output:"
             cat deploy-output.log
@@ -190,11 +192,12 @@ jobs:
       - name: Verify Staging Deployment
         run: |
           echo "✅ Unified worker deployed to staging environment"
-          echo "🌐 Staging URL: https://vibestack-worker-staging.codevibesmatter.workers.dev"
+          echo "🌐 Custom Domain URL: https://dev.getelevra.com"
+          echo "🌐 Worker URL: https://elevra-worker-staging.team-c5f.workers.dev" 
           echo "📊 Application includes both frontend (React SPA) and backend (Hono API)"
-          # Optional: Add health check
+          # Health check using worker URL (custom domain may need DNS configuration)
           sleep 10
-          curl -f https://vibestack-worker-staging.codevibesmatter.workers.dev/health || echo "⚠️ Health check failed - deployment may still be propagating"
+          curl -f https://elevra-worker-staging.team-c5f.workers.dev/api/health || echo "⚠️ Health check failed - deployment may still be propagating"
 
   # Deploy production environment
   deploy-production:
@@ -206,7 +209,7 @@ jobs:
     
     environment:
       name: production
-      url: https://vibestack-worker-production.codevibesmatter.workers.dev
+      url: https://elevra.app
     
     steps:
       - name: Checkout code
@@ -251,6 +254,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ENV: production
         run: |
           echo "🔍 Validating wrangler configuration..."
           npx wrangler --version
@@ -259,19 +263,20 @@ jobs:
           ls -la
           echo "🔧 Checking wrangler.toml..."
           head -20 wrangler.toml
-          echo "🏗️ Building unified worker application..."
-          pnpm run build
+          echo "🏗️ Building unified worker application with production environment..."
+          CLOUDFLARE_ENV=production pnpm run build
           echo "🚀 Deploying unified worker to production..."
-          npx wrangler deploy --env production --compatibility-date=2024-09-23
+          npx wrangler deploy --outdir dist/elevra_worker --compatibility-date=2024-09-23
           
       - name: Verify Production Deployment
         run: |
           echo "✅ Unified worker deployed to production environment"
-          echo "🌐 Production URL: https://vibestack-worker-production.codevibesmatter.workers.dev"
+          echo "🌐 Custom Domain URL: https://elevra.app"
+          echo "🌐 Worker URL: https://elevra-worker-production.team-c5f.workers.dev"
           echo "📊 Application includes both frontend (React SPA) and backend (Hono API)"
-          # Optional: Add health check
+          # Health check using worker URL (custom domain may need DNS configuration)
           sleep 10
-          curl -f https://vibestack-worker-production.codevibesmatter.workers.dev/health || echo "⚠️ Health check failed - deployment may still be propagating"
+          curl -f https://elevra-worker-production.team-c5f.workers.dev/api/health || echo "⚠️ Health check failed - deployment may still be propagating"
 
   # Notification job (optional)
   notify:
@@ -284,13 +289,15 @@ jobs:
       - name: Deployment Status
         run: |
           if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
-            echo "✅ Staging deployment successful: https://vibestack-worker-staging.codevibesmatter.workers.dev"
+            echo "✅ Staging deployment successful: https://dev.getelevra.com"
+            echo "   Worker URL: https://elevra-worker-staging.team-c5f.workers.dev"
           elif [ "${{ needs.deploy-staging.result }}" == "failure" ]; then
             echo "❌ Staging deployment failed"
           fi
           
           if [ "${{ needs.deploy-production.result }}" == "success" ]; then
-            echo "✅ Production deployment successful: https://vibestack-worker-production.codevibesmatter.workers.dev"
+            echo "✅ Production deployment successful: https://elevra.app"
+            echo "   Worker URL: https://elevra-worker-production.team-c5f.workers.dev"
           elif [ "${{ needs.deploy-production.result }}" == "failure" ]; then
             echo "❌ Production deployment failed"
           fi
