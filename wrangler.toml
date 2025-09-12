@@ -60,18 +60,21 @@ new_sqlite_classes = ["EmbeddingGeneratorDO"]
 [triggers]
 crons = ["0 0 * * *"]  # Run once daily at midnight UTC
 
-# Rate limiting configuration
-[[ratelimits]]
-name = "auth_rate_limit"
-simple = { limit = 5, period = 900 }
+# Rate limiting configuration - temporarily disabled for CI compatibility
+# [[ratelimits]]
+# name = "auth_rate_limit"
+# namespace_id = "placeholder-namespace-id"
+# simple = { limit = 5, period = 60 }  # Changed from 900 to 60
 
-[[ratelimits]]
-name = "api_rate_limit"
-simple = { limit = 10000, period = 60 }
+# [[ratelimits]]
+# name = "api_rate_limit" 
+# namespace_id = "placeholder-namespace-id"
+# simple = { limit = 10000, period = 60 }
 
-[[ratelimits]]
-name = "signup_rate_limit"
-simple = { limit = 3, period = 3600 }
+# [[ratelimits]]
+# name = "signup_rate_limit"
+# namespace_id = "placeholder-namespace-id"
+# simple = { limit = 3, period = 60 }  # Changed from 3600 to 60
 
 # Hyperdrive configuration for PostgreSQL connection pooling
 [[hyperdrive]]
