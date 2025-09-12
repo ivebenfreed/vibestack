@@ -112,7 +112,10 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
           pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 lightningcss-linux-x64-gnu
-          # Run postinstall scripts after native bindings are installed
+          # Fix esbuild version mismatch by rebuilding native binaries
+          npx esbuild --version || echo "esbuild not accessible, will rebuild"
+          pnpm rebuild esbuild
+          # Run postinstall scripts after native binaries are installed
           pnpm install --frozen-lockfile
         
       - name: Type Check Worker Application
