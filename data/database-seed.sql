@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pWN6Sz6jdzI3TeZBbM95DYGGLtuSG3P6BotddbbcFw0RuwUDmwZHG2WH4iDTcDC
+\restrict a9IYaVX7R1Uj2caLXVwAPUphxk9PwVxL2bVY2WkPW2j3yp8ThEHtL8nbvkRwUtz
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -646,9 +646,9 @@ COPY public.lore (id, organization_id, title, content, parent_entity_type, paren
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id, created_at, updated_at, name, description, status, data, company_name, industry, company_size, website_url, primary_contact_email, phone_number, annual_contract_value, client_since, headquarters_address, client_tier, satisfaction_rating) FROM stdin;
-cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-11 14:31:38.922	TechCorp Industries	Leading technology company specializing in enterprise software solutions	active	\N	TechCorp Industries	technology	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
 d15bd69a-c973-4f03-8f33-4f1784ff436d	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-11 14:31:53.067	HealthFirst Medical	Regional healthcare provider with 15 hospitals and 200+ clinics	active	\N	HealthFirst Medical	healthcare	large	https://healthfirst-med.org	it-projects@healthfirst.org	+15550456	{"amount": 425000, "currency": "USD"}	2022-08-01	[object Object]	gold	4
 ba575163-5ab4-4f38-9aeb-7bc2005d7cc1	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-12 01:20:59.906	RetailMax Corp	National retail chain with 500+ locations across the US	active	\N	RetailMax Corp	retail	enterprise	https://retailmax.com	tech-team@retailmax.com	+15550789	{"amount": 650000, "currency": "USD"}	2023-11-20	[object Object]	gold	4
+cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-12 22:55:12.976	TechCorp Industries	Leading technology company specializing in enterprise software solutions	active	""	TechCorp Industries	technology	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
 \.
 
 
@@ -883,7 +883,6 @@ a99c7666-08d4-45e8-bde7-7a1c454a7d9d	01920000-1000-7000-8000-000000000001	2025-0
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_worktask (id, organization_id, created_at, updated_at, title, description, priority, status, due_date, task_type, estimated_hours, actual_hours, complexity, billable, hourly_rate, blocking_issues, code_review_required) FROM stdin;
-2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-11 14:36:38.409	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-11 14:36:49.008	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	active	\N	\N	16	8	4	t	\N	\N	t
 1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-11 14:39:38.419	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-20 17:00:00	deployment	12	14	3	t	\N	\N	f
 2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-11 14:39:49.434	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	active	2025-03-15 17:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
@@ -907,6 +906,7 @@ e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-0
 eb6d8755-c903-4d03-9e67-0abc07fcca89	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.001	2025-09-12 01:54:23.001	Search and Recommendation Engine	Implement AI-powered search functionality with personalized product recommendations	medium	not_started	2025-07-01 00:00:00	development	55	\N	5	t	\N	\N	t
 394e27f2-0fc1-469f-ba73-bdb02d868817	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.121	2025-09-12 01:54:23.121	Multi-Platform Testing	Comprehensive testing across web, mobile, and tablet platforms with automated test suites	high	not_started	2025-08-15 00:00:00	testing	42	\N	3	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-12 01:54:48.69	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	not_started	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
+2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 \.
 
 
@@ -1279,5 +1279,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pWN6Sz6jdzI3TeZBbM95DYGGLtuSG3P6BotddbbcFw0RuwUDmwZHG2WH4iDTcDC
+\unrestrict a9IYaVX7R1Uj2caLXVwAPUphxk9PwVxL2bVY2WkPW2j3yp8ThEHtL8nbvkRwUtz
 

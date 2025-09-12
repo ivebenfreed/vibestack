@@ -45,8 +45,8 @@ function getAllowedOrigins(env: Env): string[] {
   } else {
     // Production/staging origins
     return [
-      'https://dev.codevibesmatter.com',
-      'https://app.codevibesmatter.com'
+      'https://dev.getelevra.com',
+      'https://app.getelevra.com'
     ];
   }
 }
@@ -59,9 +59,9 @@ function getBaseUrl(env: Env): string {
     const port = env.DEV_PORT || '4000';
     return `http://localhost:${port}`;
   } else if (env.ENVIRONMENT === "staging") {
-    return "https://dev.codevibesmatter.com";
+    return "https://dev.getelevra.com";
   } else {
-    return "https://app.codevibesmatter.com";
+    return "https://app.getelevra.com";
   }
 }
 
@@ -251,8 +251,8 @@ export function initializeAuth(env: Env, request?: Request) {
   const baseUrl = env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local"
     ? `http://localhost:${port}`  // Use dynamic port from environment
     : env.ENVIRONMENT === "staging"
-      ? "https://dev.codevibesmatter.com"
-      : "https://app.codevibesmatter.com";
+      ? "https://dev.getelevra.com"
+      : "https://app.getelevra.com";
   
   const runtimeAuthConfig = {
     // Database configuration (PostgreSQL via Kysely)
