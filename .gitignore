@@ -114,3 +114,6 @@ screenshots/
 .playwright-mcp/
 *.png
 
+# Cloudflare Workers development state
+.wrangler/
+
