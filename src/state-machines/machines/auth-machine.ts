@@ -447,7 +447,7 @@ export const authMachine = setup({
         SIGN_IN: {
           target: 'signingIn',
           actions: [
-            () => fileLog.info('[AuthMachine] SIGN_IN event received during initial state determination'),
+            ({ event }) => fileLog.info('[AuthMachine] 🎯 SIGN_IN event received during initial state determination for:', event.credentials?.email),
             assign({
               authError: null,
               errorRetryCount: 0
@@ -1199,10 +1199,13 @@ export const authMachine = setup({
       on: {
         SIGN_IN: {
           target: 'signingIn',
-          actions: assign({
-            // Clear any previous error when starting new sign-in
-            authError: null
-          })
+          actions: [
+            ({ event }) => fileLog.info('[AuthMachine] 🎯 SIGN_IN event received in unauthenticated state for:', event.credentials?.email),
+            assign({
+              // Clear any previous error when starting new sign-in
+              authError: null
+            })
+          ]
         },
         CHECK_AUTH: 'checking',
         RESTORED_SESSION: {
@@ -1221,15 +1224,17 @@ export const authMachine = setup({
     },
     
     signingIn: {
-      // entry: () => fileLog.info('[AuthMachine] Starting sign-in process'),
+      entry: () => fileLog.info('[AuthMachine] ✨ ENTERING signingIn state - about to invoke signInActor'),
       
       invoke: {
         src: 'signIn',
         input: ({ event }) => {
+          fileLog.info('[AuthMachine] 🚀 INVOKING signInActor with credentials for:', event.type === 'SIGN_IN' ? event.credentials?.email : 'unknown');
           if (event.type === 'SIGN_IN') {
             return event.credentials;
           }
           // This shouldn't happen, but provide a fallback
+          fileLog.error('[AuthMachine] ❌ ERROR: signInActor invoked without SIGN_IN event!');
           return { email: '', password: '' };
         },
         onDone: [
@@ -1357,10 +1362,13 @@ export const authMachine = setup({
         // Allow manual sign in
         SIGN_IN: {
           target: 'signingIn',
-          actions: assign({
-            authError: null,
-            errorRetryCount: 0,
-          })
+          actions: [
+            ({ event }) => fileLog.info('[AuthMachine] 🎯 SIGN_IN event received in errorRecovery state for:', event.credentials?.email),
+            assign({
+              authError: null,
+              errorRetryCount: 0,
+            })
+          ]
         },
         
         // If we get a restored session event, go to authenticated
