@@ -1,0 +1,359 @@
+import type { TableChange } from './table-changes';
+
+export type SrvMessageType = 
+  | 'srv_send_changes'      // Server sends changes from WAL
+  | 'srv_catchup_changes'   // Server sends changes during catchup sync
+  | 'srv_live_changes'      // Server sends changes during live sync
+  | 'srv_init_start'       // Server starts initial sync
+  | 'srv_init_changes'     // Server sends initial sync table data
+  | 'srv_init_complete'    // Server signals initial sync is complete
+  | 'srv_heartbeat'        // Server heartbeat
+  | 'srv_error'           // Server error
+  | 'srv_lsn_update'      // Server LSN update notification
+  | 'srv_changes_received' // Server acknowledges receipt of changes
+  | 'srv_changes_applied'  // Server signals changes were applied
+  | 'srv_sync_completed'   // Generic sync completion (for live sync)
+  | 'srv_catchup_completed'
+  | 'srv_live_start'      // Renamed: For confirming client is up-to-date and live sync starts
+  | 'srv_sync_stats'      // Server sends sync statistics
+  | 'srv_integrity_reset' // Server sends integrity reset command
+  | 'srv_integrity_validation_response' // Server responds to integrity validation
+  | 'srv_table_change_notification' // Server notifies of table changes for Legend State integration
+  | 'srv_schema_updated'   // Server notifies schema change
+  | 'srv_schema_migration' // Server notifies schema migration
+  | 'srv_schema_validated' // Server validates schema change
+  | 'srv_schema_error';    // Server schema error
+
+export type CltMessageType =
+  | 'clt_sync_request'      // Client requests sync
+  | 'clt_send_changes'      // Client sends changes
+  | 'clt_heartbeat'         // Client heartbeat
+  | 'clt_error'            // Client error
+  | 'clt_changes_received'  // Client acknowledges receipt of changes
+  | 'clt_changes_applied'   // Client signals changes were applied
+  | 'clt_init_received'    // Client acknowledges receipt of initial sync data
+  | 'clt_init_processed'   // Client signals initial sync data was processed
+  | 'clt_catchup_received' // Client acknowledges receipt of catchup sync chunk
+  | 'clt_integrity_validation' // Client requests integrity validation
+  | 'clt_integrity_baseline_validation' // Client requests baseline integrity validation
+  | 'clt_integrity_reset_ack' // Client acknowledges integrity reset
+  | 'clt_schema_request'    // Client requests schema
+  | 'clt_schema_received'   // Client acknowledges schema receipt
+  | 'clt_schema_applied'    // Client confirms schema applied
+  | 'clt_schema_error';     // Client schema error
+
+// Base message interface for all messages
+export interface BaseMessage {
+  messageId: string;
+  timestamp: number;
+  clientId: string;
+}
+
+// Server message interfaces
+export interface ServerMessage extends BaseMessage {
+  type: SrvMessageType;
+}
+
+export interface ServerChangesMessage extends ServerMessage {
+  type: 'srv_send_changes' | 'srv_catchup_changes' | 'srv_live_changes';
+  changes: TableChange[];
+  lastLSN: string;
+  sequence?: {
+    chunk: number;
+    total: number;
+  };
+  isConflictResolution?: boolean; // Indicates CRDT conflict resolution - no anti-echo filtering
+}
+
+export interface ServerCatchupChangesMessage extends ServerChangesMessage {
+  type: 'srv_catchup_changes';
+}
+
+export interface ServerLiveChangesMessage extends ServerChangesMessage {
+  type: 'srv_live_changes';
+}
+
+export interface ServerInitChangesMessage extends ServerMessage {
+  type: 'srv_init_changes';
+  changes: TableChange[];
+  sequence: {
+    table: string;
+    chunk: number;
+    total: number;
+  };
+}
+
+export interface ServerInitStartMessage extends ServerMessage {
+  type: 'srv_init_start';
+  serverLSN: string;  // Server's current LSN at start of initial sync
+  resuming?: boolean; // Indicates if this is resuming an interrupted sync
+}
+
+export interface ServerInitCompleteMessage extends ServerMessage {
+  type: 'srv_init_complete';
+  serverLSN: string;  // Server's current LSN at end of initial sync
+}
+
+export interface ServerLSNUpdateMessage extends ServerMessage {
+  type: 'srv_lsn_update';
+  lsn: string;
+}
+
+export interface ServerReceivedMessage extends ServerMessage {
+  type: 'srv_changes_received';
+  changeIds: string[];
+}
+
+export interface ServerAppliedMessage extends ServerMessage {
+  type: 'srv_changes_applied';
+  appliedChanges: string[];
+  success: boolean;
+  error?: string;
+}
+
+export interface ServerSyncCompletedMessage extends ServerMessage {
+  type: 'srv_sync_completed';
+  startLSN: string;       // Starting LSN for the sync
+  serverLSN: string;      // Server's current LSN after sync
+  changeCount: number;    // Total number of changes sent
+  success: boolean;       // Whether sync completed successfully
+  error?: string;         // Error message if any
+}
+
+/**
+ * Server heartbeat response message
+ */
+export interface ServerHeartbeatMessage extends ServerMessage {
+  type: 'srv_heartbeat';
+  serverLSN?: string;     // Current server LSN for comparison
+  inReplyTo?: string;     // Message ID this is responding to
+  error?: string;         // Error message if heartbeat processing failed
+}
+
+/**
+ * Server integrity reset command message
+ */
+export interface ServerIntegrityResetMessage extends ServerMessage {
+  type: 'srv_integrity_reset';
+  resetCommand: {
+    type: 'full_reset' | 'table_reset';
+    reason: string;
+    affectedTables?: string[];
+    preserveUserData?: boolean;
+  };
+  reason: string;
+}
+
+/**
+ * Server integrity validation response message
+ */
+export interface ServerIntegrityValidationResponseMessage extends ServerMessage {
+  type: 'srv_integrity_validation_response';
+  isValid: boolean;
+  issues: Array<{
+    type: 'record_count_mismatch' | 'missing_records' | 'extra_records' | 'data_corruption' | 'lsn_regression';
+    table: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    description: string;
+    details: any;
+  }>;
+  recommendedAction: 'none' | 'catchup' | 'reset';
+  serverFingerprints: Record<string, any>;
+  validationTimestamp: number;
+  rollbackToLSN?: string; // LSN to roll back to before starting catchup
+  rollbackReason?: string; // Explanation for the rollback recommendation
+}
+
+/**
+ * Message sent when a client connects and is already up-to-date,
+ * confirming the transition to live sync.
+ */
+export interface ServerLiveStartMessage extends ServerMessage {
+  type: 'srv_live_start';
+  startLSN: string;       // Starting LSN for the live sync
+  serverLSN: string;      // Server's current LSN
+  changeCount: number;    // Should be 0
+  success: boolean;       // Should be true
+}
+
+export interface ServerCatchupCompletedMessage extends ServerMessage {
+  type: 'srv_catchup_completed';
+  startLSN: string;       // Starting LSN for the catchup sync
+  serverLSN: string;      // Server's current LSN after catchup sync
+  changeCount: number;    // Total number of changes sent
+  success: boolean;       // Whether catchup sync completed successfully
+  error?: string;         // Error message if any
+}
+
+/**
+ * Statistics message for synchronization operations
+ * Provides detailed metrics on filtering and deduplication
+ */
+export interface ServerSyncStatsMessage extends ServerMessage {
+  type: 'srv_sync_stats';
+  syncType: 'live' | 'catchup' | 'initial';
+  
+  // Basic stats
+  originalCount: number;   // Total number of changes before processing
+  processedCount: number;  // Total number of changes after processing
+  
+  // Deduplication stats
+  deduplicationStats?: {
+    beforeCount: number;
+    afterCount: number;
+    reduction: number;
+    reductionPercent: number;
+    
+    // Reasons for deduplication (e.g. "newer version exists", "merged with insert", etc.)
+    reasons: Record<string, number>;
+  };
+  
+  // Filtering stats  
+  filteringStats?: {
+    beforeCount: number;
+    afterCount: number;
+    filtered: number;
+    
+    // Reasons for filtering (e.g. "client's own change", "system table", etc.)
+    reasons: Record<string, number>;
+    
+    // Optional list of changes that were filtered out (for verification)
+    filteredChanges?: Array<{
+      id: string;
+      table: string;
+      reason: string;
+    }>;
+  };
+  
+  // Content stats
+  contentStats?: {
+    // Changes by operation type
+    operations: Record<string, number>;
+    
+    // Changes by table
+    tables: Record<string, number>;
+    
+    // Changes by client
+    clients: Record<string, number>;
+  };
+  
+  // Performance stats
+  performanceStats?: {
+    processingTimeMs: number;
+    dbQueryTimeMs?: number;
+    networkTimeMs?: number;
+  };
+  
+  // LSN range
+  lsnRange?: {
+    first: string;
+    last: string;
+  };
+}
+
+/**
+ * Server table change notification message for Legend State integration
+ * Notifies clients about table changes with org-aware filtering already applied
+ */
+export interface ServerTableChangeNotificationMessage extends ServerMessage {
+  type: 'srv_table_change_notification';
+  organizationId: string;  // Organization that owns these changes
+  tables: string[];        // List of table names that changed (e.g., ['Project', 'Client'])
+  lsn: string;            // LSN when changes occurred
+  source: 'wal' | 'api' | 'manual'; // Source of the change notification
+  timestamp: number;      // Timestamp when changes were detected
+}
+
+// Client message interfaces
+export interface ClientMessage extends BaseMessage {
+  type: CltMessageType;
+}
+
+export interface ClientChangesMessage extends ClientMessage {
+  type: 'clt_send_changes';
+  changes: TableChange[];
+}
+
+export interface ClientHeartbeatMessage extends ClientMessage {
+  type: 'clt_heartbeat';
+  state?: string;
+  lsn: string;
+  active: boolean;
+}
+
+export interface ClientReceivedMessage extends ClientMessage {
+  type: 'clt_changes_received';
+  changeIds: string[];
+  lastLSN: string;
+}
+
+export interface ClientAppliedMessage extends ClientMessage {
+  type: 'clt_changes_applied';
+  changeIds: string[];
+  lastLSN: string;
+}
+
+export interface ClientInitReceivedMessage extends ClientMessage {
+  type: 'clt_init_received';
+  table: string;
+  chunk: number;
+}
+
+export interface ClientInitProcessedMessage extends ClientMessage {
+  type: 'clt_init_processed';
+}
+
+export interface ClientCatchupReceivedMessage extends ClientMessage {
+  type: 'clt_catchup_received';
+  chunk: number;
+  lsn: string;  // The last LSN processed in this chunk
+}
+
+/**
+ * Client integrity validation request message
+ */
+export interface ClientIntegrityValidationMessage extends ClientMessage {
+  type: 'clt_integrity_validation';
+  currentLSN: string;
+  tableFingerprints: Record<string, {
+    recordCount: number;
+    lastUpdated: number;
+    recordIdHash: string;
+    recentDataHash: string;
+  }>;
+}
+
+/**
+ * Client integrity reset acknowledgment message
+ */
+export interface ClientIntegrityResetAckMessage extends ClientMessage {
+  type: 'clt_integrity_reset_ack';
+  success: boolean;
+  result?: {
+    success: boolean;
+    tablesCleared: string[];
+    lsnReset: boolean;
+    error?: string;
+  };
+  error?: string;
+  inReplyTo?: string;
+}
+
+// Union types for all messages
+export type Message = 
+  | ServerMessage 
+  | ServerCatchupCompletedMessage
+  | ServerLiveStartMessage
+  | ServerSyncStatsMessage
+  | ServerHeartbeatMessage
+  | ServerIntegrityResetMessage
+  | ServerIntegrityValidationResponseMessage
+  | ServerTableChangeNotificationMessage
+  | ClientMessage
+  | ClientIntegrityValidationMessage
+  | ClientIntegrityResetAckMessage;
+
+// Re-export schema messages
+export * from './schema-messages';
+
+// No need for named exports since these are already exported at declaration

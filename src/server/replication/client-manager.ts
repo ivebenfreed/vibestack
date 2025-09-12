@@ -1,0 +1,392 @@
+import type { DurableObjectState } from '../types/cloudflare';
+import type { TableChange } from '@/types/sync';
+import { replicationLogger } from '../middleware/logger';
+import type { Env } from '../types/env';
+import type { MinimalContext } from '../types/hono';
+import { compareLSN } from '../lib/sync-common';
+
+const MODULE_NAME = 'client-manager';
+
+/**
+ * Interface for notification results
+ */
+export interface NotificationResult {
+  total: number;
+  notified: number;
+  wokenUp: number;
+  failed: number;
+  skipped: number;
+}
+
+/**
+ * Client state persisted in KV storage
+ */
+export interface ClientState {
+  clientId: string;
+  active: boolean;
+  lastSeen: number;
+}
+
+// Extend TableChange for our internal use to include LSN
+interface ReplicationTableChange extends TableChange {
+  lsn: string;
+}
+
+/**
+ * Manages client notifications and change filtering
+ */
+export class ClientManager {
+  private env: Env;
+  private static readonly CLIENT_TIMEOUT = 10 * 60 * 1000; // 10 minutes (increased from 5)
+  private lastFullCleanupTime: number = 0;
+  private readonly FULL_CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Once per day
+
+  constructor(env: Env) {
+    this.env = env;
+    this.lastFullCleanupTime = Date.now();
+  }
+
+  /**
+   * Perform a full cleanup of the client registry
+   * NOTE: This method is no longer actively used since sync clients now handle their own cleanup.
+   * It's retained for backward compatibility and manual administrative cleanup if needed.
+   */
+  public async purgeStaleClients(): Promise<number> {
+    try {
+      const { keys } = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
+      
+      replicationLogger.debug('Client registry cleanup started', { 
+        clientCount: keys.length 
+      }, MODULE_NAME);
+      
+      let removedCount = 0;
+      const now = Date.now();
+      
+      for (const key of keys) {
+        const value = await this.env.CLIENT_REGISTRY.get(key.name);
+        if (!value) {
+          await this.env.CLIENT_REGISTRY.delete(key.name);
+          removedCount++;
+          continue;
+        }
+        
+        try {
+          const state = JSON.parse(value);
+          const lastSeen = state.lastSeen || 0;
+          const timeSinceLastSeen = now - lastSeen;
+          const clientId = key.name.replace('client:', '');
+          
+          // Remove if inactive or stale
+          if (!state.active || timeSinceLastSeen > ClientManager.CLIENT_TIMEOUT) {
+            const reason = !state.active ? 'inactive' : 'stale';
+            replicationLogger.debug('Purging client', { 
+              clientId, 
+              reason,
+              idleSecs: Math.round(timeSinceLastSeen / 1000)
+            }, MODULE_NAME);
+            
+            await this.env.CLIENT_REGISTRY.delete(key.name);
+            removedCount++;
+          }
+        } catch (err) {
+          // If we can't parse the state, just remove the client
+          await this.env.CLIENT_REGISTRY.delete(key.name);
+          removedCount++;
+        }
+      }
+      
+      replicationLogger.debug('Cleanup completed', { 
+        removedCount,
+        totalClients: keys.length
+      }, MODULE_NAME);
+      
+      this.lastFullCleanupTime = now;
+      return removedCount;
+    } catch (error) {
+      replicationLogger.error('Purge failed', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return 0;
+    }
+  }
+
+  /**
+   * Check if there are any active clients
+   * No longer performs cleanup as sync clients now handle their own cleanup
+   */
+  public async hasActiveClients(): Promise<boolean> {
+    try {
+      // Remove the full cleanup check since sync clients handle their own cleanup
+      
+      const { keys } = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
+      
+      replicationLogger.debug('Checking active clients', { 
+        clientCount: keys.length 
+      }, MODULE_NAME);
+      
+      if (keys.length === 0) {
+        replicationLogger.debug('No clients in registry', {}, MODULE_NAME);
+        return false;
+      }
+      
+      let hasActive = false;
+      
+      // Check each client's state but don't clean up
+      for (const key of keys) {
+        const value = await this.env.CLIENT_REGISTRY.get(key.name);
+        
+        if (!value) {
+          continue;
+        }
+
+        try {
+          const state = JSON.parse(value);
+          
+          // Only check if active, don't consider lastSeen or timeout
+          if (state.active) {
+            hasActive = true;
+          }
+        } catch (err) {
+          replicationLogger.error('Client state parse error', {
+            key: key.name,
+            error: err instanceof Error ? err.message : String(err)
+          }, MODULE_NAME);
+        }
+      }
+      
+      if (!hasActive) {
+        replicationLogger.debug('No active clients', {}, MODULE_NAME);
+      }
+      
+      return hasActive;
+    } catch (error) {
+      replicationLogger.error('Active clients check failed', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return false;
+    }
+  }
+
+  /**
+   * Broadcast changes to all connected clients
+   */
+  async broadcastChanges(changes: TableChange[]): Promise<void> {
+    try {
+      replicationLogger.debug('Broadcasting', {
+        count: changes.length,
+        tables: Object.keys(
+          changes.reduce((acc: Record<string, boolean>, c) => {
+            acc[c.table] = true;
+            return acc;
+          }, {})
+        ).length
+      }, MODULE_NAME);
+      
+      // NOTE: Client notification has been refactored
+      // Previously, this code attempted to notify clients in real-time via the Sync DO,
+      // but that approach was replaced with a more reliable pull-based model where
+      // clients query the change_history table directly when they reconnect.
+      //
+      // Changes are now stored in the change_history table by the replication system,
+      // and clients will retrieve them on their next sync cycle based on their last known LSN.
+      
+      return;
+    } catch (error) {
+      replicationLogger.error('Broadcast failed', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
+  /**
+   * Wake up a client with changes
+   */
+  private async wakeUpClient(
+    clientId: string,
+    changes: TableChange[]
+  ): Promise<boolean> {
+    try {
+      replicationLogger.debug('Waking client', { clientId }, MODULE_NAME);
+      
+      // Get the client state from KV
+      const clientKey = `client:${clientId}`;
+      const value = await this.env.CLIENT_REGISTRY.get(clientKey);
+      
+      if (!value) {
+        replicationLogger.warn('Client not found', { clientId }, MODULE_NAME);
+        return false;
+      }
+
+      try {
+        const state = JSON.parse(value);
+        if (!state.active) {
+          replicationLogger.debug('Skipping inactive client', { clientId }, MODULE_NAME);
+          return false;
+        }
+        
+        // Get the SyncDO instance
+        const id = this.env.SYNC.idFromName(`client:${clientId}`);
+        const syncDO = this.env.SYNC.get(id);
+        
+        // Send changes to the client
+        replicationLogger.debug('Sending changes', { 
+          clientId, 
+          count: changes.length 
+        }, MODULE_NAME);
+        
+        // Create the URL with required parameters
+        const url = new URL('http://internal/new-changes');
+        url.searchParams.set('clientId', clientId);
+        url.searchParams.set('lsn', '0/0'); // Default value when we don't have LSN info
+        
+        const response = await syncDO.fetch(url.toString(), {
+          method: 'POST',
+          body: JSON.stringify({ changes })
+        });
+        
+        if (!response.ok) {
+          replicationLogger.warn('Notification failed', { 
+            clientId, 
+            status: response.status
+          }, MODULE_NAME);
+          return false;
+        }
+        
+        replicationLogger.debug('Notification sent', { 
+          clientId, 
+          count: changes.length 
+        }, MODULE_NAME);
+        return true;
+      } catch (parseErr) {
+        replicationLogger.error('State parse error', { 
+          clientId,
+          error: parseErr instanceof Error ? parseErr.message : String(parseErr) 
+        }, MODULE_NAME);
+        return false;
+      }
+    } catch (err) {
+      replicationLogger.error('Notification error', {
+        clientId,
+        error: err instanceof Error ? err.message : String(err)
+      }, MODULE_NAME);
+      return false;
+    }
+  }
+
+  /**
+   * Compare two LSNs (Logical Sequence Numbers)
+   * Returns true if lsn1 > lsn2, false otherwise
+   * Uses the common compareLSN function for consistency
+   */
+  private compareLSNs(lsn1: string, lsn2: string): boolean {
+    return compareLSN(lsn1, lsn2) > 0;
+  }
+
+  /**
+   * List all clients in the registry
+   */
+  public async listClients(): Promise<ClientState[]> {
+    try {
+      const { keys } = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
+      const clients: ClientState[] = [];
+      
+      for (const key of keys) {
+        const value = await this.env.CLIENT_REGISTRY.get(key.name);
+        if (!value) continue;
+        
+        try {
+          const state = JSON.parse(value);
+          clients.push({
+            clientId: key.name.replace('client:', ''),
+            active: state.active || false,
+            lastSeen: state.lastSeen || 0
+          });
+        } catch (err) {
+          replicationLogger.error('Client parse error', {
+            key: key.name,
+            error: err instanceof Error ? err.message : String(err)
+          }, MODULE_NAME);
+        }
+      }
+      
+      replicationLogger.debug('Client listing complete', { 
+        count: clients.length
+      }, MODULE_NAME);
+      
+      return clients;
+    } catch (error) {
+      replicationLogger.error('Client listing failed', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return [];
+    }
+  }
+
+  /**
+   * Get a client by ID
+   */
+  public async getClientById(clientId: string): Promise<ClientState | null> {
+    try {
+      const clientKey = `client:${clientId}`;
+      const value = await this.env.CLIENT_REGISTRY.get(clientKey);
+      
+      if (!value) {
+        return null;
+      }
+      
+      try {
+        const state = JSON.parse(value);
+        return {
+          clientId,
+          active: state.active || false,
+          lastSeen: state.lastSeen || 0
+        };
+      } catch (err) {
+        replicationLogger.error('Client parse error', {
+          clientId,
+          error: err instanceof Error ? err.message : String(err)
+        }, MODULE_NAME);
+        return null;
+      }
+    } catch (error) {
+      replicationLogger.error('Client retrieval failed', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return null;
+    }
+  }
+
+  /**
+   * Attempt to wake a client via its DO
+   * No longer checks for staleness as sync clients handle their own lifecycle
+   */
+  async wakeClient(clientId: string): Promise<boolean> {
+    try {
+      // Check if the client is in our registry
+      const client = await this.getClientById(clientId);
+      if (!client) {
+        replicationLogger.warn('Client not found', { clientId }, MODULE_NAME);
+        return false;
+      }
+      
+      // Check only if client is active, ignoring last seen time
+      if (!client.active) {
+        replicationLogger.debug('Skipping inactive client', { clientId }, MODULE_NAME);
+        return false;
+      }
+      
+      replicationLogger.debug('Waking client', { clientId }, MODULE_NAME);
+      
+      // Client should wake up on its next polling cycle
+      return true;
+    } catch (error) {
+      replicationLogger.error('Wake failed', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return false;
+    }
+  }
+} 
