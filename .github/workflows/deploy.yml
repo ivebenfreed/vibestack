@@ -112,9 +112,14 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
           pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 lightningcss-linux-x64-gnu
-          # Fix esbuild version mismatch by rebuilding native binaries
-          npx esbuild --version || echo "esbuild not accessible, will rebuild"
-          pnpm rebuild esbuild
+          # Fix esbuild version conflicts by cleaning and rebuilding ALL esbuild versions
+          echo "🔧 Cleaning esbuild cache and binaries..."
+          rm -rf node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin || true
+          rm -rf node_modules/.pnpm/@esbuild/*/node_modules/@esbuild/*/bin || true
+          pnpm rebuild esbuild @esbuild/linux-x64 || true
+          # Force clean install of esbuild packages
+          pnpm remove esbuild @esbuild/linux-x64 || true
+          pnpm add -D esbuild@latest @esbuild/linux-x64@latest
           # Run postinstall scripts after native binaries are installed
           pnpm install --frozen-lockfile
         
