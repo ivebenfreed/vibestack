@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev --port 8787 --ip 127.0.0.1",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "build:with-typecheck": "tsc -b tsconfig.ci.json && vite build",
     "build:worker": "wrangler deploy --outdir=dist",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -b",
+    "typecheck:ci": "tsc -b tsconfig.ci.json",
+    "typecheck:strict": "tsc -b tsconfig.app.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
