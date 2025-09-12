@@ -15,16 +15,13 @@ const isDeployedPreview = import.meta.env.VITE_PREVIEW === 'true';
 const DEV_API_HOST = '127.0.0.1:8787';
 const DEV_WS_PROTOCOL = 'ws';
 
-// Production URLs - using same-origin architecture
-const PROD_API_HOST = 'app.codevibesmatter.com';
+// Get URLs from environment variables (set centrally in wrangler.toml)
+const PROD_API_HOST = import.meta.env.VITE_PROD_DOMAIN || 'elevra.app';
+const STAGING_API_HOST = import.meta.env.VITE_STAGING_DOMAIN || 'dev.getelevra.com';
+const PREVIEW_API_HOST = import.meta.env.VITE_PREVIEW_DOMAIN || 'preview.elevra.app';
+
 const PROD_WS_PROTOCOL = 'wss';
-
-// Staging URLs - using same-origin architecture
-const STAGING_API_HOST = 'dev.getelevra.com';
 const STAGING_WS_PROTOCOL = 'wss';
-
-// Production preview URLs
-const PREVIEW_API_HOST = 'preview.app.codevibesmatter.com';
 
 // Get configured API URL from environment if available
 // This supports different local development setups
@@ -57,7 +54,7 @@ export function getApiBaseUrl(): string {
     }
     
     // Production environment  
-    if (hostname === 'app.codevibesmatter.com') {
+    if (hostname === 'app.getelevra.com') {
       return `https://${PROD_API_HOST}`;
     }
     
@@ -116,7 +113,7 @@ export function getSyncWebSocketUrl(): string {
     }
     
     // Production environment
-    if (hostname === 'app.codevibesmatter.com') {
+    if (hostname === 'app.getelevra.com') {
       return `${PROD_WS_PROTOCOL}://${PROD_API_HOST}/api/sync`;
     }
     

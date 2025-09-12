@@ -21,6 +21,9 @@ BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
 BETTER_AUTH_URL = "http://localhost:5173"
 RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
 USE_KV_SESSIONS = true
+VITE_PROD_DOMAIN = "app.getelevra.com"
+VITE_STAGING_DOMAIN = "dev.getelevra.com"
+VITE_PREVIEW_DOMAIN = "preview.getelevra.com"
 
 # AI binding for Cloudflare AI/Workers AI
 [ai]
@@ -110,6 +113,9 @@ BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
 BETTER_AUTH_URL = "https://dev.getelevra.com"
 RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
 USE_KV_SESSIONS = true
+VITE_PROD_DOMAIN = "app.getelevra.com"
+VITE_STAGING_DOMAIN = "dev.getelevra.com"
+VITE_PREVIEW_DOMAIN = "preview.getelevra.com"
 
 # Production AI binding
 [env.staging.ai]
@@ -152,11 +158,19 @@ id = "a6d6379243d648679a02bc01160f8bc4"
 [env.production]
 name = "elevra-worker-production"
 
+# Custom domain routes for production
+[[env.production.routes]]
+pattern = "app.getelevra.com/*"
+zone_name = "getelevra.com"
+
 [env.production.vars]
 ENVIRONMENT = "production"
 NODE_ENV = "production"
 TYPEORM_LOGGING = false
 USE_KV_SESSIONS = true
+VITE_PROD_DOMAIN = "app.getelevra.com"
+VITE_STAGING_DOMAIN = "dev.getelevra.com"
+VITE_PREVIEW_DOMAIN = "preview.getelevra.com"
 
 # Production AI binding
 [env.production.ai]
