@@ -52,9 +52,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
-          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 -w
-          cd apps/worker && pnpm add -D lightningcss-linux-x64-gnu
-          cd ../..
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 lightningcss-linux-x64-gnu
           # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
         
@@ -113,18 +111,14 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
-          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 -w
-          cd apps/worker && pnpm add -D lightningcss-linux-x64-gnu
-          cd ../..
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 lightningcss-linux-x64-gnu
           # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
         
       - name: Type Check Worker Application
-        working-directory: apps/worker
         run: pnpm run typecheck || echo "Type check warnings ignored for now"
         
       - name: Validate Environment Configuration
-        working-directory: apps/worker
         run: |
           echo "📋 Validating unified worker deployment requirements..."
           echo "✅ Wrangler config exists: $(test -f wrangler.toml && echo 'YES' || echo 'NO')"
@@ -154,7 +148,6 @@ jobs:
           fi
           
       - name: Build and Deploy Unified Worker to Staging
-        working-directory: apps/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -241,18 +234,14 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
-          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 -w
-          cd apps/worker && pnpm add -D lightningcss-linux-x64-gnu
-          cd ../..
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 lightningcss-linux-x64-gnu
           # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
         
       - name: Type Check Worker Application
-        working-directory: apps/worker
         run: pnpm run typecheck || echo "Type check warnings ignored for now"
         
       - name: Build and Deploy Unified Worker to Production
-        working-directory: apps/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -298,4 +287,4 @@ jobs:
             echo "✅ Production deployment successful: https://vibestack-worker-production.codevibesmatter.workers.dev"
           elif [ "${{ needs.deploy-production.result }}" == "failure" ]; then
             echo "❌ Production deployment failed"
-          fi 
+          fi
