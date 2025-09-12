@@ -65,7 +65,56 @@ export const checkAuthActor = fromPromise(async () => {
   } catch (error) {
     myLog.error('[checkAuthActor] Auth check failed:', error);
     
-    // Try to get persisted auth data before deciding what to do
+    // Analyze the error to determine if it's a network issue or auth failure
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // CRITICAL FIX: Check for authentication failures FIRST before anything else
+    // These indicate the session is invalid on the server side
+    const isSessionExpired = errorMessage.includes('401') || 
+                             errorMessage.includes('Unauthorized') ||
+                             errorMessage.includes('UNAUTHORIZED') ||
+                             errorMessage.includes('session expired') ||
+                             errorMessage.includes('token expired');
+    
+    if (isSessionExpired) {
+      // Session is definitively expired - clear persistence and sign out
+      myLog.info('[checkAuthActor] Session expired (401), clearing persistence and signing out');
+      
+      // CRITICAL: Clear persisted state to prevent infinite loops with expired sessions
+      try {
+        localStorage.removeItem('auth-machine-snapshot');
+        localStorage.removeItem('auth-machine-state');
+        myLog.info('[checkAuthActor] Cleared persisted auth state due to session expiry');
+      } catch (error) {
+        myLog.error('[checkAuthActor] Failed to clear persisted state:', error);
+      }
+      
+      return { 
+        authenticated: false, 
+        shouldSignOut: true, 
+        errorType: 'session-expired',
+        error: 'Your session has expired. Please sign in again.',
+        clearPersisted: true
+      };
+    }
+    
+    // 403 is permission denied, not session expiry
+    const isPermissionDenied = errorMessage.includes('403') || 
+                              errorMessage.includes('Forbidden');
+    
+    if (isPermissionDenied) {
+      // Permission issue, not session expiry - preserve auth but show error
+      myLog.info('[checkAuthActor] Permission denied (403), preserving auth state but showing error');
+      return { 
+        authenticated: false, 
+        shouldSignOut: false,  // Don't sign out, just show permission error
+        errorType: 'permission-denied',
+        error: errorMessage,
+        retryable: false  // Don't auto-retry permission errors
+      };
+    }
+    
+    // Try to get persisted auth data for network/server errors
     const persistedAuth = localStorage.getItem('auth-machine-state');
     const hasValidPersistedAuth = (() => {
       if (!persistedAuth) return false;
@@ -81,10 +130,7 @@ export const checkAuthActor = fromPromise(async () => {
       }
     })();
     
-    // Analyze the error to determine if it's a network issue or auth failure
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    
-    // Better error detection including response status
+    // Check for network errors (actual connection failures)
     const isNetworkError = errorMessage.includes('fetch') || 
                           errorMessage.includes('network') || 
                           errorMessage.includes('timeout') ||
@@ -93,25 +139,13 @@ export const checkAuthActor = fromPromise(async () => {
                           errorMessage.includes('Failed to fetch') ||
                           errorMessage.includes('NetworkError');
     
-    // Check if it's an HTTP error with status - be more specific
+    // Check for server errors (5xx)
     const isServerError = errorMessage.includes('500') || 
                          errorMessage.includes('502') || 
                          errorMessage.includes('503') || 
                          errorMessage.includes('504') ||
                          errorMessage.includes('INTERNAL_SERVER_ERROR') ||
                          errorMessage.includes('Internal Server Error');
-    
-    // REFINED: Only treat 401 as explicit session expiry that needs persistence clearing
-    // 403 could be permission issue, not session expiry - keep user logged in
-    const isSessionExpired = errorMessage.includes('401') || 
-                             errorMessage.includes('Unauthorized') ||
-                             errorMessage.includes('UNAUTHORIZED') ||
-                             errorMessage.includes('session expired') ||
-                             errorMessage.includes('token expired');
-    
-    // 403 is permission denied, not necessarily session expiry - don't clear persistence
-    const isPermissionDenied = errorMessage.includes('403') || 
-                              errorMessage.includes('Forbidden');
     
     // If we have valid persisted auth and it's a server/network error, stay authenticated
     if ((isNetworkError || isServerError) && hasValidPersistedAuth) {
@@ -141,36 +175,6 @@ export const checkAuthActor = fromPromise(async () => {
         errorType: 'network',
         error: errorMessage,
         retryable: true
-      };
-    } else if (isSessionExpired) {
-      // ONLY 401/session expired errors - clear persistence to prevent loops
-      myLog.info('[checkAuthActor] Session expired (401), clearing persistence and signing out');
-      
-      // CRITICAL: Clear persisted state to prevent infinite loops with expired sessions
-      try {
-        localStorage.removeItem('auth-machine-snapshot');
-        localStorage.removeItem('auth-machine-state');
-        myLog.info('[checkAuthActor] Cleared persisted auth state due to session expiry');
-      } catch (error) {
-        myLog.error('[checkAuthActor] Failed to clear persisted state:', error);
-      }
-      
-      return { 
-        authenticated: false, 
-        shouldSignOut: true, 
-        errorType: 'session-expired',
-        error: 'Your session has expired. Please sign in again.',
-        clearPersisted: true
-      };
-    } else if (isPermissionDenied) {
-      // 403 errors - permission issue, not session expiry - preserve auth but show error
-      myLog.info('[checkAuthActor] Permission denied (403), preserving auth state but showing error');
-      return { 
-        authenticated: false, 
-        shouldSignOut: false,  // Don't sign out, just show permission error
-        errorType: 'permission-denied',
-        error: errorMessage,
-        retryable: false  // Don't auto-retry permission errors
       };
     } else {
       // Unknown errors - be conservative but don't clear persistence unless clearly session-related

@@ -440,7 +440,21 @@ export const authMachine = setup({
           target: 'checking',
           actions: () => fileLog.info('[AuthMachine] No persisted session, checking auth status')
         }
-      ]
+      ],
+      
+      // Allow sign-in events even during initial state determination
+      on: {
+        SIGN_IN: {
+          target: 'signingIn',
+          actions: [
+            () => fileLog.info('[AuthMachine] SIGN_IN event received during initial state determination'),
+            assign({
+              authError: null,
+              errorRetryCount: 0
+            })
+          ]
+        }
+      }
     },
     
     checking: {

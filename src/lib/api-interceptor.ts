@@ -58,7 +58,12 @@ window.fetch = async (...args) => {
     
     // Check for 401 Unauthorized
     if (response.status === 401) {
-      // Only redirect if not already on sign-in page
+      // Dispatch auth session fault event to trigger auth machine sign-out
+      window.dispatchEvent(new CustomEvent('auth:session-fault', {
+        detail: { status: 401, url: args[0] }
+      }));
+      
+      // Only show toast and redirect if not already on sign-in page
       if (!window.location.pathname.includes('/sign-in')) {
         toast.error('Session Expired', {
           description: 'Please sign in to continue.',
