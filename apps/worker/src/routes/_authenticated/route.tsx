@@ -83,7 +83,6 @@ export const Route = createFileRoute('/_authenticated')({
 
     // Check if we're in organization setup phase - allow access but don't check system readiness yet
     const isInOrgSetup = finalAuthSnapshot.matches('authenticated.loadingOrganizations') ||
-                         finalAuthSnapshot.matches('authenticated.needsOrganizationSetup') ||
                          finalAuthSnapshot.matches('authenticated.needsOrganizationSelection') ||
                          finalAuthSnapshot.matches('authenticated.creatingOrganization') ||
                          finalAuthSnapshot.matches('authenticated.selectingOrganization') ||
@@ -115,7 +114,6 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   myLog.info('AuthenticatedContent Rendering at', Date.now());
   const { 
     isCheckingAuth,
-    needsOrganizationSetup, 
     needsOrganizationSelection,
     isLoadingOrganizations,
     isAuthenticatedAndReady,
@@ -140,12 +138,12 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   // Show unified loading screen during auth/org initialization
   // Simplified loading logic - removed artificial delay that caused flickering
   if (isCheckingAuth || isLoadingOrganizations ||
-      (!isAuthenticatedAndReady && !needsOrganizationSetup && !needsOrganizationSelection)) {
+      (!isAuthenticatedAndReady && !needsOrganizationSelection)) {
     return <UnifiedLoadingScreen />;
   }
 
   // Show organization setup if needed (after loading is done)
-  if (needsOrganizationSetup || needsOrganizationSelection) {
+  if (needsOrganizationSelection) {
     return <PostAuthOrganizationSetup />;
   }
 

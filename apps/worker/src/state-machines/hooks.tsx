@@ -46,7 +46,6 @@ export function useAuth() {
       userOrganizations: [],
       organizationError: null,
       isLoadingOrganizations: false,
-      needsOrganizationSetup: false,
       needsOrganizationSelection: false,
       isAuthenticatedAndReady: false,
       organizationSetupComplete: false,
@@ -116,9 +115,6 @@ export function useAuth() {
   );
   
   // Organization state checks
-  const needsOrganizationSetup = useSelector(authActor, (state) => 
-    state?.matches ? state.matches('authenticated.needsOrganizationSetup') : false
-  );
   const needsOrganizationSelection = useSelector(authActor, (state) => 
     state?.matches ? state.matches('authenticated.needsOrganizationSelection') : false
   );
@@ -278,7 +274,6 @@ export function useAuth() {
     userOrganizations,
     organizationError,
     isLoadingOrganizations,
-    needsOrganizationSetup,
     needsOrganizationSelection,
     isAuthenticatedAndReady,
     organizationSetupComplete,

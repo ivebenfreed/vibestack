@@ -218,8 +218,8 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
   const { userOrganizations } = useAuth()
   const location = useLocation()
 
-  // Transform userOrganizations to match the expected format
-  const organizations = userOrganizations.map(org => ({
+  // Transform userOrganizations to match the expected format (organizations are "worlds" in the UI)
+  const worlds = userOrganizations.map(org => ({
     info: {
       id: org.id,
       name: org.name,
@@ -261,22 +261,22 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
             </Tooltip>
           ))}
 
-          {/* Organizations */}
+          {/* Worlds */}
           <Separator className="my-2" />
-          {organizations.slice(0, 3).map(org => (
-            <Tooltip key={org.info.id}>
+          {worlds.slice(0, 3).map(world => (
+            <Tooltip key={world.info.id}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="w-full justify-center p-2"
-                  onClick={() => onEnterOrg(org.info.id)}
+                  onClick={() => onEnterOrg(world.info.id)}
                 >
-                  <Building className="h-4 w-4" />
+                  <Map className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                {org.info.name}
+                {world.info.name}
               </TooltipContent>
             </Tooltip>
           ))}
@@ -308,21 +308,21 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
         ))}
       </div>
 
-      {/* Organizations List */}
+      {/* Worlds List */}
       <div className="space-y-1">
         <div className="text-xs text-muted-foreground px-2 mb-2 flex items-center justify-between">
-          <span>Organizations</span>
-          <span className="text-xs bg-muted px-2 py-0.5 rounded">{organizations.length}</span>
+          <span>Worlds</span>
+          <span className="text-xs bg-muted px-2 py-0.5 rounded">{worlds.length}</span>
         </div>
-        {organizations.map(org => (
+        {worlds.map(world => (
           <Button
-            key={org.info.id}
+            key={world.info.id}
             variant="ghost"
             className="w-full justify-start px-3 py-2 h-auto font-normal"
-            onClick={() => onEnterOrg(org.info.id)}
+            onClick={() => onEnterOrg(world.info.id)}
           >
-            <Building className="h-4 w-4 mr-3" />
-            <span className="truncate">{org.info.name}</span>
+            <Map className="h-4 w-4 mr-3" />
+            <span className="truncate">{world.info.name}</span>
             <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
           </Button>
         ))}
@@ -387,7 +387,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {currentOrg.name} Dashboard
+              {currentOrg.name} World
             </TooltipContent>
           </Tooltip>
         </div>
@@ -412,12 +412,12 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
           <ChevronRight className="h-3 w-3 text-muted-foreground" />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-medium truncate">{currentOrg.name}</span>
-            <span className="text-xs text-muted-foreground truncate">Organization</span>
+            <span className="text-xs text-muted-foreground truncate">World</span>
           </div>
         </div>
       </div>
 
-      {/* Organization Dashboard */}
+      {/* World Dashboard */}
       <div className="space-y-1">
         <div className="text-xs text-muted-foreground px-2 mb-2">
           <span>Dashboard</span>

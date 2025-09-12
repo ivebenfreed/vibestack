@@ -20,7 +20,6 @@ export interface AuthContext {
   organizationError: string | null;
   isLoadingOrganizations: boolean;
   organizationSetupComplete: boolean;
-  needsOrganizationSetup: boolean;
   
   // Legend State initialization context - NEW
   legendStateSetupComplete: boolean;
@@ -56,7 +55,6 @@ export type AuthEvent =
   | { type: 'LOAD_ORGANIZATIONS' }
   | { type: 'SELECT_ORGANIZATION'; organizationId: string }
   | { type: 'CREATE_ORGANIZATION'; organizationData: CreateOrganizationInput }
-  | { type: 'SKIP_ORGANIZATION_SETUP' }
   | { type: 'REFRESH_ORGANIZATIONS' }
   | { type: 'SWITCH_ORGANIZATION'; organizationId: string }
   | { type: 'RETRY_LOAD_ORGANIZATIONS' }
@@ -211,7 +209,6 @@ export const authMachine = setup({
 
     markSetupComplete: assign({
       organizationSetupComplete: true,
-      needsOrganizationSetup: false,
     }),
 
     // Billing actions
@@ -320,10 +317,6 @@ export const authMachine = setup({
   },
 
   guards: {
-    hasNoOrganizations: ({ context }) => {
-      return !context.userOrganizations || context.userOrganizations.length === 0;
-    },
-
     hasNoCurrentOrganization: ({ context }) => {
       // Only return true if we truly need manual organization selection
       // This guard should be restrictive - only trigger selection UI when absolutely necessary
@@ -333,7 +326,7 @@ export const authMachine = setup({
       }
       
       if (!context.userOrganizations || context.userOrganizations.length === 0) {
-        return false; // No organizations available - handled by hasNoOrganizations guard
+        return false; // No organizations available - users always get auto-created org
       }
       
       // Single organization - always auto-selectable, no manual selection needed
@@ -383,7 +376,6 @@ export const authMachine = setup({
       organizationError: null,
       isLoadingOrganizations: false,
       organizationSetupComplete: false,
-      needsOrganizationSetup: false,
       
       // Legend State initialization context - NEW
       legendStateSetupComplete: false,
@@ -517,7 +509,6 @@ export const authMachine = setup({
                 // Set organization from session if available
                 currentOrganization: ({ event }) => event.output.organization || null,
                 organizationSetupComplete: ({ event }) => !!event.output.organization,
-                needsOrganizationSetup: ({ event }) => !event.output.organization,
               }),
               { 
                 type: 'dispatchAuthStateChange',
@@ -937,11 +928,6 @@ export const authMachine = setup({
           },
           always: [
             {
-              target: 'needsOrganizationSetup',
-              guard: 'hasNoOrganizations',
-              actions: [() => fileLog.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSetup - no organizations found')]
-            },
-            {
               target: 'needsOrganizationSelection',
               guard: 'hasNoCurrentOrganization',
               actions: [() => fileLog.info('[AuthMachine] ➡️ Transitioning to needsOrganizationSelection - no current organization')]
@@ -986,17 +972,6 @@ export const authMachine = setup({
           ]
         },
 
-        needsOrganizationSetup: {
-          on: {
-            CREATE_ORGANIZATION: {
-              target: 'creatingOrganization'
-            },
-            SKIP_ORGANIZATION_SETUP: {
-              target: 'ready',
-              actions: 'markSetupComplete'
-            }
-          }
-        },
 
         needsOrganizationSelection: {
           entry: [], // Ready for organization selection
@@ -1022,7 +997,7 @@ export const authMachine = setup({
               actions: ['setCurrentOrganization', 'markSetupComplete']
             },
             onError: {
-              target: 'needsOrganizationSetup',
+              target: 'needsOrganizationSelection',
               actions: ['setOrganizationError']
             }
           }
@@ -1292,7 +1267,6 @@ export const authMachine = setup({
                 // Set organization from session if available
                 currentOrganization: ({ event }) => event.output.organization || null,
                 organizationSetupComplete: ({ event }) => !!event.output.organization,
-                needsOrganizationSetup: ({ event }) => !event.output.organization,
               }),
               assign({
                 // Reset Legend State on fresh sign-in to ensure it always initializes

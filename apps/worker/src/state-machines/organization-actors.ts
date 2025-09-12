@@ -16,18 +16,34 @@ class OrganizationAPI {
   private baseUrl = `${window.location.origin}/api`;
 
   async getUserOrganizations(): Promise<OrganizationInfo[]> {
-    const response = await fetch(`${this.baseUrl}/organizations`, {
+    const url = `${this.baseUrl}/organizations`;
+    myLog.info('[OrganizationAPI] 🌐 Fetching organizations from:', url);
+    
+    const response = await fetch(url, {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
     });
 
+    myLog.info('[OrganizationAPI] 📥 Response status:', response.status, response.statusText);
+
     if (!response.ok) {
-      throw new Error(`Failed to load organizations: ${response.statusText}`);
+      const errorText = await response.text();
+      myLog.error('[OrganizationAPI] ❌ Request failed:', response.status, errorText);
+      throw new Error(`Failed to load organizations: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const result = await response.json();
+    myLog.info('[OrganizationAPI] 📋 Response data structure:', {
+      hasOrganizations: 'organizations' in result,
+      isArray: Array.isArray(result),
+      orgCount: Array.isArray(result) ? result.length : (result.organizations?.length || 0),
+      keys: Object.keys(result)
+    });
+    
     // Server returns {organizations: [...]} format
-    return result.organizations || result;
+    const organizations = result.organizations || result;
+    myLog.info('[OrganizationAPI] 🏢 Extracted organizations:', organizations?.length || 0, 'items');
+    return organizations;
   }
 
   async createOrganization(data: CreateOrganizationInput): Promise<OrganizationInfo> {
@@ -94,11 +110,14 @@ const organizationAPI = new OrganizationAPI();
 
 // Load user organizations actor
 export const loadOrganizationsActor = fromPromise(async () => {
+  myLog.info('[OrganizationActors] 🔄 Starting to load user organizations...');
+  
   try {
     const organizations = await organizationAPI.getUserOrganizations();
+    myLog.info('[OrganizationActors] ✅ Raw organizations response:', organizations);
     
     if (!organizations || !Array.isArray(organizations)) {
-      myLog.error('[OrganizationActors] Invalid organizations response format');
+      myLog.error('[OrganizationActors] ❌ Invalid organizations response format:', typeof organizations, organizations);
       return {
         success: false,
         organizations: [],
@@ -106,13 +125,15 @@ export const loadOrganizationsActor = fromPromise(async () => {
       };
     }
     
+    myLog.info('[OrganizationActors] ✅ Successfully loaded', organizations.length, 'organizations:', organizations.map(org => ({ id: org.id, name: org.name })));
+    
     return {
       success: true,
       organizations,
       error: null
     };
   } catch (error) {
-    myLog.error('[OrganizationActors] Failed to load organizations:', error);
+    myLog.error('[OrganizationActors] ❌ Failed to load organizations:', error);
     
     return {
       success: false,

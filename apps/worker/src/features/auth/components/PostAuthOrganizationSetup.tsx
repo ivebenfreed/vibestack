@@ -19,7 +19,6 @@ export function PostAuthOrganizationSetup() {
   const { 
     user,
     userOrganizations, 
-    needsOrganizationSetup, 
     needsOrganizationSelection,
     isLoadingOrganizations,
     organizationError,
@@ -56,8 +55,9 @@ export function PostAuthOrganizationSetup() {
     );
   }
 
-  // Need to create first organization
-  if (needsOrganizationSetup) {
+  // This component should only show for organization selection now
+  // The needsOrganizationSetup state has been removed since users get auto-created orgs
+  if (false) { // Removed needsOrganizationSetup check
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">

@@ -73,13 +73,26 @@ if (!authMachineActor) {
       persistedSnapshot = JSON.parse(stored);
       rootLog.info('Restored auth machine snapshot:', persistedSnapshot?.value);
       
-      // CRITICAL: Reset Legend State flag to ensure it always initializes on app start
-      // This flag should NOT be persisted as Legend State needs to be initialized
-      // fresh on every page load/refresh
+      // CRITICAL: Clean up persisted state for compatibility
       if (persistedSnapshot?.context) {
+        // Reset Legend State flag to ensure it always initializes on app start
         persistedSnapshot.context.legendStateSetupComplete = false;
         persistedSnapshot.context.legendStateError = null;
-        rootLog.info('[ROOT] Reset legendStateSetupComplete flag for fresh initialization');
+        
+        // Remove deprecated needsOrganizationSetup field to prevent state errors
+        delete persistedSnapshot.context.needsOrganizationSetup;
+        
+        rootLog.info('[ROOT] Cleaned up persisted snapshot for compatibility');
+      }
+      
+      // Also clean up deprecated state values that might cause matches() errors
+      if (persistedSnapshot?.value && typeof persistedSnapshot.value === 'object') {
+        // Convert any deprecated needsOrganizationSetup states to valid states
+        const stateStr = JSON.stringify(persistedSnapshot.value);
+        if (stateStr.includes('needsOrganizationSetup')) {
+          rootLog.warn('[ROOT] Detected deprecated state in persisted snapshot, clearing...');
+          persistedSnapshot = null; // Clear the entire snapshot to avoid errors
+        }
       }
     }
   } catch (error) {
@@ -183,7 +196,18 @@ if (!authMachineActor) {
   
   // Check initial state after setting up subscription (for restored snapshots)
   const initialSnapshot = authMachineActor.getSnapshot()
-  if (initialSnapshot.matches('authenticated.ready')) {
+  
+  // Add error handling for snapshot.matches() to prevent TypeError
+  let isAuthenticatedReady = false;
+  try {
+    isAuthenticatedReady = initialSnapshot?.matches && initialSnapshot.matches('authenticated.ready');
+  } catch (error) {
+    rootLog.error('[ROOT] Error checking initial snapshot state:', error);
+    // Clear the problematic snapshot
+    localStorage.removeItem('auth-machine-snapshot');
+  }
+  
+  if (isAuthenticatedReady) {
     const userOrganizations = initialSnapshot.context.userOrganizations
     const user = initialSnapshot.context.user
     
