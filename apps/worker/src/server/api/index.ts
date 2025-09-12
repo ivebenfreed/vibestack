@@ -78,6 +78,10 @@ api.route('/', statusSetsApi)
 import testParserApi from '../routes/test-parser'
 api.route('/test-parser', testParserApi)
 
+// Lore and Canon System Entities API
+import loreCanonApi from '../routes/lore-canon-api'
+api.route('/', loreCanonApi)
+
 // Add a test route directly to verify OpenAPI works
 import { createRoute, z } from '@hono/zod-openapi';
 

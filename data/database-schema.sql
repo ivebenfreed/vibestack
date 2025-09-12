@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict IP4fbF1tFoXqbaGizLcaK99GGa01WqdvxaUWc8KwornvjtQbfR6dL5Lk9HbDdOz
+\restrict LeB5RRfB0gsh7A5JWAn9BBdtgiHMyVVHerqgvuTmgJNHajBx0ueR9iukRgXbds8
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict IP4fbF1tFoXqbaGizLcaK99GGa01WqdvxaUWc8KwornvjtQbfR6dL5Lk9HbDdOz
+\unrestrict LeB5RRfB0gsh7A5JWAn9BBdtgiHMyVVHerqgvuTmgJNHajBx0ueR9iukRgXbds8
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict HIi5uadnLVfDAzSYCye4iHokM7lD3o7kEucbPmPf7OrBsw44f3hXMpQuelePanc
+\restrict hUGwaDltn3sSQW12zybxcUOYCqqElz8E6XDnOTVb6bCqHsfaMoFmDOdzoBktHwC
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HIi5uadnLVfDAzSYCye4iHokM7lD3o7kEucbPmPf7OrBsw44f3hXMpQuelePanc
+\unrestrict hUGwaDltn3sSQW12zybxcUOYCqqElz8E6XDnOTVb6bCqHsfaMoFmDOdzoBktHwC
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
+\restrict 8G3k7QxTA9iSDUkjjj9kYwtjDEsgNNnQZ55aIE0rX4hk8eBxFGIJ3DVqY4BKw2x
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
+\unrestrict 8G3k7QxTA9iSDUkjjj9kYwtjDEsgNNnQZ55aIE0rX4hk8eBxFGIJ3DVqY4BKw2x
 \connect elevra_dev
-\restrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
+\restrict 8G3k7QxTA9iSDUkjjj9kYwtjDEsgNNnQZ55aIE0rX4hk8eBxFGIJ3DVqY4BKw2x
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1486,7 +1486,7 @@ CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
+  NEW.updated_at = NOW();
   RETURN NEW;
 END;
 $$;
@@ -1999,6 +1999,36 @@ CREATE VIEW public.archetype_usage_stats AS
 
 
 ALTER VIEW public.archetype_usage_stats OWNER TO postgres;
+
+--
+-- Name: canon; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.canon (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    title text NOT NULL,
+    content text,
+    parent_entity_type text NOT NULL,
+    parent_entity_id text NOT NULL,
+    rule_type text DEFAULT 'guideline'::text,
+    enforcement_level text DEFAULT 'should'::text,
+    violation_consequence text,
+    compliance_level integer DEFAULT 80,
+    alignment_score integer DEFAULT 50,
+    ai_usage_count integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    created_by text,
+    CONSTRAINT canon_alignment_score_check CHECK (((alignment_score >= 0) AND (alignment_score <= 100))),
+    CONSTRAINT canon_compliance_level_check CHECK (((compliance_level >= 0) AND (compliance_level <= 100))),
+    CONSTRAINT canon_enforcement_level_check CHECK ((enforcement_level = ANY (ARRAY['must'::text, 'should'::text, 'may'::text, 'must_not'::text]))),
+    CONSTRAINT canon_parent_entity_type_check CHECK ((parent_entity_type = ANY (ARRAY['universe'::text, 'world'::text, 'project'::text, 'task'::text]))),
+    CONSTRAINT canon_rule_type_check CHECK ((rule_type = ANY (ARRAY['process'::text, 'standard'::text, 'requirement'::text, 'boundary'::text, 'guideline'::text])))
+);
+
+
+ALTER TABLE public.canon OWNER TO postgres;
 
 --
 -- Name: change_history; Type: TABLE; Schema: public; Owner: postgres
@@ -2691,6 +2721,35 @@ COMMENT ON COLUMN public.integration_sync_log.metadata IS 'JSON object containin
 
 
 --
+-- Name: lore; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lore (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    title text NOT NULL,
+    content text,
+    parent_entity_type text NOT NULL,
+    parent_entity_id text NOT NULL,
+    cultural_significance integer DEFAULT 50,
+    emotional_resonance text DEFAULT 'grounding'::text,
+    purpose_clarity integer DEFAULT 50,
+    alignment_score integer DEFAULT 50,
+    ai_usage_count integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    created_by text,
+    CONSTRAINT lore_alignment_score_check CHECK (((alignment_score >= 0) AND (alignment_score <= 100))),
+    CONSTRAINT lore_cultural_significance_check CHECK (((cultural_significance >= 0) AND (cultural_significance <= 100))),
+    CONSTRAINT lore_emotional_resonance_check CHECK ((emotional_resonance = ANY (ARRAY['inspiring'::text, 'grounding'::text, 'motivating'::text, 'cautionary'::text, 'celebratory'::text]))),
+    CONSTRAINT lore_parent_entity_type_check CHECK ((parent_entity_type = ANY (ARRAY['universe'::text, 'world'::text, 'project'::text, 'task'::text]))),
+    CONSTRAINT lore_purpose_clarity_check CHECK (((purpose_clarity >= 0) AND (purpose_clarity <= 100)))
+);
+
+
+ALTER TABLE public.lore OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_client; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2796,6 +2855,33 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_deliverable REP
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_deliverable OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_document; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_document (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    content text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    collection_type text DEFAULT 'general'::text,
+    parent_entity_type text,
+    parent_entity_id text,
+    alignment_score text DEFAULT 50,
+    purpose_description text,
+    ai_usage_tracking jsonb DEFAULT '{}'::jsonb,
+    category text DEFAULT 'internal'::text,
+    document_type text DEFAULT 'general'::text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_document REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_document OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_enhancedfieldsdemo; Type: TABLE; Schema: public; Owner: postgres
@@ -3033,6 +3119,77 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_worktask REPLIC
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_worktask OWNER TO postgres;
+
+--
+-- Name: org_01993ac7_c10a_7b35_afe1_855338a4fbcb_collection; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_collection (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    collection_type text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb,
+    status text DEFAULT 'draft'::text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_collection REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_collection OWNER TO postgres;
+
+--
+-- Name: org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_entity_type character varying(100) NOT NULL,
+    source_entity_id uuid NOT NULL,
+    relationship_type character varying(100) NOT NULL,
+    relationship_subtype character varying(100),
+    target_entity_type character varying(100) NOT NULL,
+    target_entity_id uuid NOT NULL,
+    properties jsonb DEFAULT '{}'::jsonb,
+    valid_from timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    valid_until timestamp without time zone,
+    created_by uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_by uuid,
+    updated_at timestamp without time zone
+);
+
+
+ALTER TABLE public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships OWNER TO postgres;
+
+--
+-- Name: org_01993ac7_c10a_7b35_afe1_855338a4fbcb_testproject; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_testproject (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    start_date date,
+    end_date date,
+    budget numeric,
+    progress_percentage integer DEFAULT 0,
+    lore_collection_id text,
+    canon_collection_id text
+);
+
+ALTER TABLE ONLY public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_testproject REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_testproject OWNER TO postgres;
 
 --
 -- Name: org_relationship_definitions; Type: TABLE; Schema: public; Owner: postgres
@@ -3492,6 +3649,22 @@ ALTER TABLE ONLY public.account
 
 
 --
+-- Name: canon canon_parent_entity; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.canon
+    ADD CONSTRAINT canon_parent_entity UNIQUE (organization_id, parent_entity_type, parent_entity_id, title);
+
+
+--
+-- Name: canon canon_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.canon
+    ADD CONSTRAINT canon_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: change_history change_history_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3740,6 +3913,22 @@ ALTER TABLE ONLY public.integration_sync_log
 
 
 --
+-- Name: lore lore_parent_entity; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lore
+    ADD CONSTRAINT lore_parent_entity UNIQUE (organization_id, parent_entity_type, parent_entity_id, title);
+
+
+--
+-- Name: lore lore_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lore
+    ADD CONSTRAINT lore_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_invoice org_01920000_1000_7000_8000_000000000001_inv_invoice_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3769,6 +3958,14 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teammember
 
 ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teammember
     ADD CONSTRAINT org_01920000_1000_7000_8000_000000000001_teamme_employee_id_key UNIQUE (employee_id);
+
+
+--
+-- Name: org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships
+    ADD CONSTRAINT org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_pkey PRIMARY KEY (id);
 
 
 --
@@ -3977,6 +4174,34 @@ ALTER TABLE ONLY public."user"
 
 ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_canon_created_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_canon_created_at ON public.canon USING btree (created_at DESC);
+
+
+--
+-- Name: idx_canon_enforcement; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_canon_enforcement ON public.canon USING btree (enforcement_level);
+
+
+--
+-- Name: idx_canon_organization_parent; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_canon_organization_parent ON public.canon USING btree (organization_id, parent_entity_type, parent_entity_id);
+
+
+--
+-- Name: idx_canon_rule_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_canon_rule_type ON public.canon USING btree (rule_type);
 
 
 --
@@ -4274,6 +4499,27 @@ CREATE INDEX idx_integration_connections_org_provider ON public.integration_conn
 
 
 --
+-- Name: idx_lore_alignment; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lore_alignment ON public.lore USING btree (alignment_score DESC);
+
+
+--
+-- Name: idx_lore_created_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lore_created_at ON public.lore USING btree (created_at DESC);
+
+
+--
+-- Name: idx_lore_organization_parent; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lore_organization_parent ON public.lore USING btree (organization_id, parent_entity_type, parent_entity_id);
+
+
+--
 -- Name: idx_org_01920000_1000_7000_8000_000000000001_relationships_sour; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -4292,6 +4538,27 @@ CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_relationships_targ ON 
 --
 
 CREATE INDEX idx_org_01920000_1000_7000_8000_000000000001_relationships_type ON public.org_01920000_1000_7000_8000_000000000001_relationships USING btree (relationship_type) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_sour; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_sour ON public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships USING btree (source_entity_type, source_entity_id) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_targ; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_targ ON public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships USING btree (target_entity_type, target_entity_id) WHERE (valid_until IS NULL);
+
+
+--
+-- Name: idx_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_type ON public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships USING btree (relationship_type) WHERE (valid_until IS NULL);
 
 
 --
@@ -4505,6 +4772,13 @@ CREATE UNIQUE INDEX unique_org_01920000_1000_7000_8000_000000000001_relationship
 
 
 --
+-- Name: unique_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_a; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX unique_org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships_a ON public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_relationships USING btree (source_entity_type, source_entity_id, relationship_type, target_entity_type, target_entity_id) WHERE (valid_until IS NULL);
+
+
+--
 -- Name: organizations organizations_update_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -4516,6 +4790,13 @@ CREATE TRIGGER organizations_update_updated_at BEFORE UPDATE ON public.organizat
 --
 
 CREATE TRIGGER trigger_set_default_organization_for_new_member AFTER INSERT ON public.organization_members FOR EACH ROW EXECUTE FUNCTION public.set_default_organization_for_new_member();
+
+
+--
+-- Name: canon update_canon_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER update_canon_updated_at BEFORE UPDATE ON public.canon FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
@@ -4537,6 +4818,13 @@ CREATE TRIGGER update_import_mappings_updated_at BEFORE UPDATE ON public.import_
 --
 
 CREATE TRIGGER update_integration_connections_updated_at BEFORE UPDATE ON public.integration_connections FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: lore update_lore_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER update_lore_updated_at BEFORE UPDATE ON public.lore FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
@@ -5021,7 +5309,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict s4OBkCXITewdCQi6Pcwq8bZvFeJT7LPZuRRUsQ0MqDwBzEfHbKZMeIwwECtVxjA
+\unrestrict 8G3k7QxTA9iSDUkjjj9kYwtjDEsgNNnQZ55aIE0rX4hk8eBxFGIJ3DVqY4BKw2x
 
 --
 -- Database "postgres" dump
@@ -5033,7 +5321,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict FTC3VTcFdzWe6PbYipqB8JtgTMkyYAGfYPyP9Nk3qPevraD52uLtB9ZfQDJLYA8
+\restrict pr4UogKd1tPF2knxATW3f21VjZ1vwmDzsQIebHwhWCYjXBLGdtcvVbjoGOKnmmH
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5054,7 +5342,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FTC3VTcFdzWe6PbYipqB8JtgTMkyYAGfYPyP9Nk3qPevraD52uLtB9ZfQDJLYA8
+\unrestrict pr4UogKd1tPF2knxATW3f21VjZ1vwmDzsQIebHwhWCYjXBLGdtcvVbjoGOKnmmH
 
 --
 -- PostgreSQL database cluster dump complete

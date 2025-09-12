@@ -21,8 +21,7 @@ export interface ProjectFields {
   owner_id?: string;
   budget?: number;
   progress_percentage?: number;
-  lore_collection_id?: string;
-  canon_collection_id?: string;
+  // Note: Lore/canon documents now use Document entity with parent relationships
   created_at: Date;
   updated_at: Date;
   created_by?: string;
@@ -102,20 +101,7 @@ export class ProjectArchetype {
       serverOnly: false,
       systemField: true  // 🔒 System-protected - required for audit trail
     },
-    lore_collection_id: {
-      type: 'text',
-      required: false,
-      syncable: true,
-      serverOnly: false,
-      systemField: true  // 🔒 System-protected - auto-created collection for project lore
-    },
-    canon_collection_id: {
-      type: 'text', 
-      required: false,
-      syncable: true,
-      serverOnly: false,
-      systemField: true  // 🔒 System-protected - auto-created collection for project canon
-    }
+    // Note: Lore/canon documents are now Document entities with parent_entity_type="project"
   } as const;
 
   /**

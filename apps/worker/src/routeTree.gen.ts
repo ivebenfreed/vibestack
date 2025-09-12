@@ -41,6 +41,7 @@ import { Route as AuthenticatedDebugIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedWorldsWorldIdRouteImport } from './routes/_authenticated/worlds/$worldId'
+import { Route as AuthenticatedUniverseDetailRouteImport } from './routes/_authenticated/universe/detail'
 import { Route as AuthenticatedTasksTimelineRouteImport } from './routes/_authenticated/tasks/timeline'
 import { Route as AuthenticatedTasksKanbanRouteImport } from './routes/_authenticated/tasks/kanban'
 import { Route as AuthenticatedSettingsOrganizationRouteImport } from './routes/_authenticated/settings/organization'
@@ -49,6 +50,7 @@ import { Route as AuthenticatedSettingsMembersRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsBillingRouteImport } from './routes/_authenticated/settings/billing'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
@@ -241,6 +243,12 @@ const AuthenticatedWorldsWorldIdRoute =
     path: '/worlds/$worldId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedUniverseDetailRoute =
+  AuthenticatedUniverseDetailRouteImport.update({
+    id: '/universe/detail',
+    path: '/universe/detail',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTasksTimelineRoute =
   AuthenticatedTasksTimelineRouteImport.update({
     id: '/tasks/timeline',
@@ -288,6 +296,12 @@ const AuthenticatedSettingsAccountRoute =
     id: '/account',
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
+const AuthenticatedProjectsProjectIdRoute =
+  AuthenticatedProjectsProjectIdRouteImport.update({
+    id: '/projects/$projectId',
+    path: '/projects/$projectId',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDebugVibegridLegendStateRoute =
   AuthenticatedDebugVibegridLegendStateRouteImport.update({
@@ -369,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/billing': typeof AuthenticatedSettingsBillingRoute
@@ -377,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AuthenticatedSettingsOrganizationRoute
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
+  '/universe/detail': typeof AuthenticatedUniverseDetailRoute
   '/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
   '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -417,6 +433,7 @@ export interface FileRoutesByTo {
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/billing': typeof AuthenticatedSettingsBillingRoute
@@ -425,6 +442,7 @@ export interface FileRoutesByTo {
   '/settings/organization': typeof AuthenticatedSettingsOrganizationRoute
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
+  '/universe/detail': typeof AuthenticatedUniverseDetailRoute
   '/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
   '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -469,6 +487,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
+  '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingRoute
@@ -477,6 +496,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationRoute
   '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
+  '/_authenticated/universe/detail': typeof AuthenticatedUniverseDetailRoute
   '/_authenticated/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
   '/_authenticated/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -521,6 +541,7 @@ export interface FileRouteTypes {
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
+    | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/billing'
@@ -529,6 +550,7 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/tasks/kanban'
     | '/tasks/timeline'
+    | '/universe/detail'
     | '/worlds/$worldId'
     | '/debug/entity-operations'
     | '/debug/sync'
@@ -569,6 +591,7 @@ export interface FileRouteTypes {
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
+    | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/billing'
@@ -577,6 +600,7 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/tasks/kanban'
     | '/tasks/timeline'
+    | '/universe/detail'
     | '/worlds/$worldId'
     | '/debug/entity-operations'
     | '/debug/sync'
@@ -620,6 +644,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
     | '/_authenticated/debug/vibegrid-legend-state'
+    | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/billing'
@@ -628,6 +653,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/organization'
     | '/_authenticated/tasks/kanban'
     | '/_authenticated/tasks/timeline'
+    | '/_authenticated/universe/detail'
     | '/_authenticated/worlds/$worldId'
     | '/_authenticated/debug/entity-operations'
     | '/_authenticated/debug/sync'
@@ -892,6 +918,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorldsWorldIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/universe/detail': {
+      id: '/_authenticated/universe/detail'
+      path: '/universe/detail'
+      fullPath: '/universe/detail'
+      preLoaderRoute: typeof AuthenticatedUniverseDetailRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/tasks/timeline': {
       id: '/_authenticated/tasks/timeline'
       path: '/tasks/timeline'
@@ -947,6 +980,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/account'
       preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/projects/$projectId': {
+      id: '/_authenticated/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/debug/vibegrid-legend-state': {
       id: '/_authenticated/debug/vibegrid-legend-state'
@@ -1078,8 +1118,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDebugRouteRoute: typeof AuthenticatedDebugRouteRouteWithChildren
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
   AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
   AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
+  AuthenticatedUniverseDetailRoute: typeof AuthenticatedUniverseDetailRoute
   AuthenticatedWorldsWorldIdRoute: typeof AuthenticatedWorldsWorldIdRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
@@ -1098,8 +1140,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDebugRouteRoute: AuthenticatedDebugRouteRouteWithChildren,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
   AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
   AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
+  AuthenticatedUniverseDetailRoute: AuthenticatedUniverseDetailRoute,
   AuthenticatedWorldsWorldIdRoute: AuthenticatedWorldsWorldIdRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
