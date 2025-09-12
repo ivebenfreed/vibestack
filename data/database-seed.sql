@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict j554c2OZTykYxHqeRuZ4jFlZV3yh4DQFzFvSJDuu5sEngZVFTMnYvhA696qZsxv
+\restrict uYTFf41vignsx2iTd1pKHW23Q4mU4PnfB4HdfHaVvxaAD5HcajYK3JvT3pEYarD
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -637,6 +637,7 @@ COPY public.import_templates (id, org_id, name, description, file_type, target_e
 
 COPY public.lore (id, organization_id, title, content, parent_entity_type, parent_entity_id, cultural_significance, emotional_resonance, purpose_clarity, alignment_score, ai_usage_count, created_at, updated_at, created_by) FROM stdin;
 13d63946-6697-4f55-a887-320ade23a6ba	01920000-1000-7000-8000-000000000001	Wide Corp Core Values	At Wide Corp, we believe in innovation, integrity, and impact. Our mission is to solve complex business challenges through cutting-edge technology solutions that empower organizations to thrive in the digital age.	world	01920000-1000-7000-8000-000000000001	95	inspiring	90	98	0	2025-09-11 23:57:25.469024+00	2025-09-11 23:57:25.469024+00	0198b046-c453-72d9-b71a-092e1f75601a
+9b52c2d0-2957-4ca5-a7b1-e16ee4d90690	01920000-1000-7000-8000-000000000001	Who Are We?	Lets do this	world	01920000-1000-7000-8000-000000000001	75	grounding	75	75	0	2025-09-12 01:05:22.716518+00	2025-09-12 01:05:22.716518+00	0198b046-c453-72d9-b71a-092e1f75601a
 \.
 
 
@@ -1233,5 +1234,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict j554c2OZTykYxHqeRuZ4jFlZV3yh4DQFzFvSJDuu5sEngZVFTMnYvhA696qZsxv
+\unrestrict uYTFf41vignsx2iTd1pKHW23Q4mU4PnfB4HdfHaVvxaAD5HcajYK3JvT3pEYarD
 

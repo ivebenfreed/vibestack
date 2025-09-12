@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { getEntity$ } from '@/legend-state'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/state-machines'
 import { useMemo } from 'react'
 
 export const Route = createFileRoute('/_authenticated/universe/')({
@@ -31,15 +31,16 @@ export const Route = createFileRoute('/_authenticated/universe/')({
 })
 
 function UniversePage() {
-  const { user } = useAuth()
+  const { user, userOrganizations } = useAuth()
   
   // Get data from Legend State
   const universeStore = getEntity$('universe')
   const universeData = use$(universeStore)
-  const organizationStore = getEntity$('organization')
-  const organizationData = use$(organizationStore)
   const projectStore = getEntity$('project')
   const projectData = use$(projectStore)
+  
+  // Use userOrganizations from AuthMachine instead of Legend State organizations
+  // This ensures we show the correct organizations that the user is authenticated for
   
   // Find user's universe
   const universe = useMemo(() => {
@@ -54,25 +55,26 @@ function UniversePage() {
   
   // Find all organizations (worlds) and projects
   const { worlds, totalProjects } = useMemo(() => {
-    if (!organizationData || !projectData) {
+    if (!userOrganizations) {
       return { worlds: [], totalProjects: 0 }
     }
     
-    // All organizations are "worlds" in our model
-    const allWorlds = Object.values(organizationData).filter(
-      (org: any) => org && org.id !== user?.default_organization_id // Exclude personal workspace
+    // Use userOrganizations from AuthMachine - these are the verified organizations
+    // All organizations are "worlds" in our UI terminology
+    const allWorlds = userOrganizations.filter(
+      (org: any) => org && org.id // Show all authenticated user's organizations as worlds
     )
     
-    // Count total projects across all worlds
-    const allProjects = Object.values(projectData).filter(
+    // Count total projects across all worlds (if projectData is available)
+    const allProjects = projectData ? Object.values(projectData).filter(
       (project: any) => project != null
-    )
+    ) : []
     
     return {
       worlds: allWorlds,
       totalProjects: allProjects.length
     }
-  }, [organizationData, projectData, user?.default_organization_id])
+  }, [userOrganizations, projectData])
   
   return (
     <ContentContainer>
@@ -88,10 +90,7 @@ function UniversePage() {
               Manage your worlds, projects, and knowledge across all areas of life and work
             </p>
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create World
-          </Button>
+          {/* Remove duplicate button - already have one below */}
         </div>
         
         {/* Universe Stats */}
@@ -138,10 +137,7 @@ function UniversePage() {
                 Life areas and business domains organized as worlds
               </p>
             </div>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create New World
-            </Button>
+            {/* Main create button moved to quick actions below */}
           </div>
           
           {worlds.length > 0 ? (
@@ -159,21 +155,21 @@ function UniversePage() {
                   <Card key={world.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                     <CardHeader className="pb-3">
                       <div className="flex items-start gap-3">
-                        <div className={`p-3 rounded-lg bg-${contextColor}-500/10`}>
-                          <WorldIcon className={`h-6 w-6 text-${contextColor}-600`} />
+                        <div className={isPersonal ? 'p-3 rounded-lg bg-purple-500/10' : 'p-3 rounded-lg bg-blue-500/10'}>
+                          <WorldIcon className={isPersonal ? 'h-6 w-6 text-purple-600' : 'h-6 w-6 text-blue-600'} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <CardTitle className="text-lg">
                               <Link 
-                                to="/worlds/$worldId" 
-                                params={{ worldId: world.id }}
+                                to="/org/$orgId/dashboard" 
+                                params={{ orgId: world.id }}
                                 className="hover:underline"
                               >
                                 {world.name}
                               </Link>
                             </CardTitle>
-                            <Badge variant="outline" className={`bg-${contextColor}-500/10 text-${contextColor}-600`}>
+                            <Badge variant="outline" className={isPersonal ? 'bg-purple-500/10 text-purple-600' : 'bg-blue-500/10 text-blue-600'}>
                               {isPersonal ? 'Personal' : 'Business'}
                             </Badge>
                           </div>

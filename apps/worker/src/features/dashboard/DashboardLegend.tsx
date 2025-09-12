@@ -4,12 +4,12 @@ import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ContentContainer } from '@/components/layout/content-container'
-import { TopNav } from '@/components/layout/top-nav'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth'
 import { EntityCreationDialog } from './EntityCreationDialog'
 import { EntityCard } from './EntityCard'
 import { QuickEntityCreate } from './QuickEntityCreate'
+import { KnowledgeTab } from '@/components/ui/knowledge-tab-simplified'
 import { PlusCircle, Globe, Building } from 'lucide-react'
 import { 
   universeLoading$,
@@ -26,37 +26,11 @@ import { useParams } from '@tanstack/react-router'
 // Create logger instance for this file
 const fileLog = log('features/dashboard/DashboardLegend.tsx');
 
-const topNav = [
-  {
-    title: 'Overview',
-    href: 'dashboard/overview',
-    isActive: true,
-    disabled: false,
-  },
-  {
-    title: 'Analytics',
-    href: 'dashboard/analytics',
-    isActive: false,
-    disabled: true,
-  },
-  {
-    title: 'Reports',
-    href: 'dashboard/reports',
-    isActive: false,
-    disabled: true,
-  },
-  {
-    title: 'Settings',
-    href: 'dashboard/settings',
-    isActive: false,
-    disabled: true,
-  },
-]
 
 const DashboardLegend = observer(function DashboardLegend() {
   const [activeTab, setActiveTab] = React.useState('overview');
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
-  const { currentOrganization, user } = useAuth();
+  const { currentOrganization, user, userOrganizations } = useAuth();
   const currentOrgId = currentOrganization?.id;
   const userId = user?.id;
 
@@ -67,6 +41,10 @@ const DashboardLegend = observer(function DashboardLegend() {
   // Determine context mode based on route
   const isUniverseMode = !routeOrgId;
   const contextOrgId = routeOrgId || 'universe';
+  
+  // Find the organization name based on the route
+  const routeOrganization = routeOrgId ? userOrganizations.find(org => org.id === routeOrgId) : null;
+  const displayOrganizationName = isUniverseMode ? 'Universe' : (routeOrganization?.name || 'Organization');
   
   fileLog.info('DashboardLegend route analysis:', { 
     routeOrgId, 
@@ -102,7 +80,6 @@ const DashboardLegend = observer(function DashboardLegend() {
         <div className='mb-2 flex items-center justify-between space-y-2'>
           <div>
             <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
-            <TopNav links={topNav} className="mt-2" />
           </div>
         </div>
         <div className="flex items-center justify-center py-12">
@@ -127,7 +104,6 @@ const DashboardLegend = observer(function DashboardLegend() {
       <div className='mb-2 flex items-center justify-between space-y-2' data-testid="dashboard-content">
         <div>
           <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
-          <TopNav links={topNav} className="mt-2" />
         </div>
         <div className='flex items-center space-x-2'>
           <QuickEntityCreate />
@@ -147,15 +123,7 @@ const DashboardLegend = observer(function DashboardLegend() {
         <div className='w-full overflow-x-auto pb-2'>
           <TabsList>
             <TabsTrigger value='overview'>Overview</TabsTrigger>
-            <TabsTrigger value='analytics' disabled>
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value='reports' disabled>
-              Reports
-            </TabsTrigger>
-            <TabsTrigger value='notifications' disabled>
-              Notifications
-            </TabsTrigger>
+            <TabsTrigger value='knowledge'>Knowledge</TabsTrigger>
           </TabsList>
         </div>
         
@@ -165,6 +133,15 @@ const DashboardLegend = observer(function DashboardLegend() {
             schema={schema}
             error={error}
             routeOrgId={routeOrgId}
+          />
+        </TabsContent>
+        
+        <TabsContent value='knowledge' className='space-y-4'>
+          <KnowledgeTab 
+            entityType={isUniverseMode ? 'universe' : 'world'}
+            entityId={routeOrgId || currentOrgId || 'universe'}
+            entityName={displayOrganizationName}
+            organizationId={routeOrgId || currentOrgId || ''}
           />
         </TabsContent>
       </Tabs>

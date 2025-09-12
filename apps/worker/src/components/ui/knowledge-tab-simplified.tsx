@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/mdx-editor';
 import { Separator } from '@/components/ui/separator';
 import { 
   BookOpen, 
@@ -229,33 +230,6 @@ export const KnowledgeTab = observer(function KnowledgeTab({
 
   return (
     <div className="space-y-6">
-      {/* Knowledge Overview */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-purple-600" />
-              <div>
-                <div className="text-2xl font-bold">{loreCount}</div>
-                <div className="text-sm text-muted-foreground">Lore Documents</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Scroll className="h-5 w-5 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold">{canonCount}</div>
-                <div className="text-sm text-muted-foreground">Canon Documents</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Knowledge Management */}
       <Card>
         <CardHeader>
@@ -473,11 +447,11 @@ export const KnowledgeTab = observer(function KnowledgeTab({
               
               <div>
                 <label className="block text-sm font-medium mb-1">Content</label>
-                <Textarea
-                  value={newDocContent}
-                  onChange={(e) => setNewDocContent(e.target.value)}
-                  placeholder="Document content (Markdown supported)"
-                  rows={8}
+                <MarkdownEditor
+                  markdown={newDocContent}
+                  onChange={setNewDocContent}
+                  placeholder="Document content (Markdown with WYSIWYG editing)"
+                  className="min-h-[200px]"
                 />
               </div>
               

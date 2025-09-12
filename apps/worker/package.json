@@ -34,6 +34,7 @@
     "@hono/zod-validator": "^0.1.11",
     "@hookform/resolvers": "^5.0.1",
     "@legendapp/state": "3.0.0-beta.31",
+    "@mdxeditor/editor": "^3.43.0",
     "@neondatabase/serverless": "^1.0.1",
     "@openauthjs/openauth": "^0.4.3",
     "@polar-sh/better-auth": "^1.1.0",

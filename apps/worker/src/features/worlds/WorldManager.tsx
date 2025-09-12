@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Plus, Globe, Building2, User, Users, Heart, Target } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/state-machines';
 import { universeHelpers, currentOrganizations$ } from '@/legend-state/observables/universe-context';
 import { WorldCard } from './WorldCard';
 import { log } from '@/logger';

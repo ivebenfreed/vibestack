@@ -11,7 +11,7 @@ import { KnowledgeTab } from '@/components/ui/knowledge-tab-simplified'
 import { ArrowLeft, Globe, Building2, User, Plus, Folder, BookOpen, Users, TrendingUp, Calendar, Target } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { getEntity$ } from '@/legend-state'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/state-machines'
 import { useMemo } from 'react'
 
 export const Route = createFileRoute('/_authenticated/worlds/$worldId')({
@@ -20,28 +20,26 @@ export const Route = createFileRoute('/_authenticated/worlds/$worldId')({
 
 function WorldDetailPage() {
   const { worldId } = Route.useParams()
-  const { user } = useAuth()
+  const { user, userOrganizations } = useAuth()
   
-  // Get organization data from Legend State (world maps to organization)
-  const organizationStore = getEntity$('organization')
-  const organizationData = use$(organizationStore)
+  // Get project data from Legend State 
   const projectStore = getEntity$('project')
   const projectData = use$(projectStore)
   
-  // Find the specific organization (world) and its projects
+  // Find the specific organization (world) and its projects using userOrganizations from AuthMachine
   const { world, worldProjects } = useMemo(() => {
-    if (!organizationData || !projectData) return { world: null, worldProjects: [] }
+    if (!userOrganizations) return { world: null, worldProjects: [] }
     
-    const foundOrg = organizationData[worldId]
+    const foundOrg = userOrganizations.find(org => org.id === worldId)
     if (!foundOrg) return { world: null, worldProjects: [] }
     
-    // Find projects belonging to this organization
-    const projects = Object.values(projectData).filter(
+    // Find projects belonging to this organization (if projectData is available)
+    const projects = projectData ? Object.values(projectData).filter(
       (project: any) => project && project.organization_id === worldId
-    )
+    ) : []
     
     return { world: foundOrg, worldProjects: projects }
-  }, [organizationData, projectData, worldId])
+  }, [userOrganizations, projectData, worldId])
   
   if (!world) {
     return (
