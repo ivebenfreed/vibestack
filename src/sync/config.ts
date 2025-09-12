@@ -20,7 +20,7 @@ const PROD_API_HOST = 'app.codevibesmatter.com';
 const PROD_WS_PROTOCOL = 'wss';
 
 // Staging URLs - using same-origin architecture
-const STAGING_API_HOST = 'dev.codevibesmatter.com';
+const STAGING_API_HOST = 'dev.getelevra.com';
 const STAGING_WS_PROTOCOL = 'wss';
 
 // Production preview URLs
@@ -52,7 +52,7 @@ export function getApiBaseUrl(): string {
     const hostname = window.location.hostname;
     
     // Staging environment
-    if (hostname === 'dev.codevibesmatter.com') {
+    if (hostname === 'dev.getelevra.com') {
       return `https://${STAGING_API_HOST}`;
     }
     
@@ -111,7 +111,7 @@ export function getSyncWebSocketUrl(): string {
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
     
     // Staging environment
-    if (hostname === 'dev.codevibesmatter.com') {
+    if (hostname === 'dev.getelevra.com') {
       return `${STAGING_WS_PROTOCOL}://${STAGING_API_HOST}/api/sync`;
     }
     
