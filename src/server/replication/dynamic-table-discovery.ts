@@ -7,7 +7,7 @@
 
 import { replicationLogger } from '../middleware/logger';
 import type { Kysely } from 'kysely';
-import type { Database } from '@repo/dataforge/kysely-types';
+// import type { Database } from '@repo/dataforge/kysely-types'; // DEPRECATED - no longer needed
 
 const MODULE_NAME = 'dynamic-table-discovery';
 

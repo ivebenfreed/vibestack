@@ -1,5 +1,5 @@
 import type { RelationshipOptionsProvider, RelationshipContext } from '../types';
-import type { StatusDefinition } from '@repo/dataforge/client-entities';
+// import type { StatusDefinition } from '@repo/dataforge/client-entities'; // DEPRECATED - no longer needed
 import { log } from '@/logger';
 const fileLog = log('components/custom/vibegrid/providers/status-definition-provider.ts');
 

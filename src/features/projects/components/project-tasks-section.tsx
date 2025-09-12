@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTableSkeleton } from '@/components/ui/table'
-import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
+// import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities' // DEPRECATED - now using @/db/client-entities
+import { Task, TaskStatus, TaskPriority } from '@/db/client-entities'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'

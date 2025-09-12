@@ -21,7 +21,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { SelectDropdown } from '@/components/select-dropdown';
-import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
+// import { Project, ProjectStatus } from '@repo/dataforge/client-entities'; // DEPRECATED - now using @/db/client-entities
+import { Project, ProjectStatus } from '@/db/client-entities';
 import { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/projects-context';
 import { zodResolver } from "@hookform/resolvers/zod";

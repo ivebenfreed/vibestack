@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 // Removed Tooltip imports for performance - using native title attributes
 import { CheckSquare, Edit2, Trash2, ExternalLink } from 'lucide-react';
-import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
+// import { Project, ProjectStatus } from '@repo/dataforge/client-entities'; // DEPRECATED - now using @/db/client-entities
+import { Project, ProjectStatus } from '@/db/client-entities';
 import { useProjects } from '../context/projects-context';
 import { Link } from '@tanstack/react-router';
 import { useSelector } from '@xstate/store/react';

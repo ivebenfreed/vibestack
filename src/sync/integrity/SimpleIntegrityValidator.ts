@@ -9,7 +9,7 @@
  * No complex decision trees, just simple pass/fail/reset logic.
  */
 
-import { db, CLIENT_DOMAIN_TABLES } from '@repo/dataforge/dexie-schema';
+// import { db, CLIENT_DOMAIN_TABLES } from '@repo/dataforge/dexie-schema'; // DEPRECATED - no longer needed
 import { isDatabaseEmpty, clearDomainDataOnly } from '../../db/dexie-storage';
 import { syncLogger } from '../utils/SyncLogger';
 import type { Table } from 'dexie';

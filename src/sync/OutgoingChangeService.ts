@@ -15,7 +15,7 @@ import {
   ServerAppliedMessage,
   ServerReceivedMessage 
 } from '@/types/sync';
-import { LocalChanges } from '@repo/dataforge/client-entities';
+import { LocalChanges } from '@/db/client-entities';
 import { Repository, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { log } from '@/logger';

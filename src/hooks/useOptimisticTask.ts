@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Task } from '@repo/dataforge/client-entities';
+import type { Task } from '@/db/client-entities';
 import { getEntity$, entityOperations } from '@/legend-state';
 
 interface OptimisticTaskState {

@@ -1,7 +1,8 @@
 import { IconDownload, IconPlus } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 import { domainServices } from '@/domain'
-import { TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
+// import { TaskStatus, TaskPriority } from '@repo/dataforge/client-entities' // DEPRECATED - now using @/db/client-entities
+import { TaskStatus, TaskPriority } from '@/db/client-entities'
 
 export function TasksPrimaryButtons() {
   const handleCreate = async () => {

@@ -22,7 +22,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { SelectDropdown } from '@/components/select-dropdown'
-import { Task, TaskStatus, TaskPriority, Project } from '@repo/dataforge/client-entities'
+// import { Task, TaskStatus, TaskPriority, Project } from '@repo/dataforge/client-entities' // DEPRECATED - now using @/db/client-entities
+import { Task, TaskStatus, TaskPriority, Project } from '@/db/client-entities'
 import { useState, useEffect } from 'react'
 import { useTasks } from '../context/tasks-context'
 import { zodResolver } from "@hookform/resolvers/zod"

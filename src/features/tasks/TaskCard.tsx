@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { CalendarDays, Clock, User2 } from 'lucide-react'
 import { format } from 'date-fns'
-import type { Task } from '@repo/dataforge/client-entities'
+// import type { Task } from '@repo/dataforge/client-entities' // DEPRECATED - now using @/db/client-entities
+import type { Task } from '@/db/client-entities'
 
 interface TaskCardProps {
   task: Task

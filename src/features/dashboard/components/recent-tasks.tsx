@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Task } from '@repo/dataforge/client-entities'; // Corrected path
+// import { Task } from '@repo/dataforge/client-entities'; // DEPRECATED - now using @/db/client-entities
+import { Task } from '@/db/client-entities';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';

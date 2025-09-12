@@ -1,5 +1,6 @@
 import React from 'react';
-import { Project } from '@repo/dataforge/client-entities';
+// import { Project } from '@repo/dataforge/client-entities'; // DEPRECATED - now using @/db/client-entities
+import { Project } from '@/db/client-entities';
 import { ProjectCard } from './project-card';
 import { FolderPlus } from 'lucide-react';
 import { useProjects } from '../context/projects-context';

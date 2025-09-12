@@ -4,7 +4,7 @@
  * @example
  * ```tsx
  * import { VibeKan, createVibeKanConfig } from '@/components/custom/vibekan'
- * import { Task, TaskStatus } from '@repo/dataforge/client-entities'
+ * import { Task, TaskStatus } from '@/db/client-entities' // Updated import path
  * 
  * const taskKanbanConfig = createVibeKanConfig<Task, TaskStatus>({
  *   columns: [

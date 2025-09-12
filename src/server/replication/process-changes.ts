@@ -14,7 +14,7 @@ import { StateManager } from './state-manager';
 import { DynamicTableDiscovery } from './dynamic-table-discovery';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
-import type { Database } from '@repo/dataforge/kysely-types';
+// import type { Database } from '@repo/dataforge/kysely-types'; // DEPRECATED - no longer needed
 import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 // ====== Types and Interfaces ======
