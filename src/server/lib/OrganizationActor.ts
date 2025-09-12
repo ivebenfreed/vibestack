@@ -10,6 +10,7 @@
 
 import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
+import { DurableObject } from 'cloudflare:workers';
 
 const MODULE_NAME = 'OrganizationActor';
 
@@ -56,7 +57,7 @@ interface RoleCacheEntry {
   updatedAt: number;
 }
 
-export class OrganizationActor implements DurableObject {
+export class OrganizationActor extends DurableObject {
   private state: DurableObjectState;
   private organizationId: string = '';
   private connections = new Map<string, ClientConnection>();
@@ -69,6 +70,7 @@ export class OrganizationActor implements DurableObject {
   private pendingReplicationCall: ReturnType<typeof setTimeout> | null = null;
   
   constructor(state: DurableObjectState, env: Env) {
+    super(state, env);
     this.state = state;
     this.env = env;
     

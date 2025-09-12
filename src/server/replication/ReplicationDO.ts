@@ -1,4 +1,5 @@
 import type { Env, ExecutionContext } from '../types/env';
+import { DurableObject } from 'cloudflare:workers';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import type { 
@@ -19,7 +20,7 @@ import { getAllClientIds } from './process-changes';
 
 const MODULE_NAME = 'DO';
 
-export class ReplicationDO implements DurableObject {
+export class ReplicationDO extends DurableObject {
   private durableObjectState: DurableObjectState;
   private env: Env;
   private pollingManager: PollingManager;
@@ -28,6 +29,7 @@ export class ReplicationDO implements DurableObject {
   private config: ReplicationConfig = DEFAULT_REPLICATION_CONFIG;
 
   constructor(state: DurableObjectState, env: Env) {
+    super(state, env);
     this.durableObjectState = state;
     this.env = env;
     

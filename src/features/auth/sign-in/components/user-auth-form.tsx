@@ -70,13 +70,21 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     }
   }, [authError, isLoading]);
 
-  // Handle when signing in state changes
+  // Handle when signing in state changes - with timing tolerance
   useEffect(() => {
     if (!isSigningIn && isLoading && !isAuthenticated && !authError) {
-      // Sign-in completed but no success or error - possible unexpected state
-      fileLog.warn("[AUTH] Sign-in completed but no clear result");
-      toast.error("Sign-in failed. Please try again.");
-      setIsLoading(false);
+      // Add a small delay to allow auth state machine to transition properly
+      // The auth machine might complete signing in before transitioning to authenticated
+      const timeout = setTimeout(() => {
+        // Re-check the state after a brief delay
+        if (!isAuthenticated && !authError) {
+          fileLog.warn("[AUTH] Sign-in completed but no clear result after delay");
+          toast.error("Sign-in failed. Please try again.");
+          setIsLoading(false);
+        }
+      }, 100); // 100ms delay to allow for state transition
+      
+      return () => clearTimeout(timeout);
     }
   }, [isSigningIn, isLoading, isAuthenticated, authError]);
 

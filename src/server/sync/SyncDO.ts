@@ -14,6 +14,7 @@ import { SyncStateManager } from './state-manager';
 // import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
 import crypto from 'crypto';
+import { DurableObject } from 'cloudflare:workers';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';
 import { UnifiedClientRegistry } from './unified-client-registry';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
@@ -47,7 +48,7 @@ function getQueryParam(request: Request, name: string): string | null {
 /**
  * SyncDO - Refactored to coordinate service modules
  */
-export class SyncDO implements DurableObject, WebSocketHandler {
+export class SyncDO extends DurableObject {
   private state: DurableObjectState;
   private env: Env;
   private ctx: DurableObjectState;
@@ -80,6 +81,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   private pendingLiveUpdates: Array<() => Promise<void>> = [];
 
   constructor(state: DurableObjectState, env: Env) {
+    super(state, env);
     this.state = state;
     this.env = env;
     this.ctx = state;
