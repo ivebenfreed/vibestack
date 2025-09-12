@@ -23,10 +23,10 @@ import type {
   ClientReceivedMessage,
   ClientAppliedMessage,
   ClientInitReceivedMessage,
-  ClientInitProcessedMessage,
-  ClientIntegrityValidationMessage,
-  ClientIntegrityResetAckMessage,
-  Message
+  ClientInitProcessedMessage
+  // ClientIntegrityValidationMessage, // DEPRECATED - removed with integrity system
+  // ClientIntegrityResetAckMessage,   // DEPRECATED - removed with integrity system  
+  // Message                           // DEPRECATED - unused generic type
 } from './messages';
 
 // Export enhanced types from table-changes
@@ -89,10 +89,10 @@ export type {
   ClientReceivedMessage,
   ClientAppliedMessage,
   ClientInitReceivedMessage,
-  ClientInitProcessedMessage,
-  ClientIntegrityValidationMessage,
-  ClientIntegrityResetAckMessage,
-  Message
+  ClientInitProcessedMessage
+  // ClientIntegrityValidationMessage, // DEPRECATED - removed with integrity system
+  // ClientIntegrityResetAckMessage,   // DEPRECATED - removed with integrity system  
+  // Message                           // DEPRECATED - unused generic type
 } from './messages';
 
 /**

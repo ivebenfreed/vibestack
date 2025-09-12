@@ -5,7 +5,7 @@ const fileLog = log('utils/handle-server-error.ts');
 
 export function handleServerError(error: unknown) {
    
-  fileLog.info(error)
+  fileLog.info('Server error occurred:', error instanceof Error ? error.message : String(error))
 
   let errMsg = 'Something went wrong!'
 
