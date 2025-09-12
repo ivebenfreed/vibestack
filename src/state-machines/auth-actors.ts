@@ -214,6 +214,14 @@ export const signInActor = fromPromise(async ({ input }: {
 }) => {
   try {
     myLog.info('[signInActor] Starting sign-in process for:', input.email);
+    myLog.info('[signInActor] Auth client available:', !!authClient);
+    myLog.info('[signInActor] Auth client methods:', Object.keys(authClient));
+    myLog.info('[signInActor] SignIn methods:', authClient.signIn ? Object.keys(authClient.signIn) : 'signIn not available');
+    
+    // Additional safety check
+    if (!authClient.signIn?.email) {
+      throw new Error('Auth client signIn.email method is not available');
+    }
     
     const result = await authClient.signIn.email({
       email: input.email,
@@ -223,7 +231,8 @@ export const signInActor = fromPromise(async ({ input }: {
     myLog.info('[signInActor] Auth client result:', {
       hasError: !!result.error,
       hasData: !!result.data,
-      errorMessage: result.error?.message
+      errorMessage: result.error?.message,
+      resultKeys: Object.keys(result || {})
     });
     
     if (result.error) {
@@ -292,9 +301,21 @@ export const signInActor = fromPromise(async ({ input }: {
     };
   } catch (error) {
     myLog.error('[signInActor] Unexpected error during sign-in:', error);
+    myLog.error('[signInActor] Error details:', {
+      errorType: typeof error,
+      errorConstructor: error?.constructor?.name,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+      authClientAvailable: !!authClient,
+      authClientSignInAvailable: !!authClient?.signIn,
+      authClientEmailAvailable: !!authClient?.signIn?.email,
+      windowLocation: typeof window !== 'undefined' ? window.location.href : 'No window',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'No navigator'
+    });
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Sign-in failed',
+      error: error instanceof Error ? error.message : 'Sign-in failed - check console for details',
     };
   }
 });
