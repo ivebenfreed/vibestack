@@ -126,15 +126,30 @@ export function useAuth() {
     if (authActor) {
       // Check if actor is still active before sending events
       const snapshot = authActor.getSnapshot();
+      myLog.info('[useAuth] 🎯 Auth actor state before SIGN_IN:', {
+        status: snapshot.status,
+        value: snapshot.value,
+        hasContext: !!snapshot.context,
+        actorId: authActor.id,
+        sessionId: authActor.sessionId
+      });
+      
       if (snapshot.status === 'stopped') {
-        myLog.info('[useAuth] Auth actor is stopped, skipping SIGN_IN event');
+        myLog.error('[useAuth] ❌ Auth actor is stopped, skipping SIGN_IN event');
         return;
       }
       
-      myLog.info('[useAuth] Sending SIGN_IN directly to AuthMachine');
+      myLog.info('[useAuth] 🚀 Sending SIGN_IN event to AuthMachine for:', credentials.email);
       authActor.send({ type: 'SIGN_IN', credentials });
+      
+      // Log state immediately after sending event
+      const afterSnapshot = authActor.getSnapshot();
+      myLog.info('[useAuth] 📊 Auth actor state after SIGN_IN event sent:', {
+        status: afterSnapshot.status,
+        value: afterSnapshot.value
+      });
     } else {
-      myLog.error('[useAuth] AuthMachine actor not available');
+      myLog.error('[useAuth] ❌ AuthMachine actor not available - window.authMachineActor is null/undefined');
     }
   }, [authActor]);
 
