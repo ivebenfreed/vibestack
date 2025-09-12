@@ -124,7 +124,7 @@ function CompleteRegistrationPage() {
         return (
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Welcome to VibeStack!</h2>
+            <h2 className="text-xl font-semibold mb-2">Welcome to Elevra!</h2>
             <p className="text-muted-foreground mb-4">
               Your account has been set up successfully. You can now sign in with your new password.
             </p>
@@ -160,7 +160,7 @@ function CompleteRegistrationPage() {
               <UserPlus className="h-12 w-12 text-blue-600 mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-2">Complete Your Account Setup</h2>
               <p className="text-muted-foreground">
-                You're almost ready to start using VibeStack. Please choose a secure password for your account.
+                You're almost ready to start using Elevra. Please choose a secure password for your account.
               </p>
             </div>
 
@@ -225,7 +225,7 @@ function CompleteRegistrationPage() {
         <CardHeader>
           <CardTitle className="text-center">Account Setup</CardTitle>
           <CardDescription className="text-center">
-            Complete your VibeStack account setup
+            Complete your Elevra account setup
           </CardDescription>
         </CardHeader>
         <CardContent>

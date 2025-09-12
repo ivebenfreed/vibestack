@@ -63,7 +63,7 @@ function OnboardingPage() {
   const steps = [
     {
       id: 'welcome',
-      title: 'Welcome to VibeStack!',
+      title: 'Welcome to Elevra!',
       description: 'Let\'s get you set up in just a few steps',
       icon: Sparkles,
     },
@@ -82,7 +82,7 @@ function OnboardingPage() {
     {
       id: 'goals',
       title: 'What are your goals?',
-      description: 'Select what you want to achieve with VibeStack',
+      description: 'Select what you want to achieve with Elevra',
       icon: Target,
     },
     {
@@ -130,7 +130,7 @@ function OnboardingPage() {
       // Mark onboarding as complete
       sessionStorage.setItem('onboardingComplete', 'true');
       
-      toast.success('Welcome to VibeStack! Your workspace is ready.');
+      toast.success('Welcome to Elevra! Your workspace is ready.');
       
       // Navigate to dashboard
       navigate({ to: '/dashboard' });

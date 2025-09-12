@@ -81,7 +81,7 @@ export function TrialBanner({
   
   const getMessage = () => {
     if (daysLeft <= 0) {
-      return `Your trial for ${organizationName || 'this organization'} has expired. Upgrade now to continue using VibeStack.`
+      return `Your trial for ${organizationName || 'this organization'} has expired. Upgrade now to continue using Elevra.`
     }
     
     if (daysLeft <= 3) {

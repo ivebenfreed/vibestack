@@ -141,7 +141,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
         console.log("[AUTH] Sign-up successful, user needs email verification");
         
         const successMessage = invitationData 
-          ? `Welcome to VibeStack! Your ${invitationData.role} account has been created. Please check your email for a verification code.`
+          ? `Welcome to Elevra! Your ${invitationData.role} account has been created. Please check your email for a verification code.`
           : "Account created! Please check your email for a verification code.";
         
         toast.success(successMessage);

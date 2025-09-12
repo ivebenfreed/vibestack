@@ -76,7 +76,7 @@ export default function SignUp() {
       <Card className='gap-4'>
         <CardHeader>
           <CardTitle className='text-lg tracking-tight'>
-            Sign Up for VibeStack
+            Sign Up for Elevra
           </CardTitle>
           <CardDescription>
             Choose how you'd like to create your account.

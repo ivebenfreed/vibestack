@@ -64,7 +64,7 @@ export function PostAuthOrganizationSetup() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building className="h-5 w-5" />
-              Welcome to VibeStack!
+              Welcome to Elevra!
             </CardTitle>
             <p className="text-muted-foreground">
               Hi {user?.name || user?.email}! Let's set up your organization to get started.
