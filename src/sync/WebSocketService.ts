@@ -8,7 +8,7 @@
  */
 
 import { syncLogger } from './utils/SyncLogger';
-import { log } from '@/logger';
+import { log } from '../logger';
 const fileLog = log('sync/WebSocketService.ts');
 
 export interface WebSocketServiceConfig {

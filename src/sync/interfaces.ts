@@ -1,4 +1,13 @@
-import { ClientMessage } from './SyncManager'; // Or a more specific local type
+// import { ClientMessage } from './SyncManager'; // DEPRECATED - SyncManager no longer exists
+
+// Define ClientMessage interface locally since it's no longer imported
+export interface ClientMessage {
+  type: string;
+  clientId: string;
+  messageId: string;
+  timestamp: number;
+  [key: string]: any;
+}
 
 // Basic type aliases
 export type ClientId = string;
