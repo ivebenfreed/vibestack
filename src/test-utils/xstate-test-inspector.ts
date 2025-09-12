@@ -93,7 +93,7 @@ class XStateTestInspector {
           if (prevSnapshot && snapshot.value !== prevSnapshot.value) {
             const transition: StateTransition = {
               timestamp,
-              machineId: actorRef.id || 'unknown',
+              machineId: (actorRef as any).id || 'unknown', // TODO: Fix XState v5 ActorRefLike type
               from: this.stateToString(prevSnapshot.value),
               to: this.stateToString(snapshot.value),
               event: (inspectionEvent as any).event,
@@ -102,10 +102,10 @@ class XStateTestInspector {
             this.transitions.push(transition);
             
             // Log state transitions
-            fileLog.info(`[XState Transition] ${actorRef.id}: ${transition.from} → ${transition.to}`);
+            fileLog.info(`[XState Transition] ${(actorRef as any).id || 'unknown'}: ${transition.from} → ${transition.to}`); // TODO: Fix XState v5 ActorRefLike type
             
             // Add automatic markers for key transitions
-            this.addAutomaticMarkers(actorRef.id || '', transition);
+            this.addAutomaticMarkers((actorRef as any).id || '', transition); // TODO: Fix XState v5 ActorRefLike type
           }
         }
         break;
@@ -315,7 +315,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Helper function to attach inspector to an actor
-export function attachInspector(actor: Actor<any>) {
+export function attachInspector(_actor: Actor<any>) {
   // XState v5 uses inspect option during creation
   // Actor must be created with inspect option
   fileLog.warn('Use: createActor(machine, { inspect: xstateTestInspector.inspect })');

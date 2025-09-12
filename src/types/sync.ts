@@ -25,14 +25,5 @@ export interface TableChange {
   data: Record<string, any>;
 }
 
-// Re-export schema types from shared package
-export type {
-  SchemaUpdateEvent,
-  SchemaUpdateHandler,
-  ServerSchemaUpdatedMessage,
-  ServerSchemaMigrationMessage,
-  ServerSchemaErrorMessage,
-  ClientSchemaReceivedMessage,
-  ClientSchemaAppliedMessage,
-  LiveStoreSchemaUpdate
-} from '@/types/sync';
+// Note: Schema types are exported from @/types/sync/schema-messages
+// Removed circular re-export that was causing build failures

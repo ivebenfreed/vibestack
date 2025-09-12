@@ -17,6 +17,7 @@ import type {
   ServerHeartbeatMessage,
   ServerIntegrityResetMessage,
   ServerIntegrityValidationResponseMessage,
+  ServerTableChangeNotificationMessage,
   ClientMessage,
   ClientChangesMessage,
   ClientHeartbeatMessage,
