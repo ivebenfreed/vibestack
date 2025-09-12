@@ -594,6 +594,18 @@ export const authMachine = setup({
               params: { authenticated: true, reason: 'session-restored' }
             },
           ]
+        },
+        
+        // Allow SIGN_IN events even during auth check - user shouldn't have to wait
+        SIGN_IN: {
+          target: 'signingIn',
+          actions: [
+            ({ event }) => fileLog.info('[AuthMachine] 🎯 SIGN_IN event received during auth check for:', event.credentials?.email),
+            assign({
+              authError: null,
+              errorRetryCount: 0
+            })
+          ]
         }
       }
     },
