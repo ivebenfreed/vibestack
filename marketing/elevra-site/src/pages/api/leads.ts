@@ -1,5 +1,4 @@
 import type { APIRoute } from 'astro';
-import { Resend } from 'resend';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -14,53 +13,72 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    // Initialize Resend (or your preferred email service)
-    const resend = new Resend(import.meta.env.RESEND_API_KEY);
+    // Get MailerLite API key from environment
+    const MAILERLITE_API_KEY = import.meta.env.MAILERLITE_API_KEY;
+    
+    if (!MAILERLITE_API_KEY) {
+      console.error('MailerLite API key not configured');
+      return new Response(
+        JSON.stringify({ error: 'Email service not configured' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Send notification email to your team
-    await resend.emails.send({
-      from: 'leads@elevra.com',
-      to: 'team@elevra.com', // Your team email
-      subject: `New Elevra Lead: ${company}`,
-      html: `
-        <h2>New Lead Captured</h2>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Company:</strong> ${company}</p>
-        <p><strong>Pain Point:</strong> ${pain || 'Not specified'}</p>
-        <p><strong>Timestamp:</strong> ${timestamp}</p>
-      `
+    // Add subscriber to MailerLite
+    const mailerLiteResponse = await fetch('https://connect.mailerlite.com/api/subscribers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${MAILERLITE_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        email: email,
+        fields: {
+          name: company, // Use company name as the name field
+          last_name: '', // Leave empty or add if you collect first/last name separately
+          company: company,
+          pain_point: pain || '',
+          signup_date: new Date().toISOString()
+        },
+        // Add to specific group if you have one set up for early access
+        // groups: ['your_early_access_group_id']
+      })
     });
 
-    // Send welcome email to the lead
-    await resend.emails.send({
-      from: 'welcome@elevra.com',
-      to: email,
-      subject: 'Welcome to Elevra Early Access!',
-      html: `
-        <h2>Thanks for joining the Elevra speed revolution!</h2>
-        <p>Hi there,</p>
-        <p>We're excited to have ${company} on board for early access to Elevra.</p>
-        <p>Here's what happens next:</p>
-        <ul>
-          <li>🚀 We'll notify you when early access opens (Q1 2024)</li>
-          <li>💰 You'll get 3 months free + lifetime early adopter pricing</li>
-          <li>⚡ First access to database relationships that actually work</li>
-        </ul>
-        <p>In the meantime, follow our progress:</p>
-        <p><a href="https://twitter.com/elevra">Twitter</a> | <a href="https://elevra.com/blog">Blog</a></p>
-        <p>Thanks,<br>The Elevra Team</p>
-      `
-    });
+    if (!mailerLiteResponse.ok) {
+      const errorData = await mailerLiteResponse.json().catch(() => ({}));
+      console.error('MailerLite API error:', errorData);
+      
+      // Don't expose MailerLite errors to the user, but log them
+      if (mailerLiteResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Service temporarily unavailable. Please try again.' }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: 'Failed to subscribe. Please try again.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const subscriberData = await mailerLiteResponse.json();
+    console.log('Successfully added subscriber:', subscriberData.data?.email);
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Lead captured successfully' }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Successfully subscribed! Check your email for a welcome message.' 
+      }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Lead capture error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to process lead' }),
+      JSON.stringify({ error: 'Failed to process subscription. Please try again.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

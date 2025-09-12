@@ -336,6 +336,8 @@ const hero = heroEntry.data;
         height: 200%;
         background: linear-gradient(45deg, transparent, rgba(91, 79, 255, 0.05), transparent);
         animation: float 15s linear infinite;
+        pointer-events: none; /* Allow clicks to pass through */
+        z-index: -1; /* Put behind the content */
     }
 
     .lead-capture h2 {
@@ -356,6 +358,11 @@ const hero = heroEntry.data;
         font-size: 16px;
         position: relative;
         z-index: 1;
+    }
+
+    :global(.lead-form) {
+        position: relative;
+        z-index: 10; /* Ensure form is above pseudo-elements */
     }
 
     :global(.lead-form .submit-button) {

@@ -11,9 +11,29 @@ const myLog = log('state-machines/hooks.tsx');
 export function useAuth() {
   const navigate = useNavigate();
   
-  // Get AuthMachine directly from window (it's started independently)
-  // Don't memoize - always get the current actor reference
-  const authActor = (window as any).authMachineActor;
+  // 🔥 FIX: Handle timing race condition between actor creation and component mounting
+  // In production, the auth machine may not be initialized when this hook first runs
+  const [authActor, setAuthActor] = React.useState(() => (window as any).authMachineActor);
+  
+  // Poll for auth actor availability if not immediately available
+  React.useEffect(() => {
+    if (!authActor) {
+      myLog.info('🕐 Auth actor not available, polling for initialization...');
+      
+      const pollForActor = () => {
+        const actor = (window as any).authMachineActor;
+        if (actor) {
+          myLog.info('✅ Auth actor found, updating hook state');
+          setAuthActor(actor);
+        } else {
+          // Continue polling with exponential backoff
+          setTimeout(pollForActor, 10);
+        }
+      };
+      
+      pollForActor();
+    }
+  }, [authActor]);
 
   // Safety check: only proceed if authActor exists
   if (!authActor) {

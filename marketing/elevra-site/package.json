@@ -13,11 +13,13 @@
     "@astrojs/cloudflare": "^12.6.0",
     "@astrojs/react": "^4.3.0",
     "@astrojs/sitemap": "^3.4.2",
+    "@hookform/resolvers": "^5.2.1",
     "astro": "^5.12.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "resend": "^4.7.0",
-    "typescript": "^5.9.2"
+    "react-hook-form": "^7.62.0",
+    "typescript": "^5.9.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/react": "^19.1.8",
