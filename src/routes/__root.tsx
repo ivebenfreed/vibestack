@@ -12,10 +12,8 @@ import { Task, Project, User } from '@/db/client-entities'
 import { authClient } from '@/lib/auth'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { IntegrityMonitor } from '@/components/IntegrityMonitor'
-// Import XState machines (auth machine removed - using Legend State)
-import { createActor } from 'xstate'
-import { simpleNotificationSyncMachine } from '@/state-machines/machines/simple-notification-sync-machine'
-import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
+// Sync system replaced with Legend State reactive observables
+// XState machines removed in favor of reactive pattern
 import { useSystem } from '@/state-machines'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { log } from '@/logger'
@@ -36,18 +34,8 @@ interface RouterContext {
 // Create logger instance for this file
 const rootLog = log('routes/__root.tsx');
 
-// 🔥 HMR FIX: Check for preserved actors from previous module (sync only - auth handled by Legend State)
-if (import.meta.hot && import.meta.hot.data.simpleNotificationSyncMachineActor) {
-  rootLog.info('🔥 HMR: Found preserved sync actor from previous module')
-  
-  // Restore preserved sync actor
-  ;(window as any).simpleNotificationSyncMachineActor = import.meta.hot.data.simpleNotificationSyncMachineActor
-  
-  // Clear from hot data
-  import.meta.hot.data.simpleNotificationSyncMachineActor = null
-  
-  rootLog.info('🔥 HMR: Sync actor restored successfully')
-}
+// 🔥 HMR: Legend State sync manager handles HMR persistence automatically
+// No manual actor preservation needed
 
 // 🔥 AUTH PERSISTENCE: Auth now handled by Legend State automatically
 // Legend State handles authentication initialization and session management
@@ -60,37 +48,9 @@ localStorage.removeItem('vibestack-last-organization-id');
 // Initialize Legend State auth system
 rootLog.info('Legend State auth system handles authentication and initialization automatically');
 
-// Create Simple Notification Sync Machine actor (only if not already exists from HMR)
-let simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
-
-if (!simpleNotificationSyncMachineActor) {
-  // Creating simple notification sync machine
-  
-  // Add inspection in test/dev mode
-  const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
-    ? { inspect: xstateTestInspector.inspect }
-    : {};
-  
-  simpleNotificationSyncMachineActor = createActor(simpleNotificationSyncMachine, {
-    ...inspectOptions,
-    id: 'simple-notification-sync-machine'
-  })
-  
-  // Simple sync machine handles notifications only
-  // Starting notification sync
-  simpleNotificationSyncMachineActor.start()
-  
-  // Store globally
-  ;(window as any).simpleNotificationSyncMachineActor = simpleNotificationSyncMachineActor
-  
-  // Set up subscriptions for new actor
-  simpleNotificationSyncMachineActor.subscribe((snapshot) => {
-    // Sync machine is now independent - no app init coordination needed
-    rootLog.info('SyncMachine State changed:', snapshot.value)
-  })
-} else {
-  rootLog.info('SyncMachine 🔥 HMR: Using existing sync machine actor')
-}
+// Initialize Legend State sync manager
+rootLog.info('Initializing Legend State sync manager')
+// Sync manager will be connected automatically when authentication is ready
 
 // Legend State initialization is now handled automatically by auth.ts reactive effects
 // No need for separate XState machine - Legend State auth handles initialization
@@ -101,41 +61,35 @@ rootLog.info('[ROOT] Legend State initialization handled automatically by auth.t
 
 // Actors are already globally accessible (assigned during creation)
 
-// 🔥 HMR FIX: Preserve sync actor across HMR updates
+// 🔥 HMR: Legend State sync manager handles HMR automatically
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    rootLog.info('XSTATE 🔥 HMR Dispose: Preserving sync actor for next module...')
-    
-    // Store sync actor reference in hot data to preserve across HMR
-    import.meta.hot.data.simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
-    
-    // Don't stop actors - let them continue running
-    rootLog.info('XSTATE 🔥 HMR: Sync actor preserved for hot reload')
+    rootLog.info('🔥 HMR Dispose: Legend State sync manager persists automatically')
   })
   
-  // On accept, restore the preserved actors
   import.meta.hot.accept(() => {
-    rootLog.info('XSTATE 🔥 HMR Accept: Module reloaded')
+    rootLog.info('🔥 HMR Accept: Module reloaded with Legend State persistence')
   })
 }
 
-// Reset sync machine on sign-out and clear Legend State context
+// Reset sync manager on sign-out and clear Legend State context
 window.addEventListener('auth:signout', () => {
-  rootLog.info('XSTATE Resetting sync machine and Legend State on sign-out')
+  rootLog.info('Resetting Legend State sync manager on sign-out')
   
-  // Reset simple notification sync machine to idle state for fresh initialization on next sign-in
-  const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
-  if (simpleNotificationSyncMachineActor) {
-    rootLog.info('XSTATE Resetting simple notification sync machine on sign-out')
-    simpleNotificationSyncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
-  }
+  // Reset sync manager using Legend State actions
+  import('../legend-state/sync-manager').then(({ syncActions }) => {
+    syncActions.reset()
+    rootLog.info('Legend State sync manager reset on sign-out')
+  }).catch((error) => {
+    console.warn('Failed to reset sync manager:', error)
+  })
   
   // Clear Legend State context on sign-out
   import('../legend-state').then(({ clearContext }) => {
     clearContext()
-    rootLog.info('XSTATE Legend State context cleared on sign-out')
+    rootLog.info('Legend State context cleared on sign-out')
   }).catch((error) => {
-    console.warn('[XSTATE] Failed to clear Legend State context:', error)
+    console.warn('Failed to clear Legend State context:', error)
   })
 })
 

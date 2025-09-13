@@ -149,15 +149,18 @@ export async function initializeLegendState(
     const { universeSchema$ } = await import('@/legend-state');
     const { when } = await import('@legendapp/state');
     
-    // Wait for entities to actually be loaded in the schema (reactive approach)
+    // Wait for schema object to exist (not necessarily with entities - some orgs have 0 entities)
     await when(() => {
       const schema = universeSchema$.peek();
-      const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
-      initLog.info('[LegendStateInit] Checking schema readiness:', { entityCount });
-      return entityCount > 0; // Wait until we have entities
+      initLog.info('[LegendStateInit] Checking schema readiness:', { 
+        hasSchema: !!schema,
+        hasEntities: !!(schema?.entities),
+        entityCount: schema?.entities ? Object.keys(schema.entities).length : 0
+      });
+      return !!schema; // Wait until we have schema object (entities may be empty)
     });
     
-    // Now get the final entity count
+    // Get the final entity count (may be 0 for some organizations)
     const schema = universeSchema$.peek();
     const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
     
@@ -166,10 +169,10 @@ export async function initializeLegendState(
     initializationActions.setProgress(70, entityCount, entityCount);
     initializationActions.setLoading(true, 'Connecting sync');
     
-    // 🔄 SYNC: Connect sync machine when Legend State is ready
+    // 🔄 SYNC: Connect sync manager when Legend State is ready
     const primaryOrgId = organizationIds[0];
     if (primaryOrgId) {
-      await connectSyncMachine(primaryOrgId, userId);
+      await connectSyncManager(primaryOrgId, userId);
     }
     
     initializationActions.setProgress(90, entityCount, entityCount);
@@ -188,49 +191,25 @@ export async function initializeLegendState(
 }
 
 /**
- * Helper function to connect sync machine from Legend State initialization
+ * Helper function to connect sync manager from Legend State initialization
  */
-async function connectSyncMachine(organizationId: string, userId: string): Promise<void> {
-  initLog.info('🔄 [Sync] Connecting sync machine from Legend State initialization:', { 
+async function connectSyncManager(organizationId: string, userId: string): Promise<void> {
+  initLog.info('🔄 [Sync] Connecting sync manager from Legend State initialization:', { 
     organizationId, 
     userId 
   });
   
-  // Get sync machine actor from global window (should be created by root component)
-  const syncActor = (window as any).simpleNotificationSyncMachineActor;
-  
-  if (!syncActor) {
-    initLog.warn('⚠️ [Sync] Sync machine actor not found on window - may not be initialized yet');
-    
-    // Wait a bit and retry - sync machine might still be initializing
-    await new Promise(resolve => setTimeout(resolve, 100));
-    const retryActor = (window as any).simpleNotificationSyncMachineActor;
-    
-    if (!retryActor) {
-      initLog.error('❌ [Sync] Sync machine actor still not available after retry');
-      return;
-    }
-    
-    initLog.info('✅ [Sync] Found sync machine actor on retry');
-  }
-  
   try {
-    const finalActor = syncActor || (window as any).simpleNotificationSyncMachineActor;
+    // Import the sync manager dynamically to avoid circular dependencies
+    const { syncActions } = await import('./sync-manager');
     
-    // Send CONNECT event to sync machine
-    finalActor.send({ 
-      type: 'CONNECT', 
-      organizationId,
-      userId
-    });
+    // Connect using the reactive sync manager
+    await syncActions.connect(organizationId, userId);
     
-    initLog.info('✅ [Sync] Sync machine connection event sent successfully');
-    
-    // Give sync a moment to connect
-    await new Promise(resolve => setTimeout(resolve, 200));
+    initLog.info('✅ [Sync] Sync manager connected successfully');
     
   } catch (error) {
-    initLog.error('❌ [Sync] Failed to connect sync machine:', error);
+    initLog.error('❌ [Sync] Failed to connect sync manager:', error);
     // Don't throw - sync connection failure shouldn't break Legend State init
   }
 }

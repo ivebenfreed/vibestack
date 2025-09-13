@@ -141,11 +141,14 @@ export function useAppInit() {
       myLog.info('[useAppInit] Legend State handles retries automatically');
     },
     restartSync: () => {
-      myLog.info('[useAppInit] Use sync machine directly for restart');
-      const syncActor = (window as any).simpleNotificationSyncMachineActor;
-      if (syncActor) {
-        syncActor.send({ type: 'RECONNECT' });
-      }
+      myLog.info('[useAppInit] Using Legend State sync manager for restart');
+      import('../legend-state/sync-manager').then(({ syncActions }) => {
+        syncActions.reconnect().catch((error) => {
+          myLog.error('[useAppInit] Failed to reconnect sync manager:', error);
+        });
+      }).catch((error) => {
+        myLog.error('[useAppInit] Failed to import sync manager for restart:', error);
+      });
     },
   };
 }
@@ -162,17 +165,99 @@ export function useSystem() {
   };
 }
 
-// Sync hook - directly from SyncMachine
+// Sync hook - now uses Legend State reactive sync manager
 export function useSync() {
-  // Get sync machine from global actor - updated for simple notification sync machine
-  const syncMachine = useMemo(() => {
-    const machine = (window as any).simpleNotificationSyncMachineActor || (window as any).syncMachineActor || null;
-    myLog.info('[useSync] Found sync machine:', !!machine, machine ? 'type: simpleNotificationSyncMachine' : 'no machine');
-    return machine;
+  // Use Legend State sync connection hook directly with proper reactivity
+  const [syncConnection, setSyncConnection] = React.useState<any>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  
+  // Import and use the Legend State sync manager directly
+  React.useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    
+    import('../legend-state/sync-manager').then(({ syncState$, connectionStatus$, statusText$ }) => {
+      try {
+        // Subscribe to sync state changes reactively using Legend State
+        unsubscribe = syncState$.onChange(() => {
+          const state = syncState$.peek();
+          const status = connectionStatus$.peek();
+          const statusMessage = statusText$.peek();
+          
+          setSyncConnection({
+            isConnected: state.isConnected,
+            isConnecting: state.isConnecting,
+            error: state.error,
+            clientId: state.clientId,
+            organizationId: state.organizationId,
+            userId: state.userId,
+            serverUrl: state.serverUrl,
+            reconnectAttempts: state.reconnectAttempts,
+            maxReconnectAttempts: state.maxReconnectAttempts,
+            lastNotification: state.lastNotification,
+            connectionStatus: status,
+            statusText: statusMessage
+          });
+        });
+        
+        // Set initial state immediately
+        const initialState = syncState$.peek();
+        const initialStatus = connectionStatus$.peek();
+        const initialStatusMessage = statusText$.peek();
+        
+        setSyncConnection({
+          isConnected: initialState.isConnected,
+          isConnecting: initialState.isConnecting,
+          error: initialState.error,
+          clientId: initialState.clientId,
+          organizationId: initialState.organizationId,
+          userId: initialState.userId,
+          serverUrl: initialState.serverUrl,
+          reconnectAttempts: initialState.reconnectAttempts,
+          maxReconnectAttempts: initialState.maxReconnectAttempts,
+          lastNotification: initialState.lastNotification,
+          connectionStatus: initialStatus,
+          statusText: initialStatusMessage
+        });
+        
+      } catch (err) {
+        myLog.error('[useSync] Failed to setup sync manager subscription:', err);
+        setError('Failed to load sync manager');
+      }
+    }).catch((err) => {
+      myLog.error('[useSync] Failed to import sync manager:', err);
+      setError('Failed to load sync manager');
+    });
+    
+    // Cleanup subscription on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
-  // Safety check: only proceed if syncMachine exists
-  if (!syncMachine) {
+  // Return compatibility interface matching old XState-based hook
+  if (error) {
+    return {
+      clientId: '',
+      currentLSN: '0/0',
+      syncPhase: null,
+      isConnected: false,
+      error,
+      isInitialSync: false,
+      isCatchupSync: false,
+      isLiveSync: false,
+      isError: true,
+      isConnecting: false,
+      isIdle: true,
+      machineState: 'error',
+      syncPhaseProgress: null,
+      isActive: false,
+      statusText: `Error: ${error}`
+    };
+  }
+
+  if (!syncConnection) {
     return {
       clientId: '',
       currentLSN: '0/0',
@@ -192,44 +277,43 @@ export function useSync() {
     };
   }
 
-  // Subscribe to sync machine state changes
-  const syncSnapshot = useSelector(syncMachine, (state) => state);
+  // Map Legend State sync manager state to XState-compatible interface
+  const isConnected = syncConnection.isConnected;
+  const isError = !!syncConnection.error;
+  const isConnecting = syncConnection.isConnecting;
+  const isIdle = !isConnected && !isConnecting && !isError;
   
-  const context = syncSnapshot?.context || {};
-  const state = syncSnapshot?.value || 'idle';
-  
-  // Convert complex state object to string for easier checking
-  const stateString = typeof state === 'string' ? state : JSON.stringify(state);
-  
-  // Determine connection status based on simple notification sync machine states
-  const isConnected = stateString === 'connected' || context.isConnected === true;
-  const isError = stateString === 'error' || !!context.error;
-  const isConnecting = stateString === 'connecting';
-  const isIdle = stateString === 'disconnected';
-  
-  // Simple notification sync machine doesn't have complex sync phases
-  const isInitialSync = false; // No initial sync phase in simple notification sync
-  const isCatchupSync = false; // No catchup sync phase in simple notification sync  
-  const isLiveSync = isConnected; // Connected state means we're receiving notifications
+  // Legend State sync manager focuses on notifications, not complex sync phases
+  const isInitialSync = false; // No initial sync phase in notification-based sync
+  const isCatchupSync = false; // No catchup sync phase in notification-based sync  
+  const isLiveSync = isConnected; // Connected state means we're receiving live notifications
   
   const isActive = isConnected && !isError;
   
-  // Generate human-readable status text for simple notification sync
-  const statusText = isError ? `Error${context.error ? `: ${context.error}` : ''}` :
-                    isConnecting ? 'Connecting...' :
-                    isConnected ? 'Connected (Live Notifications)' :
-                    isIdle ? 'Disconnected' :
-                    'Unknown';
+  // Use status text from Legend State sync manager if available, otherwise generate fallback
+  const statusText = syncConnection.statusText || 
+                    (isError ? `Error${syncConnection.error ? `: ${syncConnection.error}` : ''}` :
+                     isConnecting ? 'Connecting...' :
+                     isConnected ? 'Connected - receiving notifications' :
+                     isIdle ? 'Disconnected' :
+                     'Unknown');
+
+  // Use connection status from Legend State if available, otherwise determine from state
+  const machineState = syncConnection.connectionStatus || 
+                      (isError ? 'error' :
+                       isConnecting ? 'connecting' :
+                       isConnected ? 'connected' :
+                       'disconnected');
 
   return {
-    // Core sync state
-    clientId: context.clientId || '',
-    currentLSN: context.currentLSN || '0/0',
-    syncPhase: context.syncPhase || null,
+    // Core sync state - adapted from Legend State
+    clientId: syncConnection.clientId || '',
+    currentLSN: '0/0', // Legend State doesn't use LSN concept
+    syncPhase: null, // Legend State doesn't have sync phases
     
     // Connection status
     isConnected,
-    error: context.error || null,
+    error: syncConnection.error || null,
     
     // State booleans
     isInitialSync,
@@ -240,8 +324,8 @@ export function useSync() {
     isIdle,
     
     // State information
-    machineState: stateString,
-    syncPhaseProgress: context.syncPhaseProgress || null,
+    machineState,
+    syncPhaseProgress: null, // No progress tracking in notification sync
     isActive,
     statusText
   };
