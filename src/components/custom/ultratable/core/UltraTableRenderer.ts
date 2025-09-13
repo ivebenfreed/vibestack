@@ -211,31 +211,36 @@ export class UltraTableRenderer {
     // Clear existing header
     this.headerContainer.innerHTML = '';
     this.headerCells.clear();
-    
+
     const headerRow = this.createElement('div', 'ultra-header-row');
+
+    // Calculate exact total width to match body rows
+    const totalWidth = this.calculateTotalRowWidth();
+
     Object.assign(headerRow.style, {
       display: 'flex',
       height: '100%',
-      width: 'fit-content'
+      width: `${totalWidth}px`,
+      minWidth: `${totalWidth}px`
     });
-    
+
     // Add selection column if enabled
     if (this.options.enableSelectionColumn) {
       const selectionHeader = this.createSelectionHeader();
       headerRow.appendChild(selectionHeader);
     }
-    
+
     // Add data columns
     this.columns.forEach((column, index) => {
       const headerCell = this.createHeaderCell(column, index);
       headerRow.appendChild(headerCell);
       this.headerCells.set(column.id, headerCell);
     });
-    
+
     this.headerContainer.appendChild(headerRow);
-    
+
     if (this.options.debug) {
-      fileLog.info('[UltraTableRenderer] Header rendered with', this.columns.length, 'columns');
+      fileLog.info('[UltraTableRenderer] Header rendered with', this.columns.length, 'columns, total width:', totalWidth);
     }
   }
   
@@ -417,28 +422,32 @@ export class UltraTableRenderer {
   private createRowElement(entity: any, absoluteIndex: number): HTMLElement {
     const row = this.createElement('div', 'ultra-row');
     row.dataset.rowId = entity.id;
-    
+
+    // Calculate exact total width to match header
+    const totalWidth = this.calculateTotalRowWidth();
+
     Object.assign(row.style, {
       position: 'absolute',
       top: `${absoluteIndex * this.rowHeight}px`,
       left: '0',
-      width: 'fit-content',
+      width: `${totalWidth}px`,
+      minWidth: `${totalWidth}px`,
       height: `${this.rowHeight}px`,
       display: 'flex',
       alignItems: 'center',
       borderBottom: '1px solid var(--border)',
       backgroundColor: 'var(--background)'
     });
-    
+
     // Add hover effect
     row.addEventListener('mouseenter', () => {
       row.style.backgroundColor = 'var(--muted)';
     });
-    
+
     row.addEventListener('mouseleave', () => {
       row.style.backgroundColor = 'var(--background)';
     });
-    
+
     return row;
   }
   
@@ -614,8 +623,18 @@ export class UltraTableRenderer {
   }
   
   private syncHeaderScroll(): void {
-    // Sync header horizontal scroll with body
-    this.headerContainer.style.transform = `translateX(-${this.viewportInfo.scrollLeft}px)`;
+    // Sync header horizontal scroll with body using precise positioning
+    const scrollLeft = this.viewportInfo.scrollLeft;
+
+    // Apply the exact same scroll offset to header
+    this.headerContainer.style.transform = `translateX(-${scrollLeft}px)`;
+
+    if (this.options.debug && scrollLeft > 0) {
+      fileLog.debug('[UltraTableRenderer] Header scroll synchronized:', {
+        scrollLeft,
+        transform: `translateX(-${scrollLeft}px)`
+      });
+    }
   }
   
   private handleCellClick(rowId: string, columnId: string, value: any, rowData: any): void {
@@ -706,16 +725,33 @@ export class UltraTableRenderer {
   // ====================================
   // UTILITIES
   // ====================================
-  
+
+  private calculateTotalRowWidth(): number {
+    let totalWidth = 0;
+
+    // Add selection column width if enabled
+    if (this.options.enableSelectionColumn) {
+      totalWidth += SELECTION_COLUMN_WIDTH;
+    }
+
+    // Add all column widths
+    this.columns.forEach(column => {
+      const width = column.width || 120;
+      totalWidth += width;
+    });
+
+    return totalWidth;
+  }
+
   private calculateColumnCoordinates(): void {
     this.columnCoordinates = [];
     let offset = 0;
-    
+
     // Add selection column if enabled
     if (this.options.enableSelectionColumn) {
       offset += SELECTION_COLUMN_WIDTH;
     }
-    
+
     this.columns.forEach((column, index) => {
       const width = column.width || 120;
       this.columnCoordinates.push({
@@ -765,8 +801,19 @@ export class UltraTableRenderer {
   }
   
   refresh(): void {
+    // Recalculate column coordinates in case column widths have changed
+    this.calculateColumnCoordinates();
+
+    // Re-render header to pick up any width changes
+    this.renderHeader();
+
+    // Update viewport and re-render rows
     this.updateViewport();
     this.renderVisibleRows();
+
+    if (this.options.debug) {
+      fileLog.info('[UltraTableRenderer] Full refresh completed');
+    }
   }
   
   getMetrics(): RenderMetrics {
