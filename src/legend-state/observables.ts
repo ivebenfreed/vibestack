@@ -13,6 +13,7 @@ import { createPersistenceManager, type PersistenceManager } from './helpers/Per
 import { initializationManager, ensureLegendStateReady, type PersistenceContext } from './helpers/InitializationManager'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { clearSchemaObservables, getSchemaObservable$, peekSchemaData$ } from './schema-observable'
+import { setPersistenceManagerReference, setPersistenceConfigSetter, setupFullPersistenceConfig } from './persistence-utils'
 import { log } from '@/logger';
 const fileLog = log('legend-state/observables.ts');
 
@@ -895,8 +896,8 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     // **NEW: Add virtual entities for options system**
     await addVirtualOptionsEntities(organizationIds)
     
-    // Initialize persistence configuration after schemas are loaded
-    await initializePersistence(userId, organizationIds, 0) // Schema observables will determine entity count later
+    // NOTE: Persistence initialization is now handled by the simplified Legend State initialization
+    // This ensures proper timing and entity count calculation
     
   } catch (error) {
     fileLog.error('[Observable] Failed to load universe context:', error)
@@ -1025,13 +1026,14 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
   }
 }
 
+
 /**
  * Initialize persistence configuration for loaded organizations
  */
 async function initializePersistence(userId: string, organizationIds: string[], totalEntities: number) {
-  // Skip if no entities or already initialized
-  if (totalEntities === 0 || (persistenceManager && syncedCrudWithPersistence)) {
-    fileLog.info(`[Observable] Skipping persistence initialization: entities=${totalEntities}, already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
+  // Skip if already initialized (but allow initialization even if totalEntities is 0)
+  if (persistenceManager && syncedCrudWithPersistence) {
+    fileLog.info(`[Observable] Skipping persistence initialization: already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
     return
   }
   
@@ -1043,39 +1045,39 @@ async function initializePersistence(userId: string, organizationIds: string[], 
       return
     }
     
-    // Get all entity names from the current schema
-    const currentSchema = universeSchema$.peek()
-    const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
-    
-    if (entityKeys.length === 0) {
-      fileLog.info('[Observable] No entities found, skipping persistence setup')
-      return
-    }
-    
-    fileLog.info(`[Observable] Initializing persistence for ${entityKeys.length} entities in org ${primaryOrgId}`)
+    // Create persistence manager and basic config first, even without entities
+    fileLog.info(`[Observable] Initializing persistence manager for org ${primaryOrgId} (expected ${totalEntities} entities)`)
     
     // Create persistence manager with enhanced error handling
     persistenceManager = createPersistenceManager(primaryOrgId, userId)
+    setPersistenceManagerReference(persistenceManager)
     
-    // Create IndexedDB configuration with error recovery using Legend State v3 pattern
-    const indexedDBConfig = await persistenceManager.createIndexedDBConfig(entityKeys)
+    // Set up persistence config setter so immediate persistence setup can update global config
+    setPersistenceConfigSetter((config: any) => {
+      persistenceConfig = config
+      fileLog.info(`[Observable] 🎯 Global persistence config updated with ${Object.keys(config?.entityTableMap || {}).length} entity mappings`)
+    })
     
-    // Configure synced CRUD with or without persistence
-    if (indexedDBConfig) {
-      // IndexedDB configuration available - use the proper v3 pattern
-      const { persistOptions, entityTableMap } = indexedDBConfig
-      
-      // Store the persistOptions globally for use in individual entity creation
-      persistenceConfig = { persistOptions, entityTableMap }
-      
-      // In Legend State v3, persistOptions IS the function that wraps syncedCrud with persistence
-      syncedCrudWithPersistence = persistOptions
-      
-      fileLog.info('[Observable] Persistence configured with IndexedDB plugin')
+    // Set up basic configuration that doesn't require entity names
+    // This ensures that when entities ARE created, they can access the persistence config
+    syncedCrudWithPersistence = true // Mark as initialized so entities know persistence is available
+    
+    fileLog.info(`[Observable] ✅ Basic persistence configuration initialized, entities can now use persistence`)
+    
+    // Check if we already have entities in the schema (for post-schema initialization)
+    const currentSchema = universeSchema$.peek()
+    const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
+    
+    if (entityKeys.length > 0) {
+      fileLog.info(`[Observable] Found ${entityKeys.length} existing entities, setting up full persistence config`)
+      const persistenceConfiguration = await setupFullPersistenceConfig(entityKeys, primaryOrgId)
+      if (persistenceConfiguration) {
+        persistenceConfig = persistenceConfiguration
+      }
     } else {
-      // No IndexedDB plugin - use syncedCrud without persistence
-      syncedCrudWithPersistence = syncedCrud
-      fileLog.info('[Observable] Persistence disabled - using server-only sync')
+      fileLog.info(`[Observable] No entities found yet, persistence will be configured when schema is loaded`)
+      // Persistence configuration is now handled in the schema-observable.ts when schemas are loaded
+      // This ensures the configuration is available before entities are created
     }
     
     // Update tracking variables
@@ -1153,6 +1155,10 @@ export const entities$ = observable(() => {
     entityCount: entityKeys.length,
     sampleEntities: entityKeys.slice(0, 3)
   })
+  
+  // Note: Full persistence configuration is now set up during initialization phase
+  // This ensures entities have access to IndexedDB configuration when they are created
+  // See initializePersistence() function for the reactive configuration setup
   
   // Create entity observables using lazy initialization with global caching
   // This ensures observables persist across schema changes and are created only when accessed
@@ -1927,6 +1933,18 @@ if (typeof window !== 'undefined') {
 
 // Export InitializationManager for external use and debugging
 export { initializationManager, useInitializationState } from './helpers/InitializationManager'
+
+/**
+ * Wrapper function to expose persistence initialization with entity count
+ * This allows the simplified Legend State initialization to properly set up persistence
+ */
+export async function initializePersistenceWithEntityCount(
+  userId: string, 
+  organizationIds: string[], 
+  entityCount: number
+): Promise<void> {
+  return initializePersistence(userId, organizationIds, entityCount);
+}
 
 // Debug: Expose to window in development
 if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {

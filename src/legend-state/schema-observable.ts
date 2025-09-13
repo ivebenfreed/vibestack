@@ -282,6 +282,29 @@ export function createSchemaObservable(orgId: string) {
         
         fileLog.info(`[SchemaObservable] Loaded schema with ${Object.keys(processedSchema.entities).length} entities`)
         
+        // 🚀 CRITICAL: Immediately configure persistence when schema is loaded
+        // This ensures entities will have persistence config available when they are created
+        try {
+          const entityNames = Object.keys(processedSchema.entities).map(entityName => `${orgId}_${entityName}`)
+          
+          if (entityNames.length > 0) {
+            fileLog.info(`[SchemaObservable] 🎯 Triggering immediate persistence setup for ${entityNames.length} entities`)
+            
+            // Import and call the persistence setup function immediately
+            const { setupFullPersistenceConfig } = await import('./persistence-utils')
+            const persistenceConfig = await setupFullPersistenceConfig(entityNames, orgId)
+            
+            if (persistenceConfig) {
+              fileLog.info(`[SchemaObservable] 🎯 Successfully configured persistence with ${Object.keys(persistenceConfig.entityTableMap || {}).length} entity mappings`)
+            }
+            
+            fileLog.info(`[SchemaObservable] ✅ Persistence configuration completed for ${entityNames.length} entities`)
+          }
+        } catch (persistenceError) {
+          fileLog.error(`[SchemaObservable] Failed to setup persistence for org ${orgId}:`, persistenceError)
+          // Continue with schema loading even if persistence setup fails
+        }
+        
         // Return as single-item array for syncedCrud list format
         return [processedSchema]
         
