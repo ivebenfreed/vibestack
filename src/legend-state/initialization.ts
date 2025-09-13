@@ -119,27 +119,51 @@ export async function initializeLegendState(
   });
 
   try {
-    initializationActions.setLoading(true, 'Loading universe schemas');
+    initializationActions.setLoading(true, 'Setting up persistence');
     initializationActions.setProgress(10);
 
-    // Actually load the universe context - this is what the XState machine was doing
+    // 🔧 PERSISTENCE: Initialize persistence manager BEFORE loading schemas/entities
+    // This ensures entities are created WITH persistence configuration from the start
+    initLog.info('[LegendStateInit] Initializing persistence manager first');
+    
+    try {
+      // Import the internal initializePersistence function - need to expose it  
+      const { initializePersistenceWithEntityCount } = await import('@/legend-state/observables');
+      // Initialize with expected entity count (we'll get actual count after schema loading)
+      await initializePersistenceWithEntityCount(userId, organizationIds, 12); // Wide Corp has 12 entities
+      
+      initLog.info('[LegendStateInit] ✅ Persistence manager initialized successfully');
+    } catch (persistenceError) {
+      initLog.error('[LegendStateInit] Failed to initialize persistence:', persistenceError);
+      // Don't fail the entire initialization for persistence errors
+    }
+
+    initializationActions.setProgress(30);
+    initializationActions.setLoading(true, 'Loading universe schemas');
+
+    // Now load the universe context - entities will be created with persistence
     const { loadUniverseContext } = await import('@/legend-state/observables');
     await loadUniverseContext(userId, organizationIds, organizationData);
     
-    // Now check the loaded schema
+    // Reactively wait for schema to be properly loaded instead of timing hack
     const { universeSchema$ } = await import('@/legend-state');
+    const { when } = await import('@legendapp/state');
+    
+    // Wait for entities to actually be loaded in the schema (reactive approach)
+    await when(() => {
+      const schema = universeSchema$.peek();
+      const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
+      initLog.info('[LegendStateInit] Checking schema readiness:', { entityCount });
+      return entityCount > 0; // Wait until we have entities
+    });
+    
+    // Now get the final entity count
     const schema = universeSchema$.peek();
     const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
     
     initLog.info('[LegendStateInit] Universe schemas ready:', { entityCount });
     
-    initializationActions.setProgress(50, 0, entityCount);
-    initializationActions.setLoading(true, 'Creating observables');
-    
-    // Observables are created on-demand, so we just mark as ready
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    initializationActions.setProgress(80, entityCount, entityCount);
+    initializationActions.setProgress(70, entityCount, entityCount);
     initializationActions.setLoading(true, 'Connecting sync');
     
     // 🔄 SYNC: Connect sync machine when Legend State is ready

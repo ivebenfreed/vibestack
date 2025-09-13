@@ -12,12 +12,11 @@ import { Task, Project, User } from '@/db/client-entities'
 import { authClient } from '@/lib/auth'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { IntegrityMonitor } from '@/components/IntegrityMonitor'
-// 🔥 NEW: Import XState machines directly (no orchestrator needed)
+// Import XState machines (auth machine removed - using Legend State)
 import { createActor } from 'xstate'
-import { authMachine } from '@/state-machines/machines/auth-machine'
 import { simpleNotificationSyncMachine } from '@/state-machines/machines/simple-notification-sync-machine'
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
-import { useAuth, useSystem } from '@/state-machines'
+import { useSystem } from '@/state-machines'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { log } from '@/logger'
 import React from 'react'
@@ -37,232 +36,29 @@ interface RouterContext {
 // Create logger instance for this file
 const rootLog = log('routes/__root.tsx');
 
-// 🔥 HMR FIX: Check for preserved actors from previous module
-if (import.meta.hot && import.meta.hot.data.authMachineActor) {
-  rootLog.info('🔥 HMR: Found preserved actors from previous module')
+// 🔥 HMR FIX: Check for preserved actors from previous module (sync only - auth handled by Legend State)
+if (import.meta.hot && import.meta.hot.data.simpleNotificationSyncMachineActor) {
+  rootLog.info('🔥 HMR: Found preserved sync actor from previous module')
   
-  // Restore preserved actors
-  ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
+  // Restore preserved sync actor
   ;(window as any).simpleNotificationSyncMachineActor = import.meta.hot.data.simpleNotificationSyncMachineActor
   
   // Clear from hot data
-  import.meta.hot.data.authMachineActor = null
   import.meta.hot.data.simpleNotificationSyncMachineActor = null
   
-  rootLog.info('🔥 HMR: Actors restored successfully')
+  rootLog.info('🔥 HMR: Sync actor restored successfully')
 }
 
-// 🔥 AUTH PERSISTENCE: Auth machine handles its own persistence internally
-// No manual persistence needed - the auth machine's persistAuthState action handles this
+// 🔥 AUTH PERSISTENCE: Auth now handled by Legend State automatically
+// Legend State handles authentication initialization and session management
 
-// Create AuthMachine actor (only if not already exists from HMR)
-let authMachineActor = (window as any).authMachineActor
+// Clean up old auth machine localStorage keys to avoid conflicts
+localStorage.removeItem('auth-machine-state');
+localStorage.removeItem('auth-machine-snapshot');
+localStorage.removeItem('vibestack-last-organization-id');
 
-if (!authMachineActor) {
-  rootLog.info('Creating new auth machine actor at', Date.now());
-  
-  // Add inspection in test/dev mode
-  const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
-    ? { inspect: xstateTestInspector.inspect }
-    : {};
-  
-  // Try to restore persisted snapshot
-  let persistedSnapshot = null;
-  try {
-    const stored = localStorage.getItem('auth-machine-snapshot');
-    if (stored) {
-      persistedSnapshot = JSON.parse(stored);
-      rootLog.info('Restored auth machine snapshot:', persistedSnapshot?.value);
-      
-      // CRITICAL: Clean up persisted state for compatibility
-      if (persistedSnapshot?.context) {
-        // Reset Legend State flag to ensure it always initializes on app start
-        persistedSnapshot.context.legendStateSetupComplete = false;
-        persistedSnapshot.context.legendStateError = null;
-        
-        // Remove deprecated needsOrganizationSetup field to prevent state errors
-        delete persistedSnapshot.context.needsOrganizationSetup;
-        
-        rootLog.info('[ROOT] Cleaned up persisted snapshot for compatibility');
-      }
-      
-      // Also clean up deprecated state values that might cause matches() errors
-      if (persistedSnapshot?.value && typeof persistedSnapshot.value === 'object') {
-        // Convert any deprecated needsOrganizationSetup states to valid states
-        const stateStr = JSON.stringify(persistedSnapshot.value);
-        if (stateStr.includes('needsOrganizationSetup')) {
-          rootLog.warn('[ROOT] Detected deprecated state in persisted snapshot, clearing...');
-          persistedSnapshot = null; // Clear the entire snapshot to avoid errors
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('[ROOT] Failed to restore auth machine snapshot:', error);
-    localStorage.removeItem('auth-machine-snapshot');
-  }
-  
-  // Clean up old localStorage keys to avoid conflicts
-  localStorage.removeItem('auth-machine-state');
-  localStorage.removeItem('vibestack-last-organization-id');
-  
-  authMachineActor = createActor(authMachine, {
-    ...inspectOptions,
-    id: 'auth-machine',
-    snapshot: persistedSnapshot
-  })
-  
-  rootLog.info('Auth machine created, starting...');
-  authMachineActor.start()
-  
-  // Store globally
-  ;(window as any).authMachineActor = authMachineActor
-  
-  // Add event listener for session faults
-  const handleSessionFault = (event: CustomEvent) => {
-    rootLog.info('[ROOT] Session fault detected, sending SESSION_FAULT event to auth machine:', event.detail)
-    authMachineActor.send({ type: 'SESSION_FAULT' })
-  }
-  window.addEventListener('auth:session-fault', handleSessionFault as EventListener)
-  
-  // Clean up event listener on HMR
-  if (import.meta.hot) {
-    import.meta.hot.accept(() => {
-      window.removeEventListener('auth:session-fault', handleSessionFault as EventListener)
-    })
-  }
-  
-  // Set up subscriptions for new actor
-  authMachineActor.subscribe((snapshot) => {
-    // Persist snapshot for proper XState persistence
-    try {
-      localStorage.setItem('auth-machine-snapshot', JSON.stringify(snapshot));
-    } catch (error) {
-      console.warn('[ROOT] Failed to persist auth snapshot:', error);
-    }
-    
-    const authenticated = snapshot.matches('authenticated')
-    const reason = snapshot.value === 'authenticated' ? 'authenticated' : 
-                   snapshot.value === 'unauthenticated' ? 'unauthenticated' :
-                   snapshot.value === 'signingOut' ? 'signing-out' : 'checking'
-    
-    // 🚀 DIRECT LEGEND STATE INITIALIZATION: Load org context when auth completes
-    if (authenticated && snapshot.matches('authenticated.ready')) {
-      const currentOrganization = snapshot.context.currentOrganization
-      const user = snapshot.context.user
-      
-      if (currentOrganization?.id && user?.id) {
-        rootLog.info('Auth ready - starting parallel Legend State and sync initialization:', currentOrganization.id)
-        
-        // 🔄 SYNC: Connect sync machine when ready
-        const connectSync = () => {
-          const syncActor = (window as any).simpleNotificationSyncMachineActor;
-          if (syncActor) {
-            rootLog.info('✅ Triggering sync connection - auth ready');
-            syncActor.send({ 
-              type: 'CONNECT', 
-              organizationId: currentOrganization.id,
-              userId: user.id
-            });
-          } else {
-            // Retry until sync actor is available
-            setTimeout(connectSync, 10);
-          }
-        };
-        connectSync();
-        
-        // Note: Persistence setup is now handled by auth machine
-        // Only load universe context for schema data - persistence is already configured
-        import('../legend-state').then(({ universeHelpers }) => {
-          // Initialize universe context for organizations display
-          universeHelpers.setAuthenticated(true, user.id).then(async () => {
-            rootLog.info('Universe context authenticated and workspace data loaded')
-            
-            // No need to refresh - Legend State init machine handles all loading
-            
-            rootLog.info('Universe helpers setup complete - persistence handled by Legend State init machine')
-          }).catch((error) => {
-            console.error('[ROOT] Failed to initialize universe helpers:', error)
-          })
-        }).catch((error) => {
-          console.error('[ROOT] Failed to import Legend State:', error)
-        })
-      }
-    }
-    
-    // Emit custom event for navigation logic
-    window.dispatchEvent(new CustomEvent('auth:state-changed', {
-      detail: { authenticated, reason }
-    }))
-  })
-  
-  // Check initial state after setting up subscription (for restored snapshots)
-  const initialSnapshot = authMachineActor.getSnapshot()
-  
-  // Add error handling for snapshot.matches() to prevent TypeError
-  let isAuthenticatedReady = false;
-  try {
-    isAuthenticatedReady = initialSnapshot?.matches && initialSnapshot.matches('authenticated.ready');
-  } catch (error) {
-    rootLog.error('[ROOT] Error checking initial snapshot state:', error);
-    // Clear the problematic snapshot
-    localStorage.removeItem('auth-machine-snapshot');
-  }
-  
-  if (isAuthenticatedReady) {
-    const userOrganizations = initialSnapshot.context.userOrganizations
-    const user = initialSnapshot.context.user
-    
-    // Debug log to see what organization data we have
-    rootLog.info('[ROOT] Restored auth state organizations:', {
-      orgCount: userOrganizations?.length,
-      hasNames: userOrganizations?.[0]?.name ? true : false,
-      firstOrgName: userOrganizations?.[0]?.name || 'NO NAME',
-      firstOrgId: userOrganizations?.[0]?.id
-    })
-    
-    if (userOrganizations?.length > 0 && user?.id) {
-      rootLog.info('Initial auth already ready - loading Legend State universe context')
-      
-      // 🔄 SYNC: Connect sync machine for restored auth state (wait for actor to be ready)
-      // Use first organization for sync connection (universe mode still needs an org for WebSocket)
-      const connectSync = () => {
-        const syncActor = (window as any).simpleNotificationSyncMachineActor;
-        if (syncActor) {
-          rootLog.info('✅ Triggering sync connection - restored auth ready');
-          syncActor.send({ 
-            type: 'CONNECT', 
-            organizationId: userOrganizations[0].id,
-            userId: user.id
-          });
-        } else {
-          // Retry until sync actor is available
-          setTimeout(connectSync, 10);
-        }
-      };
-      connectSync();
-      
-      // Note: For restored sessions, persistence is already handled by auth machine
-      // Only initialize universe helpers for organization display
-      import('../legend-state').then(({ universeHelpers, universeLoader }) => {
-        // Initialize universe context for organizations display
-        universeHelpers.setAuthenticated(true, user.id).then(async () => {
-          rootLog.info('Universe context authenticated, loading workspace data...')
-          
-          // Load workspace data using the universe loader
-          await universeLoader.loadWorkspaceData()
-          
-          rootLog.info('Universe helpers setup complete (initial) - workspace data loaded')
-        }).catch((error) => {
-          console.error('[ROOT] Failed to initialize universe helpers (initial):', error)
-        })
-      }).catch((error) => {
-        console.error('[ROOT] Failed to import Legend State (initial):', error)
-      })
-    }
-  }
-} else {
-  // HMR: Using existing auth machine actor
-}
+// Initialize Legend State auth system
+rootLog.info('Legend State auth system handles authentication and initialization automatically');
 
 // Create Simple Notification Sync Machine actor (only if not already exists from HMR)
 let simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
@@ -305,17 +101,16 @@ rootLog.info('[ROOT] Legend State initialization handled automatically by auth.t
 
 // Actors are already globally accessible (assigned during creation)
 
-// 🔥 HMR FIX: Preserve actors across HMR updates
+// 🔥 HMR FIX: Preserve sync actor across HMR updates
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    rootLog.info('XSTATE 🔥 HMR Dispose: Preserving actors for next module...')
+    rootLog.info('XSTATE 🔥 HMR Dispose: Preserving sync actor for next module...')
     
-    // Store actor references in hot data to preserve across HMR
-    import.meta.hot.data.authMachineActor = (window as any).authMachineActor
+    // Store sync actor reference in hot data to preserve across HMR
     import.meta.hot.data.simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
     
     // Don't stop actors - let them continue running
-    rootLog.info('XSTATE 🔥 HMR: Actors preserved for hot reload')
+    rootLog.info('XSTATE 🔥 HMR: Sync actor preserved for hot reload')
   })
   
   // On accept, restore the preserved actors
@@ -382,7 +177,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootComponentInternal() {
   rootLog.info('RootComponentInternal rendering at', Date.now());
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated } = useUnifiedAuth()
   const navigate = useNavigate()
   
   

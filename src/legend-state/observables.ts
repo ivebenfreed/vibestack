@@ -836,7 +836,7 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
         }
         
         // CRITICAL FIX: Don't wait for data loading synchronously - this breaks Legend State patterns
-        // The legend-state-init-machine should work with reactive observables, not synchronous data
+        // Legend State handles initialization automatically through reactive observables
         // Schema observables will load asynchronously and components will react when data is ready
         fileLog.info(`[Observable] Schema observable created for org ${orgId}, data will load asynchronously`)
         

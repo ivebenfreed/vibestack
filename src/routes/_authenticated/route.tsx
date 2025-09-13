@@ -22,59 +22,10 @@ const myLog = log('routes/_authenticated/route.tsx');
 export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
   beforeLoad: async ({ location }) => {
-    // Get auth actor - if not available, redirect to sign-in
-    const authActor = (window as any).authMachineActor
-    if (!authActor) {
-      throw redirect({
-        to: '/sign-in',
-        search: { redirect: location.pathname },
-        replace: true
-      })
-    }
+    // AUTH MACHINE REMOVED - Use Legend State auth directly
+    myLog.info('Checking Legend State authentication for route access')
     
-    // If auth machine is still checking, wait for it to resolve
-    const currentSnapshot = authActor.getSnapshot()
-    if (currentSnapshot.matches('checking')) {
-      myLog.info('Waiting for auth resolution...')
-      
-      await new Promise<void>((resolve) => {
-        let resolved = false
-        
-        const subscription = authActor.subscribe((snapshot: any) => {
-          if (!resolved && !snapshot.matches('checking')) {
-            resolved = true
-            subscription.unsubscribe()
-            resolve()
-          }
-        })
-        
-        // Check again immediately in case it resolved while setting up subscription
-        if (!authActor.getSnapshot().matches('checking')) {
-          resolved = true
-          subscription.unsubscribe()
-          resolve()
-        }
-      })
-    }
-    
-    // Check final auth state
-    const finalAuthSnapshot = authActor.getSnapshot()
-    myLog.info('Final auth state check:', {
-      matches: finalAuthSnapshot.value,
-      user: !!finalAuthSnapshot.context.user,
-      authError: finalAuthSnapshot.context.authError,
-      errorRetryCount: finalAuthSnapshot.context.errorRetryCount,
-      path: window.location.pathname
-    })
-    
-    // Allow errorRecovery state - don't redirect immediately
-    if (finalAuthSnapshot.matches('errorRecovery')) {
-      myLog.info('In error recovery state, allowing access with persisted auth')
-      // The error recovery state will handle retries and eventual redirect if needed
-      return
-    }
-    
-    // Check Legend State auth as fallback - wait for loading to complete
+    // Check Legend State auth - wait for loading to complete
     const legendStateLoading = auth$.loading.get()
     const legendStateUser = auth$.user.get()
     const isLegendStateAuthenticated = !!legendStateUser
@@ -114,18 +65,13 @@ export const Route = createFileRoute('/_authenticated')({
     const finalLegendStateUser = auth$.user.get()
     const finalIsLegendStateAuthenticated = !!finalLegendStateUser
     
-    // Allow access if either XState or Legend State shows authenticated user
-    const isAuthenticated = (finalAuthSnapshot.matches('authenticated') && finalAuthSnapshot.context.user) || 
-                           finalIsLegendStateAuthenticated
-    
-    myLog.info('Combined auth check:', {
-      xstateAuth: finalAuthSnapshot.matches('authenticated') && !!finalAuthSnapshot.context.user,
+    myLog.info('Legend State auth check:', {
       legendStateAuth: finalIsLegendStateAuthenticated,
       legendStateUser: finalLegendStateUser?.email,
-      finalDecision: isAuthenticated
+      path: window.location.pathname
     })
     
-    if (!isAuthenticated) {
+    if (!finalIsLegendStateAuthenticated) {
       myLog.info('Redirecting to sign-in from:', window.location.pathname)
       throw redirect({
         to: '/sign-in',
@@ -133,22 +79,7 @@ export const Route = createFileRoute('/_authenticated')({
         replace: true
       })
     }
-
-    // Check if we're in organization setup phase - allow access but don't check system readiness yet
-    const isInOrgSetup = finalAuthSnapshot.matches('authenticated.loadingOrganizations') ||
-                         finalAuthSnapshot.matches('authenticated.needsOrganizationSelection') ||
-                         finalAuthSnapshot.matches('authenticated.creatingOrganization') ||
-                         finalAuthSnapshot.matches('authenticated.selectingOrganization') ||
-                         finalAuthSnapshot.matches('authenticated.loadingBilling') ||
-                         finalAuthSnapshot.matches('authenticated.trialExpiredSetup') ||
-                         finalAuthSnapshot.matches('authenticated.upgradingSubscription');
-
-    if (isInOrgSetup) {
-      myLog.info('In organization setup phase, skipping system readiness check')
-      return
-    }
     
-    // FIXED: Removed blocking Legend State check from beforeLoad to prevent white screen
     // Components will handle their own loading states using UnifiedLoadingScreen
     myLog.info('Route loading - components will handle Legend State initialization')
   },

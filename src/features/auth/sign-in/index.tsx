@@ -24,11 +24,15 @@ export default function SignIn() {
   useEffect(() => {
     if (isAuthenticated) {
       console.log('[SignIn] User authenticated via Legend State - auto-redirecting')
-      const redirectTo = search.redirect || '/' // Default to home page
-      navigate({ 
-        to: redirectTo as any,
-        replace: true 
-      })
+      const redirectTo = search.redirect || '/universe' // Default to universe dashboard
+      console.log('[SignIn] Attempting to redirect to:', redirectTo)
+      
+      // Use TanStack Router for proper navigation
+      if (redirectTo === '/' || !redirectTo || redirectTo === '') {
+        navigate({ to: '/universe', replace: true })
+      } else {
+        navigate({ to: redirectTo, replace: true })
+      }
     }
   }, [isAuthenticated, navigate, search.redirect])
   

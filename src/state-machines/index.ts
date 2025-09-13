@@ -1,5 +1,5 @@
 // Main exports for XState universal state management
-export { authMachine } from './machines/auth-machine';
+// Auth machine removed - Legend State handles authentication directly
 // App init machine removed - Legend State handles initialization directly
 
 // Direct machine hooks
