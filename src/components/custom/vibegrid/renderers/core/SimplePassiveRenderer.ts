@@ -12,17 +12,30 @@ import type {
   TableInteraction$, 
   TableViewport$ 
 } from '../../stores/pure-observables';
-import { CanvasOverlayDOM } from '../../overlays/CanvasOverlayDOM';
-import { EditingOverlay } from '../../overlays/EditingOverlay';
-import { ContextMenuManager } from '../../components/ContextMenu';
-import { SelectionManager } from '../managers/SelectionManager';
+// New modular architecture imports
+import { ObserverManager, type ObserverManagerOptions } from './ObserverManager';
+import { DOMElementFactory, type DOMElementFactoryOptions } from '../factories/DOMElementFactory';
+import { HeaderRenderer, type HeaderRendererOptions } from '../components/HeaderRenderer';
+
+// Phase 2 manager imports
+import { CellRenderer } from '../managers/CellRenderer';
+import { RowRenderer } from '../managers/RowRenderer';
+import { ViewportManager } from '../managers/ViewportManager';
+import { EventManager } from '../managers/EventManager';
+
+// Existing modular components
+import { OverlayManager, type CoordinateMapping } from '../modules/OverlayManager';
+import { BadgeRenderer } from '../modules/BadgeRenderer';
+import { CellFormatter } from '../modules/CellFormatter';
+import { SelectionController } from '../modules/SelectionController';
+import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
+import { ScrollController } from '../modules/ScrollController';
+
+// Utility imports
 import type { ViewportInfo, TableRow } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
-// Smart cell system imports
 import { createDataLoadingStage$, createStageCallbacks } from '../../stores/data-loading-stages';
-import { createDependencyContext, getCellDependencies, checkCellReadiness } from '../../utils/cell-readiness';
-import { createLoadingCell, createErrorCell } from '../../components/LoadingCell';
 
 const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
@@ -55,29 +68,23 @@ export class SimplePassiveRenderer {
   
   // Basic row management
   private activeRows: Map<string, HTMLElement> = new Map();
+  private lastVisibleColumns: { start: number; end: number } | null = null;
   
-  // Complete overlay system and selection manager
-  private canvasOverlay: CanvasOverlayDOM | null = null;
-  private selectionManager: SelectionManager | null = null;
-  private editingOverlay: EditingOverlay | null = null;
-  private contextMenu: ContextMenuManager | null = null;
+  // Overlay management
+  private overlayManager: OverlayManager | null = null;
   
-  // Coordinate mapping for overlays
-  private coordinateMapping = {
-    rows: [] as Array<{ rowId: string; y: number; height: number; index: number }>,
-    columns: [] as Array<{ columnId: string; x: number; width: number; index: number; offset: number }>,
+  // Coordinate mapping (maintained locally but synced with overlay manager)
+  private coordinateMapping: CoordinateMapping = {
+    rows: [],
+    columns: [],
     version: 0
   };
   
   // Scroll coordination
   private _scrollRAF: number | null = null;
   
-  // Row range selection tracking
-  private lastSelectedRowId: string | null = null;
-  
-  // Keyboard navigation tracking
-  private focusedCell: string | null = null; // format: "rowId:columnId"
-  private selectionAnchor: string | null = null; // anchor cell for range selection
+  // Row range selection tracking - now handled by SelectionController
+  // Keyboard navigation tracking - now handled by KeyboardNavigationController
   
   // UI element references
   private selectAllCheckbox: HTMLInputElement | null = null;
@@ -86,6 +93,23 @@ export class SimplePassiveRenderer {
   private dataLoadingStage$: any = null;
   private relationshipResolver$: Map<string, any> = new Map();
   private formattersReady: boolean = false;
+  private universeSchema$: any = null;
+  
+  // Modular controllers
+  private selectionController: SelectionController | null = null;
+  private keyboardNavController: KeyboardNavigationController | null = null;
+  private scrollController: ScrollController | null = null;
+  
+  // New modular components (Phase 1 additions)
+  private observerManager: ObserverManager | null = null;
+  private domFactory: DOMElementFactory | null = null;
+  private headerRenderer: HeaderRenderer | null = null;
+  
+  // Phase 2 manager additions
+  private cellRenderer: CellRenderer | null = null;
+  private rowRenderer: RowRenderer | null = null;
+  private viewportManager: ViewportManager | null = null;
+  private eventManager: EventManager | null = null;
   
   constructor(private options: SimplePassiveRendererOptions) {
     fileLog.info('🎯 SimplePassiveRenderer: Initializing');
@@ -96,77 +120,243 @@ export class SimplePassiveRenderer {
     this.tableViewport$ = options.tableViewport$;
     
     this.initDOM();
-    this.initOverlays();
-    this.setupObservers();
-    this.setupScrollHandling();
+    this.initDOMFactory();
+    this.initControllers();
+    this.initPhase2Managers();
+    this.initOverlayManager();
+    this.initHeaderRenderer();
+    this.initObserverManager();
+    this.postInitialization();
   }
   
   /**
-   * Initialize overlay components
+   * Initialize DOM Element Factory
    */
-  private initOverlays(): void {
-    fileLog.info('🎨 Initializing overlays');
+  private initDOMFactory(): void {
+    fileLog.info('🏭 Initializing DOM Element Factory');
     
-    // Create complete canvas overlay system
-    this.canvasOverlay = new CanvasOverlayDOM(
-      {
-        selectionColor: 'rgba(59, 130, 246, 0.1)',
-        selectionBorderColor: 'rgb(59, 130, 246)',
-        selectionBorderWidth: 2,
-        cellHeight: ROW_HEIGHT,
-        cellWidth: 150 // Default width, will be updated by coordinate mapping
-      },
-      (event) => {
-        fileLog.info('📋 Canvas overlay event:', event);
-        // Handle fill events from the overlay system
-      }
-    );
-    this.canvasOverlay.init(this.container);
-
-    // Create selection manager with DOM dependencies
-    this.selectionManager = new SelectionManager({
-      getCellElement: (rowId: string, columnId: string) => {
-        const cellElement = this.container.querySelector(`[data-cell-id="${rowId}:${columnId}"]`) as HTMLElement;
-        return cellElement;
-      },
-      forEachRowElement: (callback: (element: HTMLElement, rowId: string) => void) => {
-        const rowElements = this.container.querySelectorAll('[data-row-id]');
-        rowElements.forEach((element) => {
-          const rowId = element.getAttribute('data-row-id');
-          if (rowId) callback(element as HTMLElement, rowId);
-        });
-      },
-      getHeaderElement: () => this.headerContainer!,
-      isSelectionColumnEnabled: () => this.options.enableSelectionColumn ?? false
-    });
-    
-    // Create editing overlay
-    this.editingOverlay = new EditingOverlay(this.container, {
-      // Pass tableInteraction$ for direct observable commit (new architecture)
+    this.domFactory = new DOMElementFactory({
       tableInteraction$: this.tableInteraction$,
-      // Fallback callbacks for old architecture compatibility
-      onCommit: async (value) => {
-        await this.tableInteraction$.saveEdit(value);
+      enableSelectionColumn: this.options.enableSelectionColumn,
+      onEntityUpdate: this.options.onEntityUpdate
+    });
+    
+    fileLog.info('✅ DOM Element Factory initialized');
+  }
+
+  /**
+   * Initialize modular controllers
+   */
+  private initControllers(): void {
+    fileLog.info('🎮 Initializing modular controllers');
+    
+    // Initialize selection controller
+    this.selectionController = new SelectionController({
+      tableInteraction$: this.tableInteraction$,
+      getProcessedRows: () => this.tableCore$.processedRows.get(),
+      getVisibleColumns: () => this.tableCore$.visibleColumns.get()
+    });
+    
+    // Initialize keyboard navigation controller
+    this.keyboardNavController = new KeyboardNavigationController({
+      tableInteraction$: this.tableInteraction$,
+      selectionController: this.selectionController,
+      getProcessedRows: () => this.tableCore$.processedRows.get(),
+      getVisibleColumns: () => this.tableCore$.visibleColumns.get(),
+      container: this.container
+    });
+    
+    // Scroll controller will be initialized after DOM is ready
+  }
+  
+  /**
+   * Initialize Phase 2 managers
+   */
+  private initPhase2Managers(): void {
+    fileLog.info('🚀 Initializing Phase 2 managers');
+    
+    // Initialize CellRenderer first (dependency for RowRenderer)
+    this.cellRenderer = new CellRenderer({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      domFactory: this.domFactory!,
+      keyboardNavController: this.keyboardNavController,
+      container: this.container,
+      onEntityUpdate: this.options.onEntityUpdate
+    });
+    
+    // Initialize RowRenderer (depends on CellRenderer)
+    this.rowRenderer = new RowRenderer({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      domFactory: this.domFactory!,
+      cellRenderer: this.cellRenderer,
+      selectionController: this.selectionController,
+      enableSelectionColumn: this.options.enableSelectionColumn,
+      createElement: this.createElement.bind(this)
+    });
+    
+    // Initialize ViewportManager with the actual viewport element
+    this.viewportManager = new ViewportManager({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      scrollController: this.scrollController,
+      keyboardNavController: this.keyboardNavController,
+      selectionController: this.selectionController,
+      container: this.container,
+      viewport: this.viewport!, // Pass the actual viewport element
+      headerViewport: this.headerViewport!,
+      bodyContainer: this.bodyContainer!,
+      onViewportChange: () => this.renderBody(),
+      createElement: this.createElement.bind(this)
+    });
+    
+    // Initialize EventManager
+    this.eventManager = new EventManager({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      container: this.container,
+      onEntityUpdate: this.options.onEntityUpdate
+    });
+    
+    fileLog.info('✅ Phase 2 managers initialized');
+  }
+  
+  /**
+   * Initialize overlay manager
+   */
+  private initOverlayManager(): void {
+    fileLog.info('🎨 Initializing overlay manager');
+    
+    this.overlayManager = new OverlayManager({
+      container: this.container,
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      enableSelectionColumn: this.options.enableSelectionColumn,
+      headerContainer: this.headerContainer,
+      bodyContainer: this.bodyContainer,
+      getProcessedRows: () => this.tableCore$.processedRows.get()
+    });
+    
+    fileLog.info('✅ Overlay manager initialized');
+  }
+
+  /**
+   * Initialize Observer Manager (replaces setupObservers)
+   */
+  private initObserverManager(): void {
+    fileLog.info('🔍 Initializing Observer Manager');
+    
+    this.observerManager = new ObserverManager({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      overlayManager: this.overlayManager,
+      
+      // Callback functions for renderer actions
+      onColumnsChanged: () => {
+        this.renderHeader();
+        this.renderBody();
       },
-      onCancel: () => {
-        this.tableInteraction$.cancelEdit();
+      onColumnVisibilityChanged: () => {
+        this.renderHeader();
+        this.renderBody();
       },
-      // Add relationshipContext for ComboboxEditor options loading
-      relationshipContext: {
-        // Basic context object - ComboboxEditor mainly just checks for existence
-        relationshipResolvers: {}
+      onRowsChanged: () => {
+        this.renderBody();
       },
-      // Add getRowData function to access current row data from observables
-      getRowData: (rowId: string) => {
-        const processedRows = this.tableCore$.processedRows.get();
-        return processedRows.find((row: any) => row.id === rowId) || null;
+      onViewportChanged: () => {
+        this.handleViewportChange();
+      },
+      onSelectionChanged: (selectedCells: Set<string>) => {
+        this.updateDOMSelectionClasses(selectedCells);
+      },
+      onEditingChanged: (editingCell: string | null, editValue?: string) => {
+        // Editing is handled by overlay manager
+      },
+      onSelectAllCheckboxChanged: (state: { checked: boolean; indeterminate: boolean }) => {
+        this.updateSelectAllCheckboxVisual(state);
+      },
+      onSortChanged: () => {
+        this.updateSortIndicators();
+      },
+      onDragChanged: () => {
+        // Drag changes are handled by overlay manager
+      },
+      
+      // Column resize handlers
+      updateHeaderCellWidth: (columnId: string, newWidth: number) => {
+        this.updateHeaderCellWidth(columnId, newWidth);
+      },
+      updateBodyCellWidths: (columnId: string, newWidth: number) => {
+        this.updateBodyCellWidths(columnId, newWidth);
       }
     });
     
-    // Create context menu manager
-    this.contextMenu = new ContextMenuManager(this.container);
+    fileLog.info('✅ Observer Manager initialized');
+  }
+
+  /**
+   * Initialize Header Renderer
+   */
+  private initHeaderRenderer(): void {
+    if (!this.headerContainer || !this.domFactory) {
+      fileLog.warn('🎨 Cannot initialize HeaderRenderer - missing dependencies');
+      return;
+    }
     
-    fileLog.info('✅ Canvas overlay system initialized');
+    fileLog.info('🎨 Initializing Header Renderer');
+    
+    this.headerRenderer = new HeaderRenderer({
+      headerContainer: this.headerContainer,
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      domFactory: this.domFactory,
+      selectionController: this.selectionController,
+      coordinateMapping: this.coordinateMapping,
+      enableSelectionColumn: this.options.enableSelectionColumn,
+      updateCoordinateMapping: (mapping: CoordinateMapping) => {
+        this.coordinateMapping = mapping;
+        this.overlayManager?.updateCoordinateMapping(mapping);
+      }
+    });
+    
+    fileLog.info('✅ Header Renderer initialized');
+  }
+  
+  /**
+   * Post-initialization setup after all managers are created
+   */
+  private postInitialization(): void {
+    fileLog.info('🚀 Starting post-initialization');
+    
+    // Initialize viewport dimensions and setup scroll handling
+    if (this.viewportManager) {
+      this.viewportManager.initializeViewportDimensions();
+      this.viewportManager.setupScrollHandling();
+    }
+    
+    // Initialize overlay now that DOM is ready
+    if (this.overlayManager) {
+      this.overlayManager.initializeOverlay();
+    }
+    
+    // Setup event handling via EventManager
+    if (this.eventManager) {
+      this.eventManager.setOverlayManager(this.overlayManager!);
+      this.eventManager.setupEventHandling();
+    }
+    
+    // Initial render
+    this.renderHeader();
+    this.renderBody();
+    
+    fileLog.info('✅ Post-initialization complete');
   }
   
   /**
@@ -184,7 +374,18 @@ export class SimplePassiveRenderer {
     // Create main table container
     const table = this.createElement('div', 'vibegridx-table');
     
-    // Header viewport wrapper (for proper horizontal scrolling sync)
+    // Create header container first (will be populated by HeaderRenderer)
+    this.headerContainer = this.createElement('div', 'vibegridx-header');
+    this.headerContainer.style.cssText = `
+      position: relative;
+      white-space: nowrap;
+      height: 100%;
+      display: flex;
+      min-width: min-content;
+      width: max-content;
+    `;
+    
+    // Create header viewport wrapper for the header container
     this.headerViewport = this.createElement('div', 'vibegridx-header-viewport');
     this.headerViewport.style.cssText = `
       position: absolute;
@@ -201,22 +402,10 @@ export class SimplePassiveRenderer {
       z-index: 10;
       contain: layout style;
     `;
-    
-    // Hide webkit scrollbars for header viewport
     this.headerViewport.style.setProperty('-webkit-overflow-scrolling', 'touch');
+    this.headerViewport.appendChild(this.headerContainer);
     
-    // Header container (scrollable content inside viewport)
-    this.headerContainer = this.createElement('div', 'vibegridx-header');
-    this.headerContainer.style.cssText = `
-      position: relative;
-      white-space: nowrap;
-      height: 100%;
-      display: flex;
-      min-width: min-content;
-      width: max-content;
-    `;
-    
-    // Viewport (scrollable area)
+    // Basic viewport structure (will be enhanced by ViewportManager)
     this.viewport = this.createElement('div', 'vibegridx-viewport');
     this.viewport.style.cssText = `
       position: absolute;
@@ -227,279 +416,45 @@ export class SimplePassiveRenderer {
       overflow: auto;
     `;
     
-    // Body container (inside viewport)
     this.bodyContainer = this.createElement('div', 'vibegridx-body');
     this.bodyContainer.style.cssText = `
       position: relative;
       width: 100%;
     `;
     
-    // Assemble structure with header viewport wrapper
-    this.headerViewport.appendChild(this.headerContainer);
     this.viewport.appendChild(this.bodyContainer);
+    
+    // Assemble the complete structure
     table.appendChild(this.headerViewport);
     table.appendChild(this.viewport);
     this.container.appendChild(table);
     
-    // Initialize viewport dimensions
-    setTimeout(() => {
-      if (this.viewport) {
-        const rect = this.viewport.getBoundingClientRect();
-        this.tableViewport$.updateViewport(rect.width, rect.height);
-      }
-    }, 0);
-    
-    fileLog.info('✅ DOM structure created');
+    fileLog.info('✅ Basic DOM structure created');
   }
   
   /**
-   * Setup reactive observers
+   * Legacy observers setup - removed, now using ObserverManager
    */
   private setupObservers(): void {
-    fileLog.info('🔍 Setting up observers');
-    
-    // Observe columns changes
-    const columnsDisposer = observe(() => {
-      const columns = this.tableCore$.columns.get();
-      fileLog.info('📊 Columns changed', { count: columns.length });
-      this.renderHeader();
-      this.renderBody();
-    });
-    this.disposers.push(columnsDisposer);
-    
-    // Observe column visibility changes
-    const columnVisibilityDisposer = observe(() => {
-      const columnVisibility = this.tableCore$.columnVisibility.get();
-      const hiddenCount = Object.values(columnVisibility).filter(visible => visible === false).length;
-      fileLog.info('👁️ Column visibility changed', { hiddenCount });
-      // Only re-render header and body - both need to filter columns
-      this.renderHeader();
-      this.renderBody();
-    });
-    this.disposers.push(columnVisibilityDisposer);
-    
-    // Observe column resize changes to re-render cells with new widths
-    const columnResizeDisposer = observe(() => {
-      const resizeState = this.tableInteraction$.columnResize.get();
-      if (resizeState && resizeState.isResizing && resizeState.newWidth && resizeState.columnId) {
-        // Only update visual elements during resize, don't trigger re-renders
-        this.updateHeaderCellWidth(resizeState.columnId, resizeState.newWidth);
-        this.updateBodyCellWidths(resizeState.columnId, resizeState.newWidth);
-      } else if (resizeState === null) {
-        // Resize completed - only re-render if needed (columns observable will trigger this)
-        fileLog.info('📏 Column resize completed');
-        // Don't trigger additional re-render here - the columns observable change will handle it
-      }
-    });
-    this.disposers.push(columnResizeDisposer);
-    
-    // Observe processed rows changes
-    const rowsDisposer = observe(() => {
-      const rows = this.tableCore$.processedRows.get();
-      fileLog.info('📋 Rows changed', { count: rows.length });
-      this.renderBody();
-    });
-    this.disposers.push(rowsDisposer);
-    
-    // Observe viewport changes
-    const viewportDisposer = observe(() => {
-      const scrollTop = this.tableViewport$.scrollTop.get();
-      const scrollLeft = this.tableViewport$.scrollLeft.get();
-      const viewportWidth = this.tableViewport$.viewportWidth.get();
-      const viewportHeight = this.tableViewport$.viewportHeight.get();
-      
-      fileLog.info('🖼️ Viewport changed', { 
-        scrollTop, 
-        scrollLeft, 
-        viewportWidth, 
-        viewportHeight 
-      });
-      this.handleViewportChange();
-    });
-    this.disposers.push(viewportDisposer);
-    
-    // Observe selection changes and update overlay
-    const selectionDisposer = observe(() => {
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      const scrollTop = this.tableViewport$.scrollTop.get();
-      const scrollLeft = this.tableViewport$.scrollLeft.get();
-      const viewportHeight = this.tableViewport$.viewportHeight.get();
-      
-      fileLog.info('🎯 Selection changed', { 
-        selectedCount: selectedCells.size,
-        scrollTop,
-        viewportHeight 
-      });
-      
-      // Checkbox state is now handled by the computed observable and observer
-      
-      // Update selection using both SelectionManager and CanvasOverlayDOM
-      if (this.selectionManager) {
-        this.selectionManager.setSelectedCells(selectedCells);
-      }
-
-      // Apply CSS classes to DOM cells for immediate visual feedback
-      this.updateDOMSelectionClasses(selectedCells);
-
-      // Update visual overlays via CanvasOverlayDOM with calculated positions
-      if (this.canvasOverlay) {
-        // Update coordinate mapping first
-        this.canvasOverlay.updateCoordinateMapping(this.coordinateMapping);
-        
-        // Update viewport
-        const viewportInfo: ViewportInfo = {
-          start: Math.floor(scrollTop / ROW_HEIGHT),
-          end: Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT),
-          scrollTop: scrollTop,
-          scrollLeft: scrollLeft
-        };
-        this.canvasOverlay.updateViewport(viewportInfo);
-        
-        // Calculate visual positions for selected cells
-        const visualCells = this.calculateVisualCellPositions(selectedCells);
-        
-        // Update selection with visual positions (proper method)
-        this.canvasOverlay.updateSelectionWithVisualPositions(visualCells);
-        
-        // Render fill handle with visual positions
-        if (visualCells.length > 0) {
-          this.canvasOverlay.renderFillHandle(visualCells, undefined, viewportInfo);
-        } else {
-          this.canvasOverlay.hideFillHandle();
-        }
-      }
-    });
-    this.disposers.push(selectionDisposer);
-    
-    // Observe select all checkbox state changes
-    const checkboxDisposer = observe(() => {
-      const checkboxState = this.tableInteraction$.selectAllCheckboxState.get();
-      this.updateSelectAllCheckboxVisual(checkboxState);
-    });
-    this.disposers.push(checkboxDisposer);
-    
-    // Observe editing state and show/hide editing overlay
-    const editingDisposer = observe(() => {
-      const editingCell = this.tableInteraction$.editingCell.get();
-      const editValue = this.tableInteraction$.editValue.get();
-      
-      if (editingCell && this.editingOverlay) {
-        const [rowId, columnId] = editingCell.split(':');
-        // Find the cell element
-        const cellElement = this.container.querySelector(
-          `[data-row-id="${rowId}"][data-column-id="${columnId}"]`
-        ) as HTMLElement;
-        
-        if (cellElement) {
-          const rect = cellElement.getBoundingClientRect();
-          const containerRect = this.container.getBoundingClientRect();
-          
-          // Get column info
-          const columns = this.tableCore$.columns.get();
-          const column = columns.find((col: any) => col.id === columnId);
-          
-          if (column) {
-            const position = {
-              x: rect.left - containerRect.left,
-              y: rect.top - containerRect.top,
-              width: rect.width,
-              height: rect.height
-            };
-            
-            const cell = { rowId, columnId };
-            
-            fileLog.debug('🖊️ Showing edit overlay', {
-              editingCell,
-              position,
-              cell,
-              column: column.id,
-              value: editValue
-            });
-            
-            this.editingOverlay.showAt(position, cell, column, editValue || '');
-          }
-        }
-      } else if (this.editingOverlay) {
-        this.editingOverlay.hide();
-      }
-    });
-    this.disposers.push(editingDisposer);
-    
-    // Observe column resize state
-    const resizeDisposer = observe(() => {
-      const resizeState = this.tableInteraction$.columnResize.get();
-      
-      // Update header cell width during resize
-      if (resizeState && resizeState.isResizing && resizeState.columnId && resizeState.newWidth) {
-        this.updateHeaderCellWidth(resizeState.columnId, resizeState.newWidth);
-      }
-      
-      if (this.canvasOverlay) {
-        // Update coordinate mapping and column resize preview via CanvasOverlayDOM
-        this.canvasOverlay.updateCoordinateMapping(this.coordinateMapping);
-        this.canvasOverlay.updateColumnResizePreview(resizeState);
-      }
-    });
-    this.disposers.push(resizeDisposer);
-    
-    // Observe drag state for drag preview
-    const dragDisposer = observe(() => {
-      const isDragging = this.tableInteraction$.isDragging.get();
-      const dragSource = this.tableInteraction$.dragSource.get();
-      const dragTarget = this.tableInteraction$.dragTarget.get();
-      const scrollTop = this.tableViewport$.scrollTop.get();
-      const scrollLeft = this.tableViewport$.scrollLeft.get();
-      const viewportHeight = this.tableViewport$.viewportHeight.get();
-      
-      if (this.canvasOverlay) {
-        // Update coordinate mapping
-        this.canvasOverlay.updateCoordinateMapping(this.coordinateMapping);
-        
-        // Create drag state if dragging
-        if (isDragging && dragSource) {
-          const dragState = {
-            isDragging: true,
-            startCell: dragSource,
-            currentCell: dragTarget || dragSource
-          };
-          
-          const viewportInfo: ViewportInfo = {
-            start: Math.floor(scrollTop / ROW_HEIGHT),
-            end: Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT),
-            scrollTop: scrollTop,
-            scrollLeft: scrollLeft
-          };
-          
-          this.canvasOverlay.updateDragPreview(dragState, viewportInfo);
-        } else {
-          this.canvasOverlay.updateDragPreview(null, null);
-        }
-      }
-    });
-    this.disposers.push(dragDisposer);
-    
-    // Sort observer - updates sort indicators when sort state changes
-    const sortDisposer = observe(() => {
-      const sortBy = this.tableCore$.sortBy.get();
-      fileLog.debug('🔄 Sort state changed, updating indicators', { sortBy });
-      
-      // Update sort indicators after a small delay to ensure header is rendered
-      requestAnimationFrame(() => {
-        this.updateSortIndicators();
-      });
-    });
-    this.disposers.push(sortDisposer);
+    // This method is kept for compatibility but now delegates to ObserverManager
+    // All observer logic has been moved to ObserverManager.ts
     
     // Setup context menu event handler
     this.setupContextMenu();
     
-    fileLog.info('✅ All observers and event handlers set up');
+    fileLog.info('✅ Legacy setupObservers() called - using ObserverManager instead');
   }
 
   /**
    * Create DOM element with class - matches UnifiedTableRenderer pattern
    */
   private createElement(tag: string, className: string): HTMLElement {
+    // Delegate to DOM Factory for consistent element creation
+    if (this.domFactory) {
+      return this.domFactory.createElement(tag, className);
+    }
+    
+    // Fallback for early initialization
     const el = document.createElement(tag);
     el.className = className;
     return el;
@@ -509,6 +464,12 @@ export class SimplePassiveRenderer {
    * Create group header element with expand/collapse functionality
    */
   private createGroupHeaderElement(groupRow: any, rowIndex: number): HTMLElement {
+    // Delegate to DOM Factory for consistent group header creation
+    if (this.domFactory) {
+      return this.domFactory.createGroupHeaderElement(groupRow, rowIndex);
+    }
+    
+    // Fallback implementation for early initialization
     const groupData = groupRow.data;
     const level = groupRow.level || 0;
     const isExpanded = groupRow.isExpanded;
@@ -598,6 +559,7 @@ export class SimplePassiveRenderer {
   
   /**
    * Setup context menu handling
+   * LEGACY: Now handled by EventManager in Phase 2
    */
   private setupContextMenu(): void {
     // Add right-click handler for context menu
@@ -605,14 +567,14 @@ export class SimplePassiveRenderer {
       e.preventDefault();
       
       const cellElement = (e.target as HTMLElement).closest('[data-row-id][data-column-id]') as HTMLElement;
-      if (cellElement && this.contextMenu) {
+      if (cellElement && this.overlayManager) {
         const rowId = cellElement.dataset.rowId;
         const columnId = cellElement.dataset.columnId;
         
         fileLog.info('🖱️ Context menu triggered', { rowId, columnId });
         
         // Show context menu
-        this.contextMenu.show({
+        this.overlayManager.showContextMenu({
           isVisible: true,
           position: {
             x: e.pageX,
@@ -626,32 +588,32 @@ export class SimplePassiveRenderer {
             columnId
           },
           onClose: () => {
-            this.contextMenu?.hide();
+            this.overlayManager?.hideContextMenu();
           },
           onCopy: () => {
             fileLog.info('📋 Copy action');
             // Implement copy logic via tableInteraction$
-            this.contextMenu?.hide();
+            this.overlayManager?.hideContextMenu();
           },
           onPaste: () => {
             fileLog.info('📋 Paste action');
             // Implement paste logic via tableInteraction$
-            this.contextMenu?.hide();
+            this.overlayManager?.hideContextMenu();
           },
           onCut: () => {
             fileLog.info('✂️ Cut action');
             // Implement cut logic via tableInteraction$
-            this.contextMenu?.hide();
+            this.overlayManager?.hideContextMenu();
           },
           onInsertRow: () => {
             fileLog.info('➕ Insert row action');
             // Implement insert row logic via tableCore$
-            this.contextMenu?.hide();
+            this.overlayManager?.hideContextMenu();
           },
           onDeleteRow: () => {
             fileLog.info('➖ Delete row action');
             // Implement delete row logic via tableCore$
-            this.contextMenu?.hide();
+            this.overlayManager?.hideContextMenu();
           }
         });
       }
@@ -664,24 +626,35 @@ export class SimplePassiveRenderer {
   private renderHeader(): void {
     if (!this.headerContainer) return;
     
+    // Delegate to HeaderRenderer if available
+    if (this.headerRenderer) {
+      this.headerRenderer.render();
+      
+      // Update select all checkbox reference
+      this.selectAllCheckbox = this.headerRenderer.getSelectAllCheckbox();
+      return;
+    }
+    
+    // Fallback to original header rendering
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
-    fileLog.info('🎨 Rendering header', { columnCount: columns.length });
+    fileLog.info('🎨 Rendering header (fallback)', { columnCount: columns.length });
     
     this.headerContainer.innerHTML = '';
     
     const headerRow = this.createElement('div', 'vibegridx-header-row');
     headerRow.style.cssText = `
-      display: flex;
+      position: relative;
       height: ${HEADER_HEIGHT}px;
-      align-items: center;
     `;
     
-    // Add corner header cell (aligns with row headers)
+    // Add corner header cell (aligns with row headers) with absolute positioning
     const cornerCell = this.createElement('div', 'vibegridx-corner-header');
     cornerCell.style.cssText = `
+      position: absolute;
+      left: 0;
+      top: 0;
       width: 40px;
-      min-width: 40px;
       height: ${HEADER_HEIGHT}px;
       background: #f8f9fa;
       border-right: 1px solid #e9ecef;
@@ -689,8 +662,8 @@ export class SimplePassiveRenderer {
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
       cursor: pointer;
+      z-index: 1;
     `;
 
     if (this.options.enableSelectionColumn) {
@@ -730,7 +703,7 @@ export class SimplePassiveRenderer {
           this.tableInteraction$.clearSelection();
           fileLog.info('🎯 Select all checkbox - clearing selection');
         } else {
-          this.selectAllCells();
+          this.selectionController?.selectAllCells();
           fileLog.info('🎯 Select all checkbox - selecting all');
         }
       });
@@ -740,16 +713,16 @@ export class SimplePassiveRenderer {
     
     headerRow.appendChild(cornerCell);
     
-    // Get virtual column range for horizontal scrolling
+    // Get virtual column range from the observable (single source of truth)
     const visibleColumnRange = this.tableViewport$.visibleColumns.get();
     const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
-    // Apply horizontal virtual scrolling - only render columns in visible range
-    const startColIndex = Math.max(0, visibleColumnRange.start);
-    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
+    // Use the range directly from the observable (it already includes buffer)
+    const startColIndex = visibleColumnRange.start;
+    const endColIndex = visibleColumnRange.end;
     const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
     
-    fileLog.info('🎨 Rendering header with column virtual scrolling', { 
+    fileLog.info('🎨 Rendering header with virtual columns', { 
       totalColumns: columns.length,
       allVisibleColumns: allVisibleColumns.length,
       virtualRange: `${startColIndex}-${endColIndex}`,
@@ -772,7 +745,7 @@ export class SimplePassiveRenderer {
       xOffset += column.width;
     });
     
-    // Reset xOffset for virtual column rendering
+    // Calculate starting x position for virtual columns
     xOffset = 40;
     for (let i = 0; i < startColIndex; i++) {
       xOffset += allVisibleColumns[i].width;
@@ -783,7 +756,10 @@ export class SimplePassiveRenderer {
       const headerCell = this.createElement('div', 'vibegridx-header-cell');
       headerCell.dataset.field = column.id; // Add field ID for sort updates
       headerCell.style.cssText = `
-        flex: 0 0 ${column.width}px;
+        position: absolute;
+        left: ${xOffset}px;
+        top: 0;
+        width: ${column.width}px;
         height: 100%;
         padding: 0 12px;
         display: flex;
@@ -792,7 +768,6 @@ export class SimplePassiveRenderer {
         font-size: 14px;
         border-right: 1px solid #e9ecef;
         background: #f8f9fa;
-        position: relative;
       `;
       
       // Create header content with text and sort icon (like HeaderEngine)
@@ -920,7 +895,7 @@ export class SimplePassiveRenderer {
         if (isCtrlKey && !isShiftKey) {
           // Ctrl+Click on header - select entire column
           e.preventDefault();
-          this.selectColumn(column.id);
+          this.selectionController?.selectColumn(column.id);
           fileLog.info('🎯 Column selected', { columnId: column.id });
         } else {
           // Regular click or Shift+click - toggle sort
@@ -956,6 +931,8 @@ export class SimplePassiveRenderer {
     this.headerContainer.style.minWidth = `${totalHeaderWidth}px`;
     
     this.coordinateMapping.version++;
+    // Sync coordinate mapping with overlay manager
+    this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
     fileLog.info('✅ Header rendered with total width', { totalHeaderWidth });
   }
   
@@ -963,22 +940,32 @@ export class SimplePassiveRenderer {
    * Render table body
    */
   private renderBody(): void {
-    if (!this.bodyContainer) return;
+    if (!this.bodyContainer || !this.rowRenderer || !this.viewportManager) return;
     
     const rows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
+    const columnVisibility = this.tableCore$.columnVisibility.get();
     
-    fileLog.info('🎨 Rendering body', { 
+    // Debug: Check if we have group rows
+    const groupRows = rows.filter((row: any) => row.type === 'group');
+    const dataRows = rows.filter((row: any) => row.type === 'data');
+    
+    fileLog.info('🎨 Rendering body with Phase 2 managers', { 
       rowCount: rows.length, 
-      columnCount: columns.length 
+      columnCount: columns.length,
+      groupRows: groupRows.length,
+      dataRows: dataRows.length,
+      firstRowType: rows[0]?.type,
+      firstRowData: rows[0]
     });
     
     this.bodyContainer.innerHTML = '';
     
-    // Set total height for virtual scrolling
-    const totalHeight = rows.length * ROW_HEIGHT;
-    this.bodyContainer.style.height = `${totalHeight}px`;
+    // Clear active rows in RowRenderer
+    this.rowRenderer.clearActiveRows();
+    
+    // Update content dimensions via ViewportManager
+    this.viewportManager.updateContentDimensions();
     
     // Update row coordinate mapping
     this.coordinateMapping.rows = [];
@@ -989,22 +976,28 @@ export class SimplePassiveRenderer {
     const endIndex = Math.min(rows.length, visibleRange.end);
     const visibleRows = rows.slice(startIndex, endIndex);
     
-    fileLog.debug('🎨 Virtual scrolling', { 
+    fileLog.debug('🎨 Virtual scrolling with Phase 2', { 
       totalRows: rows.length, 
       visibleRange: `${startIndex}-${endIndex}`,
       rendering: visibleRows.length
     });
     
-    // Get virtual column range for horizontal scrolling (same as header)
+    // Get virtual column range from the observable (single source of truth) - MUST match header
     const visibleColumnRange = this.tableViewport$.visibleColumns.get();
     const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
-    // Apply horizontal virtual scrolling - only render columns in visible range
-    const startColIndex = Math.max(0, visibleColumnRange.start);
-    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
+    // Use the EXACT same range as header (from observable with buffer already included)
+    const startColIndex = visibleColumnRange.start;
+    const endColIndex = visibleColumnRange.end;
     const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
     
-    // Render only visible rows with proper positioning
+    // Calculate starting x position for virtual columns - MUST match header
+    let startX = 40; // Account for row header
+    for (let i = 0; i < startColIndex; i++) {
+      startX += allVisibleColumns[i].width;
+    }
+    
+    // Render only visible rows using RowRenderer
     visibleRows.forEach((row, visibleIndex) => {
       const actualRowIndex = startIndex + visibleIndex;
       
@@ -1012,14 +1005,18 @@ export class SimplePassiveRenderer {
       
       // Check if this is a group header or data row
       if (row.type === 'group') {
-        rowElement = this.createGroupHeaderElement(row, actualRowIndex);
+        fileLog.info('🎯 Rendering group row', { 
+          rowId: row.id, 
+          level: row.level,
+          isExpanded: row.isExpanded,
+          data: row.data
+        });
+        rowElement = this.rowRenderer.createGroupHeaderElement(row, actualRowIndex);
       } else {
-        rowElement = this.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility);
+        rowElement = this.rowRenderer.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility, startX);
       }
       
       this.bodyContainer.appendChild(rowElement);
-      
-      // Add to coordinate mapping (all rows for overlay positioning)
     });
     
     // Build complete coordinate mapping for all rows (needed for overlays)
@@ -1033,7 +1030,10 @@ export class SimplePassiveRenderer {
     });
     
     this.coordinateMapping.version++;
-    fileLog.info('✅ Body rendered', { totalHeight });
+    // Sync coordinate mapping with overlay manager
+    this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
+    
+    fileLog.info('✅ Body rendered with Phase 2 managers');
   }
   
   /**
@@ -1096,6 +1096,7 @@ export class SimplePassiveRenderer {
   
   /**
    * Create a row element
+   * LEGACY: Now handled by RowRenderer in Phase 2
    */
   private createRowElement(
     row: any, 
@@ -1189,14 +1190,17 @@ export class SimplePassiveRenderer {
             from: this.lastSelectedRowId,
             to: row.id
           });
-          this.selectRowRange(this.lastSelectedRowId, row.id);
+          const lastSelectedRowId = this.selectionController?.getLastSelectedRowId();
+          if (lastSelectedRowId) {
+            this.selectionController?.selectRowRange(lastSelectedRowId, row.id);
+          }
         } else {
           // Use toggleRowSelection for proper multi-row behavior
           fileLog.debug('🔘 Regular click - calling toggleRowSelection', {
             rowId: row.id
           });
-          this.toggleRowSelection(row.id);
-          this.lastSelectedRowId = row.id;
+          this.selectionController?.toggleRowSelection(row.id);
+          this.selectionController?.setLastSelectedRowId(row.id);
         }
         return;
       }
@@ -1206,10 +1210,10 @@ export class SimplePassiveRenderer {
         // Ctrl+Click on row header - add to selection
         e.preventDefault();
         // TODO: Implement multi-row selection
-        this.selectRow(row.id);
+        this.selectionController?.selectRow(row.id);
       } else {
         // Regular click - select entire row
-        this.selectRow(row.id);
+        this.selectionController?.selectRow(row.id);
       }
       
       fileLog.info('🎯 Row header clicked', { rowId: row.id, isCtrlKey });
@@ -1218,7 +1222,7 @@ export class SimplePassiveRenderer {
     rowElement.appendChild(rowHeader);
     
     columns.forEach((column, colIndex) => {
-      const cell = this.createCellElement(row, column, colIndex);
+      const cell = this.cellRenderer!.createCellElement(row, column, colIndex);
       rowElement.appendChild(cell);
     });
     
@@ -1234,254 +1238,11 @@ export class SimplePassiveRenderer {
   }
   
   /**
-   * Create a cell element with proper CSS-based dual-target system
-   * Now enhanced with smart cell dependency checking
-   */
-  private createCellElement(
-    row: any, 
-    column: any, 
-    colIndex: number
-  ): HTMLElement {
-    // Check if smart cell system should handle this cell
-    const cellType = column.cellType || column.type || 'text';
-    
-    if (this.shouldUseSmartCell(cellType)) {
-      return this.createSmartCell(row, column, cellType);
-    }
-    
-    // Fall back to original cell creation for simple cell types
-    const cellElement = this.createElement('div', 'vibegridx-cell');
-    cellElement.dataset.rowId = row.id;
-    cellElement.dataset.columnId = column.id;
-    cellElement.style.cssText = `
-      flex: 0 0 ${column.width}px;
-      height: 100%;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-      font-size: 14px;
-      border-right: 1px solid #f1f3f5;
-      overflow: hidden;
-      position: relative;
-      cursor: default;
-    `;
-    
-    // Get cell value and determine content type for proper CSS classes
-    const value = row[column.id];
-    
-    // Create content element with proper CSS classes based on type
-    // The content element should only take up the space it needs, not flex: 1
-    let contentElement: HTMLElement;
-    
-    if (cellType === 'enum' || cellType === 'select' || cellType === 'tags') {
-      // Badge/enum content - use centralized formatter for schema-based styling
-      contentElement = this.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
-      const displayValue = this.formatCellValue(value, cellType, column);
-      
-      // Check if the formatter returned HTML (with styling)
-      if (displayValue.includes('<span')) {
-        contentElement.innerHTML = displayValue;
-      } else {
-        contentElement.textContent = displayValue;
-        
-        // Apply default styling if no schema-based styling was applied
-        contentElement.style.cssText = `
-          background-color: rgb(243, 244, 246);
-          color: rgb(75, 85, 99);
-          border: 1px solid rgb(209, 213, 219);
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          font-weight: 500;
-          white-space: nowrap;
-        `;
-      }
-    } else if (this.isTagsField(column.id, value)) {
-      // Tags field with comma-separated values - create multiple badges
-      contentElement = this.createTagsElement(value, row, column);
-    } else if (['number', 'integer', 'float'].includes(cellType)) {
-      // Number content - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else if (cellType === 'boolean') {
-      // Boolean content - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.createElement('span', 'vibegridx-boolean-text vibegridx-cell-boolean-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else if (value == null || value === '') {
-      // Empty content - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.createElement('span', 'vibegridx-cell-empty-editable');
-      contentElement.textContent = 'Click to edit';
-      contentElement.style.fontSize = '12px';
-      contentElement.style.opacity = '0.6';
-    } else {
-      // Text content (default) - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.createElement('span', 'vibegridx-cell-text-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    }
-    
-    // Let CSS classes handle all styling - no manual overrides
-    // This ensures the clickable area matches exactly the text content size
-    
-    // Add click handler for content area - immediate edit mode
-    contentElement.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const cellId = `${row.id}:${column.id}`;
-      
-      fileLog.info('📝 Content clicked - entering edit mode', {
-        rowId: row.id,
-        columnId: column.id,
-        value,
-        cellType
-      });
-      
-      // Start edit immediately
-      this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
-    });
-    
-    cellElement.appendChild(contentElement);
-    
-    // Mouse down handler for cell selection (only on cell background, not content)
-    cellElement.addEventListener('mousedown', (e) => {
-      const target = e.target as Element;
-      
-      // If click is on content element with editable class, ignore for selection
-      if (target && target.classList && (
-          target.classList.contains('vibegridx-cell-text-editable') ||
-          target.classList.contains('vibegridx-cell-badge-editable') ||
-          target.classList.contains('vibegridx-cell-number-editable') ||
-          target.classList.contains('vibegridx-cell-boolean-editable') ||
-          target.classList.contains('vibegridx-cell-empty-editable'))) {
-        fileLog.info('📝 Content element clicked, ignoring for selection');
-        return; // Content clicks are handled separately for editing
-      }
-      
-      // Only proceed for cell background clicks (whitespace)
-      if (target !== cellElement) {
-        fileLog.info('🖱️ Click not on cell element, ignoring', {
-          targetElement: (target as HTMLElement)?.tagName,
-          targetClass: (target as HTMLElement)?.className
-        });
-        return;
-      }
-      
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      const isShiftKey = e.shiftKey;
-      const cellId = `${row.id}:${column.id}`;
-      
-      fileLog.info('🖱️ Cell whitespace clicked - selection mode', { 
-        rowId: row.id, 
-        columnId: column.id,
-        ctrl: isCtrlKey,
-        shift: isShiftKey,
-        target: (e.target as HTMLElement).className
-      });
-      
-      // Update keyboard navigation focus
-      this.focusedCell = cellId;
-      if (!isCtrlKey && !isShiftKey) {
-        // For single clicks, update the anchor
-        this.selectionAnchor = cellId;
-      }
-      
-      // Focus the container so it can receive keyboard events
-      this.container.focus();
-      
-      // Prevent text selection during drag
-      e.preventDefault();
-      
-      if (isShiftKey && this.tableInteraction$.anchorCell.get()) {
-        // Shift+click for range selection
-        this.tableInteraction$.selectRange(this.tableInteraction$.anchorCell.get()!, cellId);
-      } else if (isCtrlKey) {
-        // Ctrl/Cmd+click for multi-selection toggle
-        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-      } else {
-        // Regular click - use toggleCellSelection to properly set anchor, then start potential drag selection
-        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-        this.tableInteraction$.startDragSelection(cellId);
-      }
-      
-      // Set up document-level mouse move and up handlers for drag selection
-      const handleMouseMove = (e: MouseEvent) => {
-        // Find the cell element under the mouse
-        const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-        const cellUnderMouse = elementUnderMouse?.closest('[data-row-id][data-column-id]') as HTMLElement;
-        
-        if (cellUnderMouse) {
-          const rowId = cellUnderMouse.dataset.rowId;
-          const columnId = cellUnderMouse.dataset.columnId;
-          if (rowId && columnId) {
-            const currentCellId = `${rowId}:${columnId}`;
-            this.tableInteraction$.updateDragSelection(currentCellId);
-          }
-        }
-      };
-      
-      const handleMouseUp = (e: MouseEvent) => {
-        fileLog.info('🖱️ Mouse up - ending drag selection');
-        this.tableInteraction$.endDragSelection();
-        
-        // Clean up listeners
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-      
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    });
-    
-    // Click handler removed - all logic handled by mousedown and content click handlers
-    
-    // Double-click handler removed - immediate edit mode via content click
-    
-    // Remove drag handlers - cells should not be draggable for reordering
-    // Drag functionality will be reserved for:
-    // 1. Column headers (for reordering columns) 
-    // 2. Fill handle (for filling data ranges)
-    // Regular cells should only support selection, not dragging
-    
-    return cellElement;
-  }
-  
-  /**
    * Format cell value using centralized display formatters
    */
   private formatCellValue(value: any, type?: string, column?: any): string {
-    if (value === null || value === undefined) return '';
-    
-    // Use centralized display formatters for consistent formatting
-    if (type) {
-      try {
-        // Pass field schema information for enhanced formatting (colors, badges, etc.)
-        const fieldSchema = column?.fieldSchema || null;
-        const formatted = formatFieldForDisplay(value, type, { compact: true }, fieldSchema);
-        return formatted;
-      } catch (error) {
-        fileLog.warn('⚠️ Display formatter error, falling back to default', {
-          type,
-          value,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    }
-    
-    // Fallback formatting for types not handled by centralized formatters
-    switch (type) {
-      case 'date':
-      case 'datetime':
-        return value instanceof Date ? value.toLocaleDateString() : String(value);
-      case 'number':
-      case 'integer':
-      case 'decimal':
-        return typeof value === 'number' ? value.toString() : String(value);
-      case 'boolean':
-        return typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
-      default:
-        return String(value);
-    }
+    // Delegate to the modular CellFormatter
+    return CellFormatter.formatCellValue(value, type, column);
   }
   
   // Removed redundant formatting methods - now using centralized display formatters
@@ -1491,53 +1252,73 @@ export class SimplePassiveRenderer {
    * Triggers virtual scrolling updates when visible range changes
    */
   private handleViewportChange(): void {
-    const scrollTop = this.tableViewport$.scrollTop.get();
-    const scrollLeft = this.tableViewport$.scrollLeft.get();
-    const viewportWidth = this.tableViewport$.viewportWidth.get();
-    const viewportHeight = this.tableViewport$.viewportHeight.get();
-    const visibleRange = this.tableViewport$.visibleRange.get();
+    // Check if horizontal columns have changed
+    const visibleColumns = this.tableViewport$.visibleColumns.get();
+    const previousColumns = this.lastVisibleColumns || { start: -1, end: -1 };
     
-    fileLog.debug('📐 Viewport updated', { 
-      scrollTop, 
-      scrollLeft, 
-      viewportWidth, 
-      viewportHeight,
-      visibleRange: `${visibleRange.start}-${visibleRange.end}`
-    });
+    const columnsChanged = visibleColumns.start !== previousColumns.start || 
+                          visibleColumns.end !== previousColumns.end;
     
-    // Update viewport dimensions if we have a container
-    if (this.viewport && viewportWidth === 0) {
-      const rect = this.viewport.getBoundingClientRect();
-      this.tableViewport$.updateViewport(rect.width, rect.height);
+    // Update viewport manager
+    if (this.viewportManager) {
+      this.viewportManager.handleViewportChange();
     }
     
-    // Trigger virtual scrolling update when scroll changes visible range
-    // This will re-render only the visible rows
-    this.renderBody();
+    // Update overlay selection with current viewport position
+    if (this.overlayManager) {
+      // Re-update selection overlay which will internally update viewport info
+      const selectedCells = this.tableInteraction$.selectedCells.get();
+      if (selectedCells.size > 0) {
+        this.overlayManager.updateSelection(selectedCells);
+      }
+    }
+    
+    // Re-render if columns changed (for horizontal virtual scrolling)
+    if (columnsChanged) {
+      this.lastVisibleColumns = visibleColumns;
+      this.renderHeader();
+      this.renderBody();
+    } else {
+      // Only re-render body for vertical scrolling
+      this.renderBody();
+    }
   }
   
   /**
    * Destroy the renderer
    */
   destroy(): void {
-    fileLog.info('🧹 Destroying SimplePassiveRenderer');
+    fileLog.info('🧹 Destroying SimplePassiveRenderer with Phase 2 managers');
     
-    // Clean up observers
+    // Clean up observers (managed by ObserverManager)
+    if (this.observerManager) {
+      this.observerManager.destroy();
+      this.observerManager = null;
+    }
+    
+    // Clean up Phase 2 managers
+    if (this.eventManager) {
+      this.eventManager.destroy();
+      this.eventManager = null;
+    }
+    
+    if (this.viewportManager) {
+      this.viewportManager.destroy();
+      this.viewportManager = null;
+    }
+    
+    // RowRenderer and CellRenderer don't need explicit cleanup
+    this.rowRenderer = null;
+    this.cellRenderer = null;
+    
+    // Clean up legacy disposers (if any remain)
     this.disposers.forEach(dispose => dispose());
     this.disposers = [];
     
-    // Clean up selection manager and overlays
-    if (this.selectionManager) {
-      this.selectionManager.clearAllSelections();
-    }
-    if (this.canvasOverlay) {
-      this.canvasOverlay.destroy();
-    }
-    if (this.editingOverlay) {
-      this.editingOverlay.hide();
-    }
-    if (this.contextMenu) {
-      this.contextMenu.destroy();
+    // Clean up overlay manager
+    if (this.overlayManager) {
+      this.overlayManager.destroy();
+      this.overlayManager = null;
     }
     
     // Clear DOM
@@ -1551,331 +1332,37 @@ export class SimplePassiveRenderer {
     this.headerContainer = null;
     this.headerViewport = null;
     this.bodyContainer = null;
-    this.selectionManager = null;
-    this.canvasOverlay = null;
-    this.editingOverlay = null;
-    this.contextMenu = null;
+    this.domFactory = null;
+    this.headerRenderer = null;
     
-    fileLog.info('✅ SimplePassiveRenderer destroyed with all 5 overlays cleaned up');
+    fileLog.info('✅ SimplePassiveRenderer destroyed with all Phase 2 managers cleaned up');
   }
   
-  /**
-   * Select all visible cells
-   */
-  private selectAllCells(): void {
-    const processedRows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    
-    const allCells = new Set<string>();
-    
-    for (const row of processedRows) {
-      for (const column of visibleColumns) {
-        allCells.add(`${row.id}:${column.id}`);
-      }
-    }
-    
-    this.tableInteraction$.selectedCells.set(allCells);
-    this.tableInteraction$.selectionMode.set('multi');
-    
-    fileLog.info('🎯 Selected all cells', { 
-      rowCount: processedRows.length,
-      columnCount: visibleColumns.length,
-      totalSelected: allCells.size
-    });
-  }
+  // selectAllCells method removed - now handled by SelectionController
   
-  /**
-   * Select entire column
-   */
-  private selectColumn(columnId: string): void {
-    const processedRows = this.tableCore$.processedRows.get();
-    const columnCells = new Set<string>();
-    
-    for (const row of processedRows) {
-      columnCells.add(`${row.id}:${columnId}`);
-    }
-    
-    this.tableInteraction$.selectedCells.set(columnCells);
-    this.tableInteraction$.selectionMode.set('column');
-    
-    fileLog.info('🎯 Selected column', { 
-      columnId,
-      rowCount: processedRows.length,
-      selectedCells: columnCells.size
-    });
-  }
+  // selectColumn method removed - now handled by SelectionController
   
-  /**
-   * Select entire row (replaces current selection)
-   */
-  private selectRow(rowId: string): void {
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    
-    const rowCells = new Set<string>();
-    
-    for (const column of visibleColumns) {
-      rowCells.add(`${rowId}:${column.id}`);
-    }
-    
-    this.tableInteraction$.selectedCells.set(rowCells);
-    this.tableInteraction$.selectionMode.set('row');
-    
-    fileLog.info('🎯 Selected row', { 
-      rowId,
-      columnCount: visibleColumns.length,
-      selectedCells: rowCells.size
-    });
-  }
+  // selectRow method removed - now handled by SelectionController
 
-  /**
-   * Toggle entire row selection (adds to or removes from current selection)
-   */
-  private toggleRowSelection(rowId: string): void {
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    
-    const currentSelection = new Set(this.tableInteraction$.selectedCells.get());
-    const rowCells = new Set<string>();
-    
-    for (const column of visibleColumns) {
-      rowCells.add(`${rowId}:${column.id}`);
-    }
-    
-    // Check if row is already selected (all row cells are in selection)
-    const isRowSelected = Array.from(rowCells).every(cellId => currentSelection.has(cellId));
-    
-    if (isRowSelected) {
-      // Remove row cells from selection
-      for (const cellId of rowCells) {
-        currentSelection.delete(cellId);
-      }
-      fileLog.info('🎯 Deselected row', { 
-        rowId,
-        columnCount: visibleColumns.length,
-        remainingCells: currentSelection.size
-      });
-    } else {
-      // Add row cells to selection
-      for (const cellId of rowCells) {
-        currentSelection.add(cellId);
-      }
-      fileLog.info('🎯 Selected row', { 
-        rowId,
-        columnCount: visibleColumns.length,
-        totalCells: currentSelection.size
-      });
-    }
-    
-    this.tableInteraction$.selectedCells.set(currentSelection);
-    this.tableInteraction$.selectionMode.set('row');
-  }
+  // toggleRowSelection method removed - now handled by SelectionController
 
-  /**
-   * Select range of rows (for Shift+Click on row checkboxes)
-   */
-  private selectRowRange(startRowId: string, endRowId: string): void {
-    fileLog.debug('🎯 selectRowRange called', { startRowId, endRowId });
-    
-    const processedRows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    
-    fileLog.debug('🎯 selectRowRange - data retrieved', {
-      processedRowsCount: processedRows.length,
-      visibleColumnsCount: visibleColumns.length
-    });
+  // selectRowRange method removed - now handled by SelectionController
 
-    // Find row indices
-    const startRowIndex = processedRows.findIndex((row: any) => row.id === startRowId);
-    const endRowIndex = processedRows.findIndex((row: any) => row.id === endRowId);
+  // handleArrowKey method removed - now handled by KeyboardNavigationController
 
-    if (startRowIndex === -1 || endRowIndex === -1) {
-      fileLog.warn('🔴 Row range selection failed - invalid row IDs', { startRowId, endRowId });
-      return;
-    }
-
-    // Calculate range bounds
-    const minRowIndex = Math.min(startRowIndex, endRowIndex);
-    const maxRowIndex = Math.max(startRowIndex, endRowIndex);
-
-    // Clear existing selection and select only the range
-    const rangeSelection = new Set<string>();
-
-    // Select all cells in the row range
-    for (let r = minRowIndex; r <= maxRowIndex; r++) {
-      const rowId = processedRows[r].id;
-      for (const column of visibleColumns) {
-        rangeSelection.add(`${rowId}:${column.id}`);
-      }
-    }
-
-    this.tableInteraction$.selectedCells.set(rangeSelection);
-    this.tableInteraction$.selectionMode.set('row');
-
-    const selectedRowCount = maxRowIndex - minRowIndex + 1;
-    const selectedCellCount = selectedRowCount * visibleColumns.length;
-
-    fileLog.info('🎯 Selected row range', {
-      startRowId,
-      endRowId,
-      rowCount: selectedRowCount,
-      cellCount: selectedCellCount,
-      totalSelected: rangeSelection.size
-    });
-  }
-
-  /**
-   * Handle arrow key navigation and range selection
-   */
-  private handleArrowKey(direction: 'up' | 'down' | 'left' | 'right', isShiftKey: boolean): void {
-    fileLog.debug('⌨️ Arrow key pressed', { direction, isShiftKey, focusedCell: this.focusedCell });
-
-    const processedRows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-
-    if (processedRows.length === 0 || visibleColumns.length === 0) {
-      fileLog.debug('⌨️ No data to navigate');
-      return;
-    }
-
-    // If no focused cell, start with first visible cell
-    if (!this.focusedCell) {
-      this.focusedCell = `${processedRows[0].id}:${visibleColumns[0].id}`;
-      this.selectionAnchor = this.focusedCell;
-      fileLog.debug('⌨️ Starting focus at first cell', { focusedCell: this.focusedCell });
-    }
-
-    // Parse current focused cell
-    const [currentRowId, currentColumnId] = this.focusedCell.split(':');
-    const currentRowIndex = processedRows.findIndex((row: any) => row.id === currentRowId);
-    const currentColIndex = visibleColumns.findIndex(col => col.id === currentColumnId);
-
-    if (currentRowIndex === -1 || currentColIndex === -1) {
-      fileLog.debug('⌨️ Current focused cell not found in data');
-      return;
-    }
-
-    // Calculate new position
-    let newRowIndex = currentRowIndex;
-    let newColIndex = currentColIndex;
-
-    switch (direction) {
-      case 'up':
-        newRowIndex = Math.max(0, currentRowIndex - 1);
-        break;
-      case 'down':
-        newRowIndex = Math.min(processedRows.length - 1, currentRowIndex + 1);
-        break;
-      case 'left':
-        newColIndex = Math.max(0, currentColIndex - 1);
-        break;
-      case 'right':
-        newColIndex = Math.min(visibleColumns.length - 1, currentColIndex + 1);
-        break;
-    }
-
-    // Update focused cell
-    const newRowId = processedRows[newRowIndex].id;
-    const newColumnId = visibleColumns[newColIndex].id;
-    const newFocusedCell = `${newRowId}:${newColumnId}`;
-
-    this.focusedCell = newFocusedCell;
-
-    fileLog.debug('⌨️ New focused cell', {
-      from: `${currentRowId}:${currentColumnId}`,
-      to: newFocusedCell,
-      isShiftKey
-    });
-
-    if (isShiftKey) {
-      // Range selection mode - extend from anchor to new focused cell
-      if (!this.selectionAnchor) {
-        this.selectionAnchor = `${currentRowId}:${currentColumnId}`;
-      }
-      
-      fileLog.debug('⌨️ Extending range selection', {
-        anchor: this.selectionAnchor,
-        focus: newFocusedCell
-      });
-      
-      this.selectKeyboardRange(this.selectionAnchor, newFocusedCell);
-    } else {
-      // Single cell selection - clear previous and select new
-      this.selectionAnchor = newFocusedCell;
-      this.tableInteraction$.selectCell(newFocusedCell, false); // false = replace selection
-      fileLog.debug('⌨️ Single cell selected', { cell: newFocusedCell });
-    }
-  }
-
-  /**
-   * Select rectangular range between two cells (for keyboard range selection)
-   */
-  private selectKeyboardRange(startCell: string, endCell: string): void {
-    fileLog.debug('⌨️ Keyboard range selection', { startCell, endCell });
-    
-    const processedRows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-
-    // Parse cell coordinates
-    const [startRowId, startColId] = startCell.split(':');
-    const [endRowId, endColId] = endCell.split(':');
-
-    // Find indices
-    const startRowIndex = processedRows.findIndex((row: any) => row.id === startRowId);
-    const endRowIndex = processedRows.findIndex((row: any) => row.id === endRowId);
-    const startColIndex = visibleColumns.findIndex(col => col.id === startColId);
-    const endColIndex = visibleColumns.findIndex(col => col.id === endColId);
-
-    if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-      fileLog.debug('⌨️ Invalid cell coordinates for range selection');
-      return;
-    }
-
-    // Calculate rectangle bounds
-    const minRowIndex = Math.min(startRowIndex, endRowIndex);
-    const maxRowIndex = Math.max(startRowIndex, endRowIndex);
-    const minColIndex = Math.min(startColIndex, endColIndex);
-    const maxColIndex = Math.max(startColIndex, endColIndex);
-
-    // Create range selection
-    const rangeSelection = new Set<string>();
-    for (let r = minRowIndex; r <= maxRowIndex; r++) {
-      const rowId = processedRows[r].id;
-      for (let c = minColIndex; c <= maxColIndex; c++) {
-        const columnId = visibleColumns[c].id;
-        rangeSelection.add(`${rowId}:${columnId}`);
-      }
-    }
-
-    this.tableInteraction$.selectedCells.set(rangeSelection);
-    this.tableInteraction$.selectionMode.set('cell');
-
-    const rowCount = maxRowIndex - minRowIndex + 1;
-    const colCount = maxColIndex - minColIndex + 1;
-
-    fileLog.info('⌨️ Keyboard range selected', {
-      anchor: startCell,
-      focus: endCell,
-      rowCount,
-      colCount,
-      cellCount: rangeSelection.size
-    });
-  }
+  // selectKeyboardRange method removed - now handled by SelectionController
 
   /**
    * Update the select all checkbox visual state based on computed observable state
    */
   private updateSelectAllCheckboxVisual(state: { checked: boolean; indeterminate: boolean }): void {
+    // Delegate to HeaderRenderer if available
+    if (this.headerRenderer) {
+      this.headerRenderer.updateSelectAllCheckboxVisual(state);
+      return;
+    }
+    
+    // Fallback to original implementation
     if (!this.selectAllCheckbox) return;
 
     fileLog.debug('📋 Updating select all checkbox visual state', {
@@ -1934,39 +1421,39 @@ export class SimplePassiveRenderer {
       const isCtrlKey = e.ctrlKey || e.metaKey;
       const isShiftKey = e.shiftKey;
       
-      fileLog.debug('⌨️ Keyboard event', { key: e.key, shiftKey: isShiftKey, ctrlKey: isCtrlKey, focusedCell: this.focusedCell });
+      const focusedCell = this.keyboardNavController?.getFocusedCell();
+      fileLog.debug('⌨️ Keyboard event', { key: e.key, shiftKey: isShiftKey, ctrlKey: isCtrlKey, focusedCell });
       
       switch (e.key) {
         case 'a':
         case 'A':
           if (isCtrlKey) {
             e.preventDefault();
-            this.selectAllCells();
+            this.selectionController?.selectAllCells();
             fileLog.info('⌨️ Ctrl+A - Select all cells');
           }
           break;
         case 'Escape':
           e.preventDefault();
           this.tableInteraction$.clearSelection();
-          this.focusedCell = null;
-          this.selectionAnchor = null;
+          this.keyboardNavController?.clear();
           fileLog.info('⌨️ Escape - Clear selection and focus');
           break;
         case 'ArrowUp':
           e.preventDefault();
-          this.handleArrowKey('up', isShiftKey);
+          this.keyboardNavController?.handleArrowKey('up', isShiftKey);
           break;
         case 'ArrowDown':
           e.preventDefault();
-          this.handleArrowKey('down', isShiftKey);
+          this.keyboardNavController?.handleArrowKey('down', isShiftKey);
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          this.handleArrowKey('left', isShiftKey);
+          this.keyboardNavController?.handleArrowKey('left', isShiftKey);
           break;
         case 'ArrowRight':
           e.preventDefault();
-          this.handleArrowKey('right', isShiftKey);
+          this.keyboardNavController?.handleArrowKey('right', isShiftKey);
           break;
         default:
           // Let other keys pass through
@@ -2003,6 +1490,14 @@ export class SimplePassiveRenderer {
    */
   private updateSortIndicators(): void {
     if (!this.headerContainer) return;
+    
+    // Delegate to HeaderRenderer if available
+    if (this.headerRenderer) {
+      this.headerRenderer.updateSortIndicators();
+      return;
+    }
+    
+    // Fallback to original implementation
     
     const sortBy = this.tableCore$.sortBy.get();
     const sortLookup = new Map<string, { direction: 'asc' | 'desc'; index: number }>();
@@ -2106,90 +1601,22 @@ export class SimplePassiveRenderer {
    * Determine if a field should be treated as a tags field
    */
   private isTagsField(columnId: string, value: any): boolean {
-    if (!value || typeof value !== 'string') return false;
-    
-    // Check if column name suggests it's a tags field
-    const tagsFieldPatterns = ['tags', 'tag', 'labels', 'categories', 'keywords'];
-    const lowerColumnId = columnId.toLowerCase();
-    const isTagsColumn = tagsFieldPatterns.some(pattern => lowerColumnId.includes(pattern));
-    
-    // Check if value contains commas (suggesting multiple tags)
-    const hasMultipleValues = value.includes(',');
-    
-    return isTagsColumn && hasMultipleValues;
+    // Delegate to the modular BadgeRenderer
+    return BadgeRenderer.isTagsField(columnId, value);
   }
 
   /**
    * Create a container element with multiple tag badges
    */
   private createTagsElement(value: string, row: any, column: any): HTMLElement {
-    const container = this.createElement('div', 'vibegridx-tags-container');
-    container.style.cssText = `
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
-    `;
-    
-    // Split comma-separated values and create individual badges
-    const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-    
-    tags.forEach((tag, index) => {
-      const tagBadge = this.createElement('span', 'vibegridx-tag-badge vibegridx-enum-badge');
-      tagBadge.textContent = tag;
-      
-      // Apply specific color class if available, otherwise use default styling
-      const colorClass = this.getBadgeColorClass(tag, column.id);
-      if (colorClass) {
-        tagBadge.classList.add(colorClass);
-      } else {
-        // Consistent badge styling matching the single-select default
-        tagBadge.style.cssText = `
-          background-color: rgb(243, 244, 246);
-          color: rgb(75, 85, 99);
-          border: 1px solid rgb(209, 213, 219);
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          font-weight: 500;
-          white-space: nowrap;
-          cursor: pointer;
-        `;
-      }
-      
-      // Add hover effect (only for badges with custom inline styles)
-      if (!colorClass) {
-        tagBadge.addEventListener('mouseenter', () => {
-          tagBadge.style.backgroundColor = 'rgb(229, 231, 235)';
-        });
-        tagBadge.addEventListener('mouseleave', () => {
-          tagBadge.style.backgroundColor = 'rgb(243, 244, 246)';
-        });
-      }
-      
-      // Add click handler for individual tag editing
-      tagBadge.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fileLog.info('🏷️ Tag badge clicked - editing entire tags field', { tag, index, allTags: tags });
-        // Edit the entire tags field, not individual tags
-        this.editTagsField(value, row, column);
-      });
-      
-      container.appendChild(tagBadge);
-    });
-    
-    // Add click handler for the container (for editing tags)
-    container.addEventListener('click', (e) => {
-      if (e.target === container) {
-        fileLog.info('🏷️ Tags container clicked - editing tags field', { currentTags: tags });
-        this.editTagsField(value, row, column);
-      }
-    });
-    
-    return container;
+    // Delegate to the modular BadgeRenderer
+    return BadgeRenderer.createTagsElement(
+      value,
+      row,
+      column,
+      this.createElement.bind(this),
+      (val, r, c) => this.editTagsField(val, r, c)
+    );
   }
 
   /**
@@ -2214,217 +1641,8 @@ export class SimplePassiveRenderer {
    * Get the appropriate CSS badge color class for a given value and column
    */
   private getBadgeColorClass(value: string, columnId: string): string | null {
-    if (!value) return null;
-    
-    const normalizedValue = value.toLowerCase().trim();
-    
-    // Status-related mappings
-    if (normalizedValue === 'open' || normalizedValue === 'new' || normalizedValue === 'todo' || normalizedValue === 'pending') {
-      return 'vibegridx-enum-badge-open';
-    }
-    if (normalizedValue === 'in-progress' || normalizedValue === 'in_progress' || normalizedValue === 'working' || normalizedValue === 'active') {
-      return 'vibegridx-enum-badge-in-progress';
-    }
-    if (normalizedValue === 'completed' || normalizedValue === 'done' || normalizedValue === 'finished' || normalizedValue === 'closed') {
-      return 'vibegridx-enum-badge-completed';
-    }
-    if (normalizedValue === 'approved') {
-      return 'vibegridx-enum-badge-approved';
-    }
-    if (normalizedValue === 'rejected') {
-      return 'vibegridx-enum-badge-rejected';
-    }
-    
-    // Priority-related mappings
-    if (normalizedValue === 'low') {
-      return 'vibegridx-enum-badge-low';
-    }
-    if (normalizedValue === 'medium' || normalizedValue === 'med' || normalizedValue === 'normal') {
-      return 'vibegridx-enum-badge-medium';
-    }
-    if (normalizedValue === 'high' || normalizedValue === 'urgent' || normalizedValue === 'critical') {
-      return 'vibegridx-enum-badge-high';
-    }
-    
-    // Type/category mappings  
-    if (normalizedValue === 'bug' || normalizedValue === 'issue' || normalizedValue === 'error') {
-      return 'vibegridx-enum-badge-rejected'; // Red color for bugs/issues
-    }
-    if (normalizedValue === 'feature' || normalizedValue === 'enhancement' || normalizedValue === 'improvement') {
-      return 'vibegridx-enum-badge-open'; // Blue color for features
-    }
-    if (normalizedValue === 'backend' || normalizedValue === 'api' || normalizedValue === 'server') {
-      return 'vibegridx-enum-badge-medium'; // Yellow/orange for backend
-    }
-    if (normalizedValue === 'frontend' || normalizedValue === 'ui' || normalizedValue === 'client') {
-      return 'vibegridx-enum-badge-active'; // Green color for frontend
-    }
-    if (normalizedValue === 'database' || normalizedValue === 'data' || normalizedValue === 'db') {
-      return 'vibegridx-enum-badge-pending'; // Yellow for database
-    }
-    
-    // Default: no specific color class (will use inline styles)
-    return null;
+    // Delegate to the modular BadgeRenderer
+    return BadgeRenderer.getBadgeColorClass(value, columnId);
   }
 
-  /**
-   * Determine if a cell type should use the smart cell system
-   */
-  private shouldUseSmartCell(cellType: string): boolean {
-    // Use smart cells for types that have dependencies
-    const smartCellTypes = [
-      'relationship-single',
-      'relationship-multi', 
-      'rollup_count',
-      'rollup_sum',
-      'rollup_average',
-      'rollup_concat',
-      'computed_expression',
-      'computed_formula'
-    ];
-    
-    return smartCellTypes.includes(cellType);
-  }
-
-  /**
-   * Create a smart cell that checks dependencies before rendering
-   */
-  private createSmartCell(row: any, column: any, cellType: string): HTMLElement {
-    // Get dependencies for this cell type
-    const deps = getCellDependencies(cellType, column);
-    
-    // Create dependency context from current state
-    const context = createDependencyContext(
-      this.universeSchema$.get() !== null, // schemaLoaded
-      this.relationshipResolver$ || new Map(), // relationshipResolver
-      this.formattersReady, // formattersReady
-      this.dataLoadingStage$?.stage.get() || 'ready', // loadingStage
-      [] // existing errors
-    );
-    
-    // Check if cell is ready to render
-    const readiness = checkCellReadiness(column, row, deps, context);
-    
-    if (readiness.isReady) {
-      // Cell is ready - render normally using existing logic
-      return this.createReadyCell(row, column, cellType);
-    } else {
-      // Cell is not ready - show loading state
-      return createLoadingCell(cellType, column);
-    }
-  }
-
-  /**
-   * Create a ready cell using the original cell creation logic
-   */
-  private createReadyCell(row: any, column: any, cellType: string): HTMLElement {
-    const cellElement = this.createElement('div', 'vibegridx-cell');
-    cellElement.dataset.rowId = row.id;
-    cellElement.dataset.columnId = column.id;
-    cellElement.style.cssText = `
-      flex: 0 0 ${column.width}px;
-      height: 100%;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-      font-size: 14px;
-      border-right: 1px solid #f1f3f5;
-      overflow: hidden;
-      position: relative;
-      cursor: default;
-    `;
-    
-    // Get cell value and create content
-    const value = row[column.id];
-    let contentElement: HTMLElement;
-    
-    // Use the same content creation logic as the original method
-    if (cellType === 'enum' || cellType === 'select' || cellType === 'tags') {
-      contentElement = this.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
-      const displayValue = this.formatCellValue(value, cellType, column);
-      
-      if (displayValue.includes('<span')) {
-        contentElement.innerHTML = displayValue;
-      } else {
-        contentElement.textContent = displayValue;
-        contentElement.style.cssText = `
-          background-color: rgb(243, 244, 246);
-          color: rgb(75, 85, 99);
-          border: 1px solid rgb(209, 213, 219);
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          font-weight: 500;
-          white-space: nowrap;
-        `;
-      }
-    } else if (this.isTagsField(column.id, value)) {
-      contentElement = this.createTagsElement(value, row, column);
-    } else if (['number', 'integer', 'float'].includes(cellType)) {
-      contentElement = this.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else if (cellType === 'boolean') {
-      contentElement = this.createElement('span', 'vibegridx-boolean-text vibegridx-cell-boolean-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else if (value == null || value === '') {
-      contentElement = this.createElement('span', 'vibegridx-cell-empty-editable');
-      contentElement.textContent = 'Click to edit';
-      contentElement.style.fontSize = '12px';
-      contentElement.style.opacity = '0.6';
-    } else {
-      contentElement = this.createElement('span', 'vibegridx-cell-text-editable');
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    }
-    
-    // Add click handler for content area
-    contentElement.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const cellId = `${row.id}:${column.id}`;
-      
-      fileLog.info('📝 Smart cell content clicked - entering edit mode', {
-        rowId: row.id,
-        columnId: column.id,
-        value,
-        cellType
-      });
-      
-      this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
-    });
-    
-    cellElement.appendChild(contentElement);
-    
-    // Add cell selection handler (same as original)
-    cellElement.addEventListener('mousedown', (e) => {
-      if ((e.target as HTMLElement) !== cellElement) {
-        fileLog.info('📝 Smart cell content element clicked, ignoring for selection');
-        return;
-      }
-      
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      const isShiftKey = e.shiftKey;
-      const cellId = `${row.id}:${column.id}`;
-      
-      this.focusedCell = cellId;
-      if (!isCtrlKey && !isShiftKey) {
-        this.selectionAnchor = cellId;
-      }
-      
-      this.container.focus();
-      e.preventDefault();
-      
-      if (isShiftKey && this.tableInteraction$.anchorCell.get()) {
-        this.tableInteraction$.selectRange(this.tableInteraction$.anchorCell.get()!, cellId);
-      } else if (isCtrlKey) {
-        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-      } else {
-        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-        this.tableInteraction$.startDragSelection(cellId);
-      }
-    });
-    
-    return cellElement;
-  }
 }

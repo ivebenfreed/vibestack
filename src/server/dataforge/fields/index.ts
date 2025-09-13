@@ -60,7 +60,6 @@ import type { EnhancedFieldHandler } from './types';
 
 export const fieldTypes = {
   text,
-  longtext: text,  // alias
   'rich-text': richText,
   'rich_text': richText,  // alias
   date,

@@ -70,7 +70,7 @@ export class ExpressionEvaluator {
       const dependencies = this.extractDependencies(tokens);
       
       // Validate expression safety
-      this.validateExpression(tokens);
+      this.validateTokens(tokens);
       
       // Replace identifiers with context values
       const evaluableExpression = this.replaceIdentifiers(tokens, context);
@@ -99,7 +99,7 @@ export class ExpressionEvaluator {
     
     try {
       const tokens = this.tokenize(expression);
-      this.validateExpression(tokens);
+      this.validateTokens(tokens);
       return { valid: true, errors: [] };
     } catch (error) {
       errors.push(error instanceof Error ? error.message : 'Validation error');
@@ -217,7 +217,7 @@ export class ExpressionEvaluator {
     return start;
   }
 
-  private validateExpression(tokens: Token[]): void {
+  private validateTokens(tokens: Token[]): void {
     for (const token of tokens) {
       switch (token.type) {
         case TokenType.FUNCTION:
