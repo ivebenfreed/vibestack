@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const data = await request.json() as any;
     const { email, company, pain, timestamp } = data;
@@ -13,8 +13,8 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    // Get MailerLite API key from environment
-    const MAILERLITE_API_KEY = import.meta.env.MAILERLITE_API_KEY;
+    // Get MailerLite API key from environment (Cloudflare Workers way)
+    const MAILERLITE_API_KEY = locals.runtime.env.MAILERLITE_API_KEY || import.meta.env.MAILERLITE_API_KEY;
     
     if (!MAILERLITE_API_KEY) {
       console.error('MailerLite API key not configured');
@@ -41,8 +41,7 @@ export const POST: APIRoute = async ({ request }) => {
           pain_point: pain || '',
           signup_date: new Date().toISOString()
         },
-        // Add to specific group if you have one set up for early access
-        // groups: ['your_early_access_group_id']
+        groups: ['165378573047170340'] // Add to Landing group for automation
       })
     });
 
