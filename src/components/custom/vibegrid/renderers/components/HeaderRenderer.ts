@@ -4,10 +4,12 @@
  */
 
 import { log } from '@/logger';
+import { observe } from '@legendapp/state';
 import type { TableCore$, TableInteraction$, TableViewport$ } from '../../stores/pure-observables';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import type { CoordinateMapping } from '../modules/OverlayManager';
+import { setupColumnDragHandlers } from '../utils/interaction-handlers';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/HeaderRenderer.ts');
 
@@ -98,15 +100,15 @@ export class HeaderRenderer {
       renderingColumns: virtualColumns.length
     });
     
-    // Update column coordinate mapping
-    this.updateColumnCoordinateMapping(allVisibleColumns);
-    
+    // Update column coordinate mapping only if columns have changed
+    const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
+
     // Calculate column positioning for virtual scrolling
     let xOffset = 40; // Start after row header
     for (let i = 0; i < startColIndex; i++) {
       xOffset += allVisibleColumns[i].width;
     }
-    
+
     // Render virtual columns
     virtualColumns.forEach((column, virtualIndex) => {
       const actualIndex = startColIndex + virtualIndex;
@@ -114,21 +116,23 @@ export class HeaderRenderer {
       headerRow.appendChild(headerCell);
       xOffset += column.width;
     });
-    
+
     // Set total width for proper overflow handling
     const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
     headerRow.style.width = `${totalHeaderWidth}px`;
     headerRow.style.minWidth = `${totalHeaderWidth}px`;
-    
+
     this.headerContainer.appendChild(headerRow);
-    
+
     // Update header container width
     this.headerContainer.style.width = `${totalHeaderWidth}px`;
     this.headerContainer.style.minWidth = `${totalHeaderWidth}px`;
-    
-    // Update coordinate mapping version and sync
-    this.coordinateMapping.version++;
-    this.updateCoordinateMapping(this.coordinateMapping);
+
+    // Only update coordinate mapping if columns actually changed
+    if (needsCoordinateUpdate) {
+      this.coordinateMapping.version++;
+      this.updateCoordinateMapping(this.coordinateMapping);
+    }
     
     fileLog.info('✅ Header rendered with total width', { totalHeaderWidth });
   }
@@ -153,20 +157,24 @@ export class HeaderRenderer {
     
     // Add click handler for sorting and column selection
     this.setupHeaderClickHandler(headerCell, column);
-    
+
+    // Add drag handling for column reordering
+    this.setupColumnDragHandlers(headerCell, column);
+
     return headerCell;
   }
 
   /**
    * Update column coordinate mapping
+   * @returns true if mapping changed, false if unchanged
    */
-  private updateColumnCoordinateMapping(allVisibleColumns: any[]): void {
-    this.coordinateMapping.columns = [];
+  private updateColumnCoordinateMapping(allVisibleColumns: any[]): boolean {
+    const newColumns: any[] = [];
     let xOffset = 40; // Start after row header
-    
-    // Build complete coordinate mapping for all visible columns (for overlays)
+
+    // Build new coordinate mapping for all visible columns
     allVisibleColumns.forEach((column, index) => {
-      this.coordinateMapping.columns.push({
+      newColumns.push({
         columnId: column.id,
         x: xOffset,
         width: column.width,
@@ -175,6 +183,24 @@ export class HeaderRenderer {
       });
       xOffset += column.width;
     });
+
+    // Check if coordinate mapping has changed (including position)
+    const hasChanged = !this.coordinateMapping.columns ||
+      this.coordinateMapping.columns.length !== newColumns.length ||
+      newColumns.some((newCol, index) => {
+        const oldCol = this.coordinateMapping.columns?.[index];
+        return !oldCol ||
+               oldCol.columnId !== newCol.columnId ||
+               oldCol.width !== newCol.width ||
+               oldCol.x !== newCol.x;
+      });
+
+    if (hasChanged) {
+      this.coordinateMapping.columns = newColumns;
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -189,7 +215,9 @@ export class HeaderRenderer {
       // Check current selection state to determine action
       const selectedCells = this.tableInteraction$.selectedCells.get();
       const processedRows = this.tableCore$.processedRows.get();
-      const visibleColumns = this.tableCore$.visibleColumns.get();
+      const columns = this.tableCore$.columns.get();
+      const columnVisibility = this.tableCore$.columnVisibility.get();
+      const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
       
       fileLog.info('🎯 Select all checkbox clicked', {
         currentSelection: selectedCells.size,
@@ -284,6 +312,44 @@ export class HeaderRenderer {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     });
+  }
+
+  /**
+   * Set up column drag handlers for column reordering
+   */
+  private setupColumnDragHandlers(headerCell: HTMLElement, column: any): void {
+    setupColumnDragHandlers(
+      headerCell,
+      column,
+      (columnId: string, e: DragEvent) => {
+        // On drag start
+        fileLog.info('🎯 Column drag started', { columnId });
+        this.tableInteraction$.isDragging.set(true);
+        this.tableInteraction$.dragSource.set(columnId);
+      },
+      (columnId: string, e: DragEvent) => {
+        // On drag end
+        fileLog.info('🎯 Column drag ended', { columnId });
+        this.tableInteraction$.isDragging.set(false);
+        this.tableInteraction$.dragSource.set(null);
+        this.tableInteraction$.dragTarget.set(null);
+      },
+      (e: DragEvent) => {
+        // On drag over
+        // Visual feedback is handled by overlay manager
+      },
+      (targetColumnId: string, e: DragEvent) => {
+        // On drop - reorder columns
+        const sourceColumnId = this.tableInteraction$.dragSource.get();
+        if (sourceColumnId && sourceColumnId !== targetColumnId) {
+          fileLog.info('🎯 Column dropped for reordering', {
+            sourceColumnId,
+            targetColumnId
+          });
+          this.tableCore$.reorderColumn(sourceColumnId, targetColumnId);
+        }
+      }
+    );
   }
 
   /**

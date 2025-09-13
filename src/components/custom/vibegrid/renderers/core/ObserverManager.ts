@@ -137,15 +137,15 @@ export class ObserverManager {
         // Only update visual elements during resize, don't trigger re-renders
         this.updateHeaderCellWidth(resizeState.columnId, resizeState.newWidth);
         this.updateBodyCellWidths(resizeState.columnId, resizeState.newWidth);
-        
-        // Update overlay manager with resize preview
+
+        // Update overlay manager with resize preview (throttled)
         if (this.overlayManager) {
           this.overlayManager.updateColumnResizePreview(resizeState);
         }
       } else if (resizeState === null) {
-        // Resize completed
+        // Resize completed - this should trigger a single re-render
         fileLog.info('📏 Column resize completed');
-        
+
         // Clear resize preview
         if (this.overlayManager) {
           this.overlayManager.updateColumnResizePreview(null);
@@ -194,29 +194,16 @@ export class ObserverManager {
   private setupSelectionObserver(): void {
     const selectionDisposer = observe(() => {
       const selectedCells = this.tableInteraction$.selectedCells.get();
-      const scrollTop = this.tableViewport$.scrollTop.get();
-      const scrollLeft = this.tableViewport$.scrollLeft.get();
-      const viewportHeight = this.tableViewport$.viewportHeight.get();
-      
-      fileLog.info('🎯 Selection changed', { 
-        selectedCount: selectedCells.size,
-        scrollTop,
-        viewportHeight 
+
+      fileLog.info('🎯 Selection changed', {
+        selectedCount: selectedCells.size
       });
-      
+
       // Update selection using overlay manager
       if (this.overlayManager) {
         this.overlayManager.updateSelection(selectedCells);
-        
-        // Update viewport info for overlays
-        const viewportInfo: ViewportInfo = {
-          start: Math.floor(scrollTop / ROW_HEIGHT),
-          end: Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT),
-          scrollTop: scrollTop,
-          scrollLeft: scrollLeft
-        };
       }
-      
+
       // Delegate to renderer for DOM class updates
       this.onSelectionChanged(selectedCells);
     });
