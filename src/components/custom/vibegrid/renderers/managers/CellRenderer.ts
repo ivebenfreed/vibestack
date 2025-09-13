@@ -6,11 +6,12 @@
  */
 
 import { log } from '@/logger';
-import type { 
-  TableCore$, 
-  TableInteraction$, 
-  TableViewport$ 
+import type {
+  TableCore$,
+  TableInteraction$,
+  TableViewport$
 } from '../../stores/pure-observables';
+import { getColumnWidth } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
 import { CellFormatter } from '../modules/CellFormatter';
@@ -69,14 +70,17 @@ export class CellRenderer {
     // Check if this cell is selected
     const cellId = `${row.id}:${column.id}`;
     const isSelected = this.tableInteraction$.selectedCells.get().has(cellId);
-    
+
+    // Use centralized visual state for column width
+    const actualWidth = getColumnWidth(column.id);
+
     // Use absolute positioning if xPosition is provided
     if (xPosition !== undefined) {
       cellElement.style.cssText = `
         position: absolute;
         left: ${xPosition}px;
         top: 0;
-        width: ${column.width}px;
+        width: ${actualWidth}px;
         height: 100%;
         padding: 0 12px;
         display: flex;
@@ -89,7 +93,7 @@ export class CellRenderer {
     } else {
       // Fallback to flex layout for compatibility
       cellElement.style.cssText = `
-        flex: 0 0 ${column.width}px;
+        flex: 0 0 ${actualWidth}px;
         height: 100%;
         padding: 0 12px;
         display: flex;

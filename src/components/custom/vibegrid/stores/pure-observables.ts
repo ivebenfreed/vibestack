@@ -14,6 +14,7 @@ import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/
 import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
+import { columnOperations, columns$ } from './columns-observable';
 
 const fileLog = log('components/custom/vibegrid/stores/pure-observables.ts');
 
@@ -677,25 +678,15 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       fileLog.info('🎯 Column width set (auto-persistent)', { columnId, width });
     },
     
-    // Update column width (for resize overlay)
+    // Update column width - DELEGATES TO COLUMNS OBSERVABLE
     updateColumnWidth(columnId: string, width: number) {
-      batch(() => {
-        const widths = { ...tableCore$.columnWidths.get() };
-        widths[columnId] = width;
-        tableCore$.columnWidths.set(widths);
-        
-        // Update columns array
-        const columns = [...tableCore$.columns.get()];
-        const colIndex = columns.findIndex(c => c.id === columnId);
-        if (colIndex >= 0) {
-          columns[colIndex] = { ...columns[colIndex], width };
-          tableCore$.columns.set(columns);
-        }
-        
-        // syncObservable automatically persists changes to localStorage
-      });
-      
-      fileLog.info('🎯 Column width updated (auto-persistent)', { columnId, width });
+      columnOperations.updateWidth(columnId, width);
+      fileLog.info('🎯 Column width updated (delegated)', { columnId, width });
+    },
+
+    // Get effective column width - DELEGATES TO COLUMNS OBSERVABLE
+    getColumnWidth(columnId: string): number {
+      return columnOperations.getWidth(columnId);
     },
 
     // Reorder columns (for column drag and drop)
@@ -859,7 +850,17 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     console.error('🔧 PERSISTENCE DEBUG: Failed to configure syncObservable', { entityType, error });
     fileLog.error('❌ Failed to configure Legend State persistence', { entityType, error: error.message });
   }
-  
+
+  // Initialize columns observable with current state
+  const orgId = universeOrgId$.get();
+  const userId = universeUserId$.get();
+  if (orgId && userId) {
+    columnOperations.initialize(columns, entityType, orgId, userId);
+    fileLog.info('✅ Columns observable initialized', { entityType, orgId, userId });
+  } else {
+    fileLog.warn('⚠️ Cannot initialize columns observable - missing orgId or userId', { orgId, userId });
+  }
+
   // Return the observable with sync state
   return {
     tableCore$,

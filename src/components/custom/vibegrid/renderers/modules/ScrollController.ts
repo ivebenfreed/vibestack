@@ -189,12 +189,28 @@ export class ScrollController {
    * Sync header horizontal scroll with body
    */
   private syncHeaderScroll(scrollLeft: number): void {
-    if (!this.scrollRAF && this.headerViewport) {
+    if (this.headerViewport) {
+      // Cancel any pending RAF to ensure immediate sync
+      if (this.scrollRAF) {
+        cancelAnimationFrame(this.scrollRAF);
+      }
+
       this.scrollRAF = requestAnimationFrame(() => {
         if (this.headerViewport) {
           this.headerViewport.scrollLeft = scrollLeft;
+
+          fileLog.debug('🔄 Header scroll synced', {
+            scrollLeft,
+            actualHeaderScroll: this.headerViewport.scrollLeft,
+            headerViewportExists: !!this.headerViewport
+          });
         }
         this.scrollRAF = null;
+      });
+    } else {
+      fileLog.warn('⚠️ Header viewport not found for scroll sync', {
+        scrollLeft,
+        headerViewport: this.headerViewport
       });
     }
   }

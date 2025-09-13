@@ -6,11 +6,12 @@
  */
 
 import { log } from '@/logger';
-import type { 
-  TableCore$, 
-  TableInteraction$, 
-  TableViewport$ 
+import type {
+  TableCore$,
+  TableInteraction$,
+  TableViewport$
 } from '../../stores/pure-observables';
+import { getColumnWidth, getViewportGeometry, visualState$, visualOperations } from '../../stores/visual-state';
 import type { ScrollController } from '../modules/ScrollController';
 import type { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import type { SelectionController } from '../modules/SelectionController';
@@ -127,7 +128,10 @@ export class ViewportManager {
     if (this.viewport) {
       const rect = this.viewport.getBoundingClientRect();
       this.tableViewport$.updateViewport(rect.width, rect.height);
-      
+
+      // Update centralized visual state
+      visualOperations.setViewportSize(rect.width, rect.height);
+
       fileLog.info('📐 Viewport dimensions initialized', {
         width: rect.width,
         height: rect.height
@@ -141,24 +145,24 @@ export class ViewportManager {
    */
   setupScrollHandling(): void {
     if (!this.viewport) return;
-    
+
     fileLog.info('📜 Setting up scroll coordination');
-    
+
     // Direct DOM event binding → Observable updates (as planned in docs)
     this.viewport.addEventListener('scroll', (e) => {
       const target = e.target as HTMLElement;
       const scrollTop = target.scrollTop;
       const scrollLeft = target.scrollLeft;
-      
+
       // Update viewport observable (triggers all reactive updates)
       this.tableViewport$.updateScroll(scrollTop, scrollLeft);
-      
+
       // Sync header scroll with requestAnimationFrame optimization
       this.syncHeaderScroll(scrollLeft);
-      
+
       fileLog.debug('📜 Scroll event processed', { scrollTop, scrollLeft });
     });
-    
+
     this.setupViewportClickHandling();
     this.setupKeyboardHandling();
   }
@@ -317,6 +321,9 @@ export class ViewportManager {
     if (this.viewport && viewportWidth === 0) {
       const rect = this.viewport.getBoundingClientRect();
       this.tableViewport$.updateViewport(rect.width, rect.height);
+
+      // Update centralized visual state
+      visualOperations.setViewportSize(rect.width, rect.height);
     }
     
     // Trigger callback for renderer coordination
@@ -347,27 +354,29 @@ export class ViewportManager {
       Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + 1
     );
     
-    // Calculate visible column range
+    // Calculate visible column range using centralized visual state
     let startColIndex = 0;
     let endColIndex = columns.length;
     let accumulatedWidth = 40; // Account for row header
-    
+
     // Find start column - first column that is at least partially visible
     for (let i = 0; i < columns.length; i++) {
-      if (accumulatedWidth + columns[i].width > scrollLeft) {
+      const actualWidth = getColumnWidth(columns[i].id);
+      if (accumulatedWidth + actualWidth > scrollLeft) {
         startColIndex = i;
         break;
       }
-      accumulatedWidth += columns[i].width;
+      accumulatedWidth += actualWidth;
     }
-    
+
     // Find end column - continue from where we left off
     for (let i = startColIndex; i < columns.length; i++) {
+      const actualWidth = getColumnWidth(columns[i].id);
       if (accumulatedWidth > scrollLeft + viewportWidth) {
         endColIndex = i + 1; // Include one more for partial visibility
         break;
       }
-      accumulatedWidth += columns[i].width;
+      accumulatedWidth += actualWidth;
     }
     
     return {
@@ -388,7 +397,11 @@ export class ViewportManager {
     );
     
     const totalHeight = rows.length * ROW_HEIGHT;
-    const totalWidth = 40 + columns.reduce((sum, col) => sum + col.width, 0) + 20; // +20px for end drop zone (match header)
+    // Use centralized visual state for accurate total calculation
+    const totalWidth = 40 + columns.reduce((sum, col) => {
+      const actualWidth = getColumnWidth(col.id);
+      return sum + actualWidth;
+    }, 0) + 20; // +20px for end drop zone (match header)
     
     this.bodyContainer.style.height = `${totalHeight}px`;
     this.bodyContainer.style.width = `${totalWidth}px`;

@@ -7,6 +7,7 @@
 
 import { observe } from '@legendapp/state';
 import { log } from '@/logger';
+import { visualOperations } from '../../stores/visual-state';
 import type { 
   TableCore$, 
   TableInteraction$, 
@@ -318,12 +319,12 @@ export class SimplePassiveRenderer {
         // Drag changes are handled by overlay manager
       },
       
-      // Column resize handlers
+      // Column resize handlers - delegate to ColumnWidthManager
       updateHeaderCellWidth: (columnId: string, newWidth: number) => {
-        this.updateHeaderCellWidth(columnId, newWidth);
+        this.columnWidthManager?.updateHeaderCellWidth(columnId, newWidth);
       },
       updateBodyCellWidths: (columnId: string, newWidth: number) => {
-        this.updateBodyCellWidths(columnId, newWidth);
+        this.columnWidthManager?.updateBodyCellWidths(columnId, newWidth);
       }
     });
     
@@ -379,6 +380,9 @@ export class SimplePassiveRenderer {
       onScroll: (scrollLeft: number, scrollTop: number) => {
         // Update viewport observable (triggers all reactive updates)
         this.tableViewport$.updateScroll(scrollTop, scrollLeft);
+
+        // Update centralized visual state
+        visualOperations.setScrollPosition(scrollLeft, scrollTop);
       },
       keyboardNavController: this.keyboardNavController,
       selectionController: this.selectionController,

@@ -10,6 +10,7 @@ import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import type { CoordinateMapping } from '../modules/OverlayManager';
 import { setupColumnDragHandlers } from '../utils/interaction-handlers';
+import { visualState$, getColumnWidth, getColumnXOffset, getVisibleColumns } from '../../stores/visual-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/HeaderRenderer.ts');
 
@@ -111,12 +112,16 @@ export class HeaderRenderer {
       xOffset += allVisibleColumns[i].width;
     }
 
+    // Get reactive column widths for consistent calculations
+    const columnWidths = this.tableCore$.columnWidths.get();
+
     // Render virtual columns
     virtualColumns.forEach((column, virtualIndex) => {
       const actualIndex = startColIndex + virtualIndex;
       const headerCell = this.createColumnHeader(column, actualIndex, xOffset);
       headerRow.appendChild(headerCell);
-      xOffset += column.width;
+      const actualWidth = getColumnWidth(column.id);
+      xOffset += actualWidth;
     });
 
     // Add end drop zone for placing columns at the end
@@ -124,7 +129,11 @@ export class HeaderRenderer {
     headerRow.appendChild(endDropZone);
 
     // Set total width for proper overflow handling (include end drop zone)
-    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0) + 20; // +20px for end zone
+    // Use centralized visual state for accurate total calculation
+    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => {
+      const actualWidth = getColumnWidth(col.id);
+      return sum + actualWidth;
+    }, 0) + 20; // +20px for end zone
     headerRow.style.width = `${totalHeaderWidth}px`;
     headerRow.style.minWidth = `${totalHeaderWidth}px`;
 
@@ -147,7 +156,9 @@ export class HeaderRenderer {
    * Create column header element
    */
   private createColumnHeader(column: any, actualIndex: number, xOffset: number): HTMLElement {
-    const headerCell = this.domFactory.createHeaderCell(column, column.width);
+    // Use single source of truth for column width
+    const actualWidth = this.tableCore$.getColumnWidth(column.id);
+    const headerCell = this.domFactory.createHeaderCell(column, actualWidth);
     
     // Create header content with text and sort icon
     const textGroup = this.domFactory.createHeaderTextGroup(column);
@@ -244,15 +255,19 @@ export class HeaderRenderer {
     let xOffset = 40; // Start after row header
 
     // Build new coordinate mapping for all visible columns
+    // Get reactive column widths
+    const columnWidths = this.tableCore$.columnWidths.get();
+
     allVisibleColumns.forEach((column, index) => {
+      const actualWidth = getColumnWidth(column.id);
       newColumns.push({
         columnId: column.id,
         x: xOffset,
-        width: column.width,
+        width: actualWidth,
         index: index,
         offset: xOffset
       });
-      xOffset += column.width;
+      xOffset += actualWidth;
     });
 
     // Check if coordinate mapping has changed (including position)
@@ -316,13 +331,16 @@ export class HeaderRenderer {
   private setupResizeHandler(resizeHandle: HTMLElement, column: any): void {
     let isResizing = false;
     let startX = 0;
-    let startWidth = column.width;
-    
+    // Get actual width from centralized visual state
+    let startWidth = getColumnWidth(column.id);
+
     resizeHandle.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       isResizing = true;
       startX = e.pageX;
-      startWidth = column.width;
+      // Update startWidth from current reactive state
+      const currentColumnWidths = this.tableCore$.columnWidths.get();
+      startWidth = currentColumnWidths[column.id] || column.width || 150;
       
       // Update interaction state
       this.tableInteraction$.columnResize.set({

@@ -4,6 +4,8 @@ import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
 import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
 import type { Column } from './types';
 import { log } from '@/logger';
+import { visualOperations, visualState$ } from './stores/visual-state';
+import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -114,6 +116,16 @@ export function VibeGrid<T extends Record<string, any> = any>(
       observablesRef.current = observables;
 
       fileLog.debug('✅ Created pure observables', { entityType });
+
+      // Initialize centralized visual state
+      const orgId = universeOrgId$.get();
+      const userId = universeUserId$.get();
+      if (orgId && userId) {
+        visualOperations.initialize(columns, entityType, orgId, userId);
+        fileLog.info('🎯 Visual state initialized', { entityType, orgId, userId });
+      } else {
+        fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
+      }
 
       // Wait for persistence to load before initializing renderer
       const checkPersistLoaded = () => {
