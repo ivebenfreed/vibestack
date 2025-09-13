@@ -18,6 +18,7 @@ import { authMachine } from '@/state-machines/machines/auth-machine'
 import { simpleNotificationSyncMachine } from '@/state-machines/machines/simple-notification-sync-machine'
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
 import { useAuth, useSystem } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { log } from '@/logger'
 import React from 'react'
 import { useRouter } from '@tanstack/react-router'
@@ -503,8 +504,20 @@ function AppWithInitialization() {
   const navigate = useNavigate()
   const router = useRouter()
   const { isSystemReady } = useSystem()
-  const { isAuthenticated } = useAuth()
-  rootLog.info('AppWithInitialization states:', { isSystemReady, isAuthenticated });
+  
+  // Use unified auth that combines both XState and Legend State auth
+  const { isAuthenticated, isSystemReady: unifiedSystemReady } = useUnifiedAuth()
+  
+  // Use the unified system ready state (combines both sources)
+  const finalSystemReady = isSystemReady || unifiedSystemReady
+  
+  rootLog.info('AppWithInitialization states:', { 
+    isSystemReady, 
+    unifiedSystemReady,
+    finalSystemReady,
+    isAuthenticated: isAuthenticated,
+    source: 'unified auth (combines XState + Legend State)'
+  });
   
   // Listen for auth state changes to handle navigation
   React.useEffect(() => {

@@ -115,19 +115,15 @@ export const universeSchema$ = observable(() => {
   const combinedEntities: Record<string, any> = {}
   let totalEntitiesAdded = 0
   
-  organizations.forEach((org) => {
+  readyOrganizations.forEach((org) => {
     // Safety check: ensure orgId exists (API returns 'id', not 'orgId')
     const orgId = org.orgId || org.id
     if (!orgId) {
-      fileLog.error(`[UniverseSchema] Skipping org with missing orgId:`, org)
+      fileLog.error(`[UniverseSchema] Skipping ready org with missing orgId:`, org)
       return
     }
     
-    // CRITICAL FIX: Skip organizations that are still loading
-    if (org.loading) {
-      fileLog.debug(`[UniverseSchema] Skipping org ${orgId} - still loading`)
-      return
-    }
+    // NOTE: Loading check is no longer needed since readyOrganizations already filters out loading orgs
     
     fileLog.info(`[UniverseSchema] Processing org ${orgId} (${org.name || 'unnamed'})`)
     

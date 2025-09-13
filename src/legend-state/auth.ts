@@ -23,8 +23,10 @@ export interface AuthOrganization {
 
 export interface AuthState {
   user: AuthUser | null;
-  organization: AuthOrganization | null;
+  organization: AuthOrganization | null; // Current selected organization
+  userOrganizations: AuthOrganization[]; // All organizations user has access to
   loading: boolean;
+  loadingOrganizations: boolean;
   error: string | null;
   sessionExpiry: string | null;
   authToken: string | null;
@@ -36,12 +38,15 @@ export const auth$ = observable<AuthState & {
   signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  loadUserOrganizations: () => Promise<void>;
   clearError: () => void;
 }>({
   // State
   user: null,
   organization: null,
+  userOrganizations: [],
   loading: true,
+  loadingOrganizations: false,
   error: null,
   sessionExpiry: null,
   authToken: null,
@@ -106,6 +111,9 @@ export const auth$ = observable<AuthState & {
         hasToken: !!session.data.session?.token
       });
 
+      // Load user organizations after successful sign-in
+      auth$.loadUserOrganizations();
+
       return true;
 
     } catch (error) {
@@ -121,12 +129,17 @@ export const auth$ = observable<AuthState & {
   signOut: async (): Promise<void> => {
     authLog.info('[AUTH$] Starting sign-out');
     
-    try {
-      await authClient.signOut();
-      authLog.info('[AUTH$] Sign-out successful');
-    } catch (error) {
-      authLog.error('[AUTH$] Sign-out error:', error);
-      // Continue with clearing state even if API call fails
+    // Only call server signOut if we have a current user session
+    if (auth$.user.get()) {
+      try {
+        await authClient.signOut();
+        authLog.info('[AUTH$] Server sign-out successful');
+      } catch (error) {
+        authLog.info('[AUTH$] Server sign-out error (continuing with local cleanup):', error);
+        // Continue with clearing state even if API call fails
+      }
+    } else {
+      authLog.info('[AUTH$] No active session, skipping server sign-out');
     }
 
     // Clear auth state
@@ -185,8 +198,11 @@ export const auth$ = observable<AuthState & {
           userId: userData.id,
           organizationName: organizationData?.name
         });
+
+        // Load user organizations after authentication check
+        auth$.loadUserOrganizations();
       } else {
-        // No user session
+        // No user session - don't treat this as an error
         auth$.user.set(null);
         auth$.organization.set(null);
         auth$.authToken.set(null);
@@ -194,22 +210,22 @@ export const auth$ = observable<AuthState & {
         authLog.info('[AUTH$] No user session found');
       }
     } catch (error) {
-      authLog.error('[AUTH$] Auth check failed:', error);
+      authLog.info('[AUTH$] Auth check failed (treating as no session):', error);
       
-      // Handle session errors
+      // Treat all auth check errors as "no session" to prevent error loops
+      // Don't set error state during initial auth check
+      auth$.user.set(null);
+      auth$.organization.set(null);
+      auth$.authToken.set(null);
+      auth$.sessionExpiry.set(null);
+      
+      // Clear persisted state only if it's a clear auth failure (401, 403)
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const isSessionExpired = errorMessage.includes('401') || 
-                               errorMessage.includes('Unauthorized') ||
-                               errorMessage.includes('session expired');
+      const isAuthFailure = errorMessage.includes('401') || 
+                           errorMessage.includes('403') ||
+                           errorMessage.includes('Unauthorized');
       
-      if (isSessionExpired) {
-        // Clear expired session
-        auth$.user.set(null);
-        auth$.organization.set(null);
-        auth$.authToken.set(null);
-        auth$.sessionExpiry.set(null);
-        
-        // Clear persisted state
+      if (isAuthFailure) {
         try {
           localStorage.removeItem('auth-machine-state');
           localStorage.removeItem('auth-machine-snapshot');
@@ -224,11 +240,100 @@ export const auth$ = observable<AuthState & {
 
   clearError: (): void => {
     auth$.error.set(null);
+  },
+
+  loadUserOrganizations: async (): Promise<void> => {
+    authLog.info('[AUTH$] Loading user organizations');
+    auth$.loadingOrganizations.set(true);
+    
+    try {
+      const response = await fetch(`${window.location.origin}/api/organizations`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch organizations: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // The API returns { organizations: [...] } format
+      const organizations = data.organizations || data;
+      
+      if (!Array.isArray(organizations)) {
+        throw new Error('Invalid organizations response format');
+      }
+
+      // Transform to AuthOrganization format - API returns flat organization objects
+      const userOrganizations: AuthOrganization[] = organizations.map((org: any) => ({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        role: 'owner' // Default role - this should come from membership data in the future
+      }));
+
+      auth$.userOrganizations.set(userOrganizations);
+
+      // Set current organization if not already set and user has organizations
+      if (!auth$.organization.get() && userOrganizations.length > 0) {
+        auth$.organization.set(userOrganizations[0]);
+      }
+
+      authLog.info('[AUTH$] Loaded user organizations:', {
+        count: userOrganizations.length,
+        organizations: userOrganizations.map(org => ({ name: org.name, role: org.role })),
+        currentOrg: auth$.organization.get()?.name
+      });
+
+    } catch (error) {
+      authLog.error('[AUTH$] Failed to load user organizations:', error);
+      auth$.userOrganizations.set([]);
+      // Don't set error state for organization loading - it's not critical for auth
+    } finally {
+      auth$.loadingOrganizations.set(false);
+    }
   }
 });
 
 // Initialize auth check on startup
 auth$.checkAuth();
+
+// Reactive effect: Auto-load universe context when organizations are loaded
+// This connects Legend State auth to the universe schema system
+import { when } from '@legendapp/state';
+
+when(() => {
+  const user = auth$.user.get();
+  const organizations = auth$.userOrganizations.get();
+  const loadingOrganizations = auth$.loadingOrganizations.get();
+  
+  // Trigger when we have a user, organizations loaded, and not currently loading
+  return user && organizations.length > 0 && !loadingOrganizations;
+}, async () => {
+  const user = auth$.user.get();
+  const organizations = auth$.userOrganizations.get();
+  
+  if (!user || organizations.length === 0) return;
+  
+  authLog.info('[AUTH$] Auto-loading universe context from Legend State auth', {
+    userId: user.id,
+    organizationCount: organizations.length,
+    organizations: organizations.map(org => ({ id: org.id, name: org.name }))
+  });
+  
+  try {
+    const { loadUniverseContext } = await import('@/legend-state/observables');
+    const organizationIds = organizations.map(org => org.id);
+    const organizationData = organizations.map(org => ({ id: org.id, name: org.name }));
+    
+    await loadUniverseContext(user.id, organizationIds, organizationData);
+    
+    authLog.info('[AUTH$] Successfully loaded universe context from Legend State auth');
+  } catch (error) {
+    authLog.error('[AUTH$] Failed to load universe context from Legend State auth:', error);
+  }
+});
 
 // Export computed values for convenience
 export const isAuthenticated$ = () => auth$.user.get() !== null;
