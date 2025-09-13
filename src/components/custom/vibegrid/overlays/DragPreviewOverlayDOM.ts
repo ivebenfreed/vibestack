@@ -77,12 +77,29 @@ export class DragPreviewOverlayDOM {
       this.clear();
       return;
     }
-    
+
+    // Skip for column drag operations (let interaction-handlers.ts handle those)
+    // Column drags have specific drag handlers with custom drag images
+    if (this.isColumnDragOperation()) {
+      this.clear();
+      return;
+    }
+
     // Calculate bounds
     const bounds = this.calculateDragBounds(dragState, viewport);
-    
+
     // Show preview
     this.showPreview(bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+
+  /**
+   * Check if this is a column drag operation (vs cell selection drag)
+   */
+  private isColumnDragOperation(): boolean {
+    // Column drags are handled by interaction-handlers.ts with setDragImage
+    // We can detect them by checking for active column drag via DOM
+    const draggingHeaders = document.querySelectorAll('.vibegridx-header-cell.dragging, .vibegridx-dragging');
+    return draggingHeaders.length > 0;
   }
   
   /**

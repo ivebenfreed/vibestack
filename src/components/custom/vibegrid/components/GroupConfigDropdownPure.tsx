@@ -58,7 +58,7 @@ const SortableGroupField = ({ field, index, onRemove }: SortableGroupFieldProps)
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.8 : 1,
   };
 
   return (
@@ -238,11 +238,8 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
         {/* Current Grouping Fields */}
         {hasActiveGrouping && (
           <>
-            <DropdownMenuLabel className="text-xs flex items-center gap-2">
+            <DropdownMenuLabel className="text-xs">
               Active Grouping
-              <Badge variant="secondary" className="text-xs">
-                Drag to reorder
-              </Badge>
             </DropdownMenuLabel>
             <div className="px-1">
               <DndContext

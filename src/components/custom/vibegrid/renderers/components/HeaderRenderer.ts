@@ -117,8 +117,12 @@ export class HeaderRenderer {
       xOffset += column.width;
     });
 
-    // Set total width for proper overflow handling
-    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
+    // Add end drop zone for placing columns at the end
+    const endDropZone = this.createEndDropZone();
+    headerRow.appendChild(endDropZone);
+
+    // Set total width for proper overflow handling (include end drop zone)
+    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0) + 20; // +20px for end zone
     headerRow.style.width = `${totalHeaderWidth}px`;
     headerRow.style.minWidth = `${totalHeaderWidth}px`;
 
@@ -162,6 +166,71 @@ export class HeaderRenderer {
     this.setupColumnDragHandlers(headerCell, column);
 
     return headerCell;
+  }
+
+  /**
+   * Create end drop zone for placing columns at the end
+   */
+  private createEndDropZone(): HTMLElement {
+    const endDropZone = document.createElement('div');
+    endDropZone.className = 'vibegridx-end-drop-zone';
+    endDropZone.style.cssText = `
+      position: relative;
+      width: 20px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      border-left: 1px dashed transparent;
+      transition: border-color 0.15s ease;
+    `;
+
+    // Add drop handlers for inserting at the end
+    endDropZone.addEventListener('dragover', (e: DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'move';
+
+      // Remove any existing insertion lines from column headers
+      document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
+
+      // Show visual feedback for end insertion
+      endDropZone.style.borderLeftColor = '#3b82f6';
+      endDropZone.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+    });
+
+    endDropZone.addEventListener('dragleave', (e: DragEvent) => {
+      // Only remove if actually leaving (not moving to child elements)
+      if (!endDropZone.contains(e.relatedTarget as Node)) {
+        endDropZone.style.borderLeftColor = 'transparent';
+        endDropZone.style.backgroundColor = 'transparent';
+      }
+    });
+
+    endDropZone.addEventListener('drop', (e: DragEvent) => {
+      e.preventDefault();
+
+      // Clear visual feedback
+      endDropZone.style.borderLeftColor = 'transparent';
+      endDropZone.style.backgroundColor = 'transparent';
+
+      const draggedColumnId = e.dataTransfer!.getData('text/plain');
+      if (draggedColumnId) {
+        fileLog.info('🎯 Column dropped at end position', { draggedColumnId });
+
+        // Move column to the end by using the last column as target with insertBefore=false
+        const columns = this.tableCore$.columns.get();
+        if (columns.length > 0) {
+          const lastColumn = columns[columns.length - 1];
+          if (lastColumn.id !== draggedColumnId) {
+            // Insert after the last column (insertBefore=false)
+            this.tableCore$.reorderColumn(draggedColumnId, lastColumn.id, false);
+          }
+        }
+      }
+    });
+
+    return endDropZone;
   }
 
   /**
@@ -338,15 +407,16 @@ export class HeaderRenderer {
         // On drag over
         // Visual feedback is handled by overlay manager
       },
-      (targetColumnId: string, e: DragEvent) => {
+      (targetColumnId: string, insertBefore: boolean, e: DragEvent) => {
         // On drop - reorder columns
         const sourceColumnId = this.tableInteraction$.dragSource.get();
         if (sourceColumnId && sourceColumnId !== targetColumnId) {
           fileLog.info('🎯 Column dropped for reordering', {
             sourceColumnId,
-            targetColumnId
+            targetColumnId,
+            insertBefore
           });
-          this.tableCore$.reorderColumn(sourceColumnId, targetColumnId);
+          this.tableCore$.reorderColumn(sourceColumnId, targetColumnId, insertBefore);
         }
       }
     );

@@ -14,7 +14,7 @@ export function setupColumnDragHandlers(
   onDragStart: (columnId: string, e: DragEvent) => void,
   onDragEnd: (columnId: string, e: DragEvent) => void,
   onDragOver: (e: DragEvent) => void,
-  onDrop: (targetColumnId: string, e: DragEvent) => void
+  onDrop: (targetColumnId: string, insertBefore: boolean, e: DragEvent) => void
 ): void {
   if (column.id === '__selection') return; // Selection column not draggable
   
@@ -31,24 +31,24 @@ export function setupColumnDragHandlers(
       position: fixed;
       top: -200px;
       left: 50px;
-      background: #1f2937;
-      color: white;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 14px;
+      background: transparent;
+      color: hsl(var(--muted-foreground));
+      padding: 0;
+      border-radius: 0;
+      font-size: 12px;
       font-weight: 600;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
-      border: 1px solid #374151;
+      box-shadow: none;
+      border: none;
       white-space: nowrap;
       z-index: 99999;
       font-family: system-ui, -apple-system, sans-serif;
-      min-width: 80px;
-      text-align: center;
+      text-align: left;
+      opacity: 0.8;
     `;
 
-    // Get column title with fallback
-    const columnTitle = column.title || column.header || column.id;
-    dragImage.textContent = `Moving: ${columnTitle}`;
+    // Get column label (same as header display)
+    const columnLabel = column.label || column.title || column.header || column.id;
+    dragImage.textContent = columnLabel;
 
     document.body.appendChild(dragImage);
 
@@ -125,7 +125,13 @@ export function setupColumnDragHandlers(
 
     const draggedColumnId = e.dataTransfer!.getData('text/plain');
     if (draggedColumnId !== column.id) {
-      onDrop(column.id, e);
+      // Calculate insertion position (same logic as dragover)
+      const rect = headerCell.getBoundingClientRect();
+      const mouseX = e.clientX;
+      const cellCenterX = rect.left + rect.width / 2;
+      const insertBefore = mouseX < cellCenterX;
+
+      onDrop(column.id, insertBefore, e);
     }
   });
 }

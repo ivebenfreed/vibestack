@@ -699,7 +699,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     },
 
     // Reorder columns (for column drag and drop)
-    reorderColumn(sourceColumnId: string, targetColumnId: string) {
+    reorderColumn(sourceColumnId: string, targetColumnId: string, insertBefore: boolean = true) {
       batch(() => {
         const columns = [...tableCore$.columns.get()];
         const sourceIndex = columns.findIndex(c => c.id === sourceColumnId);
@@ -710,14 +710,21 @@ export function createTableCore$(entityType: string, columns: Column[]) {
             sourceColumnId,
             targetColumnId,
             sourceIndex,
-            targetIndex
+            targetIndex,
+            insertBefore
           });
           return;
         }
 
-        // Remove source column and insert at target position
+        // Remove source column first
         const [sourceColumn] = columns.splice(sourceIndex, 1);
-        columns.splice(targetIndex, 0, sourceColumn);
+
+        // Recalculate target index after removal (if source was before target)
+        const adjustedTargetIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+
+        // Insert at the appropriate position
+        const insertIndex = insertBefore ? adjustedTargetIndex : adjustedTargetIndex + 1;
+        columns.splice(insertIndex, 0, sourceColumn);
 
         tableCore$.columns.set(columns);
 
@@ -726,7 +733,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 
       fileLog.info('🎯 Column reordered (auto-persistent)', {
         sourceColumnId,
-        targetColumnId
+        targetColumnId,
+        insertBefore
       });
     },
 
