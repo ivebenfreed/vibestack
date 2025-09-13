@@ -54,6 +54,11 @@ export class OverlayManager {
     columns: [],
     version: 0
   };
+
+  // Performance optimization caches
+  private lastSelectedCells: Set<string> | null = null;
+  private lastCoordinateMappingVersion: number = -1;
+  private updateSelectionRAF: number | null = null;
   
   constructor(options: OverlayManagerOptions) {
     this.container = options.container;
@@ -133,10 +138,17 @@ export class OverlayManager {
   }
   
   /**
-   * Update coordinate mapping for overlays
+   * Update coordinate mapping for overlays (optimized with change detection)
    */
   updateCoordinateMapping(mapping: CoordinateMapping): void {
+    // Skip update if coordinate mapping version hasn't changed
+    if (this.lastCoordinateMappingVersion === mapping.version) {
+      return;
+    }
+
+    this.lastCoordinateMappingVersion = mapping.version;
     this.coordinateMapping = mapping;
+
     if (this.canvasOverlay && this.canvasOverlay.isInitialized) {
       this.canvasOverlay.updateCoordinateMapping(mapping);
     }
@@ -167,23 +179,47 @@ export class OverlayManager {
   }
   
   /**
-   * Update selection display
+   * Update selection display (optimized with change detection and throttling)
    */
   updateSelection(selectedCells: Set<string>): void {
+    // Quick selection manager update (lightweight)
     if (this.selectionManager) {
       this.selectionManager.setSelectedCells(selectedCells);
     }
-    
+
+    // Skip expensive canvas updates if selection hasn't changed
+    if (this.lastSelectedCells && this.areSetsEqual(selectedCells, this.lastSelectedCells)) {
+      return;
+    }
+
+    // Store current selection
+    this.lastSelectedCells = new Set(selectedCells);
+
+    // Throttle expensive canvas overlay updates
+    if (this.updateSelectionRAF !== null) {
+      cancelAnimationFrame(this.updateSelectionRAF);
+    }
+
+    this.updateSelectionRAF = requestAnimationFrame(() => {
+      this.updateSelectionRAF = null;
+      this.performCanvasSelectionUpdate(selectedCells);
+    });
+  }
+
+  /**
+   * Perform the actual canvas selection update (separated for throttling)
+   */
+  private performCanvasSelectionUpdate(selectedCells: Set<string>): void {
     if (this.canvasOverlay && this.canvasOverlay.isInitialized && this.coordinateMapping) {
       // Convert selected cells to visual positions
       const visualCells = this.getVisualCellPositions(selectedCells);
-      
+
       // Update viewport info
       const viewportInfo = this.getViewportInfo();
-      
+
       this.canvasOverlay.updateViewport(viewportInfo);
       this.canvasOverlay.updateSelectionWithVisualPositions(visualCells);
-      
+
       // Show/hide fill handle based on selection
       if (visualCells.length > 0) {
         this.canvasOverlay.renderFillHandle(visualCells, undefined, viewportInfo);
@@ -191,6 +227,17 @@ export class OverlayManager {
         this.canvasOverlay.hideFillHandle();
       }
     }
+  }
+
+  /**
+   * Compare two Sets for equality (optimized for performance)
+   */
+  private areSetsEqual(set1: Set<string>, set2: Set<string>): boolean {
+    if (set1.size !== set2.size) return false;
+    for (const item of set1) {
+      if (!set2.has(item)) return false;
+    }
+    return true;
   }
   
   /**
@@ -319,17 +366,31 @@ export class OverlayManager {
   private getCellPosition(rowId: string, columnId: string): { x: number; y: number; width: number; height: number } | null {
     const rowInfo = this.coordinateMapping.rows.find(r => r.rowId === rowId);
     const colInfo = this.coordinateMapping.columns.find(c => c.columnId === columnId);
-    
+
     if (rowInfo && colInfo) {
-      // No need to add header height since overlay is inside viewport container
+      // EditingOverlay is attached to main container, so we need to add header height
+      const HEADER_HEIGHT = 48;
+      const adjustedY = rowInfo.y + HEADER_HEIGHT;
+
+      console.log('🔍 getCellPosition debug:');
+      console.log('  rowId:', rowId, 'columnId:', columnId);
+      console.log('  rowInfo:', `y=${rowInfo.y}, height=${rowInfo.height}, index=${rowInfo.index}`);
+      console.log('  colInfo:', `x=${colInfo.x}, width=${colInfo.width}, index=${colInfo.index}`);
+      console.log('  HEADER_HEIGHT:', HEADER_HEIGHT);
+      console.log('  ADJUSTED POSITION: x=' + colInfo.x + ', y=' + adjustedY + ' (was ' + rowInfo.y + '), width=' + colInfo.width + ', height=' + rowInfo.height);
+
       return {
         x: colInfo.x,
-        y: rowInfo.y,
+        y: adjustedY,
         width: colInfo.width,
         height: rowInfo.height
       };
     }
-    
+
+    console.log('🔍 getCellPosition debug: FAILED');
+    console.log('  rowId:', rowId, 'columnId:', columnId);
+    console.log('  rowInfo:', rowInfo ? 'FOUND' : 'NOT_FOUND');
+    console.log('  colInfo:', colInfo ? 'FOUND' : 'NOT_FOUND');
     return null;
   }
   
@@ -367,7 +428,17 @@ export class OverlayManager {
    */
   destroy(): void {
     fileLog.info('🧹 Destroying overlay system');
-    
+
+    // Clean up RAF to prevent memory leaks
+    if (this.updateSelectionRAF !== null) {
+      cancelAnimationFrame(this.updateSelectionRAF);
+      this.updateSelectionRAF = null;
+    }
+
+    // Clear caches
+    this.lastSelectedCells = null;
+    this.lastCoordinateMappingVersion = -1;
+
     if (this.selectionManager) {
       this.selectionManager.clearAllSelections();
     }

@@ -13,17 +13,23 @@ const HEADER_HEIGHT = 48;
 
 export interface DOMElementFactoryOptions {
   tableInteraction$: TableInteraction$;
+  tableCore$?: any;
+  selectionController?: any; // SelectionController instance
   enableSelectionColumn?: boolean;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
 }
 
 export class DOMElementFactory {
   private tableInteraction$: TableInteraction$;
+  private tableCore$?: any;
+  private selectionController?: any;
   private enableSelectionColumn: boolean;
   private onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
 
   constructor(options: DOMElementFactoryOptions) {
     this.tableInteraction$ = options.tableInteraction$;
+    this.tableCore$ = options.tableCore$;
+    this.selectionController = options.selectionController;
     this.enableSelectionColumn = options.enableSelectionColumn ?? false;
     this.onEntityUpdate = options.onEntityUpdate;
   }
@@ -91,12 +97,14 @@ export class DOMElementFactory {
 
     // Group label
     const groupLabel = this.createElement('div', 'vibegridx-group-label');
-    groupLabel.textContent = `${groupData.field}: ${groupData.value} (${groupData.count} items)`;
+    groupLabel.textContent = `${groupData.field}: ${groupData.displayValue} (${groupData.rowCount} items)`;
     groupLabel.style.cssText = 'flex: 1; font-size: 14px;';
 
     // Click handler for expand/collapse
     expandButton.addEventListener('click', () => {
-      this.tableInteraction$.toggleGroupExpansion(groupRow.id);
+      if (this.tableCore$?.toggleGroupExpansion) {
+        this.tableCore$.toggleGroupExpansion(groupRow.id);
+      }
     });
 
     rowElement.appendChild(expandButton);
@@ -159,8 +167,8 @@ export class DOMElementFactory {
       // Add change handler
       checkbox.addEventListener('change', (e) => {
         const isShiftKey = (e as any).shiftKey;
-        // Delegate to selection controller via interaction observable
-        this.tableInteraction$.handleRowCheckboxToggle(row.id, isShiftKey);
+        // Delegate to selection controller
+        this.selectionController?.handleRowCheckboxToggle(row.id, isShiftKey);
       });
       
       rowHeader.appendChild(checkbox);

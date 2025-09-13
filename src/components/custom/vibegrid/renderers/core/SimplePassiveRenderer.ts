@@ -30,6 +30,8 @@ import { CellFormatter } from '../modules/CellFormatter';
 import { SelectionController } from '../modules/SelectionController';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import { ScrollController } from '../modules/ScrollController';
+import { GroupRenderer } from '../modules/GroupRenderer';
+import { ColumnWidthManager } from '../modules/ColumnWidthManager';
 
 // Utility imports
 import type { ViewportInfo, TableRow } from '../../types';
@@ -99,6 +101,8 @@ export class SimplePassiveRenderer {
   private selectionController: SelectionController | null = null;
   private keyboardNavController: KeyboardNavigationController | null = null;
   private scrollController: ScrollController | null = null;
+  private groupRenderer: GroupRenderer | null = null;
+  private columnWidthManager: ColumnWidthManager | null = null;
   
   // New modular components (Phase 1 additions)
   private observerManager: ObserverManager | null = null;
@@ -120,8 +124,8 @@ export class SimplePassiveRenderer {
     this.tableViewport$ = options.tableViewport$;
     
     this.initDOM();
-    this.initDOMFactory();
     this.initControllers();
+    this.initDOMFactory();
     this.initPhase2Managers();
     this.initOverlayManager();
     this.initHeaderRenderer();
@@ -137,6 +141,8 @@ export class SimplePassiveRenderer {
     
     this.domFactory = new DOMElementFactory({
       tableInteraction$: this.tableInteraction$,
+      tableCore$: this.tableCore$,
+      selectionController: this.selectionController,
       enableSelectionColumn: this.options.enableSelectionColumn,
       onEntityUpdate: this.options.onEntityUpdate
     });
@@ -154,7 +160,11 @@ export class SimplePassiveRenderer {
     this.selectionController = new SelectionController({
       tableInteraction$: this.tableInteraction$,
       getProcessedRows: () => this.tableCore$.processedRows.get(),
-      getVisibleColumns: () => this.tableCore$.visibleColumns.get()
+      getVisibleColumns: () => {
+        const columns = this.tableCore$.columns.get();
+        const columnVisibility = this.tableCore$.columnVisibility.get();
+        return columns.filter(col => columnVisibility[col.id] !== false);
+      }
     });
     
     // Initialize keyboard navigation controller
@@ -162,11 +172,22 @@ export class SimplePassiveRenderer {
       tableInteraction$: this.tableInteraction$,
       selectionController: this.selectionController,
       getProcessedRows: () => this.tableCore$.processedRows.get(),
-      getVisibleColumns: () => this.tableCore$.visibleColumns.get(),
+      getVisibleColumns: () => {
+        const columns = this.tableCore$.columns.get();
+        const columnVisibility = this.tableCore$.columnVisibility.get();
+        return columns.filter(col => columnVisibility[col.id] !== false);
+      },
       container: this.container
     });
-    
-    // Scroll controller will be initialized after DOM is ready
+
+    // Initialize ColumnWidthManager
+    this.columnWidthManager = new ColumnWidthManager({
+      headerContainer: null, // Will be set after DOM initialization
+      bodyContainer: null,   // Will be set after DOM initialization
+      headerViewport: null   // Will be set after DOM initialization
+    });
+
+    // Scroll controller will be initialized after DOM is ready in postInitialization()
   }
   
   /**
@@ -175,7 +196,15 @@ export class SimplePassiveRenderer {
   private initPhase2Managers(): void {
     fileLog.info('🚀 Initializing Phase 2 managers');
     
-    // Initialize CellRenderer first (dependency for RowRenderer)
+    // Initialize GroupRenderer first (needed by RowRenderer)
+    this.groupRenderer = new GroupRenderer({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      domFactory: this.domFactory!,
+      createElement: this.createElement.bind(this)
+    });
+
+    // Initialize CellRenderer (dependency for RowRenderer)
     this.cellRenderer = new CellRenderer({
       tableCore$: this.tableCore$,
       tableInteraction$: this.tableInteraction$,
@@ -334,28 +363,51 @@ export class SimplePassiveRenderer {
    */
   private postInitialization(): void {
     fileLog.info('🚀 Starting post-initialization');
-    
-    // Initialize viewport dimensions and setup scroll handling
+
+    // Initialize viewport dimensions
     if (this.viewportManager) {
       this.viewportManager.initializeViewportDimensions();
-      this.viewportManager.setupScrollHandling();
+      // ViewportManager scroll handling is replaced by enhanced ScrollController
     }
-    
+
+    // Initialize enhanced ScrollController with comprehensive event handling
+    this.scrollController = new ScrollController({
+      viewport: this.viewport!,
+      headerViewport: this.headerViewport,
+      container: this.container,
+      onScroll: (scrollLeft: number, scrollTop: number) => {
+        // Update viewport observable (triggers all reactive updates)
+        this.tableViewport$.updateScroll(scrollTop, scrollLeft);
+      },
+      keyboardNavController: this.keyboardNavController,
+      selectionController: this.selectionController,
+      tableInteraction$: this.tableInteraction$
+    });
+
+    // Configure ColumnWidthManager with DOM containers
+    if (this.columnWidthManager) {
+      this.columnWidthManager.setContainers({
+        headerContainer: this.headerContainer,
+        bodyContainer: this.bodyContainer,
+        headerViewport: this.headerViewport
+      });
+    }
+
     // Initialize overlay now that DOM is ready
     if (this.overlayManager) {
       this.overlayManager.initializeOverlay();
     }
-    
+
     // Setup event handling via EventManager
     if (this.eventManager) {
       this.eventManager.setOverlayManager(this.overlayManager!);
       this.eventManager.setupEventHandling();
     }
-    
+
     // Initial render
     this.renderHeader();
     this.renderBody();
-    
+
     fileLog.info('✅ Post-initialization complete');
   }
   
@@ -439,8 +491,7 @@ export class SimplePassiveRenderer {
     // This method is kept for compatibility but now delegates to ObserverManager
     // All observer logic has been moved to ObserverManager.ts
     
-    // Setup context menu event handler
-    this.setupContextMenu();
+    // Context menu handling is now done by EventManager in Phase 2
     
     fileLog.info('✅ Legacy setupObservers() called - using ObserverManager instead');
   }
@@ -462,163 +513,24 @@ export class SimplePassiveRenderer {
   
   /**
    * Create group header element with expand/collapse functionality
+   * DELEGATED: Now handled by GroupRenderer
    */
   private createGroupHeaderElement(groupRow: any, rowIndex: number): HTMLElement {
-    // Delegate to DOM Factory for consistent group header creation
+    // Delegate to GroupRenderer for consistent group header creation
+    if (this.groupRenderer) {
+      return this.groupRenderer.createGroupHeaderElement(groupRow, rowIndex);
+    }
+
+    // Fallback to DOMFactory if GroupRenderer not available
     if (this.domFactory) {
       return this.domFactory.createGroupHeaderElement(groupRow, rowIndex);
     }
-    
-    // Fallback implementation for early initialization
-    const groupData = groupRow.data;
-    const level = groupRow.level || 0;
-    const isExpanded = groupRow.isExpanded;
-    
-    const rowElement = this.createElement('div', 'vibegridx-row vibegridx-group-header');
-    rowElement.dataset.rowId = groupRow.id;
-    rowElement.dataset.groupId = groupRow.id;
-    rowElement.style.cssText = `
-      position: absolute;
-      top: ${rowIndex * ROW_HEIGHT}px;
-      left: 0;
-      right: 0;
-      height: ${ROW_HEIGHT}px;
-      display: flex;
-      align-items: center;
-      background: ${level === 0 ? '#e3f2fd' : '#f5f5f5'};
-      border-bottom: 2px solid ${level === 0 ? '#2196f3' : '#9e9e9e'};
-      font-weight: ${level === 0 ? '600' : '500'};
-      cursor: pointer;
-      user-select: none;
-    `;
-    
-    // Add expand/collapse button with proper indentation
-    const expandButton = this.createElement('div', 'vibegridx-group-expand');
-    expandButton.style.cssText = `
-      width: ${40 + level * 20}px;
-      min-width: ${40 + level * 20}px;
-      height: ${ROW_HEIGHT}px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      color: #666;
-      padding-left: ${level * 20}px;
-    `;
-    
-    // Triangle icon for expand/collapse
-    const triangle = this.createElement('span', 'triangle-icon');
-    triangle.innerHTML = isExpanded ? '▼' : '▶';
-    triangle.style.cssText = `
-      font-size: 12px;
-      transition: transform 0.2s;
-      margin-right: 8px;
-    `;
-    expandButton.appendChild(triangle);
-    
-    // Group label with count
-    const groupLabel = this.createElement('div', 'vibegridx-group-label');
-    groupLabel.style.cssText = `
-      flex: 1;
-      display: flex;
-      align-items: center;
-      padding: 0 12px;
-      font-size: 14px;
-      color: #333;
-    `;
-    
-    const fieldName = groupData.field.charAt(0).toUpperCase() + groupData.field.slice(1);
-    const displayValue = groupData.displayValue;
-    const count = groupData.rowCount;
-    
-    groupLabel.innerHTML = `
-      <strong>${fieldName}:</strong> 
-      <span style="margin: 0 8px;">${displayValue}</span>
-      <span style="color: #666; font-size: 12px;">(${count} ${count === 1 ? 'item' : 'items'})</span>
-    `;
-    
-    rowElement.appendChild(expandButton);
-    rowElement.appendChild(groupLabel);
-    
-    // Add click handler for expand/collapse
-    rowElement.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      fileLog.info('🎯 Group header clicked', { 
-        groupId: groupRow.id, 
-        currentlyExpanded: isExpanded 
-      });
-      
-      // Toggle group expansion via tableCore$
-      this.tableCore$.toggleGroupExpansion(groupRow.id);
-    });
-    
-    return rowElement;
+
+    // Error case - should not happen with proper initialization
+    fileLog.error('🚨 Neither GroupRenderer nor DOMFactory available');
+    throw new Error('GroupRenderer not initialized - check initialization order');
   }
   
-  /**
-   * Setup context menu handling
-   * LEGACY: Now handled by EventManager in Phase 2
-   */
-  private setupContextMenu(): void {
-    // Add right-click handler for context menu
-    this.container.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      
-      const cellElement = (e.target as HTMLElement).closest('[data-row-id][data-column-id]') as HTMLElement;
-      if (cellElement && this.overlayManager) {
-        const rowId = cellElement.dataset.rowId;
-        const columnId = cellElement.dataset.columnId;
-        
-        fileLog.info('🖱️ Context menu triggered', { rowId, columnId });
-        
-        // Show context menu
-        this.overlayManager.showContextMenu({
-          isVisible: true,
-          position: {
-            x: e.pageX,
-            y: e.pageY,
-            clientX: e.clientX,
-            clientY: e.clientY
-          },
-          context: {
-            type: 'cell' as const,
-            rowId,
-            columnId
-          },
-          onClose: () => {
-            this.overlayManager?.hideContextMenu();
-          },
-          onCopy: () => {
-            fileLog.info('📋 Copy action');
-            // Implement copy logic via tableInteraction$
-            this.overlayManager?.hideContextMenu();
-          },
-          onPaste: () => {
-            fileLog.info('📋 Paste action');
-            // Implement paste logic via tableInteraction$
-            this.overlayManager?.hideContextMenu();
-          },
-          onCut: () => {
-            fileLog.info('✂️ Cut action');
-            // Implement cut logic via tableInteraction$
-            this.overlayManager?.hideContextMenu();
-          },
-          onInsertRow: () => {
-            fileLog.info('➕ Insert row action');
-            // Implement insert row logic via tableCore$
-            this.overlayManager?.hideContextMenu();
-          },
-          onDeleteRow: () => {
-            fileLog.info('➖ Delete row action');
-            // Implement delete row logic via tableCore$
-            this.overlayManager?.hideContextMenu();
-          }
-        });
-      }
-    });
-  }
   
   /**
    * Render table header
@@ -635,305 +547,9 @@ export class SimplePassiveRenderer {
       return;
     }
     
-    // Fallback to original header rendering
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get(); // Cache once
-    fileLog.info('🎨 Rendering header (fallback)', { columnCount: columns.length });
-    
-    this.headerContainer.innerHTML = '';
-    
-    const headerRow = this.createElement('div', 'vibegridx-header-row');
-    headerRow.style.cssText = `
-      position: relative;
-      height: ${HEADER_HEIGHT}px;
-    `;
-    
-    // Add corner header cell (aligns with row headers) with absolute positioning
-    const cornerCell = this.createElement('div', 'vibegridx-corner-header');
-    cornerCell.style.cssText = `
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 40px;
-      height: ${HEADER_HEIGHT}px;
-      background: #f8f9fa;
-      border-right: 1px solid #e9ecef;
-      border-bottom: 1px solid #e9ecef;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      z-index: 1;
-    `;
-
-    if (this.options.enableSelectionColumn) {
-      // Add "select all" checkbox in corner
-      this.selectAllCheckbox = document.createElement('input');
-      this.selectAllCheckbox.type = 'checkbox';
-      this.selectAllCheckbox.style.cssText = `
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-        margin: 0;
-      `;
-      this.selectAllCheckbox.title = 'Select all rows';
-      
-      // Add click handler for select all
-      this.selectAllCheckbox.addEventListener('click', (e) => {
-        e.stopPropagation();
-        
-        // Check current selection state to determine action
-        const selectedCells = this.tableInteraction$.selectedCells.get();
-        const processedRows = this.tableCore$.processedRows.get();
-        const columns = this.tableCore$.columns.get();
-        const visibleColumns = columns.filter(col => {
-          return columnVisibility[col.id] !== false;
-        });
-        const totalCells = processedRows.length * visibleColumns.length;
-        
-        fileLog.info('🎯 Select all checkbox clicked', {
-          currentSelection: selectedCells.size,
-          totalCells,
-          checkboxChecked: this.selectAllCheckbox!.checked
-        });
-        
-        // If we have any selection (full or partial), clear it
-        // If we have no selection, select all
-        if (selectedCells.size > 0) {
-          this.tableInteraction$.clearSelection();
-          fileLog.info('🎯 Select all checkbox - clearing selection');
-        } else {
-          this.selectionController?.selectAllCells();
-          fileLog.info('🎯 Select all checkbox - selecting all');
-        }
-      });
-      
-      cornerCell.appendChild(this.selectAllCheckbox);
-    }
-    
-    headerRow.appendChild(cornerCell);
-    
-    // Get virtual column range from the observable (single source of truth)
-    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
-    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    
-    // Use the range directly from the observable (it already includes buffer)
-    const startColIndex = visibleColumnRange.start;
-    const endColIndex = visibleColumnRange.end;
-    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
-    
-    fileLog.info('🎨 Rendering header with virtual columns', { 
-      totalColumns: columns.length,
-      allVisibleColumns: allVisibleColumns.length,
-      virtualRange: `${startColIndex}-${endColIndex}`,
-      renderingColumns: virtualColumns.length
-    });
-    
-    // Update column coordinate mapping (account for 40px row header)
-    this.coordinateMapping.columns = [];
-    let xOffset = 40; // Start after row header
-    
-    // Build complete coordinate mapping for all visible columns (for overlays)
-    allVisibleColumns.forEach((column, index) => {
-      this.coordinateMapping.columns.push({
-        columnId: column.id,
-        x: xOffset,
-        width: column.width,
-        index: index,
-        offset: xOffset
-      });
-      xOffset += column.width;
-    });
-    
-    // Calculate starting x position for virtual columns
-    xOffset = 40;
-    for (let i = 0; i < startColIndex; i++) {
-      xOffset += allVisibleColumns[i].width;
-    }
-    
-    virtualColumns.forEach((column, virtualIndex) => {
-      const actualIndex = startColIndex + virtualIndex;
-      const headerCell = this.createElement('div', 'vibegridx-header-cell');
-      headerCell.dataset.field = column.id; // Add field ID for sort updates
-      headerCell.style.cssText = `
-        position: absolute;
-        left: ${xOffset}px;
-        top: 0;
-        width: ${column.width}px;
-        height: 100%;
-        padding: 0 12px;
-        display: flex;
-        align-items: center;
-        font-weight: 600;
-        font-size: 14px;
-        border-right: 1px solid #e9ecef;
-        background: #f8f9fa;
-      `;
-      
-      // Create header content with text and sort icon (like HeaderEngine)
-      const textGroup = this.createElement('div', 'vibegridx-header-text-group');
-      textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;';
-      
-      // Header text
-      const headerText = this.createElement('span', 'vibegridx-header-text');
-      headerText.style.cssText = 'flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-      headerText.textContent = column.label;
-      
-      // Sort icon (if column is sortable)
-      if (column.sortable !== false) {
-        const sortIcon = this.createElement('span', 'vibegridx-sort-icon');
-        sortIcon.style.cssText = 'flex-shrink: 0; min-width: 16px; margin-left: 4px;';
-        sortIcon.innerHTML = this.createSortIconSVG(null); // No sort initially
-        textGroup.appendChild(headerText);
-        textGroup.appendChild(sortIcon);
-      } else {
-        textGroup.appendChild(headerText);
-      }
-      
-      headerCell.appendChild(textGroup);
-      
-      // Add resize handle
-      const resizeHandle = this.createElement('div', 'vibegridx-resize-handle');
-      resizeHandle.style.cssText = `
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        width: 4px;
-        cursor: col-resize;
-        background: transparent;
-        z-index: 1;
-      `;
-      
-      // Add resize handle events
-      let isResizing = false;
-      let startX = 0;
-      let startWidth = column.width;
-      
-      resizeHandle.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        isResizing = true;
-        startX = e.pageX;
-        startWidth = column.width;
-        
-        // Update interaction state
-        this.tableInteraction$.columnResize.set({
-          isResizing: true,
-          columnId: column.id,
-          startWidth: startWidth,
-          newWidth: startWidth
-        });
-        
-        // Add document-level listeners for resize
-        let resizeRAF: number | null = null;
-        const handleMouseMove = (e: MouseEvent) => {
-          if (!isResizing) return;
-          
-          // Throttle resize updates with requestAnimationFrame
-          if (!resizeRAF) {
-            resizeRAF = requestAnimationFrame(() => {
-              const deltaX = e.pageX - startX;
-              const newWidth = Math.max(50, startWidth + deltaX); // Min width 50px
-              
-              // Update resize state
-              this.tableInteraction$.columnResize.set({
-                isResizing: true,
-                columnId: column.id,
-                startWidth: startWidth,
-                newWidth: newWidth
-              });
-              
-              resizeRAF = null;
-            });
-          }
-        };
-        
-        const handleMouseUp = () => {
-          if (!isResizing) return;
-          isResizing = false;
-          
-          // Cancel any pending resize RAF
-          if (resizeRAF) {
-            cancelAnimationFrame(resizeRAF);
-            resizeRAF = null;
-          }
-          
-          const resizeState = this.tableInteraction$.columnResize.get();
-          if (resizeState && resizeState.newWidth) {
-            // Apply the new width
-            this.tableCore$.updateColumnWidth(column.id, resizeState.newWidth);
-          }
-          
-          // Clear resize state
-          this.tableInteraction$.columnResize.set(null);
-          
-          // Clean up listeners
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        };
-        
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-      });
-      
-      headerCell.appendChild(resizeHandle);
-      
-      // Update xOffset for next column positioning
-      xOffset += column.width;
-      
-      // Add click handler for sorting and column selection
-      headerCell.style.cursor = 'pointer';
-      headerCell.addEventListener('click', (e) => {
-        // Don't sort if clicking on resize handle
-        if ((e.target as HTMLElement).classList.contains('vibegridx-resize-handle')) {
-          return;
-        }
-        
-        const isCtrlKey = e.ctrlKey || e.metaKey;
-        const isShiftKey = e.shiftKey;
-        
-        if (isCtrlKey && !isShiftKey) {
-          // Ctrl+Click on header - select entire column
-          e.preventDefault();
-          this.selectionController?.selectColumn(column.id);
-          fileLog.info('🎯 Column selected', { columnId: column.id });
-        } else {
-          // Regular click or Shift+click - toggle sort
-          // Shift+click enables multi-column sorting
-          const isMultiSort = isShiftKey;
-          
-          fileLog.info('🔄 Column header clicked for sort', { 
-            columnId: column.id, 
-            field: column.field,
-            usingField: column.field || column.id,
-            isMultiSort,
-            isShiftKey
-          });
-          
-          // Use column.field for sorting (data field), not column.id (display identifier)
-          // Pass isMultiSort parameter to enable/disable multi-column sorting
-          this.tableCore$.toggleSort(column.field || column.id, isMultiSort);
-        }
-      });
-      
-      headerRow.appendChild(headerCell);
-    });
-    
-    // Calculate total width and set header container width for proper overflow handling
-    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
-    headerRow.style.width = `${totalHeaderWidth}px`;
-    headerRow.style.minWidth = `${totalHeaderWidth}px`;
-    
-    this.headerContainer.appendChild(headerRow);
-    
-    // Update header container width to ensure proper scrolling
-    this.headerContainer.style.width = `${totalHeaderWidth}px`;
-    this.headerContainer.style.minWidth = `${totalHeaderWidth}px`;
-    
-    this.coordinateMapping.version++;
-    // Sync coordinate mapping with overlay manager
-    this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
-    fileLog.info('✅ Header rendered with total width', { totalHeaderWidth });
+    // HeaderRenderer should always be available - if not, something is wrong
+    fileLog.error('🚨 HeaderRenderer not available - this should not happen');
+    throw new Error('HeaderRenderer not initialized - check initialization order');
   }
   
   /**
@@ -1020,18 +636,33 @@ export class SimplePassiveRenderer {
     });
     
     // Build complete coordinate mapping for all rows (needed for overlays)
+    const newRows: any[] = [];
     rows.forEach((row, rowIndex) => {
-      this.coordinateMapping.rows.push({
+      newRows.push({
         rowId: row.id,
         y: rowIndex * ROW_HEIGHT,
         height: ROW_HEIGHT,
         index: rowIndex
       });
     });
-    
-    this.coordinateMapping.version++;
-    // Sync coordinate mapping with overlay manager
-    this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
+
+    // Check for row coordinate mapping changes (including position)
+    const rowMappingChanged = !this.coordinateMapping.rows ||
+      this.coordinateMapping.rows.length !== newRows.length ||
+      newRows.some((newRow, index) => {
+        const oldRow = this.coordinateMapping.rows?.[index];
+        return !oldRow ||
+               oldRow.rowId !== newRow.rowId ||
+               oldRow.y !== newRow.y;
+      });
+
+    // Only update coordinate mapping if it actually changed
+    if (rowMappingChanged) {
+      this.coordinateMapping.rows = newRows;
+      this.coordinateMapping.version++;
+      // Sync coordinate mapping with overlay manager
+      this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
+    }
     
     fileLog.info('✅ Body rendered with Phase 2 managers');
   }
@@ -1094,148 +725,10 @@ export class SimplePassiveRenderer {
     return visualCells;
   }
   
-  /**
-   * Create a row element
-   * LEGACY: Now handled by RowRenderer in Phase 2
-   */
-  private createRowElement(
-    row: any, 
-    rowIndex: number, 
-    columns: any[],
-    columnVisibility: Record<string, boolean>
-  ): HTMLElement {
-    const rowElement = this.createElement('div', 'vibegridx-row');
-    rowElement.dataset.rowId = row.id;
-    rowElement.style.cssText = `
-      position: absolute;
-      top: ${rowIndex * ROW_HEIGHT}px;
-      left: 0;
-      right: 0;
-      height: ${ROW_HEIGHT}px;
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid #f1f3f5;
-      background: ${rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa'};
-    `;
-    
-    // Add row header (row number or checkbox selector)
-    const rowHeader = this.createElement('div', 'vibegridx-row-header');
-    rowHeader.style.cssText = `
-      width: 40px;
-      min-width: 40px;
-      height: ${ROW_HEIGHT}px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f8f9fa;
-      border-right: 1px solid #e9ecef;
-      font-size: 12px;
-      color: #6c757d;
-      cursor: pointer;
-      user-select: none;
-      flex-shrink: 0;
-    `;
-    rowHeader.dataset.rowId = row.id;
+  // REMOVED: createRowElement() - Now fully handled by RowRenderer in Phase 2
+  // This legacy method has been replaced by this.rowRenderer.createRowElement()
 
-    if (this.options.enableSelectionColumn) {
-      // Create checkbox for row selection
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.style.cssText = `
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-        margin: 0;
-      `;
-      checkbox.dataset.rowId = row.id;
-      
-      // Check if this row is currently selected (use ALL visible columns, not just virtual ones)
-      const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
-        this.tableCore$.columnVisibility.get()[col.id] !== false
-      );
-      
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      const isRowSelected = allVisibleColumns.every(col => 
-        selectedCells.has(`${row.id}:${col.id}`)
-      ) && allVisibleColumns.length > 0;
-      
-      checkbox.checked = isRowSelected;
-      
-      rowHeader.appendChild(checkbox);
-    } else {
-      // Show row number
-      rowHeader.textContent = String(rowIndex + 1);
-    }
-    
-    // Add click handler for row selection
-    rowHeader.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      
-      // If click is directly on checkbox, let it handle the event
-      if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
-        const checkbox = target as HTMLInputElement;
-        const isShiftKey = e.shiftKey;
-        
-        fileLog.debug('🔘 Checkbox click detected', {
-          rowId: row.id,
-          isShiftKey,
-          lastSelectedRowId: this.lastSelectedRowId,
-          checkboxChecked: checkbox.checked
-        });
-        
-        if (isShiftKey && this.lastSelectedRowId) {
-          // Shift+Click for row range selection
-          fileLog.debug('🎯 Shift+Click detected - calling selectRowRange', {
-            from: this.lastSelectedRowId,
-            to: row.id
-          });
-          const lastSelectedRowId = this.selectionController?.getLastSelectedRowId();
-          if (lastSelectedRowId) {
-            this.selectionController?.selectRowRange(lastSelectedRowId, row.id);
-          }
-        } else {
-          // Use toggleRowSelection for proper multi-row behavior
-          fileLog.debug('🔘 Regular click - calling toggleRowSelection', {
-            rowId: row.id
-          });
-          this.selectionController?.toggleRowSelection(row.id);
-          this.selectionController?.setLastSelectedRowId(row.id);
-        }
-        return;
-      }
-      
-      // Click on row header area (but not checkbox) - still select row
-      if (isCtrlKey) {
-        // Ctrl+Click on row header - add to selection
-        e.preventDefault();
-        // TODO: Implement multi-row selection
-        this.selectionController?.selectRow(row.id);
-      } else {
-        // Regular click - select entire row
-        this.selectionController?.selectRow(row.id);
-      }
-      
-      fileLog.info('🎯 Row header clicked', { rowId: row.id, isCtrlKey });
-    });
-    
-    rowElement.appendChild(rowHeader);
-    
-    columns.forEach((column, colIndex) => {
-      const cell = this.cellRenderer!.createCellElement(row, column, colIndex);
-      rowElement.appendChild(cell);
-    });
-    
-    // Calculate total width to ensure consistent scrolling with header
-    const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
-      this.tableCore$.columnVisibility.get()[col.id] !== false
-    );
-    const totalRowWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
-    rowElement.style.width = `${totalRowWidth}px`;
-    rowElement.style.minWidth = `${totalRowWidth}px`;
-    
-    return rowElement;
-  }
+  // Legacy method body removed - functionality moved to RowRenderer
   
   /**
    * Format cell value using centralized display formatters
@@ -1307,6 +800,24 @@ export class SimplePassiveRenderer {
       this.viewportManager = null;
     }
     
+    // Clean up ScrollController
+    if (this.scrollController) {
+      this.scrollController.destroy();
+      this.scrollController = null;
+    }
+
+    // Clean up ColumnWidthManager
+    if (this.columnWidthManager) {
+      this.columnWidthManager.destroy();
+      this.columnWidthManager = null;
+    }
+
+    // Clean up GroupRenderer
+    if (this.groupRenderer) {
+      this.groupRenderer.destroy();
+      this.groupRenderer = null;
+    }
+
     // RowRenderer and CellRenderer don't need explicit cleanup
     this.rowRenderer = null;
     this.cellRenderer = null;
@@ -1378,111 +889,9 @@ export class SimplePassiveRenderer {
     checkbox.indeterminate = state.indeterminate;
   }
   
-  /**
-   * Setup scroll event handling and header synchronization
-   * Implements the planned scroll coordination from PURE_OBSERVABLE_PROGRESS.md
-   */
-  private setupScrollHandling(): void {
-    if (!this.viewport) return;
-    
-    fileLog.info('📜 Setting up scroll coordination');
-    
-    // Direct DOM event binding → Observable updates (as planned in docs)
-    this.viewport.addEventListener('scroll', (e) => {
-      const target = e.target as HTMLElement;
-      const scrollTop = target.scrollTop;
-      const scrollLeft = target.scrollLeft;
-      
-      // Update viewport observable (triggers all reactive updates)
-      this.tableViewport$.updateScroll(scrollTop, scrollLeft);
-      
-      // Sync header scroll with requestAnimationFrame optimization
-      this.syncHeaderScroll(scrollLeft);
-      
-      fileLog.debug('📜 Scroll event processed', { scrollTop, scrollLeft });
-    });
-    
-    // Add click-outside handler to clear selection
-    this.container.addEventListener('click', (e) => {
-      const cellElement = (e.target as HTMLElement).closest('[data-row-id][data-column-id]');
-      const headerElement = (e.target as HTMLElement).closest('.vibegridx-header-cell');
-      const viewportElement = (e.target as HTMLElement).closest('.vibegridx-viewport');
-      
-      // Only clear selection if click is in the viewport area but not on a cell or header
-      // This prevents clearing when clicking on cells (event bubbling) or outside the table entirely
-      if (viewportElement && !cellElement && !headerElement) {
-        fileLog.info('🖱️ Click outside cells - clearing selection');
-        this.tableInteraction$.clearSelection();
-      }
-    });
-    
-    // Add keyboard event handling for advanced selection and navigation
-    this.container.addEventListener('keydown', (e) => {
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      const isShiftKey = e.shiftKey;
-      
-      const focusedCell = this.keyboardNavController?.getFocusedCell();
-      fileLog.debug('⌨️ Keyboard event', { key: e.key, shiftKey: isShiftKey, ctrlKey: isCtrlKey, focusedCell });
-      
-      switch (e.key) {
-        case 'a':
-        case 'A':
-          if (isCtrlKey) {
-            e.preventDefault();
-            this.selectionController?.selectAllCells();
-            fileLog.info('⌨️ Ctrl+A - Select all cells');
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          this.tableInteraction$.clearSelection();
-          this.keyboardNavController?.clear();
-          fileLog.info('⌨️ Escape - Clear selection and focus');
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('up', isShiftKey);
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('down', isShiftKey);
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('left', isShiftKey);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('right', isShiftKey);
-          break;
-        default:
-          // Let other keys pass through
-          break;
-      }
-    });
-    
-    // Make container focusable to receive keyboard events
-    this.container.tabIndex = 0; // Changed from -1 to 0 to make it focusable
-    this.container.style.outline = 'none';
-    
-    fileLog.info('✅ Scroll coordination setup complete');
-  }
+  // REMOVED: setupScrollHandling() - Now handled by enhanced ScrollController
   
-  /**
-   * Synchronize header horizontal scroll with viewport
-   * Now properly syncs header scroll position instead of using transforms
-   */
-  private syncHeaderScroll(scrollLeft: number): void {
-    if (!this._scrollRAF && this.headerViewport) {
-      this._scrollRAF = requestAnimationFrame(() => {
-        if (this.headerViewport) {
-          this.headerViewport.scrollLeft = scrollLeft;
-          fileLog.debug('📜 Header scroll synced', { scrollLeft });
-        }
-        this._scrollRAF = null;
-      });
-    }
-  }
+  // REMOVED: syncHeaderScroll() - Now handled by ColumnWidthManager
 
   /**
    * Update sort indicators in header cells based on current sort state
@@ -1497,105 +906,14 @@ export class SimplePassiveRenderer {
       return;
     }
     
-    // Fallback to original implementation
-    
-    const sortBy = this.tableCore$.sortBy.get();
-    const sortLookup = new Map<string, { direction: 'asc' | 'desc'; index: number }>();
-    
-    // Build lookup map from current sort state
-    sortBy.forEach((sort, index) => {
-      sortLookup.set(sort.field, { direction: sort.direction, index });
-    });
-    
-    // Update all header cells
-    this.headerContainer.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
-      const field = (cell as HTMLElement).dataset.field;
-      if (!field) return;
-      
-      const sortInfo = sortLookup.get(field);
-      
-      // Update classes for CSS styling
-      cell.classList.remove('sort-asc', 'sort-desc');
-      if (sortInfo) {
-        cell.classList.add(sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc');
-      }
-      
-      // Update sort icon SVG
-      const sortIcon = cell.querySelector('.vibegridx-sort-icon');
-      if (sortIcon) {
-        sortIcon.innerHTML = this.createSortIconSVG(sortInfo);
-      }
-    });
-    
-    fileLog.debug('🔄 Sort indicators updated', { 
-      sortBy: sortBy.map(s => `${s.field}:${s.direction}`)
-    });
+    // HeaderRenderer should always be available - if not, something is wrong
+    fileLog.error('🚨 HeaderRenderer not available for sort indicators - this should not happen');
+    throw new Error('HeaderRenderer not initialized - check initialization order');
   }
 
-  /**
-   * Create SVG sort icon with proper opacity for current sort state
-   * Copied from HeaderEngine.createSortIconSVG() for consistency
-   */
-  private createSortIconSVG(sortInfo?: { direction: 'asc' | 'desc'; index: number } | null): string {
-    const ascOpacity = sortInfo?.direction === 'asc' ? '1' : '0.3';
-    const descOpacity = sortInfo?.direction === 'desc' ? '1' : '0.3';
-    
-    return `<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-      <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${ascOpacity}"/>
-      <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${descOpacity}"/>
-    </svg>`;
-  }
+  // REMOVED: createSortIconSVG() - Now handled by HeaderRenderer
 
-  /**
-   * Update header cell width to keep in sync with column resize
-   */
-  private updateHeaderCellWidth(columnId: string, newWidth: number): void {
-    const headerCell = this.headerContainer.querySelector(`[data-field="${columnId}"]`) as HTMLElement;
-    if (headerCell) {
-      // Update the flex-basis style to match new width
-      const currentStyle = headerCell.style.cssText;
-      const updatedStyle = currentStyle.replace(
-        /flex:\s*0\s+0\s+\d+px/,
-        `flex: 0 0 ${newWidth}px`
-      );
-      headerCell.style.cssText = updatedStyle;
-      
-      fileLog.debug('📏 Updated header cell width', {
-        columnId,
-        newWidth,
-        previousStyle: currentStyle.match(/flex:\s*0\s+0\s+\d+px/)?.[0],
-        updatedStyle: `flex: 0 0 ${newWidth}px`
-      });
-    } else {
-      fileLog.warn('⚠️ Header cell not found for width update', { columnId });
-    }
-  }
-
-  /**
-   * Update body cell widths to keep in sync with column resize
-   */
-  private updateBodyCellWidths(columnId: string, newWidth: number): void {
-    const bodyCells = this.bodyContainer?.querySelectorAll(`[data-column-id="${columnId}"]`) as NodeListOf<HTMLElement>;
-    if (bodyCells && bodyCells.length > 0) {
-      bodyCells.forEach((cell) => {
-        // Update the flex-basis style to match new width
-        const currentStyle = cell.style.cssText;
-        const updatedStyle = currentStyle.replace(
-          /flex:\s*0\s+0\s+\d+px/,
-          `flex: 0 0 ${newWidth}px`
-        );
-        cell.style.cssText = updatedStyle;
-      });
-      
-      fileLog.debug('📏 Updated body cell widths', {
-        columnId,
-        newWidth,
-        cellsUpdated: bodyCells.length
-      });
-    } else {
-      fileLog.debug('📏 No body cells found for width update', { columnId });
-    }
-  }
+  // REMOVED: updateHeaderCellWidth() and updateBodyCellWidths() - Now handled by ColumnWidthManager
 
   /**
    * Determine if a field should be treated as a tags field
