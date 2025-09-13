@@ -247,9 +247,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // ====================================
 
   const api = useMemo(() => {
-    if (!observablesRef.current) return null;
+    if (!observablesRef.current || !isInitialized || !isPersistLoaded) return null;
 
     const { tableCore$, tableInteraction$, tableViewport$ } = observablesRef.current;
+
+    // Ensure all observables exist before creating API
+    if (!tableCore$ || !tableInteraction$ || !tableViewport$) return null;
 
     return {
       // Data manipulation
@@ -287,9 +290,16 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       // Data access
       getProcessedRows: () => tableCore$.processedRows.get(),
-      getVisibleRange: () => tableViewport$.visibleRange.get(),
+      getVisibleRange: () => {
+        try {
+          return tableViewport$.visibleRange?.get() || { start: 0, end: 10 };
+        } catch (error) {
+          fileLog.error('Error getting visible range', error);
+          return { start: 0, end: 10 };
+        }
+      },
     };
-  }, [isInitialized]);
+  }, [isInitialized, isPersistLoaded]);
 
   // ====================================
   // RENDER

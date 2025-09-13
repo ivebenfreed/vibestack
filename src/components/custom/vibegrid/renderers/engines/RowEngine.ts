@@ -8,6 +8,7 @@ import type { VirtualScrollManager } from '../managers/VirtualScrollManager';
 import type { ColumnManager } from '../managers/ColumnManager';
 import type { DOMSystem } from '../systems/DOMSystem';
 import type { SelectionManager } from '../managers/SelectionManager';
+import { visualState$ } from '../../stores/visual-state';
 import { log } from '@/logger';
 const fileLog = log('components/custom/vibegrid/renderers/engines/RowEngine.ts');
 
@@ -78,9 +79,24 @@ export class RowEngine {
    */
   renderVisibleRows(state: RenderState): RowRenderMetrics {
     const startTime = performance.now();
-    
-    const visibleRange = this.config.virtualGrid.getVisibleRange();
-    
+
+    // Get visible range from visual observables instead of VirtualScrollManager
+    const visualState = visualState$.get();
+    const visibleRange = visualState.geometry.visibleRowRange;
+
+    // Defensive check for undefined visibleRange
+    if (!visibleRange || typeof visibleRange.start !== 'number' || typeof visibleRange.end !== 'number') {
+      console.error('RowEngine: Invalid visibleRange from visual observables', visibleRange);
+      // Return early with empty metrics to avoid crashing
+      return {
+        totalRows: 0,
+        renderedRows: 0,
+        cellsRendered: 0,
+        renderTime: performance.now() - startTime,
+        averageCellRenderTime: 0
+      };
+    }
+
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
     // Update virtual dimensions (in case row count changed)

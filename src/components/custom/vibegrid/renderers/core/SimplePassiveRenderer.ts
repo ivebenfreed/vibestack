@@ -7,7 +7,7 @@
 
 import { observe } from '@legendapp/state';
 import { log } from '@/logger';
-import { visualOperations } from '../../stores/visual-state';
+import { visualOperations, visualState$ } from '../../stores/visual-state';
 import type { 
   TableCore$, 
   TableInteraction$, 
@@ -567,16 +567,16 @@ export class SimplePassiveRenderer {
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
     
-    // Debug: Check if we have group rows
+    // Debug: Check if we have group rows (Legend State rows don't have type property)
     const groupRows = rows.filter((row: any) => row.type === 'group');
-    const dataRows = rows.filter((row: any) => row.type === 'data');
-    
-    fileLog.info('🎨 Rendering body with Phase 2 managers', { 
-      rowCount: rows.length, 
+    const dataRows = rows.filter((row: any) => !row.type || row.type !== 'group'); // All non-group rows are data
+
+    fileLog.info('🎨 Rendering body with Phase 2 managers', {
+      rowCount: rows.length,
       columnCount: columns.length,
       groupRows: groupRows.length,
       dataRows: dataRows.length,
-      firstRowType: rows[0]?.type,
+      firstRowType: rows[0]?.type || 'data (no type property)',
       firstRowData: rows[0]
     });
     
@@ -591,8 +591,9 @@ export class SimplePassiveRenderer {
     // Update row coordinate mapping
     this.coordinateMapping.rows = [];
     
-    // Virtual scrolling: Only render visible rows
-    const visibleRange = this.tableViewport$.visibleRange.get();
+    // Virtual scrolling: Only render visible rows - use visual observables
+    const visualState = visualState$.get();
+    const visibleRange = visualState.geometry.visibleRowRange;
     const startIndex = Math.max(0, visibleRange.start);
     const endIndex = Math.min(rows.length, visibleRange.end);
     const visibleRows = rows.slice(startIndex, endIndex);
@@ -604,7 +605,7 @@ export class SimplePassiveRenderer {
     });
     
     // Get virtual column range from the observable (single source of truth) - MUST match header
-    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
+    const visibleColumnRange = visualState.geometry.visibleColumnRange;
     const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
     
     // Use the EXACT same range as header (from observable with buffer already included)

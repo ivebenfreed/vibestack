@@ -89,15 +89,14 @@ export class HeaderRenderer {
     
     // Filter visible columns and get virtual column range
     const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
-    const startColIndex = Math.max(0, visibleColumnRange.start);
-    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
-    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
+
+    // TODO: Implement proper column virtualization
+    // For now, render all visible columns (no virtual column range)
+    const virtualColumns = allVisibleColumns;
     
-    fileLog.info('🎨 Header virtual scrolling', {
+    fileLog.info('🎨 Header rendering', {
       totalColumns: columns.length,
       allVisibleColumns: allVisibleColumns.length,
-      virtualRange: `${startColIndex}-${endColIndex}`,
       renderingColumns: virtualColumns.length,
       virtualColumnIds: virtualColumns.map(col => col.id),
       virtualColumnLabels: virtualColumns.map(col => col.label || col.id)
@@ -106,18 +105,15 @@ export class HeaderRenderer {
     // Update column coordinate mapping only if columns have changed
     const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
 
-    // Calculate column positioning for virtual scrolling
+    // Calculate column positioning (no virtualization for now)
     let xOffset = 40; // Start after row header
-    for (let i = 0; i < startColIndex; i++) {
-      xOffset += allVisibleColumns[i].width;
-    }
 
     // Get reactive column widths for consistent calculations
     const columnWidths = this.tableCore$.columnWidths.get();
 
-    // Render virtual columns
-    virtualColumns.forEach((column, virtualIndex) => {
-      const actualIndex = startColIndex + virtualIndex;
+    // Render all visible columns
+    virtualColumns.forEach((column, columnIndex) => {
+      const actualIndex = columnIndex;
       const headerCell = this.createColumnHeader(column, actualIndex, xOffset);
       headerRow.appendChild(headerCell);
       const actualWidth = getColumnWidth(column.id);
@@ -157,7 +153,7 @@ export class HeaderRenderer {
    */
   private createColumnHeader(column: any, actualIndex: number, xOffset: number): HTMLElement {
     // Use single source of truth for column width
-    const actualWidth = this.tableCore$.getColumnWidth(column.id);
+    const actualWidth = getColumnWidth(column.id);
     const headerCell = this.domFactory.createHeaderCell(column, actualWidth);
     
     // Create header content with text and sort icon
