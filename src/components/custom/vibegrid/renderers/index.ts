@@ -40,7 +40,7 @@ export { EventSystem } from './systems/EventSystem';
 export { PerformanceSystem } from './systems/PerformanceSystem';
 
 // Engines - Complex rendering pipelines (legacy, to be migrated)
-export { HeaderEngine } from './engines/HeaderEngine';
+// HeaderEngine removed - using HeaderRenderer instead
 export { RowEngine } from './engines/RowEngine';
 export { CellPipeline } from './engines/CellPipeline';
 

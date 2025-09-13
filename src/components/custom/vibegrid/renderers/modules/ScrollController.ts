@@ -187,8 +187,15 @@ export class ScrollController {
 
   /**
    * Sync header horizontal scroll with body
+   * Uses unified visual state for scroll synchronization
    */
   private syncHeaderScroll(scrollLeft: number): void {
+    fileLog.info('🔄 syncHeaderScroll called', {
+      scrollLeft,
+      hasHeaderViewport: !!this.headerViewport,
+      headerViewportElement: this.headerViewport
+    });
+
     if (this.headerViewport) {
       // Cancel any pending RAF to ensure immediate sync
       if (this.scrollRAF) {
@@ -197,20 +204,28 @@ export class ScrollController {
 
       this.scrollRAF = requestAnimationFrame(() => {
         if (this.headerViewport) {
-          this.headerViewport.scrollLeft = scrollLeft;
+          // Apply transform based on unified visual state
+          // The visual state handles the coordination between column virtualization and scroll position
+          const transform = `translateX(-${scrollLeft}px)`;
+          this.headerViewport.style.transform = transform;
 
-          fileLog.debug('🔄 Header scroll synced', {
+          fileLog.info('🔄 Header transform applied', {
             scrollLeft,
-            actualHeaderScroll: this.headerViewport.scrollLeft,
-            headerViewportExists: !!this.headerViewport
+            transform,
+            appliedTransform: this.headerViewport.style.transform,
+            headerViewportExists: !!this.headerViewport,
+            headerViewportClassName: this.headerViewport.className
           });
+        } else {
+          fileLog.error('❌ Header viewport lost in RAF callback');
         }
         this.scrollRAF = null;
       });
     } else {
       fileLog.warn('⚠️ Header viewport not found for scroll sync', {
         scrollLeft,
-        headerViewport: this.headerViewport
+        headerViewport: this.headerViewport,
+        headerViewportType: typeof this.headerViewport
       });
     }
   }
@@ -232,9 +247,9 @@ export class ScrollController {
       behavior: options.behavior || 'auto'
     });
     
-    // Sync header if scrolling horizontally
+    // Sync header position if scrolling horizontally
     if (options.left !== undefined && this.headerViewport) {
-      this.headerViewport.scrollLeft = options.left;
+      this.headerViewport.style.transform = `translateX(-${options.left}px)`;
     }
   }
 

@@ -135,12 +135,35 @@ export const visualState$ = computed((): VisualState => {
   const totalHeight = inputs.rowCount * inputs.rowHeight;
 
   // Calculate visible ranges
-  const startColIndex = Math.max(0,
-    visibleColumns.findIndex(col => col.xOffset + col.width > inputs.scrollLeft)
-  );
-  const endColIndex = Math.min(visibleColumns.length,
-    visibleColumns.findIndex(col => col.xOffset > inputs.scrollLeft + inputs.viewportWidth) + 1
-  );
+  const startColIndexResult = visibleColumns.findIndex(col => col.xOffset + col.width > inputs.scrollLeft);
+  const startColIndex = Math.max(0, startColIndexResult === -1 ? 0 : startColIndexResult);
+
+  const endColIndexResult = visibleColumns.findIndex(col => col.xOffset > inputs.scrollLeft + inputs.viewportWidth);
+  const endColIndex = Math.min(visibleColumns.length, endColIndexResult === -1 ? visibleColumns.length : endColIndexResult + 1);
+
+  // DEBUG: Log column virtualization calculations
+  if (inputs.scrollLeft > 0) {
+    console.log('🔍 COLUMN VIRTUALIZATION DEBUG', {
+      scrollLeft: inputs.scrollLeft,
+      viewportWidth: inputs.viewportWidth,
+      scrollRightEdge: inputs.scrollLeft + inputs.viewportWidth,
+      startColIndexResult,
+      startColIndex,
+      endColIndexResult,
+      endColIndex,
+      visibleColumnsCount: visibleColumns.length,
+      virtualRangeCount: endColIndex - startColIndex,
+      firstColXOffset: visibleColumns[0]?.xOffset,
+      startColXOffset: visibleColumns[startColIndex]?.xOffset,
+      endColXOffset: visibleColumns[endColIndex - 1]?.xOffset,
+      columnOffsets: visibleColumns.slice(Math.max(0, startColIndex - 2), endColIndex + 2).map(col => ({
+        id: col.id,
+        xOffset: col.xOffset,
+        width: col.width,
+        rightEdge: col.xOffset + col.width
+      }))
+    });
+  }
 
   const startRowIndex = Math.floor(inputs.scrollTop / inputs.rowHeight);
   const endRowIndex = Math.min(inputs.rowCount,

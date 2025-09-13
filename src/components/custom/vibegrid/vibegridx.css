@@ -106,6 +106,8 @@
   min-width: var(--cell-min-width, 60px);
   max-width: var(--cell-max-width, 400px);
   overflow: hidden;
+  /* DEBUGGING: Add bright border to visualize header cell boundaries */
+  border: 2px solid magenta !important;
 }
 
 /* Active state cursor handled programmatically */
@@ -487,6 +489,8 @@ body.vibegridx-dragging-active * {
   cursor: pointer;
   color: hsl(var(--foreground));
   background: inherit;
+  /* DEBUGGING: Add bright border to visualize cell boundaries */
+  border: 2px solid lime !important;
 }
 
 /* Single-click editing hover states */

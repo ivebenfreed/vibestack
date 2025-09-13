@@ -383,6 +383,38 @@ export class SimplePassiveRenderer {
 
         // Update centralized visual state
         visualOperations.setScrollPosition(scrollLeft, scrollTop);
+
+        // DEBUGGING: Log detailed width calculations during scroll
+        const visualState = visualState$.get();
+        const viewport = this.viewport;
+        const headerViewport = this.headerViewport;
+
+        fileLog.info('📜 SCROLL DEBUG - Width Calculations', {
+          scrollLeft,
+          scrollTop,
+          // Visual state geometry
+          visualStateTotalWidth: visualState.geometry.totalWidth,
+          visualStateViewportWidth: visualState.geometry.viewportWidth,
+          // Visible columns analysis
+          visibleColumnsCount: visualState.visibleColumns.length,
+          columnLayouts: visualState.visibleColumns.map(col => ({
+            id: col.id,
+            width: col.width,
+            xOffset: col.xOffset,
+            visible: col.visible
+          })),
+          // DOM dimensions
+          viewportClientWidth: viewport?.clientWidth,
+          viewportScrollWidth: viewport?.scrollWidth,
+          headerViewportClientWidth: headerViewport?.clientWidth,
+          headerViewportScrollWidth: headerViewport?.scrollWidth,
+          // Transform states
+          headerTransform: headerViewport?.style.transform,
+          // Scroll edge analysis
+          scrollRightEdge: scrollLeft + (viewport?.clientWidth || 0),
+          totalScrollableWidth: (viewport?.scrollWidth || 0) - (viewport?.clientWidth || 0),
+          scrollProgress: viewport?.scrollWidth ? (scrollLeft / ((viewport.scrollWidth - viewport.clientWidth) || 1) * 100).toFixed(1) + '%' : '0%'
+        });
       },
       keyboardNavController: this.keyboardNavController,
       selectionController: this.selectionController,
@@ -452,12 +484,14 @@ export class SimplePassiveRenderer {
       height: ${HEADER_HEIGHT}px;
       background: hsl(var(--muted));
       border-bottom: 1px solid hsl(var(--border));
-      overflow-x: auto;
-      overflow-y: hidden;
+      overflow: hidden;
       scrollbar-width: none; /* Firefox */
       -ms-overflow-style: none; /* IE/Edge */
       z-index: 10;
       contain: layout style;
+      /* DEBUGGING: Add border to visualize header container boundaries */
+      border: 2px solid blue !important;
+      box-sizing: border-box;
     `;
     this.headerViewport.style.setProperty('-webkit-overflow-scrolling', 'touch');
     this.headerViewport.appendChild(this.headerContainer);
@@ -477,6 +511,9 @@ export class SimplePassiveRenderer {
     this.bodyContainer.style.cssText = `
       position: relative;
       width: 100%;
+      /* DEBUGGING: Add border to visualize body container boundaries */
+      border: 2px solid red !important;
+      box-sizing: border-box;
     `;
     
     this.viewport.appendChild(this.bodyContainer);
@@ -604,20 +641,23 @@ export class SimplePassiveRenderer {
       rendering: visibleRows.length
     });
     
-    // Get virtual column range from the observable (single source of truth) - MUST match header
+    // Get virtual column range and layouts from the unified visual state (single source of truth)
     const visibleColumnRange = visualState.geometry.visibleColumnRange;
-    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    
+    const allColumnLayouts = visualState.columnLayouts;
+    const visibleColumnLayouts = visualState.visibleColumns;
+
     // Use the EXACT same range as header (from observable with buffer already included)
     const startColIndex = visibleColumnRange.start;
     const endColIndex = visibleColumnRange.end;
-    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
-    
-    // Calculate starting x position for virtual columns - MUST match header
-    let startX = 40; // Account for row header
-    for (let i = 0; i < startColIndex; i++) {
-      startX += allVisibleColumns[i].width;
-    }
+    const virtualColumnLayouts = visibleColumnLayouts.slice(startColIndex, endColIndex);
+
+    // Use pre-computed starting x position from unified visual state - NO duplicate calculation
+    const startX = startColIndex > 0 ? visibleColumnLayouts[startColIndex].xOffset : 40;
+
+    // Convert column layouts back to columns for compatibility with existing renderer
+    const virtualColumns = virtualColumnLayouts.map(layout =>
+      columns.find(col => col.id === layout.id)
+    ).filter(Boolean);
     
     // Render only visible rows using RowRenderer
     visibleRows.forEach((row, visibleIndex) => {
@@ -751,14 +791,24 @@ export class SimplePassiveRenderer {
    * Triggers virtual scrolling updates when visible range changes
    */
   private handleViewportChange(): void {
-    // Check if horizontal columns have changed
-    const visibleColumns = this.tableViewport$.visibleColumns.get();
+    // FIXED: Use unified visual state instead of broken tableViewport$ observable
+    const visualState = visualState$.get();
+    const visibleColumns = visualState.geometry.visibleColumnRange;
     const previousColumns = this.lastVisibleColumns || { start: -1, end: -1 };
 
     const columnsChanged = visibleColumns && (
       visibleColumns.start !== previousColumns.start ||
       visibleColumns.end !== previousColumns.end
     );
+
+    // DEBUG: Log trigger analysis to identify excessive rendering
+    fileLog.info('🔍 VIEWPORT CHANGE TRIGGER FIXED', {
+      scrollLeft: this.tableViewport$.scrollLeft.get(),
+      visibleColumns: visibleColumns ? `${visibleColumns.start}-${visibleColumns.end}` : 'null',
+      previousColumns: `${previousColumns.start}-${previousColumns.end}`,
+      columnsChanged,
+      willTriggerHeaderRender: columnsChanged && visibleColumns
+    });
 
     // Check if vertical rows have changed (for virtual scrolling)
     const visibleRows = this.tableViewport$.visibleRows.get();

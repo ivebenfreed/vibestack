@@ -6,12 +6,13 @@
  */
 
 import { log } from '@/logger';
+import { visualState$ } from '../../stores/visual-state';
 import type {
   TableCore$,
   TableInteraction$,
   TableViewport$
 } from '../../stores/pure-observables';
-import { getColumnWidth, getViewportGeometry, visualState$, visualOperations } from '../../stores/visual-state';
+import { getViewportGeometry, visualState$, visualOperations } from '../../stores/visual-state';
 import type { ScrollController } from '../modules/ScrollController';
 import type { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import type { SelectionController } from '../modules/SelectionController';
@@ -84,14 +85,20 @@ export class ViewportManager {
     // Header viewport wrapper (for proper horizontal scrolling sync)
     this.headerViewport = this.createElement('div', 'vibegridx-header-viewport');
     this.headerViewport.style.cssText = `
-      overflow-x: auto;
-      overflow-y: hidden;
+      overflow: hidden;
       position: relative;
       border-bottom: 1px solid #e9ecef;
       flex-shrink: 0;
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE and Edge */
+      /* DEBUGGING: Add border to visualize header container boundaries */
+      border: 2px solid blue !important;
+      box-sizing: border-box;
     `;
+
+    fileLog.info('🔵 DEBUG: Header viewport created with blue border', {
+      className: 'vibegridx-header-viewport',
+      border: '2px solid blue',
+      element: this.headerViewport
+    });
     
     // Hide webkit scrollbars for header viewport
     this.headerViewport.style.setProperty('-webkit-overflow-scrolling', 'touch');
@@ -110,7 +117,16 @@ export class ViewportManager {
     this.bodyContainer.style.cssText = `
       position: relative;
       overflow: hidden;
+      /* DEBUGGING: Add border to visualize body container boundaries */
+      border: 2px solid red !important;
+      box-sizing: border-box;
     `;
+
+    fileLog.info('🔴 DEBUG: Body container created with red border', {
+      className: 'vibegridx-body',
+      border: '2px solid red',
+      element: this.bodyContainer
+    });
     
     this.viewport.appendChild(this.bodyContainer);
     
@@ -141,28 +157,27 @@ export class ViewportManager {
 
   /**
    * Setup scroll event handling and header synchronization
-   * Implements the planned scroll coordination from PURE_OBSERVABLE_PROGRESS.md
+   * DISABLED: Causing duplicate scroll handlers with ScrollController
+   * ScrollController now handles all scroll events to prevent race conditions
    */
   setupScrollHandling(): void {
     if (!this.viewport) return;
 
-    fileLog.info('📜 Setting up scroll coordination');
+    fileLog.info('📜 DISABLED: ViewportManager scroll handling (using ScrollController instead)');
 
-    // Direct DOM event binding → Observable updates (as planned in docs)
-    this.viewport.addEventListener('scroll', (e) => {
-      const target = e.target as HTMLElement;
-      const scrollTop = target.scrollTop;
-      const scrollLeft = target.scrollLeft;
+    // DISABLED: This was causing duplicate scroll handlers and excessive renders
+    // ScrollController now handles all scroll events properly
+    // this.viewport.addEventListener('scroll', (e) => {
+    //   const target = e.target as HTMLElement;
+    //   const scrollTop = target.scrollTop;
+    //   const scrollLeft = target.scrollLeft;
+    //   this.tableViewport$.updateScroll(scrollTop, scrollLeft);
 
-      // Update viewport observable (triggers all reactive updates)
-      this.tableViewport$.updateScroll(scrollTop, scrollLeft);
+    //   this.syncHeaderScroll(scrollLeft);
+    //   // ... rest of scroll handler logic was here
+    // });
 
-      // Sync header scroll with requestAnimationFrame optimization
-      this.syncHeaderScroll(scrollLeft);
-
-      fileLog.debug('📜 Scroll event processed', { scrollTop, scrollLeft });
-    });
-
+    // Still setup interaction handling (not scroll-related)
     this.setupViewportClickHandling();
     this.setupKeyboardHandling();
   }
@@ -285,12 +300,12 @@ export class ViewportManager {
     if (!this._scrollRAF && this.headerViewport) {
       this._scrollRAF = requestAnimationFrame(() => {
         if (this.headerViewport) {
-          // Use native scrolling for the header viewport
-          this.headerViewport.scrollLeft = scrollLeft;
-          
-          fileLog.debug('📜 Header scroll synced', { 
-            scrollLeft, 
-            actualScrollLeft: this.headerViewport.scrollLeft
+          // Use transform to position header content (header viewport is not scrollable)
+          this.headerViewport.style.transform = `translateX(-${scrollLeft}px)`;
+
+          fileLog.debug('📜 Header position synced', {
+            scrollLeft,
+            transform: this.headerViewport.style.transform
           });
         }
         this._scrollRAF = null;
@@ -341,11 +356,11 @@ export class ViewportManager {
     const scrollLeft = this.tableViewport$.scrollLeft.get();
     const viewportHeight = this.tableViewport$.viewportHeight.get();
     const viewportWidth = this.tableViewport$.viewportWidth.get();
-    
+
     const rows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get().filter(col => 
-      this.tableCore$.columnVisibility.get()[col.id] !== false
-    );
+    // Use UNIFIED visual state's visible columns - no duplicate filtering
+    const visualState = visualState$.get();
+    const columns = visualState.visibleColumns;
     
     // Calculate visible row range
     const startRowIndex = Math.floor(scrollTop / ROW_HEIGHT);
@@ -361,7 +376,7 @@ export class ViewportManager {
 
     // Find start column - first column that is at least partially visible
     for (let i = 0; i < columns.length; i++) {
-      const actualWidth = getColumnWidth(columns[i].id);
+      const actualWidth = columns[i].width; // Use precomputed width from visual state
       if (accumulatedWidth + actualWidth > scrollLeft) {
         startColIndex = i;
         break;
@@ -371,7 +386,7 @@ export class ViewportManager {
 
     // Find end column - continue from where we left off
     for (let i = startColIndex; i < columns.length; i++) {
-      const actualWidth = getColumnWidth(columns[i].id);
+      const actualWidth = columns[i].width; // Use precomputed width from visual state
       if (accumulatedWidth > scrollLeft + viewportWidth) {
         endColIndex = i + 1; // Include one more for partial visibility
         break;
@@ -390,18 +405,15 @@ export class ViewportManager {
    */
   updateContentDimensions(): void {
     if (!this.bodyContainer) return;
-    
+
     const rows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get().filter(col => 
-      this.tableCore$.columnVisibility.get()[col.id] !== false
-    );
+    // Use UNIFIED visual state's visible columns - no duplicate filtering
+    const visualState = visualState$.get();
+    const columns = visualState.visibleColumns;
     
     const totalHeight = rows.length * ROW_HEIGHT;
-    // Use centralized visual state for accurate total calculation
-    const totalWidth = 40 + columns.reduce((sum, col) => {
-      const actualWidth = getColumnWidth(col.id);
-      return sum + actualWidth;
-    }, 0) + 20; // +20px for end drop zone (match header)
+    // Use UNIFIED visual state's totalWidth - no duplicate calculation
+    const totalWidth = visualState.geometry.totalWidth;
     
     this.bodyContainer.style.height = `${totalHeight}px`;
     this.bodyContainer.style.width = `${totalWidth}px`;

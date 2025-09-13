@@ -499,7 +499,9 @@ export class RowEngine {
       height: `${this.config.rowHeight}px`,
       borderRight: '1px solid var(--border)',
       boxSizing: 'border-box',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      // DEBUGGING: Add border to visualize cell boundaries and positioning
+      border: '1px solid orange !important'
     });
     
     // Create content using CellPipeline

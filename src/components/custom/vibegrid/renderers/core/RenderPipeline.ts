@@ -6,7 +6,7 @@ import type { RenderState, ViewportInfo } from '../../types';
 import type { VirtualScrollManager } from '../managers/VirtualScrollManager';
 import type { ColumnManager } from '../managers/ColumnManager';
 import type { DOMSystem } from '../systems/DOMSystem';
-import type { HeaderEngine } from '../engines/HeaderEngine';
+import type { HeaderRenderer } from '../components/HeaderRenderer';
 import type { RowEngine } from '../engines/RowEngine';
 import type { PerformanceSystem } from '../systems/PerformanceSystem';
 import { log } from '@/logger';
@@ -19,7 +19,7 @@ const fileLog = log('components/custom/vibegrid/renderers/core/RenderPipeline.ts
 export interface RenderPipelineConfig {
   virtualGrid: VirtualScrollManager;
   domManager: DOMSystem;
-  headerRenderer: HeaderEngine;
+  headerRenderer: HeaderRenderer;
   rowRenderingEngine: RowEngine;
   performanceMonitor: PerformanceSystem;
   rowHeight: number;
@@ -60,8 +60,8 @@ export class RenderPipeline {
     
     try {
       // STEP 1: Render header
-      const headerMetrics = this.config.headerRenderer.renderHeader(state);
-      this.config.performanceMonitor.recordPhase('header', headerMetrics.renderTime);
+      this.config.headerRenderer.render();
+      // HeaderRenderer doesn't return metrics, so skip this for now
       
       // Check if this is the first render
       if (this.isFirstRender) {

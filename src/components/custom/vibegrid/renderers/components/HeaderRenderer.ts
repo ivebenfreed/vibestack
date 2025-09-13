@@ -5,6 +5,7 @@
 
 import { log } from '@/logger';
 import { observe } from '@legendapp/state';
+import { visualState$ } from '../../stores/visual-state';
 import type { TableCore$, TableInteraction$, TableViewport$ } from '../../stores/pure-observables';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
@@ -62,10 +63,20 @@ export class HeaderRenderer {
    */
   render(): void {
     if (!this.headerContainer) return;
-    
+
+    // Get visual state early for debugging
+    const visualState = visualState$.get();
+
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
-    fileLog.info('🎨 Rendering header', { columnCount: columns.length });
+
+    fileLog.info('🔄 HEADER RENDER TRIGGERED', {
+      columnCount: columns.length,
+      scrollLeft: visualState.geometry.scrollLeft,
+      visibleRange: `${visualState.geometry.visibleColumnRange.start}-${visualState.geometry.visibleColumnRange.end}`,
+      totalColumns: visualState.visibleColumns.length,
+      virtualRangeCount: visualState.geometry.visibleColumnRange.end - visualState.geometry.visibleColumnRange.start
+    });
     
     this.headerContainer.innerHTML = '';
     
@@ -90,13 +101,23 @@ export class HeaderRenderer {
     // Filter visible columns and get virtual column range
     const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
 
-    // TODO: Implement proper column virtualization
-    // For now, render all visible columns (no virtual column range)
-    const virtualColumns = allVisibleColumns;
+    // FIXED: Use actual column virtualization from visual state with BUFFER
+    const visibleColumnRange = visualState.geometry.visibleColumnRange;
+
+    // Add buffer zones to prevent gaps at scroll edges (this was missing!)
+    const COLUMN_BUFFER = 2; // Render 2 extra columns on each side
+    const startWithBuffer = Math.max(0, visibleColumnRange.start - COLUMN_BUFFER);
+    const endWithBuffer = Math.min(visualState.visibleColumns.length, visibleColumnRange.end + COLUMN_BUFFER);
+
+    // Get virtualized columns with buffer for smooth scrolling
+    const virtualColumns = visualState.visibleColumns.slice(startWithBuffer, endWithBuffer);
     
-    fileLog.info('🎨 Header rendering', {
+    fileLog.info('🎨 Header rendering with BUFFER', {
       totalColumns: columns.length,
       allVisibleColumns: allVisibleColumns.length,
+      visibleRange: `${visibleColumnRange.start}-${visibleColumnRange.end}`,
+      bufferRange: `${startWithBuffer}-${endWithBuffer}`,
+      bufferSize: COLUMN_BUFFER,
       renderingColumns: virtualColumns.length,
       virtualColumnIds: virtualColumns.map(col => col.id),
       virtualColumnLabels: virtualColumns.map(col => col.label || col.id)
@@ -105,19 +126,36 @@ export class HeaderRenderer {
     // Update column coordinate mapping only if columns have changed
     const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
 
-    // Calculate column positioning (no virtualization for now)
-    let xOffset = 40; // Start after row header
+    // FIXED: Use exact positioning from visual state to match body cells
+    fileLog.info('🔧 Header using virtualized columns', {
+      scrollLeft: visualState.geometry.scrollLeft,
+      viewportWidth: visualState.geometry.viewportWidth,
+      visibleColumnRange,
+      virtualColumnsCount: virtualColumns.length,
+      virtualColumnIds: virtualColumns.map(col => col.id),
+      xOffsets: virtualColumns.map(col => col.xOffset),
+      allVisibleColumnIds: visualState.visibleColumns.map(col => col.id),
+      totalVisibleColumns: visualState.visibleColumns.length
+    });
 
-    // Get reactive column widths for consistent calculations
-    const columnWidths = this.tableCore$.columnWidths.get();
+    // Render virtualized columns with unified visual state positioning
+    // The header viewport will be transformed by ScrollController, so we position cells
+    // relative to the first visible column, not their absolute xOffset
+    const firstVisibleXOffset = virtualColumns.length > 0 ? virtualColumns[0].xOffset : 40;
 
-    // Render all visible columns
-    virtualColumns.forEach((column, columnIndex) => {
-      const actualIndex = columnIndex;
-      const headerCell = this.createColumnHeader(column, actualIndex, xOffset);
+    virtualColumns.forEach((columnLayout, columnIndex) => {
+      // Position relative to the first visible column since header viewport will be transformed
+      const relativeXOffset = columnLayout.xOffset - firstVisibleXOffset;
+      const headerCell = this.createColumnHeader(columnLayout, columnIndex, relativeXOffset);
       headerRow.appendChild(headerCell);
-      const actualWidth = getColumnWidth(column.id);
-      xOffset += actualWidth;
+
+      fileLog.debug('🎯 Header cell positioned', {
+        columnId: columnLayout.id,
+        absoluteXOffset: columnLayout.xOffset,
+        firstVisibleXOffset,
+        relativeXOffset,
+        scrollLeft: visualState.geometry.scrollLeft
+      });
     });
 
     // Add end drop zone for placing columns at the end
@@ -125,11 +163,8 @@ export class HeaderRenderer {
     headerRow.appendChild(endDropZone);
 
     // Set total width for proper overflow handling (include end drop zone)
-    // Use centralized visual state for accurate total calculation
-    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => {
-      const actualWidth = getColumnWidth(col.id);
-      return sum + actualWidth;
-    }, 0) + 20; // +20px for end zone
+    // Use UNIFIED visual state's totalWidth - no duplicate calculation
+    const totalHeaderWidth = visualState.geometry.totalWidth;
     headerRow.style.width = `${totalHeaderWidth}px`;
     headerRow.style.minWidth = `${totalHeaderWidth}px`;
 

@@ -124,28 +124,48 @@ export function createPureObservables(entityType: string, columns: Column[]) {
   const tableInteraction$ = createTableInteraction$(tableCore$);
   const tableViewport$ = createTableViewport$(tableCore$);
 
-  // Initialize visual-state with column data
+  // Initialize visual-state with column data and persisted visual settings
   visualInputs$.columns.set(columns);
   visualInputs$.entityType.set(entityType);
 
-  // Sync column configuration from tableCore$ to visual-state
-  const syncColumnsToVisual = () => {
-    const columnWidths = tableCore$.columnWidths.get();
-    const columnVisibility = tableCore$.columnVisibility.get();
-    const columnOrder = tableCore$.columnOrder.get();
+  // Initialize visual state with any persisted values from tableCore$ (one-time setup)
+  const initialColumnWidths = tableCore$.columnWidths.get();
+  const initialColumnVisibility = tableCore$.columnVisibility.get();
+  const initialColumnOrder = tableCore$.columnOrder.get();
 
-    visualInputs$.columnWidths.set(columnWidths);
-    visualInputs$.columnVisibility.set(columnVisibility);
-    visualInputs$.columnOrder.set(columnOrder);
+  visualInputs$.columnWidths.set(initialColumnWidths);
+  visualInputs$.columnVisibility.set(initialColumnVisibility);
+  visualInputs$.columnOrder.set(initialColumnOrder);
+
+  fileLog.debug('🎯 Visual state initialized with persisted settings', {
+    widthCount: Object.keys(initialColumnWidths).length,
+    visibilityCount: Object.keys(initialColumnVisibility).length,
+    orderCount: initialColumnOrder.length
+  });
+
+  // ARCHITECTURAL FIX: Visual state should be authoritative, not tableCore$
+  // Sync visual configuration FROM visual-state TO tableCore$ for persistence only
+  const syncVisualToTableCore = () => {
+    const columnWidths = visualInputs$.columnWidths.get();
+    const columnVisibility = visualInputs$.columnVisibility.get();
+    const columnOrder = visualInputs$.columnOrder.get();
+
+    // Update tableCore$ for persistence, but visualState$ remains authoritative
+    tableCore$.columnWidths.set(columnWidths);
+    tableCore$.columnVisibility.set(columnVisibility);
+    tableCore$.columnOrder.set(columnOrder);
+
+    fileLog.debug('🔄 Synced visual state to tableCore$ for persistence', {
+      widthCount: Object.keys(columnWidths).length,
+      visibilityCount: Object.keys(columnVisibility).length,
+      orderCount: columnOrder.length
+    });
   };
 
-  // Initial sync
-  syncColumnsToVisual();
-
-  // Set up reactive sync (columns changes in tableCore$ update visual-state)
-  tableCore$.columnWidths.onChange(syncColumnsToVisual);
-  tableCore$.columnVisibility.onChange(syncColumnsToVisual);
-  tableCore$.columnOrder.onChange(syncColumnsToVisual);
+  // Set up reactive sync (visual changes update tableCore$ for persistence)
+  visualInputs$.columnWidths.onChange(syncVisualToTableCore);
+  visualInputs$.columnVisibility.onChange(syncVisualToTableCore);
+  visualInputs$.columnOrder.onChange(syncVisualToTableCore);
 
   fileLog.info('✅ Pure observables created successfully', {
     entityType,

@@ -11,6 +11,7 @@ import type {
   TableInteraction$, 
   TableViewport$ 
 } from '../../stores/pure-observables';
+import { visualState$ } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import type { CellRenderer } from './CellRenderer';
@@ -93,11 +94,9 @@ export class RowRenderer {
       currentX += column.width;
     });
     
-    // Calculate total width to ensure consistent scrolling with header
-    const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
-      this.tableCore$.columnVisibility.get()[col.id] !== false
-    );
-    const totalRowWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0) + 20; // +20px for end drop zone (match header)
+    // Use UNIFIED visual state's totalWidth - no duplicate calculation
+    const visualState = visualState$.get();
+    const totalRowWidth = visualState.geometry.totalWidth;
     rowElement.style.width = `${totalRowWidth}px`;
     rowElement.style.minWidth = `${totalRowWidth}px`;
     
@@ -156,10 +155,9 @@ export class RowRenderer {
     `;
     checkbox.dataset.rowId = row.id;
     
-    // Check if this row is currently selected (use ALL visible columns, not just virtual ones)
-    const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
-      this.tableCore$.columnVisibility.get()[col.id] !== false
-    );
+    // Check if this row is currently selected (use ALL visible columns from visual state)
+    const visualState = visualState$.get();
+    const allVisibleColumns = visualState.visibleColumns;
     
     const selectedCells = this.tableInteraction$.selectedCells.get();
     const isRowSelected = allVisibleColumns.every(col => 
@@ -375,9 +373,9 @@ export class RowRenderer {
    */
   updateAllRowCheckboxes(): void {
     const selectedCells = this.tableInteraction$.selectedCells.get();
-    const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
-      this.tableCore$.columnVisibility.get()[col.id] !== false
-    );
+    // Use UNIFIED visual state's visible columns - no duplicate filtering
+    const visualState = visualState$.get();
+    const allVisibleColumns = visualState.visibleColumns;
 
     this.activeRows.forEach((rowElement, rowId) => {
       const checkbox = rowElement.querySelector('input[type="checkbox"]') as HTMLInputElement;

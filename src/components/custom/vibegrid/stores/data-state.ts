@@ -13,6 +13,7 @@ import { getEntity$, entityOperations, universeSchema$, universeLoading$, univer
 import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig, GroupField, GroupNode, AggregationConfig } from '../types';
 import { columnOperations, columns$ } from './columns-observable';
+import { visualOperations } from './visual-state';
 
 const fileLog = log('components/custom/vibegrid/stores/data-state.ts');
 
@@ -497,6 +498,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         hasSorting: sortBy.length > 0,
         hasGrouping: !!groupConfig
       });
+
+      // Update visual state with the current row count
+      visualOperations.setRowCount(rows.length);
 
       return rows;
     },

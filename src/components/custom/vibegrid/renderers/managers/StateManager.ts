@@ -10,11 +10,12 @@ import type {
   RendererOptions 
 } from '../../types';
 import type { ColumnManager } from './ColumnManager';
+import { visualState$ } from '../../stores/visual-state';
 // ColumnDimensionManager removed - use coordinateMapping instead
 import type { DOMSystem } from '../systems/DOMSystem';
 import type { VirtualScrollManager } from './VirtualScrollManager';
 import type { SelectionManager } from './SelectionManager';
-import type { HeaderEngine } from '../engines/HeaderEngine';
+import type { HeaderRenderer } from '../components/HeaderRenderer';
 import type { RowEngine } from '../engines/RowEngine';
 import type { PerformanceMonitor } from './PerformanceMonitor';
 import type { RenderOrchestrator } from './RenderOrchestrator';
@@ -28,7 +29,7 @@ const fileLog = log('components/custom/vibegrid/renderers/managers/StateManager.
 export interface StateManagerConfig {
   virtualGrid: VirtualScrollManager;
   selectionManager: SelectionManager;
-  headerRenderer: HeaderEngine;
+  headerRenderer: HeaderRenderer;
   rowRenderingEngine: RowEngine;
   performanceMonitor: PerformanceMonitor;
   renderOrchestrator: RenderOrchestrator;
@@ -197,7 +198,9 @@ export class StateManager {
   private updateHeaderDimensions(): void {
     if (this.lastRenderState?.coordinateMapping?.columns?.length > 0) {
       const coordinateColumns = this.lastRenderState.coordinateMapping.columns;
-      const totalWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0) + 20; // +20px for end drop zone
+      // Use UNIFIED visual state's totalWidth - no duplicate calculation
+      const visualState = visualState$.get();
+      const totalWidth = visualState.geometry.totalWidth;
       const header = this.config.domManager.getElement('header');
       header.style.width = `${totalWidth}px`;
       
@@ -215,7 +218,7 @@ export class StateManager {
       
       // Re-render header content to show/hide columns
       if (this.lastRenderState) {
-        this.config.headerRenderer.renderHeader(this.lastRenderState);
+        this.config.headerRenderer.render();
         // Also re-render visible rows to update cell positions
         this.config.rowRenderingEngine.renderVisibleRows(this.lastRenderState);
       }

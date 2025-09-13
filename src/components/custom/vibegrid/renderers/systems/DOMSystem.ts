@@ -67,7 +67,16 @@ export class DOMSystem {
     Object.assign(headerViewport.style, {
       overflow: 'hidden',
       position: 'relative',
-      flexShrink: '0' // Don't shrink header
+      flexShrink: '0', // Don't shrink header
+      /* DEBUGGING: Add border to visualize header container boundaries */
+      border: '2px solid blue !important',
+      boxSizing: 'border-box'
+    });
+
+    fileLog.info('🔵 DEBUG: Header viewport created with blue border', {
+      className: 'vibegridx-header-viewport',
+      border: '2px solid blue',
+      element: headerViewport
     });
     
     const header = document.createElement('div');
@@ -95,7 +104,18 @@ export class DOMSystem {
     // Create body for table rows
     const body = document.createElement('div');
     body.className = CSS_CLASSES.BODY;
-    body.style.position = 'relative';
+    Object.assign(body.style, {
+      position: 'relative',
+      /* DEBUGGING: Add border to visualize body container boundaries */
+      border: '2px solid red !important',
+      boxSizing: 'border-box'
+    });
+
+    fileLog.info('🔴 DEBUG: Body container created with red border', {
+      className: CSS_CLASSES.BODY,
+      border: '2px solid red',
+      element: body
+    });
     
     viewport.appendChild(body);
     
