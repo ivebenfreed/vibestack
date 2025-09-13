@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { useAuth } from '@/state-machines'
+import { useLegendAuth } from '@/legend-state/hooks/use-legend-auth'
 import { Route } from '../../sign-in'
 import { authClient } from '@/lib/auth'
 import { log } from '@/logger';
@@ -36,8 +36,8 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   
-  // Use orchestrator auth hook
-  const { signIn, isAuthenticated, isSigningIn, authError } = useAuth();
+  // Use Legend State auth hook as the default
+  const { signIn, isAuthenticated, loading, error } = useLegendAuth();
   
   const routerState = useRouterState()
   const searchParams = routerState.location.search as { redirect?: string }
@@ -63,21 +63,21 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
 
   // Handle auth errors
   useEffect(() => {
-    if (authError && isLoading) {
-      console.error("[AUTH] Authentication failed:", authError);
-      toast.error(authError);
+    if (error && isLoading) {
+      console.error("[AUTH] Authentication failed:", error);
+      toast.error(error);
       setIsLoading(false);
     }
-  }, [authError, isLoading]);
+  }, [error, isLoading]);
 
   // Handle when signing in state changes - with timing tolerance
   useEffect(() => {
-    if (!isSigningIn && isLoading && !isAuthenticated && !authError) {
+    if (!loading && isLoading && !isAuthenticated && !error) {
       // Add a small delay to allow auth state machine to transition properly
       // The auth machine might complete signing in before transitioning to authenticated
       const timeout = setTimeout(() => {
         // Re-check the state after a brief delay
-        if (!isAuthenticated && !authError) {
+        if (!isAuthenticated && !error) {
           fileLog.warn("[AUTH] Sign-in completed but no clear result after delay");
           toast.error("Sign-in failed. Please try again.");
           setIsLoading(false);
@@ -86,7 +86,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       
       return () => clearTimeout(timeout);
     }
-  }, [isSigningIn, isLoading, isAuthenticated, authError]);
+  }, [loading, isLoading, isAuthenticated, error]);
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
@@ -170,8 +170,8 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             </FormItem>
           )}
         />
-        <Button type='submit' className='mt-2' disabled={isLoading || isSigningIn}>
-          {(isLoading || isSigningIn) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type='submit' className='mt-2' disabled={isLoading || loading}>
+          {(isLoading || loading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Login
         </Button>
 

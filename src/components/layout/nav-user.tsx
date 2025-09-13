@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { useSignOut } from '@/hooks/use-sign-out'
 
 export function NavUser({
@@ -37,7 +37,8 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const { user: authUser, isLoading, displayName } = useAuth()
+  const { user: authUser, loading: isLoading } = useUnifiedAuth()
+  const displayName = authUser?.name || ''
   const { signOut } = useSignOut()
   
   // Use the auth session first, then props as fallback - single source of truth

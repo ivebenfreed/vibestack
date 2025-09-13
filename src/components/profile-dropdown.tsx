@@ -12,11 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LogOut, User } from 'lucide-react'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { useSignOut } from '@/hooks/use-sign-out'
 
 export function ProfileDropdown() {
-  const { user, isLoading, displayName } = useAuth()
+  const { user, loading: isLoading } = useUnifiedAuth()
+  const displayName = user?.name || ''
   const { signOut } = useSignOut()
 
   // Use the auth user data directly - single source of truth

@@ -35,7 +35,7 @@ export interface AuthState {
 // Legend State Observable for Auth
 export const auth$ = observable<AuthState & {
   // Actions
-  signIn: (email: string, password: string) => Promise<boolean>;
+  signIn: (credentials: { email: string; password: string }) => Promise<boolean>;
   signOut: () => Promise<void>;
   checkAuth: () => Promise<void>;
   loadUserOrganizations: () => Promise<void>;
@@ -52,13 +52,13 @@ export const auth$ = observable<AuthState & {
   authToken: null,
 
   // Actions
-  signIn: async (email: string, password: string): Promise<boolean> => {
-    authLog.info('[AUTH$] Starting sign-in for:', email);
+  signIn: async (credentials: { email: string; password: string }): Promise<boolean> => {
+    authLog.info('[AUTH$] Starting sign-in for:', credentials.email);
     auth$.loading.set(true);
     auth$.error.set(null);
 
     try {
-      const result = await authClient.signIn.email({ email, password });
+      const result = await authClient.signIn.email({ email: credentials.email, password: credentials.password });
       
       if (result.error) {
         authLog.error('[AUTH$] Sign-in failed:', result.error.message);

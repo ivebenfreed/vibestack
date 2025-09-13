@@ -1,17 +1,17 @@
-import { useAuth } from '@/state-machines';
+import { useLegendAuth } from '@/legend-state/hooks/use-legend-auth';
 import { log } from '@/logger';
 const fileLog = log('hooks/use-sign-out.ts');
 
 /**
- * Simple sign-out hook that leverages the auth machine.
+ * Simple sign-out hook that leverages Legend State auth.
  * The route guard will handle navigation when auth state changes.
  */
 export function useSignOut() {
-  const { signOut, isSigningOut } = useAuth();
+  const { signOut, loading: isSigningOut } = useLegendAuth();
 
   const handleSignOut = async () => {
     try {
-      // Simply trigger sign out in auth machine
+      // Simply trigger sign out in Legend State auth
       signOut();
       // Route guard will detect auth change and redirect
       return true;

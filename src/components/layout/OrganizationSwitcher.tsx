@@ -26,18 +26,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useAuth } from '@/state-machines';
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
 import { CreateOrganizationForm } from '@/features/auth/components/CreateOrganizationForm';
 
 export function OrganizationSwitcher() {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { 
-    currentOrganization, 
-    userOrganizations, 
-    hasMultipleOrganizations,
-    switchOrganization 
-  } = useAuth();
+    organization: currentOrganization, 
+    userOrganizations
+  } = useUnifiedAuth();
+  
+  const hasMultipleOrganizations = userOrganizations && userOrganizations.length > 1;
+  
+  // For organization switching, we'll need to implement this in Legend State
+  const switchOrganization = (orgId: string) => {
+    console.log('Organization switching not yet implemented in Legend State:', orgId);
+  };
 
   const handleSelectOrganization = async (orgId: string) => {
     if (orgId !== currentOrganization?.id) {
