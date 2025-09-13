@@ -660,8 +660,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         ...visibility,
         [columnId]: !visibility[columnId]
       });
+      // Note: Selection clearing is handled by the calling component
       // persistObservable automatically persists changes
-      
+
       fileLog.info('🎯 Column toggled (auto-persistent)', { columnId, visible: !visibility[columnId] });
     },
     
@@ -696,7 +697,39 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       
       fileLog.info('🎯 Column width updated (auto-persistent)', { columnId, width });
     },
-    
+
+    // Reorder columns (for column drag and drop)
+    reorderColumn(sourceColumnId: string, targetColumnId: string) {
+      batch(() => {
+        const columns = [...tableCore$.columns.get()];
+        const sourceIndex = columns.findIndex(c => c.id === sourceColumnId);
+        const targetIndex = columns.findIndex(c => c.id === targetColumnId);
+
+        if (sourceIndex === -1 || targetIndex === -1) {
+          fileLog.warn('⚠️ Column reorder failed: column not found', {
+            sourceColumnId,
+            targetColumnId,
+            sourceIndex,
+            targetIndex
+          });
+          return;
+        }
+
+        // Remove source column and insert at target position
+        const [sourceColumn] = columns.splice(sourceIndex, 1);
+        columns.splice(targetIndex, 0, sourceColumn);
+
+        tableCore$.columns.set(columns);
+
+        // syncObservable automatically persists changes to localStorage
+      });
+
+      fileLog.info('🎯 Column reordered (auto-persistent)', {
+        sourceColumnId,
+        targetColumnId
+      });
+    },
+
     setGroupConfig(config: GroupConfig | null) {
       tableCore$.groupConfig.set(config);
       // persistObservable automatically persists changes
@@ -754,6 +787,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         Object.keys(visibility || {}).map(key => [key, true])
       );
       tableCore$.columnVisibility.set(allVisible);
+      // Note: Selection clearing is handled by the calling component
       // persistObservable automatically persists changes
       fileLog.info('🎯 All columns shown (auto-persistent)');
     },
@@ -761,7 +795,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     hideAllColumns() {
       const columns = tableCore$.columns;
       const visibility = tableCore$.columnVisibility.get();
-      
+
       // Only hide columns that are hideable (not required)
       const newVisibility = Object.fromEntries(
         Object.keys(visibility || {}).map(key => {
@@ -770,8 +804,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
           return [key, canHide ? false : visibility[key]];
         })
       );
-      
+
       tableCore$.columnVisibility.set(newVisibility);
+      // Note: Selection clearing is handled by the calling component
       // persistObservable automatically persists changes
       fileLog.info('🎯 All hideable columns hidden (auto-persistent)');
     },

@@ -24,22 +24,105 @@ export function setupColumnDragHandlers(
     e.dataTransfer!.effectAllowed = 'move';
     e.dataTransfer!.setData('text/plain', column.id);
     headerCell.classList.add('dragging');
+
+    // Create custom drag image with column title
+    const dragImage = document.createElement('div');
+    dragImage.style.cssText = `
+      position: fixed;
+      top: -200px;
+      left: 50px;
+      background: #1f2937;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+      border: 1px solid #374151;
+      white-space: nowrap;
+      z-index: 99999;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-width: 80px;
+      text-align: center;
+    `;
+
+    // Get column title with fallback
+    const columnTitle = column.title || column.header || column.id;
+    dragImage.textContent = `Moving: ${columnTitle}`;
+
+    document.body.appendChild(dragImage);
+
+    // Create the drag image with proper offset
+    e.dataTransfer!.setDragImage(dragImage, dragImage.offsetWidth / 2, dragImage.offsetHeight / 2);
+
+    // Clean up drag image after a short delay to ensure it's captured
+    setTimeout(() => {
+      if (document.body.contains(dragImage)) {
+        document.body.removeChild(dragImage);
+      }
+    }, 100);
+
     onDragStart(column.id, e);
   });
   
   headerCell.addEventListener('dragend', (e: DragEvent) => {
     headerCell.classList.remove('dragging');
+
+    // Clean up any remaining insertion lines
+    document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
+
     onDragEnd(column.id, e);
   });
   
   headerCell.addEventListener('dragover', (e: DragEvent) => {
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'move';
+
+    // Show insertion line at the border where column will be inserted
+    const rect = headerCell.getBoundingClientRect();
+    const mouseX = e.clientX;
+    const cellCenterX = rect.left + rect.width / 2;
+
+    // Determine if inserting before or after this column
+    const insertBefore = mouseX < cellCenterX;
+
+    // Remove any existing insertion lines
+    document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
+
+    // Create insertion line
+    const dropLine = document.createElement('div');
+    dropLine.className = 'column-drop-line';
+    dropLine.style.cssText = `
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: #3b82f6;
+      border-radius: 1px;
+      z-index: 9999;
+      box-shadow: 0 0 4px rgba(59, 130, 246, 0.5);
+      ${insertBefore ? 'left: -1px;' : 'right: -1px;'}
+    `;
+
+    headerCell.style.position = 'relative';
+    headerCell.appendChild(dropLine);
+
     onDragOver(e);
+  });
+
+  headerCell.addEventListener('dragleave', (e: DragEvent) => {
+    // Only remove if actually leaving the cell (not moving to child elements)
+    if (!headerCell.contains(e.relatedTarget as Node)) {
+      document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
+    }
   });
   
   headerCell.addEventListener('drop', (e: DragEvent) => {
     e.preventDefault();
+
+    // Clean up insertion lines
+    document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
+
     const draggedColumnId = e.dataTransfer!.getData('text/plain');
     if (draggedColumnId !== column.id) {
       onDrop(column.id, e);
