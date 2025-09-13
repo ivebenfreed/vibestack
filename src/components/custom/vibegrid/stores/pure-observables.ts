@@ -1521,8 +1521,8 @@ export function createTableViewport$(tableCore$?: any) {
         }
       }
       
-      // Add buffer for smooth scrolling (2 columns on each side)
-      const bufferSize = 2;
+      // Add buffer for smooth scrolling (5 columns on each side for better performance)
+      const bufferSize = 5;
       const bufferedStart = Math.max(0, startIndex - bufferSize);
       const bufferedEnd = Math.min(visibleColumns.length, endIndex + bufferSize);
       

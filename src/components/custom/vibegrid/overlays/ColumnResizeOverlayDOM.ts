@@ -109,12 +109,15 @@ export class ColumnResizeOverlayDOM {
     
     // Position indicator (adjust for scroll position so it stays aligned with the column)
     const adjustedX = newX - scrollLeft;
+    
+    // Since overlay is inside viewport container, start from top of viewport
+    // The viewport container itself is positioned below the header
     Object.assign(this.resizeIndicator.style, {
       position: 'absolute',
       left: `${adjustedX - this.config.resizeIndicatorWidth! / 2}px`,
-      top: `${this.config.headerHeight}px`, // Start below the header
+      top: '0', // Start from top of viewport container
       width: `${this.config.resizeIndicatorWidth}px`,
-      height: `${this.config.totalHeight}px`,
+      height: '100%', // Use full height of container
       backgroundColor: this.config.resizeIndicatorColor,
       boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)',
       pointerEvents: 'none',

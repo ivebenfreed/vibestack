@@ -28,6 +28,9 @@ export class SelectionOverlayDOM {
   // Track elements being animated out for cleanup
   private animatingOut = new Set<string>();
   
+  // Track current viewport for scroll adjustment
+  private currentViewport: ViewportInfo | null = null;
+  
   constructor(
     container: HTMLElement,
     config: SelectionOverlayConfig
@@ -50,6 +53,13 @@ export class SelectionOverlayDOM {
       container: this.container,
       config: this.config
     });
+  }
+  
+  /**
+   * Update the current viewport for scroll adjustment
+   */
+  updateViewport(viewport: ViewportInfo): void {
+    this.currentViewport = viewport;
   }
   
   /**
@@ -100,12 +110,11 @@ export class SelectionOverlayDOM {
       // Always show selected cells, don't filter by viewport for now to debug alignment
       visibleCells.add(cellKey);
       
-      // Calculate position based on coordinate mapping with proper header offset
-      // The row coordinates are absolute within the body container, 
-      // but overlay needs to be relative to the main container (including header)
+      // Calculate position based on coordinate mapping
+      // Since overlay is inside viewport container, no need to add header offset
       cellPositions.set(cellKey, {
         x: colCoord.x,
-        y: rowCoord.y + headerHeight, // Add header height to position correctly
+        y: rowCoord.y, // Row coordinates are already relative to viewport
         width: colCoord.width,
         height: rowCoord.height
       });
@@ -116,7 +125,7 @@ export class SelectionOverlayDOM {
         colCoord: { x: colCoord.x, width: colCoord.width },
         finalPosition: {
           x: colCoord.x,
-          y: rowCoord.y + headerHeight,
+          y: rowCoord.y,
           width: colCoord.width,
           height: rowCoord.height
         }
@@ -274,6 +283,7 @@ export class SelectionOverlayDOM {
     }
     
     // Update position and size
+    // No need to adjust for scroll since we're inside the scrolling container
     Object.assign(element.style, {
       left: `${position.x}px`,
       top: `${position.y}px`,

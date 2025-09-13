@@ -1,6 +1,25 @@
 import React from 'react';
 import { observer } from '@legendapp/state/react';
-import { Settings2, Plus, X, ChevronDown } from 'lucide-react';
+import { Settings2, Plus, X, ChevronDown, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import {
+  CSS,
+} from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -20,6 +39,65 @@ interface GroupConfigDropdownPureProps {
   className?: string;
 }
 
+interface SortableGroupFieldProps {
+  field: GroupField;
+  index: number;
+  onRemove: (index: number) => void;
+}
+
+const SortableGroupField = ({ field, index, onRemove }: SortableGroupFieldProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `${field.field}-${index}` });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between p-2 rounded-sm hover:bg-accent/50 cursor-grab active:cursor-grabbing"
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded text-muted-foreground"
+        >
+          <GripVertical size={12} />
+        </div>
+        <span className="text-sm truncate">{field.displayName}</span>
+        {index === 0 && (
+          <Badge variant="outline" className="text-xs px-1">
+            Primary
+          </Badge>
+        )}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove(index);
+        }}
+        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive ml-2"
+      >
+        <X size={12} />
+      </Button>
+    </div>
+  );
+};
+
 export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure({
   tableCore$,
   tableInteraction$,
@@ -30,6 +108,14 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
   const groupConfig = tableCore$.groupConfig.get();
   const isOpen = tableInteraction$.groupConfigMenuState.isOpen.get();
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   // Event handlers using observable methods
   const handleOpenChange = React.useCallback((open: boolean) => {
     if (open) {
@@ -38,6 +124,27 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
       tableInteraction$.closeGroupConfigMenu();
     }
   }, [tableInteraction$]);
+
+  const handleDragEnd = React.useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id && groupConfig) {
+      // Extract indices from the drag item ids
+      const activeIndex = groupConfig.fields.findIndex((field, index) => `${field.field}-${index}` === active.id);
+      const overIndex = groupConfig.fields.findIndex((field, index) => `${field.field}-${index}` === over?.id);
+
+      if (activeIndex !== -1 && overIndex !== -1) {
+        const reorderedFields = arrayMove(groupConfig.fields, activeIndex, overIndex);
+
+        const newConfig: GroupConfig = {
+          ...groupConfig,
+          fields: reorderedFields
+        };
+
+        tableCore$.setGroupConfig(newConfig);
+      }
+    }
+  }, [groupConfig, tableCore$]);
 
   // Available columns for grouping (only select/enum fields suitable for grouping)
   const availableColumns = React.useMemo(() => {
@@ -131,29 +238,33 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
         {/* Current Grouping Fields */}
         {hasActiveGrouping && (
           <>
-            <DropdownMenuLabel className="text-xs">Active Grouping</DropdownMenuLabel>
-            {groupConfig.fields.map((field, index) => (
-              <DropdownMenuItem 
-                key={`${field.field}-${index}`} 
-                className="flex items-center justify-between p-2"
+            <DropdownMenuLabel className="text-xs flex items-center gap-2">
+              Active Grouping
+              <Badge variant="secondary" className="text-xs">
+                Drag to reorder
+              </Badge>
+            </DropdownMenuLabel>
+            <div className="px-1">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
               >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-sm truncate">{field.displayName}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleRemoveGroupField(index);
-                  }}
-                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive ml-2"
+                <SortableContext
+                  items={groupConfig.fields.map((field, index) => `${field.field}-${index}`)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <X size={12} />
-                </Button>
-              </DropdownMenuItem>
-            ))}
+                  {groupConfig.fields.map((field, index) => (
+                    <SortableGroupField
+                      key={`${field.field}-${index}`}
+                      field={field}
+                      index={index}
+                      onRemove={handleRemoveGroupField}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </div>
             <DropdownMenuSeparator />
           </>
         )}

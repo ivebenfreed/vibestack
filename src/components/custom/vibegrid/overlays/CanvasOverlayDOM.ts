@@ -59,6 +59,13 @@ export class CanvasOverlayDOM {
   }
   
   /**
+   * Check if overlay has been initialized
+   */
+  get isInitialized(): boolean {
+    return this.overlayContainer !== null;
+  }
+  
+  /**
    * Initialize the overlay container
    */
   init(container: HTMLElement): void {
@@ -392,6 +399,12 @@ export class CanvasOverlayDOM {
     
     const overlay = this.getSelectionOverlay();
     fileLog.info('CanvasOverlayDOM: Got selection overlay, calling updateWithVisualPositions');
+    
+    // Pass viewport info to selection overlay so it can adjust for scroll
+    if (this.currentViewport) {
+      overlay.updateViewport(this.currentViewport);
+    }
+    
     overlay.updateWithVisualPositions(visualCells);
   }
   
