@@ -139,6 +139,15 @@ export async function initializeLegendState(
     // Observables are created on-demand, so we just mark as ready
     await new Promise(resolve => setTimeout(resolve, 100));
     
+    initializationActions.setProgress(80, entityCount, entityCount);
+    initializationActions.setLoading(true, 'Connecting sync');
+    
+    // 🔄 SYNC: Connect sync machine when Legend State is ready
+    const primaryOrgId = organizationIds[0];
+    if (primaryOrgId) {
+      await connectSyncMachine(primaryOrgId, userId);
+    }
+    
     initializationActions.setProgress(90, entityCount, entityCount);
     initializationActions.setLoading(true, 'Finalizing initialization');
     
@@ -151,5 +160,53 @@ export async function initializeLegendState(
     initializationActions.setError(
       error instanceof Error ? error.message : 'Initialization failed'
     );
+  }
+}
+
+/**
+ * Helper function to connect sync machine from Legend State initialization
+ */
+async function connectSyncMachine(organizationId: string, userId: string): Promise<void> {
+  initLog.info('🔄 [Sync] Connecting sync machine from Legend State initialization:', { 
+    organizationId, 
+    userId 
+  });
+  
+  // Get sync machine actor from global window (should be created by root component)
+  const syncActor = (window as any).simpleNotificationSyncMachineActor;
+  
+  if (!syncActor) {
+    initLog.warn('⚠️ [Sync] Sync machine actor not found on window - may not be initialized yet');
+    
+    // Wait a bit and retry - sync machine might still be initializing
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const retryActor = (window as any).simpleNotificationSyncMachineActor;
+    
+    if (!retryActor) {
+      initLog.error('❌ [Sync] Sync machine actor still not available after retry');
+      return;
+    }
+    
+    initLog.info('✅ [Sync] Found sync machine actor on retry');
+  }
+  
+  try {
+    const finalActor = syncActor || (window as any).simpleNotificationSyncMachineActor;
+    
+    // Send CONNECT event to sync machine
+    finalActor.send({ 
+      type: 'CONNECT', 
+      organizationId,
+      userId
+    });
+    
+    initLog.info('✅ [Sync] Sync machine connection event sent successfully');
+    
+    // Give sync a moment to connect
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+  } catch (error) {
+    initLog.error('❌ [Sync] Failed to connect sync machine:', error);
+    // Don't throw - sync connection failure shouldn't break Legend State init
   }
 }
