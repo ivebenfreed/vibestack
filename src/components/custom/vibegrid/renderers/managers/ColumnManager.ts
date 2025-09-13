@@ -101,7 +101,7 @@ export class ColumnManager {
    */
   getTotalColumnsWidth(coordinateMapping: any): number {
     // State machine coordinateMapping is the authoritative source
-    const totalWidth = coordinateMapping.columns.reduce((sum: number, col: any) => sum + col.width, 0);
+    const totalWidth = coordinateMapping.columns.reduce((sum: number, col: any) => sum + col.width, 0) + 20; // +20px for end drop zone
     
     fileLog.info('ColumnManager: Using state machine total width:', {
       totalWidth,

@@ -561,7 +561,7 @@ export class RowEngine {
     
     const coordinateColumns = state.coordinateMapping.columns;
     // The coordinate mapping already includes the selection column width
-    return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
+    return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0) + 20; // +20px for end drop zone
   }
   
   private resolveRelationships(row: TableRow, columns: Column[], resolvers: Record<string, (id: string | string[]) => string>): TableRow {

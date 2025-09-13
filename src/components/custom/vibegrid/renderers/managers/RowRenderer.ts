@@ -97,7 +97,7 @@ export class RowRenderer {
     const allVisibleColumns = this.tableCore$.columns.get().filter(col => 
       this.tableCore$.columnVisibility.get()[col.id] !== false
     );
-    const totalRowWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
+    const totalRowWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0) + 20; // +20px for end drop zone (match header)
     rowElement.style.width = `${totalRowWidth}px`;
     rowElement.style.minWidth = `${totalRowWidth}px`;
     

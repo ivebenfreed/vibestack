@@ -388,7 +388,7 @@ export class ViewportManager {
     );
     
     const totalHeight = rows.length * ROW_HEIGHT;
-    const totalWidth = 40 + columns.reduce((sum, col) => sum + col.width, 0);
+    const totalWidth = 40 + columns.reduce((sum, col) => sum + col.width, 0) + 20; // +20px for end drop zone (match header)
     
     this.bodyContainer.style.height = `${totalHeight}px`;
     this.bodyContainer.style.width = `${totalWidth}px`;

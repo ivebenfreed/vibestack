@@ -197,7 +197,7 @@ export class StateManager {
   private updateHeaderDimensions(): void {
     if (this.lastRenderState?.coordinateMapping?.columns?.length > 0) {
       const coordinateColumns = this.lastRenderState.coordinateMapping.columns;
-      const totalWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
+      const totalWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0) + 20; // +20px for end drop zone
       const header = this.config.domManager.getElement('header');
       header.style.width = `${totalWidth}px`;
       

@@ -160,20 +160,20 @@ export class ScrollController {
   private handleViewportScroll(event: Event): void {
     const scrollLeft = this.viewport.scrollLeft;
     const scrollTop = this.viewport.scrollTop;
-    
+
     // Only process if scroll position actually changed
     if (scrollLeft !== this.lastScrollLeft || scrollTop !== this.lastScrollTop) {
       this.lastScrollLeft = scrollLeft;
       this.lastScrollTop = scrollTop;
-      
-      // Sync header scroll
+
+      // Sync header scroll immediately (lightweight operation)
       this.syncHeaderScroll(scrollLeft);
-      
-      // Call external scroll handler
+
+      // Call external scroll handler (triggers viewport observer)
       if (this.onScroll) {
         this.onScroll(scrollLeft, scrollTop);
       }
-      
+
       fileLog.info('Viewport scrolled', {
         scrollLeft,
         scrollTop,

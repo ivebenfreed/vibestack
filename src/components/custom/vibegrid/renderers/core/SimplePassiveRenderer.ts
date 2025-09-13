@@ -71,6 +71,7 @@ export class SimplePassiveRenderer {
   // Basic row management
   private activeRows: Map<string, HTMLElement> = new Map();
   private lastVisibleColumns: { start: number; end: number } | null = null;
+  private lastVisibleRows: { start: number; end: number } | null = null;
   
   // Overlay management
   private overlayManager: OverlayManager | null = null;
@@ -748,16 +749,26 @@ export class SimplePassiveRenderer {
     // Check if horizontal columns have changed
     const visibleColumns = this.tableViewport$.visibleColumns.get();
     const previousColumns = this.lastVisibleColumns || { start: -1, end: -1 };
-    
-    const columnsChanged = visibleColumns.start !== previousColumns.start || 
-                          visibleColumns.end !== previousColumns.end;
-    
+
+    const columnsChanged = visibleColumns && (
+      visibleColumns.start !== previousColumns.start ||
+      visibleColumns.end !== previousColumns.end
+    );
+
+    // Check if vertical rows have changed (for virtual scrolling)
+    const visibleRows = this.tableViewport$.visibleRows.get();
+    const previousRows = this.lastVisibleRows || { start: -1, end: -1 };
+    const rowsChanged = visibleRows && (
+      visibleRows.start !== previousRows.start ||
+      visibleRows.end !== previousRows.end
+    );
+
     // Update viewport manager
     if (this.viewportManager) {
       this.viewportManager.handleViewportChange();
     }
-    
-    // Update overlay selection with current viewport position
+
+    // Update overlay selection with current viewport position (lightweight)
     if (this.overlayManager) {
       // Re-update selection overlay which will internally update viewport info
       const selectedCells = this.tableInteraction$.selectedCells.get();
@@ -765,15 +776,22 @@ export class SimplePassiveRenderer {
         this.overlayManager.updateSelection(selectedCells);
       }
     }
-    
-    // Re-render if columns changed (for horizontal virtual scrolling)
-    if (columnsChanged) {
+
+    // Only re-render when necessary to prevent excessive rendering during scroll
+    if (columnsChanged && visibleColumns) {
+      // Horizontal scrolling with column changes - full re-render
       this.lastVisibleColumns = visibleColumns;
       this.renderHeader();
       this.renderBody();
-    } else {
-      // Only re-render body for vertical scrolling
+      fileLog.info('🔄 Full re-render: columns changed', { visibleColumns });
+    } else if (rowsChanged && visibleRows) {
+      // Vertical scrolling with row changes - body only
+      this.lastVisibleRows = visibleRows;
       this.renderBody();
+      fileLog.info('🔄 Body re-render: rows changed', { visibleRows });
+    } else {
+      // No visible range changes - skip expensive re-renders
+      fileLog.debug('⏭️ Viewport change skipped re-render (no visible range changes)');
     }
   }
   

@@ -97,7 +97,9 @@ export class HeaderRenderer {
       totalColumns: columns.length,
       allVisibleColumns: allVisibleColumns.length,
       virtualRange: `${startColIndex}-${endColIndex}`,
-      renderingColumns: virtualColumns.length
+      renderingColumns: virtualColumns.length,
+      virtualColumnIds: virtualColumns.map(col => col.id),
+      virtualColumnLabels: virtualColumns.map(col => col.label || col.id)
     });
     
     // Update column coordinate mapping only if columns have changed

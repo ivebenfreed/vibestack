@@ -271,7 +271,7 @@ export class DOMElementFactory {
     // Header text
     const headerText = this.createElement('span', 'vibegridx-header-text');
     headerText.style.cssText = 'flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-    headerText.textContent = column.label;
+    headerText.textContent = column.label || column.name || column.id;
     
     textGroup.appendChild(headerText);
 

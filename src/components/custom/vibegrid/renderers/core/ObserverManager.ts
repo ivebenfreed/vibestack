@@ -44,8 +44,9 @@ export class ObserverManager {
   private tableInteraction$: TableInteraction$;
   private tableViewport$: TableViewport$;
   private overlayManager?: OverlayManager;
-  
+
   private disposers: (() => void)[] = [];
+  private viewportThrottleRAF: number | null = null;
   
   // Callback functions
   private onColumnsChanged: () => void;
