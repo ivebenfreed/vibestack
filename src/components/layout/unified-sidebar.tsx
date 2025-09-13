@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -75,7 +75,9 @@ const bottomNavigation: NavItem[] = [
 export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isAdmin, isSuperAdmin } = useAuth()
+  const { user } = useUnifiedAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  const isSuperAdmin = user?.role === 'super_admin'
   
   // Determine current context from URL instead of observables
   const routeOrgId = location.pathname.startsWith('/org/') 
@@ -215,11 +217,11 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
   isCollapsed: boolean
   onEnterOrg: (orgId: string) => void
 }) {
-  const { userOrganizations } = useAuth()
+  const { userOrganizations } = useUnifiedAuth()
   const location = useLocation()
 
   // Transform userOrganizations to match the expected format (organizations are "worlds" in the UI)
-  const worlds = userOrganizations.map(org => ({
+  const worlds = (userOrganizations || []).map(org => ({
     info: {
       id: org.id,
       name: org.name,
@@ -337,13 +339,13 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
   isCollapsed: boolean
   onBackToUniverse: () => void
 }) {
-  const { userOrganizations } = useAuth()
+  const { userOrganizations } = useUnifiedAuth()
   // Create organization-specific entity groups
   const orgEntityGroups$ = React.useMemo(() => createEntityGroups(orgId), [orgId])
   const entityNavGroups = use$(orgEntityGroups$)
   const location = useLocation()
 
-  const currentOrg = userOrganizations.find(org => org.id === orgId)
+  const currentOrg = (userOrganizations || []).find(org => org.id === orgId)
   if (!currentOrg) {
     return <div className="p-4 text-sm text-muted-foreground">Organization not found</div>
   }

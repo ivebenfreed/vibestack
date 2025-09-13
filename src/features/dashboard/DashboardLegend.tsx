@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ContentContainer } from '@/components/layout/content-container'
 import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/lib/auth'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { EntityCreationDialog } from './EntityCreationDialog'
 import { EntityCard } from './EntityCard'
 import { QuickEntityCreate } from './QuickEntityCreate'
@@ -30,7 +30,7 @@ const fileLog = log('features/dashboard/DashboardLegend.tsx');
 const DashboardLegend = observer(function DashboardLegend() {
   const [activeTab, setActiveTab] = React.useState('overview');
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
-  const { currentOrganization, user, userOrganizations } = useAuth();
+  const { currentOrganization, user, userOrganizations } = useUnifiedAuth();
   const currentOrgId = currentOrganization?.id;
   const userId = user?.id;
 
@@ -250,7 +250,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
   isUniverseMode: boolean
   orgId?: string
 }) {
-  const { currentOrganization } = useAuth()
+  const { currentOrganization } = useUnifiedAuth()
   
   // Access the entity store which triggers loading
   const entityStore = getEntity$(entityName)

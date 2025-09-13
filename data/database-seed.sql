@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XWLxBQ4annbPeKIb5nJbCZyenjD1esEciAEfC5kjUWhsNIrWMGSXPqScegOCYmz
+\restrict 3oWU08G13oU5K96rotKk017zk2WceWFdtUKTAccI2ifaAWnumktsLFgdLNNMwG0
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -899,12 +899,12 @@ a880b054-1c80-443a-a613-e60c33ba8ccb	01920000-1000-7000-8000-000000000001	2025-0
 85566e0d-4fd8-44e5-97a1-aa71e5024750	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.082	2025-09-12 01:54:00.082	API Security Testing	Comprehensive security testing of healthcare APIs including penetration testing and vulnerability assessment	critical	not_started	2025-05-01 00:00:00	testing	40	\N	3	t	\N	\N	f
 7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-12 01:54:00.275	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	active	2025-03-15 00:00:00	deployment	35	\N	3	t	\N	\N	f
 f98ab62c-724c-4b91-95ef-92ec6c19a0f3	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.45	2025-09-12 01:54:00.45	Integration with EHR Systems	Develop integrations with major Electronic Health Record systems for seamless data exchange	medium	not_started	2025-06-01 00:00:00	development	55	\N	4	t	\N	\N	t
-c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-12 01:54:22.47	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	high	active	2025-03-20 00:00:00	design	45	\N	3	t	\N	\N	f
 b814d501-69ad-40ee-a7b5-6c99a399f9d6	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.592	2025-09-12 01:54:22.592	Inventory Management System	Develop real-time inventory tracking system with automated reorder points and supplier integration	high	not_started	2025-04-30 00:00:00	development	60	\N	4	t	\N	\N	t
 6a731430-a1bc-4db1-b7fb-0e6cafe897e5	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.728	2025-09-12 01:54:22.728	Customer Analytics Dashboard	Build comprehensive analytics dashboard for customer behavior, sales trends, and business intelligence	medium	not_started	2025-06-15 00:00:00	development	50	\N	3	t	\N	\N	t
 e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-12 01:54:22.873	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	active	2025-04-01 00:00:00	development	40	\N	4	t	\N	\N	t
 eb6d8755-c903-4d03-9e67-0abc07fcca89	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.001	2025-09-12 01:54:23.001	Search and Recommendation Engine	Implement AI-powered search functionality with personalized product recommendations	medium	not_started	2025-07-01 00:00:00	development	55	\N	5	t	\N	\N	t
 394e27f2-0fc1-469f-ba73-bdb02d868817	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.121	2025-09-12 01:54:23.121	Multi-Platform Testing	Comprehensive testing across web, mobile, and tablet platforms with automated test suites	high	not_started	2025-08-15 00:00:00	testing	42	\N	3	t	\N	\N	f
+c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-13 02:15:28.651	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	high	active	2025-03-20 04:00:00	design	45	\N	3	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-12 01:54:48.69	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	not_started	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 \.
@@ -1279,5 +1279,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XWLxBQ4annbPeKIb5nJbCZyenjD1esEciAEfC5kjUWhsNIrWMGSXPqScegOCYmz
+\unrestrict 3oWU08G13oU5K96rotKk017zk2WceWFdtUKTAccI2ifaAWnumktsLFgdLNNMwG0
 

@@ -323,13 +323,13 @@ when(() => {
   });
   
   try {
-    const { loadUniverseContext } = await import('@/legend-state/observables');
+    const { initializeLegendState } = await import('@/legend-state/initialization');
     const organizationIds = organizations.map(org => org.id);
     const organizationData = organizations.map(org => ({ id: org.id, name: org.name }));
     
-    await loadUniverseContext(user.id, organizationIds, organizationData);
+    await initializeLegendState(user.id, organizationIds, organizationData);
     
-    authLog.info('[AUTH$] Successfully loaded universe context from Legend State auth');
+    authLog.info('[AUTH$] Successfully initialized Legend State from simplified initialization');
   } catch (error) {
     authLog.error('[AUTH$] Failed to load universe context from Legend State auth:', error);
   }
