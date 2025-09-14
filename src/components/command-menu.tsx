@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
-import { useAuth } from '@/state-machines'
+import { useNavigate, useLocation } from '@tanstack/react-router'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import {
   CommandDialog,
   CommandEmpty,
@@ -16,126 +16,154 @@ import {
   CheckSquare,
   Settings,
   Bug,
-  MessageSquare,
-  Package,
   HelpCircle,
   Search,
   FileText,
+  Globe,
+  Activity,
+  BarChart3,
 } from 'lucide-react'
 import { searchEntities, type SearchResult } from '@/legend-state/observables/search'
 import { observer, use$ } from '@legendapp/state/react'
-import { universeSchema$, universeLoading$ } from '@/legend-state'
+import { universeSchema$, universeLoading$, createEntityGroups } from '@/legend-state'
 import { useSearch } from '@/context/search-context'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 
-// Base navigation items that don't depend on universe context
-const baseNavigationItems = [
-  { id: 'dashboard', label: 'Dashboard', href: '/', icon: Home },
-  { id: 'universe', label: 'Universe', href: '/universe', icon: Home },
-  { id: 'apps', label: 'Apps', href: '/apps', icon: Package },
-  { id: 'chats', label: 'Chats', href: '/chats', icon: MessageSquare },
-  { id: 'help-center', label: 'Help Center', href: '/help-center', icon: HelpCircle },
-  { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
-  { id: 'debug', label: 'Debug', href: '/debug', icon: Bug },
-  { id: 'debug-sync', label: 'Debug - Sync', href: '/debug/sync', icon: Bug },
-  { id: 'debug-database', label: 'Debug - Database', href: '/debug/database', icon: Bug },
-]
+// Base navigation items that match the unified sidebar structure
+const getBaseNavigationItems = (isAdmin: boolean, isSuperAdmin: boolean, currentOrgId?: string) => {
+  const items = [
+    // Universe-level navigation (matches unified sidebar)
+    { id: 'universe', label: 'Universe Dashboard', href: '/universe', icon: Globe },
+    { id: 'universe-analytics', label: 'Analytics', href: '/universe/analytics', icon: Activity },
 
-// Entity icon mapping based on archetype or name patterns
-const getEntityIcon = (entityName: string, archetype?: string) => {
-  // Check archetype first
-  if (archetype) {
-    switch (archetype) {
-      case 'project': return FolderKanban
-      case 'task': return CheckSquare
-      case 'person': return Home // You might want to import Users icon
-      case 'meeting': return MessageSquare
-      default: break
-    }
+    // Organization dashboard (only if in org context)
+    ...(currentOrgId ? [
+      { id: 'org-dashboard', label: 'Organization Dashboard', href: `/org/${currentOrgId}/dashboard`, icon: BarChart3 }
+    ] : []),
+
+    // Bottom navigation items (matches unified sidebar)
+    { id: 'help-center', label: 'Help Center', href: '/help-center', icon: HelpCircle },
+    { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+  ]
+
+  // Add debug items only for admins (matches unified sidebar logic)
+  if (isAdmin || isSuperAdmin) {
+    items.push(
+      { id: 'debug', label: 'Debug', href: '/debug', icon: Bug },
+      { id: 'debug-sync', label: 'Debug - Sync', href: '/debug/sync', icon: Bug },
+      { id: 'debug-database', label: 'Debug - Database', href: '/debug/database', icon: Bug },
+    )
   }
 
-  // Fallback to name-based mapping
-  const lowercaseName = entityName.toLowerCase()
-  if (lowercaseName.includes('task')) return CheckSquare
-  if (lowercaseName.includes('project')) return FolderKanban
-  if (lowercaseName.includes('client') || lowercaseName.includes('contact')) return Home
-  if (lowercaseName.includes('meeting')) return MessageSquare
-  if (lowercaseName.includes('document')) return FileText
+  return items
+}
 
-  // Default icon
-  return FileText
+// Icon resolver for dynamic entity icons (matches sidebar implementation)
+const IconMap: Record<string, React.ElementType> = {
+  CheckSquare,
+  FolderKanban,
+  FileText,
+  Activity,
+  Globe,
+  BarChart3,
+}
+
+function getIconComponent(iconName: string): React.ElementType {
+  return IconMap[iconName] || FileText
 }
 
 export const CommandMenu = observer(function CommandMenu() {
   const navigate = useNavigate()
-  const { isAdmin, isSuperAdmin, currentOrganization } = useAuth()
+  const location = useLocation()
+  const { user, userOrganizations } = useUnifiedAuth()
   const { open, setOpen } = useSearch()
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
 
+  // Use same organization detection logic as sidebar (URL-based)
+  const currentOrgId = location.pathname.startsWith('/org/')
+    ? location.pathname.split('/')[2] // Extract orgId from /org/{orgId}/...
+    : null
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  const isSuperAdmin = user?.role === 'super_admin'
+
+  // Get current organization details (same as sidebar)
+  const currentOrg = currentOrgId
+    ? (userOrganizations || []).find(org => org.id === currentOrgId)
+    : null
+
   // Use Legend State observables for reactive data access
   const universeSchema = use$(universeSchema$)
   const universeLoading = use$(universeLoading$)
-  const currentOrgId = currentOrganization?.id // Get current org ID from auth
+
+  // Create global entity groups across ALL organizations (not filtered by current org)
+  const globalEntityGroups$ = useMemo(() => {
+    console.log('[CommandMenu] Creating GLOBAL entity groups across universe')
+    return createEntityGroups() // No orgId filter = show all entities from all orgs
+  }, [])
+
+  const entityNavGroups = use$(globalEntityGroups$)
+
+  // Debug logging for entity groups
+  useEffect(() => {
+    console.log('[CommandMenu] Entity nav groups changed:', {
+      entityNavGroups,
+      groupCount: entityNavGroups?.length || 0,
+      currentOrgId,
+      hasOrgEntityGroups: !!globalEntityGroups$
+    })
+  }, [entityNavGroups, currentOrgId, globalEntityGroups$])
 
   // Generate dynamic navigation items based on universe context
   const navigationItems = useMemo(() => {
-    const items = [...baseNavigationItems]
+    const items = [...getBaseNavigationItems(isAdmin, isSuperAdmin, currentOrgId)]
 
-    // Add entity-based navigation items if schema is available
-    if (universeSchema?.entities && currentOrgId) {
-      const entityEntries = Object.entries(universeSchema.entities)
-      console.log('[CommandMenu] Generating entity navigation items:', {
-        entityCount: entityEntries.length,
-        entityNames: entityEntries.map(([name]) => name),
-        currentOrgId,
+    // Add GLOBAL entity-based navigation items from ALL organizations
+    if (entityNavGroups) {
+      console.log('[CommandMenu] Generating GLOBAL entity navigation items:', {
+        groupCount: entityNavGroups.length,
         universeLoading
       })
 
-      // Add entity navigation items with proper org prefix and normalized names
-      entityEntries.forEach(([entityName, entityConfig]: [string, any]) => {
-        try {
-          // Extract clean entity name and get display format
-          const { entityName: cleanEntityName } = EntityNameUtils.extractOrgPrefix(entityName)
-          const displayName = EntityNameUtils.toDisplayFormat(entityName)
-          const icon = getEntityIcon(cleanEntityName, entityConfig.archetype)
+      // Add entity navigation items from ALL organizations
+      entityNavGroups.forEach(group => {
+        group.items?.forEach(item => {
+          // Extract organization ID from the URL to get org name
+          const orgIdMatch = item.url.match(/\/org\/([^/]+)\//)
+          const itemOrgId = orgIdMatch ? orgIdMatch[1] : null
+          const itemOrg = itemOrgId
+            ? (userOrganizations || []).find(org => org.id === itemOrgId)
+            : null
 
-          console.log('[CommandMenu] Adding entity navigation item:', {
-            original: entityName,
-            clean: cleanEntityName,
-            display: displayName
+          console.log('[CommandMenu] Adding GLOBAL entity navigation item:', {
+            title: item.title,
+            url: item.url,
+            icon: item.icon,
+            orgId: itemOrgId,
+            orgName: itemOrg?.name
           })
 
           items.push({
-            id: `entity-${cleanEntityName}`,
-            label: displayName,
-            href: `/org/${currentOrgId}/entities/${cleanEntityName}`, // Use proper org prefix
-            icon: icon
+            id: `entity-${itemOrgId}-${item.title}`,
+            label: item.title,
+            href: item.url,
+            icon: getIconComponent(item.icon),
+            orgName: itemOrg?.name // Store org name for subtitle
           })
-        } catch (error) {
-          console.error('[CommandMenu] Error processing entity navigation item:', entityName, error)
-        }
+        })
       })
     } else {
-      console.log('[CommandMenu] Entity navigation not available:', {
-        hasEntities: !!universeSchema?.entities,
-        entityCount: Object.keys(universeSchema?.entities || {}).length,
-        universeLoading,
-        currentOrgId,
-        universeSchema: universeSchema ? 'exists' : 'null',
-        conditionCheck: {
-          hasEntities: !!universeSchema?.entities,
-          loadingState: universeLoading,
-          hasOrgId: !!currentOrgId,
-          allTrue: !!(universeSchema?.entities && currentOrgId)
-        }
+      console.log('[CommandMenu] GLOBAL entity navigation not available:', {
+        hasEntityGroups: !!entityNavGroups,
+        groupCount: entityNavGroups?.length || 0,
+        universeLoading
       })
     }
 
     console.log('[CommandMenu] Total navigation items generated:', items.length)
     return items
-  }, [universeSchema, universeLoading, currentOrgId])
+  }, [entityNavGroups, universeLoading, currentOrgId, isAdmin, isSuperAdmin, location.pathname, userOrganizations])
 
   const runCommand = (command: () => unknown) => {
     setOpen(false)
@@ -174,12 +202,8 @@ export const CommandMenu = observer(function CommandMenu() {
     return () => clearTimeout(searchTimeout)
   }, [query, universeSchema, universeLoading])
 
-  // Filter navigation items - always show base items, filter by permissions and query
+  // Filter navigation items by query only (permissions now handled in getBaseNavigationItems)
   const filteredNavItems = navigationItems.filter(item => {
-    // Permission filtering
-    if (item.id.startsWith('debug') && !isAdmin && !isSuperAdmin) {
-      return false
-    }
     // If there's a query, filter navigation items but keep them visible
     if (query.trim()) {
       return item.label.toLowerCase().includes(query.toLowerCase())
@@ -226,7 +250,7 @@ export const CommandMenu = observer(function CommandMenu() {
           )}
 
           {/* Entity Navigation Items */}
-          {entityNavItems.length > 0 && !query.trim() && (
+          {entityNavItems.length > 0 && (
             <CommandGroup heading="Entities">
               {entityNavItems.map((item) => (
                 <CommandItem
@@ -239,7 +263,14 @@ export const CommandMenu = observer(function CommandMenu() {
                   <div className='mr-2 flex h-4 w-4 items-center justify-center'>
                     <item.icon className='h-4 w-4' />
                   </div>
-                  {item.label}
+                  <div className='flex flex-col items-start'>
+                    <span className='font-medium'>{item.label}</span>
+                    {item.orgName && (
+                      <span className='text-xs text-muted-foreground'>
+                        {item.orgName}
+                      </span>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
