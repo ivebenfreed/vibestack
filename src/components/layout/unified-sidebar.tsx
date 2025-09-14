@@ -14,9 +14,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { observer } from '@legendapp/state/react'
 import { createEntityGroups } from '@/legend-state'
 import { use$ } from '@legendapp/state/react'
-import { 
-  Home, 
-  Settings, 
+import {
+  Home,
+  Settings,
   Bug,
   HelpCircle,
   ChevronDown,
@@ -32,7 +32,8 @@ import {
   MessageSquare,
   File,
   Circle,
-  BarChart3
+  BarChart3,
+  ChevronsLeft
 } from 'lucide-react'
 
 // Icon resolver for dynamic entity icons
@@ -112,17 +113,51 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
       {isCollapsed ? (
         <header className="border-b border-border flex-shrink-0">
           <div className="flex h-14 items-center justify-center">
-            <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-md">
-              <span className="text-primary-foreground font-bold text-lg">E</span>
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onToggle}
+                    className="w-8 h-8 p-0"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-md">
+                      <span className="text-primary-foreground font-bold text-lg">E</span>
+                    </div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Expand sidebar</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </header>
       ) : (
         <header className="border-b border-border flex-shrink-0">
-          <div className="flex h-14 items-center justify-center">
-            <div className="font-semibold text-sidebar-foreground px-4">
+          <div className="flex h-14 items-center justify-between px-4">
+            <div className="font-semibold text-sidebar-foreground">
               Elevra
             </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onToggle}
+                    className="p-2 hover:bg-sidebar-accent"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                    <span className="sr-only">Collapse sidebar</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Collapse sidebar</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </header>
       )}

@@ -16,7 +16,7 @@ import SyncStatusIcon from '@/features/sync/components/SyncStatusIcon'
 import { TrialBanner } from '@/components/trial-banner'
 import { useOrgTrialStatus } from '@/contexts/AbilityContext'
 import { useAuth } from '@/state-machines'
-import { RotateCcw, Menu, X } from 'lucide-react'
+import { RotateCcw, Menu } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -239,31 +239,6 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
               {/* Desktop Header */}
               <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
                 <div className="flex h-14 items-center gap-3 px-6 sm:gap-4">
-                  {/* Toggle button */}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                          className="p-2"
-                        >
-                          {sidebarCollapsed ? (
-                            <Menu className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Toggle sidebar</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  
-                  <Separator orientation='vertical' className='h-6' />
                   
                   <div className="flex-1 flex justify-center">
                     <Search />
