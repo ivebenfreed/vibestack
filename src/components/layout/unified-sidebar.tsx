@@ -113,7 +113,7 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
         <header className="border-b border-border flex-shrink-0">
           <div className="flex h-14 items-center justify-center">
             <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-md">
-              <span className="text-primary-foreground font-bold text-lg">V</span>
+              <span className="text-primary-foreground font-bold text-lg">E</span>
             </div>
           </div>
         </header>
@@ -121,7 +121,7 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
         <header className="border-b border-border flex-shrink-0">
           <div className="flex h-14 items-center justify-center">
             <div className="font-semibold text-sidebar-foreground px-4">
-              VibeStack
+              Elevra
             </div>
           </div>
         </header>

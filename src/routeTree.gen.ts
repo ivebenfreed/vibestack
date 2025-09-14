@@ -54,7 +54,6 @@ import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_au
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
-import { Route as AuthenticatedDebugLegendTableRouteImport } from './routes/_authenticated/debug/legend-table'
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
 import { Route as AuthenticatedOrgOrgIdTestPassiveRendererRouteImport } from './routes/_authenticated/org/$orgId/test-passive-renderer'
@@ -321,12 +320,6 @@ const AuthenticatedDebugStateMachineTestRoute =
     path: '/state-machine-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-const AuthenticatedDebugLegendTableRoute =
-  AuthenticatedDebugLegendTableRouteImport.update({
-    id: '/legend-table',
-    path: '/legend-table',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
 const AuthenticatedDebugLegendStateTestRoute =
   AuthenticatedDebugLegendStateTestRouteImport.update({
     id: '/legend-state-test',
@@ -379,7 +372,6 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
-  '/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -429,7 +421,6 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
-  '/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -483,7 +474,6 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
-  '/_authenticated/debug/legend-table': typeof AuthenticatedDebugLegendTableRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -537,7 +527,6 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/debug/legend-state-test'
-    | '/debug/legend-table'
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
@@ -587,7 +576,6 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/debug/legend-state-test'
-    | '/debug/legend-table'
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
@@ -640,7 +628,6 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/_authenticated/debug/legend-state-test'
-    | '/_authenticated/debug/legend-table'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
     | '/_authenticated/debug/vibegrid-legend-state'
@@ -1009,13 +996,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugStateMachineTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
-    '/_authenticated/debug/legend-table': {
-      id: '/_authenticated/debug/legend-table'
-      path: '/legend-table'
-      fullPath: '/debug/legend-table'
-      preLoaderRoute: typeof AuthenticatedDebugLegendTableRouteImport
-      parentRoute: typeof AuthenticatedDebugRouteRoute
-    }
     '/_authenticated/debug/legend-state-test': {
       id: '/_authenticated/debug/legend-state-test'
       path: '/legend-state-test'
@@ -1056,7 +1036,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugLegendStateTestRoute: typeof AuthenticatedDebugLegendStateTestRoute
-  AuthenticatedDebugLegendTableRoute: typeof AuthenticatedDebugLegendTableRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
   AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -1069,7 +1048,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
   {
     AuthenticatedDebugLegendStateTestRoute:
       AuthenticatedDebugLegendStateTestRoute,
-    AuthenticatedDebugLegendTableRoute: AuthenticatedDebugLegendTableRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,

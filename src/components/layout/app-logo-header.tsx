@@ -1,7 +1,7 @@
 import React from 'react';
 
-// SVG for "V" logo
-const VLogo = () => (
+// SVG for "E" logo
+const ELogo = () => (
   <svg
     width="24"
     height="24"
@@ -11,7 +11,7 @@ const VLogo = () => (
     className="h-6 w-6"
   >
     <path
-      d="M6 4L12 18L18 4"
+      d="M6 4h12M6 4v16M6 20h12M6 12h8"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
@@ -30,7 +30,7 @@ export function AppLogoHeader({ isCollapsed }: AppLogoHeaderProps) {
   
   return (
     <div className="flex items-center p-2" style={{ width: 'min-content' }}>
-      <VLogo />
+      <ELogo />
       {/* Multiple strategies to ensure the text is hidden when collapsed: */}
       {/* 1. Conditional rendering with React */}
       {/* 2. CSS display:none */}
