@@ -14,6 +14,7 @@ import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
 import { visualOperations } from './visual-state';
+import { GroupProcessor } from '../processors/GroupProcessor';
 
 const fileLog = log('components/custom/vibegrid/stores/data-state.ts');
 
@@ -281,6 +282,11 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     sortBy: defaultState.sortBy,
     filters: defaultState.filters,
 
+    // Computed groupConfig from visual state (for dropdown component)
+    get groupConfig() {
+      return visualOperations.getGroupConfig ? visualOperations.getGroupConfig() : null;
+    },
+
     // Computed processed data (lazy)
     get processedRows() {
       // Check if universe schema is ready before getting entity
@@ -317,15 +323,42 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 
       let rows = Object.values(data || {});
 
+      // Apply filters and sorting first
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
 
-      fileLog.info('<� Processed rows computed', {
+      // Get grouping configuration from visual state
+      const groupConfig = visualOperations.getGroupConfig ? visualOperations.getGroupConfig() : null;
+
+      // Apply grouping if configured
+      if (groupConfig && groupConfig.fields && groupConfig.fields.length > 0) {
+        const groupResult = GroupProcessor.processData(rows, columns, groupConfig);
+
+        fileLog.info('✅ Processed rows with grouping', {
+          entityObservable: !!entityObs,
+          inputCount: Object.keys(data || {}).length,
+          filteredAndSortedRows: rows.length,
+          virtualRowsAfterGrouping: groupResult.virtualRows.length,
+          groupCount: groupResult.groupCount,
+          hasFilters: filters.length > 0,
+          hasSorting: sortBy.length > 0,
+          hasGrouping: true
+        });
+
+        // Update visual state with the processed row count
+        visualOperations.setRowCount(groupResult.virtualRows.length);
+
+        // Return virtual rows (mix of group headers and data rows)
+        return groupResult.virtualRows;
+      }
+
+      fileLog.info('<� Processed rows computed (no grouping)', {
         entityObservable: !!entityObs,
         inputCount: Object.keys(data || {}).length,
         outputCount: rows.length,
         hasFilters: filters.length > 0,
-        hasSorting: sortBy.length > 0
+        hasSorting: sortBy.length > 0,
+        hasGrouping: false
       });
 
       // Update visual state with the current row count

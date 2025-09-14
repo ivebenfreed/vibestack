@@ -109,6 +109,7 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
   const groupConfig = tableCore$.groupConfig.get();
   const isOpen = tableInteraction$.groupConfigMenuState.isOpen.get();
 
+
   // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor),

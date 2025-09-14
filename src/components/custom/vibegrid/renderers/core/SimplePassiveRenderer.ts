@@ -578,7 +578,7 @@ export class SimplePassiveRenderer {
     const rows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
-    
+
     // Debug: Check if we have group rows (Legend State rows don't have type property)
     const groupRows = rows.filter((row: any) => row.type === 'group');
     const dataRows = rows.filter((row: any) => !row.type || row.type !== 'group'); // All non-group rows are data
@@ -587,11 +587,9 @@ export class SimplePassiveRenderer {
       rowCount: rows.length,
       columnCount: columns.length,
       groupRows: groupRows.length,
-      dataRows: dataRows.length,
-      firstRowType: rows[0]?.type || 'data (no type property)',
-      firstRowData: rows[0]
+      dataRows: dataRows.length
     });
-    
+
     this.bodyContainer.innerHTML = '';
     
     // Clear active rows in RowRenderer

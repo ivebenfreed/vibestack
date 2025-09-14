@@ -124,10 +124,34 @@ export class GroupProcessor {
     // Group rows by field value
     const groupMap = new Map<string, TableRow[]>();
     
-    rows.forEach(row => {
-      const value = row.data[fieldName];
+    rows.forEach((row, index) => {
+      // Debug: log the actual data structure to understand the format
+      if (index === 0) {
+        log.info('🔍 GroupProcessor: Examining first row structure', {
+          row: row,
+          hasData: !!row?.data,
+          hasDirectAccess: !!row?.[fieldName],
+          rowKeys: Object.keys(row || {}),
+          fieldName,
+          fieldValue: row?.[fieldName] || row?.data?.[fieldName]
+        });
+      }
+
+      // Handle different data structures - try both row.data and direct row access
+      let value;
+      if (row && row.data) {
+        // Structured format: row.data.fieldName
+        value = row.data[fieldName];
+      } else if (row && typeof row === 'object') {
+        // Direct format: row.fieldName
+        value = row[fieldName];
+      } else {
+        log.warn('GroupProcessor: Skipping invalid row', { row, fieldName });
+        return;
+      }
+
       const groupKey = this.getGroupKey(value);
-      
+
       if (!groupMap.has(groupKey)) {
         groupMap.set(groupKey, []);
       }
@@ -140,7 +164,19 @@ export class GroupProcessor {
     
     groupMap.forEach((groupRows, groupKey) => {
       const firstRow = groupRows[0];
-      const value = firstRow.data[fieldName];
+
+      // Handle different data structures - try both row.data and direct row access
+      let value;
+      if (firstRow && firstRow.data) {
+        // Structured format: row.data.fieldName
+        value = firstRow.data[fieldName];
+      } else if (firstRow && typeof firstRow === 'object') {
+        // Direct format: row.fieldName
+        value = firstRow[fieldName];
+      } else {
+        log.warn('GroupProcessor: Invalid firstRow in groupMap', { firstRow, fieldName });
+        return;
+      }
       
       const groupNode: GroupNode = {
         id: `group_${fieldName}_${groupKey}`,
@@ -189,9 +225,21 @@ export class GroupProcessor {
       const groupMap = new Map<string, TableRow[]>();
       
       remainingRows.forEach(row => {
-        const value = row.data[fieldName];
+        // Handle different data structures - try both row.data and direct row access
+        let value;
+        if (row && row.data) {
+          // Structured format: row.data.fieldName
+          value = row.data[fieldName];
+        } else if (row && typeof row === 'object') {
+          // Direct format: row.fieldName
+          value = row[fieldName];
+        } else {
+          log.warn('GroupProcessor: Skipping invalid row in multi-level grouping', { row, fieldName });
+          return;
+        }
+
         const groupKey = this.getGroupKey(value);
-        
+
         if (!groupMap.has(groupKey)) {
           groupMap.set(groupKey, []);
         }
@@ -204,7 +252,19 @@ export class GroupProcessor {
       
       groupMap.forEach((groupRows, groupKey) => {
         const firstRow = groupRows[0];
-        const value = firstRow.data[fieldName];
+
+        // Handle different data structures - try both row.data and direct row access
+        let value;
+        if (firstRow && firstRow.data) {
+          // Structured format: row.data.fieldName
+          value = firstRow.data[fieldName];
+        } else if (firstRow && typeof firstRow === 'object') {
+          // Direct format: row.fieldName
+          value = firstRow[fieldName];
+        } else {
+          log.warn('GroupProcessor: Invalid firstRow in multi-level groupMap', { firstRow, fieldName });
+          return;
+        }
         const groupId = `group_${fieldName}_${groupKey}${parentId ? `_${parentId}` : ''}`;
         
         const groupNode: GroupNode = {
@@ -265,7 +325,16 @@ export class GroupProcessor {
       
       config.aggregations.forEach(aggConfig => {
         const fieldValues = groupRows
-          .map(row => row.data[aggConfig.field])
+          .map(row => {
+            // Handle different data structures - try both row.data and direct row access
+            if (row && row.data) {
+              return row.data[aggConfig.field];
+            } else if (row && typeof row === 'object') {
+              return row[aggConfig.field];
+            } else {
+              return null;
+            }
+          })
           .filter(val => val !== null && val !== undefined && val !== '');
         
         if (fieldValues.length === 0) {

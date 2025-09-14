@@ -560,6 +560,13 @@ export const visualOperations = {
   },
 
   /**
+   * Get current grouping configuration
+   */
+  getGroupConfig(): GroupConfig | null {
+    return visualInputs$.groupConfig.get();
+  },
+
+  /**
    * Toggle group expansion/collapse
    */
   toggleGroupExpansion(groupId: string) {
