@@ -7,7 +7,7 @@ import { log } from '@/logger';
 import { visualOperations } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 
-const fileLog = log('components/custom/vibegrid/renderers/modules/GroupRenderer.ts');
+const fileLog = log('components/custom/vibegrid/renderers/components/GroupRenderer.ts');
 
 const ROW_HEIGHT = 40;
 

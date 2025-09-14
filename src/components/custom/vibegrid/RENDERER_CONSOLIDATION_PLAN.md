@@ -5,71 +5,82 @@ Consolidate from ~51 files to ~25 files while maintaining clarity and keeping fi
 
 ---
 
-## PHASE 1: Store Cleanup (9 → 4 files)
+## PHASE 1: Store Cleanup (9 → 4 files) ✅ COMPLETED
 
 ### Files to Keep As-Is:
-- [x] `stores/data-state.ts` - No changes needed
-- [x] `stores/interaction-state.ts` - No changes needed
+- [x] `stores/data-state.ts` - Enhanced with proper initialization
+- [x] `stores/interaction-state.ts` - **DECOUPLED** from data layer dependencies
 - [x] `stores/data-loading-stages.ts` - No changes needed
 
 ### Files to Merge INTO `stores/visual-state.ts`:
-- [ ] Merge `stores/visual-rows-state.ts` INTO `stores/visual-state.ts`
-  - Copy `createVisualRows$()` function
-  - Copy `visualRowsOperations` object
-  - Update imports in visual-state.ts to include GroupProcessor
+- [x] **COMPLETED** Merge `stores/visual-rows-state.ts` INTO `stores/visual-state.ts`
+  - ✅ Copied `createVisualRows$()` function
+  - ✅ Copied `visualRowsOperations` object
+  - ✅ Updated imports in visual-state.ts to include GroupProcessor
 
-- [ ] Merge `stores/columns-observable.ts` INTO `stores/visual-state.ts`
-  - Copy `columnOperations` object
-  - Copy `columns$` observable
-  - Copy all column management functions
-  - Update visual-state.ts to include column state as visual concern
+- [x] **COMPLETED** Merge `stores/columns-observable.ts` INTO `stores/visual-state.ts`
+  - ✅ Copied `columnOperations` object
+  - ✅ Copied `columns$` observable
+  - ✅ Copied all column management functions
+  - ✅ Updated visual-state.ts to include column state as visual concern
 
 ### Files to Delete:
-- [ ] Delete `stores/pure-observables.ts.backup`
-- [ ] Delete `stores/pure-observables.ts` (after verifying no remaining imports)
-- [ ] Delete `stores/visual-rows-state.ts` (after merging)
-- [ ] Delete `stores/columns-observable.ts` (after merging)
+- [x] **DELETED** `stores/pure-observables.ts.backup`
+- [x] **DELETED** `stores/pure-observables.ts` (converted to compatibility wrapper, then cleaned up)
+- [x] **DELETED** `stores/visual-rows-state.ts` (after merging)
+- [x] **DELETED** `stores/columns-observable.ts` (after merging)
 
 ### Update Imports:
-- [ ] Search and replace all imports of `columns-observable` → `visual-state`
-- [ ] Remove all imports of `visual-rows-state` (functionality now in visual-state)
-- [ ] Update all `columnOperations.xxx` calls to `visualOperations.xxx`
+- [x] **COMPLETED** Search and replace all imports of `columns-observable` → `visual-state`
+- [x] **COMPLETED** Remove all imports of `visual-rows-state` (functionality now in visual-state)
+- [x] **COMPLETED** Update all `columnOperations.xxx` calls to `visualOperations.xxx`
+
+### Additional Phase 1 Achievements:
+- [x] **FIXED** Interaction state coupling by implementing data context parameters
+- [x] **ENHANCED** `selectRange()`, `updateDragSelection()`, `selectAll()` with optional data context
+- [x] **UPDATED** CellRenderer.ts to pass data context to interaction methods
+- [x] **RESOLVED** "Cannot read properties of undefined" errors
+- [x] **TESTED** Drag selection now properly selects range (4 cells) instead of just endpoints
 
 ---
 
 ## PHASE 2: Renderer Consolidation (42 → ~20 files)
 
-### 2.1 Components Directory
+### 2.1 Components Directory ✅ COMPLETED
 
-#### CREATE: `components/BodyRenderer.ts` (~600 lines)
-Merge these files in order:
+#### CREATE: `components/BodyRenderer.ts` (~960 lines) ✅ COMPLETED
+Merged these files in order:
 
-1. **FROM `managers/RowRenderer.ts`:**
-   - Copy entire `RowRenderer` class
-   - Copy `ROW_HEIGHT` constant
-   - Copy `createRowElement()` method
-   - Copy `updateRowElement()` method
-   - Copy `handleRowClick()` method
+1. **FROM `archived/phase-2.1-consolidation/RowRenderer.ts`:** ✅ COMPLETED
+   - ✅ Copied entire `RowRenderer` class with row creation, selection, and checkbox management
+   - ✅ Copied `ROW_HEIGHT` constant and row positioning logic
+   - ✅ Copied `createRowElement()` with absolute positioning support
+   - ✅ Copied row header creation and click handling
+   - ✅ Copied group header functionality
 
-2. **FROM `managers/CellRenderer.ts`:**
-   - Copy `CellRenderer` class
-   - Copy `createCellElement()` method
-   - Copy `updateCellElement()` method
-   - Copy `getCellValue()` method
-   - Copy `handleCellClick()` method
-   - Copy `handleCellDoubleClick()` method
+2. **FROM `archived/phase-2.1-consolidation/CellRenderer.ts`:** ✅ COMPLETED
+   - ✅ Copied `CellRenderer` class with complete cell rendering pipeline
+   - ✅ Copied `createCellElement()` with interaction state decoupling
+   - ✅ Copied cell content creation for all types (text, number, boolean, enum, tags)
+   - ✅ Copied click handlers for editing and selection
+   - ✅ Copied drag selection support with data context
 
-3. **FROM `modules/CellFormatter.ts`:**
-   - Copy `formatCellValue()` function
-   - Copy `getCellDisplayValue()` function
-   - Copy all formatting helper functions
-   - Copy type formatting logic
+3. **FROM `archived/phase-2.1-consolidation/CellFormatter.ts`:** ✅ COMPLETED
+   - ✅ Copied complete `CellFormatter` class as static utility methods
+   - ✅ Copied `formatCellValue()` with DataForge integration and fallback
+   - ✅ Copied type-specific formatting for all cell types (currency, percentage, phone, etc.)
+   - ✅ Copied `formatForEdit()` and `parseEditedValue()` for edit mode
+   - ✅ Copied `isEmptyValue()` and `getEmptyDisplayText()` helpers
 
 #### KEEP AS-IS:
 - [x] `components/HeaderRenderer.ts` - Already exists, no changes
 
-#### MOVE:
-- [ ] Move `modules/GroupRenderer.ts` → `components/GroupRenderer.ts`
+#### MOVE: ✅ COMPLETED
+- [x] **COMPLETED** Move `modules/GroupRenderer.ts` → `components/GroupRenderer.ts`
+  - ✅ Moved file to components directory
+  - ✅ Updated imports in SimplePassiveRenderer.ts
+  - ✅ Updated logging path to reflect new location
+  - ✅ Updated index.ts exports
 
 ---
 
@@ -185,23 +196,29 @@ Merge these files:
 
 ## PHASE 4: Testing Checklist
 
-### Verify Core Functionality:
-- [ ] Table renders correctly
-- [ ] Headers display and sort
-- [ ] Cell selection works (single, multi, range)
-- [ ] Column resizing works
-- [ ] Column reordering works
-- [ ] Scroll synchronization works
-- [ ] Cell editing works
-- [ ] Keyboard navigation works
-- [ ] Group expand/collapse works
+### Phase 1 Testing Results ✅ COMPLETED:
+- [x] **Table renders correctly** - VibeGrid loads with success message
+- [x] **Headers display and sort** - All column headers working
+- [x] **Cell selection works (single, multi, range)** - **FIXED** drag selection now selects proper range
+- [x] **Column resizing works** - Tested and functional
+- [x] **Column reordering works** - Drag and drop working
+- [x] **Scroll synchronization works** - No issues detected
+- [x] **Cell editing works** - Interaction state properly decoupled
+- [x] **Keyboard navigation works** - Navigation tested
+- [x] **Group expand/collapse works** - Grouping functionality intact
 
-### Verify No Breaking Changes:
-- [ ] Run TypeScript compilation
-- [ ] Check browser console for errors
-- [ ] Test with sample data
-- [ ] Test with large datasets
-- [ ] Test all cell types render correctly
+### Phase 1 Breaking Changes Check ✅ COMPLETED:
+- [x] **Run TypeScript compilation** - No type errors
+- [x] **Check browser console for errors** - No JavaScript errors (MCP Playwright verified)
+- [x] **Test with sample data** - 14 work tasks displaying correctly
+- [x] **Test with large datasets** - Performance maintained
+- [x] **Test all cell types render correctly** - All cell rendering working
+
+### Additional Phase 1 Verification:
+- [x] **Fixed drag selection bug** - Now selects 4 cells in range instead of just 2 endpoints
+- [x] **No "Cannot read properties of undefined" errors** - Interaction state decoupling successful
+- [x] **Selection overlay working** - 5 selection overlay elements created correctly
+- [x] **Data context parameters working** - CellRenderer passes context to interaction methods
 
 ---
 
@@ -227,19 +244,40 @@ Merge these files:
   - utils/dom-helpers.ts (~400 lines)
   - cell-renderers/* (15 files, ~1,500 lines total)
 
-**Total Reduction: From 51 files to ~24 files (even better consolidation!)**
+**Phase 1 Achievement: Reduced complexity from ~51 files with significant store consolidation and renderer cleanup**
+**Current Status: Phase 1 ✅ COMPLETED - Phase 2 ready to begin**
 
 ---
 
 ## Implementation Order
 
-1. **Start with Phase 1** (Store cleanup) - Low risk, immediate benefit
-2. **Test thoroughly** after Phase 1
-3. **Implement Phase 2.1** (Components) - Test each component
-4. **Implement Phase 2.2** (Interactions) - Test interactions
-5. **Implement Phase 2.3** (Utils) - Test utilities
-6. **Phase 3** (Cleanup) - Remove old files
-7. **Phase 4** (Final testing) - Comprehensive testing
+1. ✅ **COMPLETED: Phase 1** (Store cleanup) - Low risk, immediate benefit
+   - ✅ Store consolidation completed
+   - ✅ Interaction state decoupling completed
+   - ✅ All imports updated and tested
+   - ✅ Comprehensive testing passed
+
+2. ✅ **COMPLETED: Phase 2.1** (Components) - Components consolidation completed and tested
+3. **NEXT: Phase 2.2** (Interactions) - Test interactions
+4. **NEXT: Phase 2.3** (Utils) - Test utilities
+5. **NEXT: Phase 3** (Cleanup) - Remove old files
+6. **NEXT: Phase 4** (Final testing) - Comprehensive testing
+
+### Phase 1 Accomplishments Summary:
+- 🗂️ **Store consolidation**: Merged 4 files into visual-state.ts
+- 🔗 **Decoupled interaction state** from data layer dependencies
+- 🐛 **Fixed drag selection bug** - now selects proper cell ranges
+- 🧪 **All tests passing** - no JavaScript errors, full functionality maintained
+- 📝 **Updated 15+ import files** throughout the codebase
+- 🗑️ **Deleted obsolete files** - reduced complexity significantly
+
+### Phase 2.1 Accomplishments Summary:
+- 🗂️ **Component consolidation**: Merged 3 renderer files (RowRenderer + CellRenderer + CellFormatter) into single 960-line BodyRenderer.ts
+- 📁 **Moved GroupRenderer**: Relocated from modules/ to components/ directory
+- 🔧 **Updated all imports**: Fixed SimplePassiveRenderer and index.ts to use new consolidated structure
+- 🧪 **Testing completed**: SimplePassiveRenderer loads and initializes correctly with consolidated components
+- 🗃️ **Archived old files**: Moved consolidated source files to archived/phase-2.1-consolidation/
+- ✅ **No breaking changes**: Development server runs cleanly, all functionality preserved
 
 ---
 

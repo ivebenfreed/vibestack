@@ -6,7 +6,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { getEntity$ } from '@/legend-state/observables';
-import { PassiveTableRenderer } from '@/components/custom/vibegrid/renderers/core/PassiveTableRenderer';
+import { SimplePassiveRenderer } from '@/components/custom/vibegrid/renderers/core/SimplePassiveRenderer';
 import { createPureObservables } from '@/components/custom/vibegrid/stores/pure-observables';
 import { createEntityColumnsObservable } from '@/legend-state';
 import { log } from '@/logger';
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/_authenticated/org/$orgId/test-passive-re
 function TestPassiveRenderer() {
   const { orgId } = Route.useParams();
   const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<PassiveTableRenderer | null>(null);
+  const rendererRef = useRef<SimplePassiveRenderer | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,8 +53,8 @@ function TestPassiveRenderer() {
 
       fileLog.info('🧪 Created pure observables', { entityType });
 
-      // Create the PassiveTableRenderer
-      const renderer = new PassiveTableRenderer({
+      // Create the SimplePassiveRenderer
+      const renderer = new SimplePassiveRenderer({
         container: containerRef.current,
         tableCore$,
         tableInteraction$,
@@ -65,7 +65,7 @@ function TestPassiveRenderer() {
       setIsInitialized(true);
       setError(null);
 
-      fileLog.info('🧪 PassiveTableRenderer initialized successfully');
+      fileLog.info('🧪 SimplePassiveRenderer initialized successfully');
 
       // Test interactions
       setTimeout(() => {
@@ -93,7 +93,7 @@ function TestPassiveRenderer() {
     // Cleanup
     return () => {
       if (rendererRef.current) {
-        fileLog.info('🧪 Cleaning up PassiveTableRenderer');
+        fileLog.info('🧪 Cleaning up SimplePassiveRenderer');
         rendererRef.current.destroy();
         rendererRef.current = null;
       }
@@ -103,7 +103,7 @@ function TestPassiveRenderer() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
-        <h1 className="text-2xl font-bold">PassiveTableRenderer Test</h1>
+        <h1 className="text-2xl font-bold">SimplePassiveRenderer Test</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Testing pure observable architecture with Task entity
         </p>
@@ -114,7 +114,7 @@ function TestPassiveRenderer() {
         )}
         {isInitialized && !error && (
           <div className="mt-2 p-2 bg-green-100 text-green-700 rounded">
-            ✅ PassiveTableRenderer initialized successfully
+            ✅ SimplePassiveRenderer initialized successfully
           </div>
         )}
       </div>
@@ -132,7 +132,7 @@ function TestPassiveRenderer() {
       <div className="p-4 border-t bg-muted/50">
         <div className="text-sm space-y-1">
           <p><strong>Architecture:</strong> Pure Observables (tableCore$, tableInteraction$, tableViewport$)</p>
-          <p><strong>Renderer:</strong> PassiveTableRenderer with granular observers</p>
+          <p><strong>Renderer:</strong> SimplePassiveRenderer with granular observers</p>
           <p><strong>Columns:</strong> Schema-driven from universeSchema$ observable (no hardcoding)</p>
           <p><strong>Event Binding:</strong> Direct DOM → Observable methods</p>
           <p><strong>Overlays:</strong> 100% reused from existing implementation</p>

@@ -11,7 +11,7 @@ import { syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { log } from '@/logger';
-import type { Column, SortConfig, FilterConfig } from '../types';
+import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
 import { visualOperations } from './visual-state';
 
@@ -444,6 +444,12 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       // persistObservable automatically persists changes
 
       fileLog.info('<� Column width set (auto-persistent)', { columnId, width });
+    },
+
+    setGroupConfig(config: GroupConfig | null) {
+      // Delegate to visual operations which handles the actual grouping state
+      visualOperations.setGroupConfig(config);
+      fileLog.info('<� Group config delegated to visual state', { config });
     }
   });
 

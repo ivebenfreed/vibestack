@@ -17,18 +17,17 @@ import { DOMElementFactory, type DOMElementFactoryOptions } from '../factories/D
 import { HeaderRenderer, type HeaderRendererOptions } from '../components/HeaderRenderer';
 
 // Manager imports (ViewportManager consolidated into visual-state)
-import { CellRenderer } from '../managers/CellRenderer';
-import { RowRenderer } from '../managers/RowRenderer';
+import { BodyRenderer } from '../components/BodyRenderer';
 import { EventManager } from '../managers/EventManager';
 
 // Existing modular components
 import { OverlayManager, type CoordinateMapping } from '../modules/OverlayManager';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
-import { CellFormatter } from '../modules/CellFormatter';
+import { CellFormatter } from '../components/BodyRenderer';
 import { SelectionController } from '../modules/SelectionController';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import { ScrollController } from '../modules/ScrollController';
-import { GroupRenderer } from '../modules/GroupRenderer';
+import { GroupRenderer } from '../components/GroupRenderer';
 import { ColumnWidthManager } from '../modules/ColumnWidthManager';
 
 // Utility imports
@@ -109,8 +108,7 @@ export class SimplePassiveRenderer {
   private headerRenderer: HeaderRenderer | null = null;
   
   // Phase 2 manager additions
-  private cellRenderer: CellRenderer | null = null;
-  private rowRenderer: RowRenderer | null = null;
+  private bodyRenderer: BodyRenderer | null = null;
   // ViewportManager consolidated into visual-state
   private eventManager: EventManager | null = null;
   
@@ -195,35 +193,24 @@ export class SimplePassiveRenderer {
   private initPhase2Managers(): void {
     fileLog.info('🚀 Initializing Phase 2 managers');
     
-    // Initialize GroupRenderer first (needed by RowRenderer)
+    // Initialize GroupRenderer first (needed by BodyRenderer)
     this.groupRenderer = new GroupRenderer({
-      tableCore$: this.tableCore$,
-      tableInteraction$: this.tableInteraction$,
       domFactory: this.domFactory!,
       createElement: this.createElement.bind(this)
     });
 
-    // Initialize CellRenderer (dependency for RowRenderer)
-    this.cellRenderer = new CellRenderer({
+    // Initialize BodyRenderer (consolidated cell and row rendering)
+    this.bodyRenderer = new BodyRenderer({
       tableCore$: this.tableCore$,
       tableInteraction$: this.tableInteraction$,
       tableViewport$: this.tableViewport$,
       domFactory: this.domFactory!,
-      keyboardNavController: this.keyboardNavController,
-      container: this.container,
-      onEntityUpdate: this.options.onEntityUpdate
-    });
-    
-    // Initialize RowRenderer (depends on CellRenderer)
-    this.rowRenderer = new RowRenderer({
-      tableCore$: this.tableCore$,
-      tableInteraction$: this.tableInteraction$,
-      tableViewport$: this.tableViewport$,
-      domFactory: this.domFactory!,
-      cellRenderer: this.cellRenderer,
       selectionController: this.selectionController,
+      keyboardNavController: this.keyboardNavController,
       enableSelectionColumn: this.options.enableSelectionColumn,
-      createElement: this.createElement.bind(this)
+      container: this.container,
+      createElement: this.createElement.bind(this),
+      onEntityUpdate: this.options.onEntityUpdate
     });
     
     // ViewportManager functionality now consolidated in visual-state.ts
@@ -586,7 +573,7 @@ export class SimplePassiveRenderer {
    * Render table body
    */
   private renderBody(): void {
-    if (!this.bodyContainer || !this.rowRenderer) return;
+    if (!this.bodyContainer || !this.bodyRenderer) return;
     
     const rows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
@@ -608,7 +595,7 @@ export class SimplePassiveRenderer {
     this.bodyContainer.innerHTML = '';
     
     // Clear active rows in RowRenderer
-    this.rowRenderer.clearActiveRows();
+    this.bodyRenderer.clearActiveRows();
     
     // Update content dimensions in visual state
     const totalHeight = rows.length * 40; // ROW_HEIGHT
@@ -662,9 +649,9 @@ export class SimplePassiveRenderer {
           isExpanded: row.isExpanded,
           data: row.data
         });
-        rowElement = this.rowRenderer.createGroupHeaderElement(row, actualRowIndex);
+        rowElement = this.bodyRenderer.createGroupHeaderElement(row, actualRowIndex);
       } else {
-        rowElement = this.rowRenderer.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility, startX);
+        rowElement = this.bodyRenderer.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility, startX);
       }
       
       this.bodyContainer.appendChild(rowElement);
@@ -876,8 +863,7 @@ export class SimplePassiveRenderer {
     }
 
     // RowRenderer and CellRenderer don't need explicit cleanup
-    this.rowRenderer = null;
-    this.cellRenderer = null;
+    this.bodyRenderer = null;
     
     // Clean up legacy disposers (if any remain)
     this.disposers.forEach(dispose => dispose());
