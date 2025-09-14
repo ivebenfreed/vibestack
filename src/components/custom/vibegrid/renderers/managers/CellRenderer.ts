@@ -6,11 +6,9 @@
  */
 
 import { log } from '@/logger';
-import type {
-  TableCore$,
-  TableInteraction$,
-  TableViewport$
-} from '../../stores/pure-observables';
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import type { TableViewport$ } from '../../stores/pure-observables';
 import { getColumnWidth } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
@@ -199,28 +197,21 @@ export class CellRenderer {
     
     cellElement.appendChild(contentElement);
     
-    // Mouse down handler for cell selection (only on cell background, not content)
+    // Mouse down handler for cell selection
     cellElement.addEventListener('mousedown', (e) => {
       const target = e.target as Element;
-      
+
       // If click is on content element with editable class, ignore for selection
+      // These elements have their own click handlers for editing
       if (target && target.classList && (
           target.classList.contains('vibegridx-cell-text-editable') ||
           target.classList.contains('vibegridx-cell-badge-editable') ||
           target.classList.contains('vibegridx-cell-number-editable') ||
           target.classList.contains('vibegridx-cell-boolean-editable') ||
-          target.classList.contains('vibegridx-cell-empty-editable'))) {
+          target.classList.contains('vibegridx-cell-empty-editable') ||
+          target.classList.contains('vibegridx-enum-badge'))) {
         fileLog.info('📝 Content element clicked, ignoring for selection');
         return; // Content clicks are handled separately for editing
-      }
-      
-      // Only proceed for cell background clicks (whitespace)
-      if (target !== cellElement) {
-        fileLog.info('🖱️ Click not on cell element, ignoring', {
-          targetElement: (target as HTMLElement)?.tagName,
-          targetClass: (target as HTMLElement)?.className
-        });
-        return;
       }
       
       const isCtrlKey = e.ctrlKey || e.metaKey;
@@ -271,7 +262,13 @@ export class CellRenderer {
           const columnId = cellUnderMouse.dataset.columnId;
           if (rowId && columnId) {
             const currentCellId = `${rowId}:${columnId}`;
-            this.tableInteraction$.updateDragSelection(currentCellId);
+            // Create data context for the interaction state
+            const dataContext = {
+              rows: this.tableCore$.processedRows.get(),
+              columns: this.tableCore$.columns.get(),
+              columnVisibility: this.tableCore$.columnVisibility.get()
+            };
+            this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
           }
         }
       };

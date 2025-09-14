@@ -6,11 +6,9 @@
  */
 
 import { log } from '@/logger';
-import type { 
-  TableCore$, 
-  TableInteraction$, 
-  TableViewport$ 
-} from '../../stores/pure-observables';
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import type { TableViewport$ } from '../../stores/pure-observables';
 import { visualState$ } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';

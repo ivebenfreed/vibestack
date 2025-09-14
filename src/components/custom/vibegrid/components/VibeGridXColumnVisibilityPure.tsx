@@ -14,7 +14,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import type { Column } from '../types';
-import type { TableCore$, TableInteraction$ } from '../stores/pure-observables';
+import type { TableCore$ } from '../stores/data-state';
+import type { TableInteraction$ } from '../stores/interaction-state';
 
 interface VibeGridXColumnVisibilityPureProps {
   tableCore$: TableCore$;

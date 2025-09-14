@@ -73,8 +73,10 @@ export function UniversalEntityPage({
   const Icon = archetypeConfig.icon
   
   // Get columns from dynamic schema-driven generation - same pattern as debug pages
+  // Get columns from dynamic schema-driven generation - same pattern as debug pages
+  // Add safety check to prevent "Cannot read properties of undefined (reading 'get')" error
   const columnsObservable = createEntityColumnsObservable(entityName);
-  const columns = columnsObservable.get();
+  const columns = columnsObservable ? columnsObservable.get() : [];
 
   // Event handlers - same pattern as debug pages
   const handleSelectionChange = (cells: Set<string>) => {

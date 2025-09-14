@@ -29,8 +29,7 @@ export function createCellElement(
     flexShrink: '0',
     overflow: 'hidden',
     minWidth: '0',
-    // DEBUGGING: Add border to visualize cell boundaries
-    border: '1px solid green !important',
+    // border: '1px solid green !important',
     boxSizing: 'border-box'
   });
   

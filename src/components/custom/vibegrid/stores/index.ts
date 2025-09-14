@@ -27,8 +27,8 @@ export type { ColumnLayout, ViewportGeometry, VisualState } from './visual-state
 export { createTableCore$, createTableCoreSync$ } from './data-state';
 export { createTableInteraction$ } from './interaction-state';
 
-// Column operations (existing)
-export { columns$, columnOperations } from './columns-observable';
+// Column operations (moved to visual-state in Phase 1 consolidation)
+export { visibleColumns$, visualOperations } from './visual-state';
 
 // Note: Individual cores are not exported to prevent direct usage
 // All access should go through the main factory function or visual-state

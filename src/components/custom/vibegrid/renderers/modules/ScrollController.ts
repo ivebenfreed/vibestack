@@ -204,8 +204,7 @@ export class ScrollController {
 
       this.scrollRAF = requestAnimationFrame(() => {
         if (this.headerViewport) {
-          // Apply transform based on unified visual state
-          // The visual state handles the coordination between column virtualization and scroll position
+          // Apply transform to sync header with body scroll
           const transform = `translateX(-${scrollLeft}px)`;
           this.headerViewport.style.transform = transform;
 

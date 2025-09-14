@@ -6,11 +6,9 @@
  */
 
 import { log } from '@/logger';
-import type { 
-  TableCore$, 
-  TableInteraction$, 
-  TableViewport$ 
-} from '../../stores/pure-observables';
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import type { TableViewport$ } from '../../stores/pure-observables';
 import type { OverlayManager } from '../modules/OverlayManager';
 
 const fileLog = log('components/custom/vibegrid/renderers/managers/EventManager.ts');

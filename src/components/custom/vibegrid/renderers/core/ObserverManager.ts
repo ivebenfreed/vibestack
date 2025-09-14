@@ -5,11 +5,9 @@
 
 import { observe } from '@legendapp/state';
 import { log } from '@/logger';
-import type { 
-  TableCore$, 
-  TableInteraction$, 
-  TableViewport$ 
-} from '../../stores/pure-observables';
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import type { TableViewport$ } from '../../stores/pure-observables';
 import type { ViewportInfo } from '../../types';
 import type { OverlayManager } from '../modules/OverlayManager';
 
@@ -88,18 +86,97 @@ export class ObserverManager {
    */
   private setupObservers(): void {
     fileLog.info('🔍 Setting up observers');
-    
-    this.setupColumnsObserver();
-    this.setupColumnVisibilityObserver();
-    this.setupColumnResizeObserver();
-    this.setupRowsObserver();
-    this.setupViewportObserver();
-    this.setupSelectionObserver();
-    this.setupSelectAllCheckboxObserver();
-    this.setupEditingObserver();
-    this.setupSortObserver();
-    this.setupDragObserver();
-    
+
+    try {
+      fileLog.info('🔍 Setting up columns observer');
+      this.setupColumnsObserver();
+      fileLog.info('✅ Columns observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up columns observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up column visibility observer');
+      this.setupColumnVisibilityObserver();
+      fileLog.info('✅ Column visibility observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up column visibility observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up column resize observer');
+      this.setupColumnResizeObserver();
+      fileLog.info('✅ Column resize observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up column resize observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up rows observer');
+      this.setupRowsObserver();
+      fileLog.info('✅ Rows observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up rows observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up viewport observer');
+      this.setupViewportObserver();
+      fileLog.info('✅ Viewport observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up viewport observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up selection observer');
+      this.setupSelectionObserver();
+      fileLog.info('✅ Selection observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up selection observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up select all checkbox observer');
+      this.setupSelectAllCheckboxObserver();
+      fileLog.info('✅ Select all checkbox observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up select all checkbox observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up editing observer');
+      this.setupEditingObserver();
+      fileLog.info('✅ Editing observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up editing observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up sort observer');
+      this.setupSortObserver();
+      fileLog.info('✅ Sort observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up sort observer', error);
+      throw error;
+    }
+
+    try {
+      fileLog.info('🔍 Setting up drag observer');
+      this.setupDragObserver();
+      fileLog.info('✅ Drag observer set up');
+    } catch (error) {
+      fileLog.error('❌ Failed to set up drag observer', error);
+      throw error;
+    }
+
     fileLog.info('✅ All observers set up');
   }
 
@@ -177,12 +254,12 @@ export class ObserverManager {
       const scrollLeft = this.tableViewport$.scrollLeft.get();
       const viewportWidth = this.tableViewport$.viewportWidth.get();
       const viewportHeight = this.tableViewport$.viewportHeight.get();
-      
-      fileLog.info('🖼️ Viewport changed', { 
-        scrollTop, 
-        scrollLeft, 
-        viewportWidth, 
-        viewportHeight 
+
+      fileLog.info('🖼️ Viewport changed', {
+        scrollTop,
+        scrollLeft,
+        viewportWidth,
+        viewportHeight
       });
       this.onViewportChanged();
     });

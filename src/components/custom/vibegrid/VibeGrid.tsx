@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { createPureObservables } from './stores/pure-observables';
+import { createTableCore$, createTableCoreSync$ } from './stores/data-state';
+import { createTableInteraction$ } from './stores/interaction-state';
 import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
 import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
 import type { Column } from './types';
 import { log } from '@/logger';
 import { visualOperations, visualState$ } from './stores/visual-state';
 import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
+import { observable } from '@legendapp/state';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -56,7 +58,7 @@ interface VibeGridProps<T = any> {
 export function VibeGrid<T extends Record<string, any> = any>(
   props: VibeGridProps<T>
 ): React.ReactElement {
-  
+
   const {
     tableId,
     entityType,
@@ -111,8 +113,28 @@ export function VibeGrid<T extends Record<string, any> = any>(
         columnCount: columns.length
       });
 
-      // Create the three-layer observables
-      const observables = createPureObservables(entityType, columns);
+      // Create the three-layer observables directly
+      const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns);
+      const tableInteraction$ = createTableInteraction$();
+
+      // Create a proper viewport observable with Legend State observables for each property
+      const tableViewport$ = {
+        scrollTop: observable(0),
+        scrollLeft: observable(0),
+        viewportWidth: observable(0),
+        viewportHeight: observable(0),
+        updateViewport(width: number, height: number) {
+          tableViewport$.viewportWidth.set(width);
+          tableViewport$.viewportHeight.set(height);
+        }
+      };
+
+      const observables = {
+        tableCore$,
+        tableCoreSync$,
+        tableInteraction$,
+        tableViewport$
+      };
       observablesRef.current = observables;
 
       fileLog.debug('✅ Created pure observables', { entityType });
@@ -129,12 +151,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       // Wait for persistence to load before initializing renderer
       const checkPersistLoaded = () => {
-        const isLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
-        fileLog.debug('🔄 Checking persistence loaded state', { 
-          entityType, 
-          isPersistLoaded: isLoaded 
+        // Check if persistence is loaded - handle case where isPersistLoaded might not exist
+        let isLoaded = true; // Default to true for now since we fixed the columns parameter
+        if (observables.tableCoreSync$ && typeof observables.tableCoreSync$.isPersistLoaded !== 'undefined') {
+          isLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
+        }
+
+        fileLog.debug('🔄 Checking persistence loaded state', {
+          entityType,
+          isPersistLoaded: isLoaded,
+          hasIsPersistLoaded: !!(observables.tableCoreSync$?.isPersistLoaded)
         });
-        
+
         if (isLoaded) {
           fileLog.debug('✅ Persistence loaded, initializing renderer', { entityType });
           

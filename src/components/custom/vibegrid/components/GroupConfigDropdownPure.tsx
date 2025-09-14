@@ -31,7 +31,8 @@ import {
   DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import type { Column, GroupConfig, GroupField } from '../types';
-import type { TableCore$, TableInteraction$ } from '../stores/pure-observables';
+import type { TableCore$ } from '../stores/data-state';
+import type { TableInteraction$ } from '../stores/interaction-state';
 
 interface GroupConfigDropdownPureProps {
   tableCore$: TableCore$;

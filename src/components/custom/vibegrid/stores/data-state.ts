@@ -11,8 +11,8 @@ import { syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { log } from '@/logger';
-import type { Column, SortConfig, FilterConfig, GroupConfig, GroupField, GroupNode, AggregationConfig } from '../types';
-import { columnOperations, columns$ } from './columns-observable';
+import type { Column, SortConfig, FilterConfig } from '../types';
+// Import moved to visual-state.ts as part of Phase 1 consolidation
 import { visualOperations } from './visual-state';
 
 const fileLog = log('components/custom/vibegrid/stores/data-state.ts');
@@ -34,7 +34,6 @@ export interface PersistedTableState {
   // Data transformation configuration (persisted)
   sortBy: SortConfig[];
   filters: FilterConfig[];
-  groupConfig: GroupConfig | null;
 
   // Metadata
   version: string;
@@ -52,7 +51,6 @@ export interface TableCoreState {
   columnVisibility: Record<string, boolean>;
   sortBy: SortConfig[];
   filters: FilterConfig[];
-  groupConfig: GroupConfig | null;
 }
 
 // Re-export the observable types
@@ -111,165 +109,6 @@ function applySorting(rows: any[], sortBy: SortConfig[]): any[] {
   });
 }
 
-function applyGrouping(rows: any[], groupConfig: GroupConfig): any[] {
-  if (!groupConfig || !groupConfig.fields || groupConfig.fields.length === 0) {
-    return rows;
-  }
-
-  fileLog.info('<� Applying grouping', {
-    rowCount: rows.length,
-    groupFields: groupConfig.fields.map(f => f.field)
-  });
-
-  // Create hierarchical groups based on multiple grouping fields
-  const groupTree = createGroupTree(rows, groupConfig.fields);
-
-  // Flatten the tree into a virtual row array with group headers and data rows
-  const virtualRows = flattenGroupTree(groupTree, groupConfig.expandedGroups);
-
-  fileLog.info('<� Grouping applied', {
-    originalRows: rows.length,
-    virtualRows: virtualRows.length,
-    groupCount: countGroups(groupTree)
-  });
-
-  return virtualRows;
-}
-
-function createGroupTree(rows: any[], groupFields: GroupField[]): GroupNode[] {
-  if (groupFields.length === 0) {
-    return rows; // Return raw rows when no grouping
-  }
-
-  // Group by the first field
-  const firstField = groupFields[0];
-  const groups: Map<any, any[]> = new Map();
-
-  for (const row of rows) {
-    const groupValue = row[firstField.field] || 'Ungrouped';
-
-    if (!groups.has(groupValue)) {
-      groups.set(groupValue, []);
-    }
-    groups.get(groupValue)!.push(row);
-  }
-
-  // Create group nodes
-  const groupNodes: GroupNode[] = [];
-
-  for (const [groupValue, groupRows] of groups.entries()) {
-    const displayValue = formatGroupValue(groupValue, firstField.field);
-    const groupId = `group-${firstField.field}-${String(groupValue).replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-    // Recursively create subgroups if there are more grouping fields
-    const children = groupFields.length > 1
-      ? createGroupTree(groupRows, groupFields.slice(1))
-      : groupRows;
-
-    const groupNode: GroupNode = {
-      id: groupId,
-      field: firstField.field,
-      value: groupValue,
-      displayValue: displayValue,
-      level: 0, // Will be set during flattening
-      rowCount: groupRows.length,
-      totalCount: groupRows.length,
-      children: children,
-      isCollapsed: false,
-      summary: {
-        count: groupRows.length,
-        field: firstField.field,
-        value: groupValue
-      }
-    };
-
-    groupNodes.push(groupNode);
-  }
-
-  // Sort groups if needed
-  groupNodes.sort((a, b) => {
-    return a.displayValue.localeCompare(b.displayValue);
-  });
-
-  return groupNodes;
-}
-
-function flattenGroupTree(groupTree: GroupNode[], expandedGroups: Set<string>, level: number = 0): any[] {
-  const result: any[] = [];
-
-  for (const node of groupTree) {
-    if (node.field && node.displayValue) { // This is a GroupNode
-      // Add the group header row
-      const groupHeaderRow = {
-        type: 'group',
-        id: node.id,
-        level: level,
-        data: node,
-        isExpandable: true,
-        isExpanded: expandedGroups.has(node.id)
-      };
-
-      result.push(groupHeaderRow);
-
-      // Add children if group is expanded
-      if (expandedGroups.has(node.id)) {
-        if (Array.isArray(node.children)) {
-          for (const child of node.children) {
-            if (child.field && child.displayValue) { // Another GroupNode
-              // Recursive group
-              result.push(...flattenGroupTree([child], expandedGroups, level + 1));
-            } else {
-              // Data row
-              result.push({
-                type: 'data',
-                id: child.id,
-                data: child,
-                level: level + 1,
-                parentGroupId: node.id
-              });
-            }
-          }
-        }
-      }
-    } else {
-      // Data row at root level (shouldn't happen with proper grouping)
-      result.push({
-        type: 'data',
-        id: node.id,
-        data: node,
-        level: level
-      });
-    }
-  }
-
-  return result;
-}
-
-function formatGroupValue(value: any, field: string): string {
-  if (value === null || value === undefined) {
-    return 'Ungrouped';
-  }
-
-  if (typeof value === 'string' && value.trim() === '') {
-    return 'Empty';
-  }
-
-  return String(value);
-}
-
-function countGroups(groupTree: GroupNode[]): number {
-  let count = 0;
-  for (const node of groupTree) {
-    if (node.field && node.displayValue) { // This is a GroupNode
-      count++;
-      if (Array.isArray(node.children)) {
-        count += countGroups(node.children.filter(child => child.field && child.displayValue));
-      }
-    }
-  }
-  return count;
-}
-
 // ====================================
 // PERSISTENCE HELPERS
 // ====================================
@@ -316,7 +155,6 @@ function createDefaultTableState(entityType: string, columns: Column[]): Partial
     columnVisibility: Object.fromEntries(columns.map(col => [col.id, true])),
     sortBy: [],
     filters: [],
-    groupConfig: null,
     version: '1.0',
     lastUpdated: new Date().toISOString(),
     entityType,
@@ -403,7 +241,6 @@ function saveDisplayState(entityType: string, tableState: any): void {
       columnVisibility: tableState.columnVisibility,
       sortBy: tableState.sortBy,
       filters: tableState.filters,
-      groupBy: tableState.groupConfig, // Note: using groupBy for compatibility
       version: '1.0',
       lastUpdated: new Date().toISOString()
     };
@@ -443,7 +280,6 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     columnVisibility: defaultState.columnVisibility,
     sortBy: defaultState.sortBy,
     filters: defaultState.filters,
-    groupConfig: defaultState.groupConfig,
 
     // Computed processed data (lazy)
     get processedRows() {
@@ -460,7 +296,6 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       const entityObs = getEntity$(entityType);
       const sortBy = tableCore$.sortBy.get();
       const filters = tableCore$.filters.get();
-      const groupConfig = tableCore$.groupConfig.get();
 
       // Get the data from the entity observable
       let data = {};
@@ -485,18 +320,12 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
 
-      // Apply grouping if configured
-      if (groupConfig) {
-        rows = applyGrouping(rows, groupConfig);
-      }
-
       fileLog.info('<� Processed rows computed', {
         entityObservable: !!entityObs,
         inputCount: Object.keys(data || {}).length,
         outputCount: rows.length,
         hasFilters: filters.length > 0,
-        hasSorting: sortBy.length > 0,
-        hasGrouping: !!groupConfig
+        hasSorting: sortBy.length > 0
       });
 
       // Update visual state with the current row count
@@ -615,12 +444,6 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       // persistObservable automatically persists changes
 
       fileLog.info('<� Column width set (auto-persistent)', { columnId, width });
-    },
-
-    setGrouping(groupConfig: GroupConfig | null) {
-      tableCore$.groupConfig.set(groupConfig);
-      // persistObservable automatically persists changes
-      fileLog.info('<� Grouping configured (auto-persistent)', { groupConfig });
     }
   });
 
@@ -644,9 +467,6 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     }
     if (existingState.filters) {
       tableCore$.filters.set(existingState.filters);
-    }
-    if (existingState.groupConfig) {
-      tableCore$.groupConfig.set(existingState.groupConfig);
     }
   }
 
@@ -674,7 +494,6 @@ export function createTableCore$(entityType: string, columns: Column[]) {
               columnVisibility: value.columnVisibility,
               sortBy: value.sortBy,
               filters: value.filters,
-              groupConfig: value.groupConfig,
               version: '1.0',
               lastUpdated: new Date().toISOString(),
               entityType: value.entityType
@@ -699,7 +518,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
   const orgId = universeOrgId$.get();
   const userId = universeUserId$.get();
   if (orgId && userId) {
-    columnOperations.initialize(columns, entityType, orgId, userId);
+    visualOperations.initializeColumns(columns, entityType, orgId, userId);
     fileLog.info(' Columns observable initialized', { entityType, orgId, userId });
   } else {
     fileLog.warn('� Cannot initialize columns observable - missing orgId or userId', { orgId, userId });

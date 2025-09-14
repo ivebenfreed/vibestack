@@ -81,8 +81,8 @@ export type TableInteraction$ = ReturnType<typeof createTableInteraction$>;
 // INTERACTION STATE OBSERVABLE FACTORY
 // ====================================
 
-export function createTableInteraction$(tableCore$?: any) {
-  fileLog.info('<¯ Creating tableInteraction$ observable');
+export function createTableInteraction$() {
+  fileLog.info('<ï¿½ Creating tableInteraction$ observable');
 
   const tableInteraction$ = observable({
     // Selection state
@@ -93,28 +93,23 @@ export function createTableInteraction$(tableCore$?: any) {
     isSelecting: false,
 
     // Select all checkbox state (computed)
-    selectAllCheckboxState: computed(() => {
-      if (!tableCore$) {
+    // Note: This is now a simple state-based computation without data coupling
+    // The renderer should manage the complex logic and update this state appropriately
+    selectAllCheckboxState: computed((get) => {
+      try {
+        const selectedCells = get(() => tableInteraction$.selectedCells);
+        const selectedCount = selectedCells.size;
+
+        if (selectedCount === 0) {
+          return { checked: false, indeterminate: false };
+        } else {
+          // Without data context, we can't determine if all cells are selected
+          // So we show indeterminate when any cells are selected
+          // The renderer should provide a proper setSelectAllState method
+          return { checked: false, indeterminate: true };
+        }
+      } catch (error) {
         return { checked: false, indeterminate: false };
-      }
-
-      const selectedCells = tableInteraction$.selectedCells.get();
-      const processedRows = tableCore$.processedRows.get();
-      const columns = tableCore$.columns.get();
-      const visibleColumns = columns.filter((col: any) => {
-        const visibility = tableCore$.columnVisibility.get();
-        return visibility[col.id] !== false;
-      });
-
-      const totalCells = processedRows.length * visibleColumns.length;
-      const selectedCount = selectedCells.size;
-
-      if (selectedCount === 0) {
-        return { checked: false, indeterminate: false };
-      } else if (selectedCount === totalCells) {
-        return { checked: true, indeterminate: false };
-      } else {
-        return { checked: false, indeterminate: true };
       }
     }),
 
@@ -196,7 +191,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.anchorCell.set(cellId);
       });
 
-      fileLog.info('<¯ Cell selected', { cellId, isMulti, selectionCount: tableInteraction$.selectedCells.get().size });
+      fileLog.info('<ï¿½ Cell selected', { cellId, isMulti, selectionCount: tableInteraction$.selectedCells.get().size });
     },
 
     selectRow(rowId: string, isMulti: boolean = false) {
@@ -217,22 +212,22 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectedRows.set(newSelected);
       });
 
-      fileLog.info('<¯ Row selected', { rowId, isMulti, selectionCount: tableInteraction$.selectedRows.get().size });
+      fileLog.info('<ï¿½ Row selected', { rowId, isMulti, selectionCount: tableInteraction$.selectedRows.get().size });
     },
 
-    selectAll() {
-      if (!tableCore$) return;
+    selectAll(dataContext?: { rows: any[], columns: any[], columnVisibility: Record<string, boolean> }) {
+      if (!dataContext) {
+        // Without data context, can't determine what "all" means
+        fileLog.warn('âš ï¸ selectAll called without data context - ignoring');
+        return;
+      }
 
       batch(() => {
-        const processedRows = tableCore$.processedRows.get();
-        const columns = tableCore$.columns.get();
-        const visibleColumns = columns.filter((col: any) => {
-          const visibility = tableCore$.columnVisibility.get();
-          return visibility[col.id] !== false;
-        });
+        const { rows, columns, columnVisibility } = dataContext;
+        const visibleColumns = columns.filter((col: any) => columnVisibility[col.id] !== false);
 
         const allCells = new Set<string>();
-        for (const row of processedRows) {
+        for (const row of rows) {
           for (const column of visibleColumns) {
             allCells.add(`${row.id}:${column.id}`);
           }
@@ -241,7 +236,9 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.selectedCells.set(allCells);
       });
 
-      fileLog.info('<¯ All cells selected', { totalCells: tableInteraction$.selectedCells.get().size });
+      fileLog.info('âœ… All cells selected with data context', {
+        totalCells: tableInteraction$.selectedCells.get().size
+      });
     },
 
     clearSelection() {
@@ -251,7 +248,98 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.anchorCell.set(null);
       });
 
-      fileLog.info('<¯ Selection cleared');
+      fileLog.info('<ï¿½ Selection cleared');
+    },
+
+    selectRange(startCellId: string, endCellId: string, dataContext?: { rows: any[], columns: any[], columnVisibility: Record<string, boolean> }) {
+      // If no data context provided, fall back to simple selection
+      if (!dataContext) {
+        const cellsToSelect = new Set<string>();
+        cellsToSelect.add(startCellId);
+        cellsToSelect.add(endCellId);
+
+        batch(() => {
+          tableInteraction$.selectedCells.set(cellsToSelect);
+          tableInteraction$.anchorCell.set(startCellId);
+        });
+
+        fileLog.info('ðŸŽ¯ Simple range selection (no data context)', {
+          count: cellsToSelect.size,
+          from: startCellId,
+          to: endCellId
+        });
+        return;
+      }
+
+      // Full range selection with data context
+      const [startRowId, startColId] = startCellId.split(':');
+      const [endRowId, endColId] = endCellId.split(':');
+
+      const { rows, columns, columnVisibility } = dataContext;
+      const visibleColumns = columns.filter((col: any) => columnVisibility[col.id] !== false);
+
+      // Get row and column indices
+      const startRowIndex = rows.findIndex((row: any) => row.id === startRowId);
+      const endRowIndex = rows.findIndex((row: any) => row.id === endRowId);
+      const startColIndex = visibleColumns.findIndex((col: any) => col.id === startColId);
+      const endColIndex = visibleColumns.findIndex((col: any) => col.id === endColId);
+
+      if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
+        return;
+      }
+
+      // Ensure proper ordering
+      const minRowIndex = Math.min(startRowIndex, endRowIndex);
+      const maxRowIndex = Math.max(startRowIndex, endRowIndex);
+      const minColIndex = Math.min(startColIndex, endColIndex);
+      const maxColIndex = Math.max(startColIndex, endColIndex);
+
+      // Select all cells in the range
+      const newSelection = new Set<string>();
+      for (let rowIndex = minRowIndex; rowIndex <= maxRowIndex; rowIndex++) {
+        for (let colIndex = minColIndex; colIndex <= maxColIndex; colIndex++) {
+          const rowId = rows[rowIndex].id;
+          const columnId = visibleColumns[colIndex].id;
+          newSelection.add(`${rowId}:${columnId}`);
+        }
+      }
+
+      batch(() => {
+        tableInteraction$.selectedCells.set(newSelection);
+        tableInteraction$.anchorCell.set(startCellId);
+      });
+
+      fileLog.info('ðŸŽ¯ Full range selection with data context', {
+        start: startCellId,
+        end: endCellId,
+        totalCells: newSelection.size
+      });
+    },
+
+    toggleCellSelection(rowId: string, columnId: string, isCtrlKey: boolean = false, isShiftKey: boolean = false) {
+      const cellId = `${rowId}:${columnId}`;
+      batch(() => {
+        const cells = new Set(tableInteraction$.selectedCells.get());
+
+        if (isShiftKey && tableInteraction$.anchorCell.get()) {
+          // Shift+click for range selection
+          tableInteraction$.selectRange(tableInteraction$.anchorCell.get()!, cellId);
+        } else if (isCtrlKey) {
+          // Ctrl/Cmd+click for multi-selection toggle
+          if (cells.has(cellId)) {
+            cells.delete(cellId);
+          } else {
+            cells.add(cellId);
+          }
+          tableInteraction$.selectedCells.set(cells);
+        } else {
+          // Regular click - clear selection and select only this cell
+          tableInteraction$.selectedCells.set(new Set([cellId]));
+          tableInteraction$.anchorCell.set(cellId);
+        }
+      });
+
+      fileLog.info('<ï¿½ Cell selection toggled', { rowId, columnId, isCtrlKey, isShiftKey });
     },
 
     startEdit(cellId: string, initialValue?: any) {
@@ -262,7 +350,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.editValidation.set(null);
       });
 
-      fileLog.info('<¯ Edit started', { cellId, initialValue });
+      fileLog.info('<ï¿½ Edit started', { cellId, initialValue });
     },
 
     updateEditValue(value: any) {
@@ -276,7 +364,7 @@ export function createTableInteraction$(tableCore$?: any) {
       const editValue = finalValue !== undefined ? finalValue : tableInteraction$.editValue.get();
 
       if (!editingCell) {
-        fileLog.warn('  saveEdit called but no cell is being edited');
+        fileLog.warn('ï¿½ saveEdit called but no cell is being edited');
         return;
       }
 
@@ -290,7 +378,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.editValidation.set(null);
       });
 
-      fileLog.info('<¯ Edit saved', { cellId: editingCell, value: editValue });
+      fileLog.info('<ï¿½ Edit saved', { cellId: editingCell, value: editValue });
     },
 
     cancelEdit() {
@@ -303,7 +391,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.editValidation.set(null);
       });
 
-      fileLog.info('<¯ Edit cancelled', { cellId: editingCell });
+      fileLog.info('<ï¿½ Edit cancelled', { cellId: editingCell });
     },
 
     setHover(cellId: string | null, rowId: string | null = null) {
@@ -327,7 +415,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.dragTarget.set(null);
       });
 
-      fileLog.info('<¯ Drag started', { source });
+      fileLog.info('<ï¿½ Drag started', { source });
     },
 
     updateDragTarget(target: { row: string; column: string }) {
@@ -344,7 +432,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.dragTarget.set(null);
       });
 
-      fileLog.info('<¯ Drag ended', { source, target });
+      fileLog.info('<ï¿½ Drag ended', { source, target });
 
       return { source, target };
     },
@@ -356,7 +444,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.dragSelectCurrent.set(cellId);
       });
 
-      fileLog.info('<¯ Drag selection started', { startCell: cellId });
+      fileLog.info('<ï¿½ Drag selection started', { startCell: cellId });
     },
 
     updateDragSelect(cellId: string) {
@@ -373,9 +461,27 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.dragSelectCurrent.set(null);
       });
 
-      fileLog.info('<¯ Drag selection ended', { start, end: current });
+      fileLog.info('<ï¿½ Drag selection ended', { start, end: current });
 
       return { start, end: current };
+    },
+
+    // Alias methods for compatibility with CellRenderer
+    startDragSelection(cellId: string) {
+      return tableInteraction$.startDragSelect(cellId);
+    },
+
+    updateDragSelection(cellId: string, dataContext?: { rows: any[], columns: any[], columnVisibility: Record<string, boolean> }) {
+      // When dragging, select the range from start to current
+      const start = tableInteraction$.dragSelectStart.get();
+      if (start && cellId !== tableInteraction$.dragSelectCurrent.get()) {
+        tableInteraction$.selectRange(start, cellId, dataContext);
+        tableInteraction$.updateDragSelect(cellId);
+      }
+    },
+
+    endDragSelection() {
+      return tableInteraction$.endDragSelect();
     },
 
     startColumnResize(columnId: string, startX: number, startWidth: number) {
@@ -391,7 +497,7 @@ export function createTableInteraction$(tableCore$?: any) {
         });
       });
 
-      fileLog.info('<¯ Column resize started', { columnId, startX, startWidth });
+      fileLog.info('<ï¿½ Column resize started', { columnId, startX, startWidth });
     },
 
     updateColumnResize(currentX: number) {
@@ -426,7 +532,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.columnResize.set(null);
       });
 
-      fileLog.info('<¯ Column resize ended', { columnId: resizingColumn, newWidth });
+      fileLog.info('<ï¿½ Column resize ended', { columnId: resizingColumn, newWidth });
 
       return { columnId: resizingColumn, newWidth };
     },
@@ -444,7 +550,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.headerMenuState.menuType.set(menuType);
       });
 
-      fileLog.info('<¯ Header menu opened', { columnId, position, menuType });
+      fileLog.info('<ï¿½ Header menu opened', { columnId, position, menuType });
     },
 
     closeHeaderMenu() {
@@ -454,7 +560,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.headerMenuState.menuType.set(null);
       });
 
-      fileLog.info('<¯ Header menu closed');
+      fileLog.info('<ï¿½ Header menu closed');
     },
 
     openContextMenu(position: { x: number; y: number }, context: 'cell' | 'row' | 'column' | 'header', targetId: string) {
@@ -471,7 +577,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.contextMenuState.targetId.set(targetId);
       });
 
-      fileLog.info('<¯ Context menu opened', { position, context, targetId });
+      fileLog.info('<ï¿½ Context menu opened', { position, context, targetId });
     },
 
     closeContextMenu() {
@@ -482,7 +588,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.contextMenuState.targetId.set(null);
       });
 
-      fileLog.info('<¯ Context menu closed');
+      fileLog.info('<ï¿½ Context menu closed');
     },
 
     openColumnVisibilityMenu() {
@@ -497,7 +603,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.columnVisibilityMenuState.searchValue.set('');
       });
 
-      fileLog.info('<¯ Column visibility menu opened');
+      fileLog.info('<ï¿½ Column visibility menu opened');
     },
 
     closeColumnVisibilityMenu() {
@@ -506,7 +612,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.columnVisibilityMenuState.searchValue.set('');
       });
 
-      fileLog.info('<¯ Column visibility menu closed');
+      fileLog.info('<ï¿½ Column visibility menu closed');
     },
 
     setColumnVisibilitySearch(searchValue: string) {
@@ -524,7 +630,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.groupConfigMenuState.isOpen.set(true);
       });
 
-      fileLog.info('<¯ Group config menu opened');
+      fileLog.info('<ï¿½ Group config menu opened');
     },
 
     closeGroupConfigMenu() {
@@ -532,7 +638,83 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.groupConfigMenuState.isOpen.set(false);
       });
 
-      fileLog.info('<¯ Group config menu closed');
+      fileLog.info('<ï¿½ Group config menu closed');
+    },
+
+    // ====================================
+    // VISUAL UPDATE METHODS (Consolidated from SelectionManager)
+    // ====================================
+
+    /**
+     * Update visual selection state for cells in the DOM
+     * This replaces SelectionManager's setSelectedCells with DOM updates
+     */
+    updateCellSelectionVisuals(
+      getCellElement: (rowId: string, columnId: string) => HTMLElement | null
+    ) {
+      const selectedCells = tableInteraction$.selectedCells.get();
+
+      // Find all cells with selection class and remove it
+      document.querySelectorAll('.vibegridx-selected').forEach(el => {
+        el.classList.remove('vibegridx-selected');
+      });
+
+      // Add selection class to currently selected cells
+      selectedCells.forEach(cellKey => {
+        const [rowId, columnId] = cellKey.split(':');
+        const element = getCellElement(rowId, columnId);
+        element?.classList.add('vibegridx-selected');
+      });
+    },
+
+    /**
+     * Update visual selection state for rows in the DOM
+     * This replaces SelectionManager's setSelectedRows with DOM updates
+     */
+    updateRowSelectionVisuals(
+      forEachRowElement: (callback: (element: HTMLElement, rowId: string) => void) => void
+    ) {
+      const selectedRows = tableInteraction$.selectedRows.get();
+
+      // Update all row elements
+      forEachRowElement((element, rowId) => {
+        if (selectedRows.has(rowId)) {
+          element.classList.add('vibegridx-row-selected');
+        } else {
+          element.classList.remove('vibegridx-row-selected');
+        }
+      });
+    },
+
+    /**
+     * Update visual editing state for a cell in the DOM
+     * This replaces SelectionManager's setEditingCell with DOM updates
+     */
+    updateEditingCellVisual(
+      getCellElement: (rowId: string, columnId: string) => HTMLElement | null,
+      oldCellId?: string | null,
+      newCellId?: string | null
+    ) {
+      // Remove editing state from old cell
+      if (oldCellId) {
+        const [rowId, columnId] = oldCellId.split(':');
+        const oldElement = getCellElement(rowId, columnId);
+        if (oldElement) {
+          oldElement.classList.remove('vibegridx-editing');
+          oldElement.contentEditable = 'false';
+        }
+      }
+
+      // Add editing state to new cell
+      if (newCellId) {
+        const [rowId, columnId] = newCellId.split(':');
+        const newElement = getCellElement(rowId, columnId);
+        if (newElement) {
+          newElement.classList.add('vibegridx-editing');
+          newElement.contentEditable = 'true';
+          newElement.focus({ preventScroll: true });
+        }
+      }
     }
   });
 

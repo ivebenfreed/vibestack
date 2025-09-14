@@ -5,13 +5,14 @@
 
 import { log } from '@/logger';
 import { observe } from '@legendapp/state';
-import { visualState$ } from '../../stores/visual-state';
-import type { TableCore$, TableInteraction$, TableViewport$ } from '../../stores/pure-observables';
+import { visualState$, visualOperations, getColumnWidth, getColumnXOffset, getVisibleColumns } from '../../stores/visual-state';
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import type { TableViewport$ } from '../../stores/pure-observables';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import type { CoordinateMapping } from '../modules/OverlayManager';
 import { setupColumnDragHandlers } from '../utils/interaction-handlers';
-import { visualState$, getColumnWidth, getColumnXOffset, getVisibleColumns } from '../../stores/visual-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/HeaderRenderer.ts');
 
@@ -82,85 +83,63 @@ export class HeaderRenderer {
     
     const headerRow = this.domFactory.createElement('div', 'vibegridx-header-row');
     headerRow.style.cssText = `
-      display: flex;
+      position: relative;
       height: ${HEADER_HEIGHT}px;
-      align-items: center;
     `;
     
     // Add corner header cell (aligns with row headers)
     const { cornerCell, selectAllCheckbox } = this.domFactory.createCornerHeaderCell();
     this.selectAllCheckbox = selectAllCheckbox || null;
-    
+
+    // Position corner cell absolutely
+    cornerCell.style.position = 'absolute';
+    cornerCell.style.left = '0';
+    cornerCell.style.top = '0';
+    cornerCell.style.zIndex = '1';
+
     // Add select all checkbox handler
     if (this.selectAllCheckbox) {
       this.setupSelectAllHandler();
     }
-    
+
     headerRow.appendChild(cornerCell);
     
     // Filter visible columns and get virtual column range
     const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
 
-    // FIXED: Use actual column virtualization from visual state with BUFFER
-    const visibleColumnRange = visualState.geometry.visibleColumnRange;
+    // Render ALL visible columns - headers don't need virtualization
+    // The transform on the header viewport handles scrolling
+    const allColumnLayouts = visualState.visibleColumns;
 
-    // Add buffer zones to prevent gaps at scroll edges (this was missing!)
-    const COLUMN_BUFFER = 2; // Render 2 extra columns on each side
-    const startWithBuffer = Math.max(0, visibleColumnRange.start - COLUMN_BUFFER);
-    const endWithBuffer = Math.min(visualState.visibleColumns.length, visibleColumnRange.end + COLUMN_BUFFER);
-
-    // Get virtualized columns with buffer for smooth scrolling
-    const virtualColumns = visualState.visibleColumns.slice(startWithBuffer, endWithBuffer);
-    
-    fileLog.info('🎨 Header rendering with BUFFER', {
+    fileLog.info('🎨 Header rendering ALL columns (no virtualization)', {
       totalColumns: columns.length,
-      allVisibleColumns: allVisibleColumns.length,
-      visibleRange: `${visibleColumnRange.start}-${visibleColumnRange.end}`,
-      bufferRange: `${startWithBuffer}-${endWithBuffer}`,
-      bufferSize: COLUMN_BUFFER,
-      renderingColumns: virtualColumns.length,
-      virtualColumnIds: virtualColumns.map(col => col.id),
-      virtualColumnLabels: virtualColumns.map(col => col.label || col.id)
+      visibleColumns: allColumnLayouts.length,
+      scrollLeft: visualState.geometry.scrollLeft,
+      columnIds: allColumnLayouts.slice(0, 5).map(col => col.id)
     });
-    
+
     // Update column coordinate mapping only if columns have changed
     const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
 
-    // FIXED: Use exact positioning from visual state to match body cells
-    fileLog.info('🔧 Header using virtualized columns', {
-      scrollLeft: visualState.geometry.scrollLeft,
-      viewportWidth: visualState.geometry.viewportWidth,
-      visibleColumnRange,
-      virtualColumnsCount: virtualColumns.length,
-      virtualColumnIds: virtualColumns.map(col => col.id),
-      xOffsets: virtualColumns.map(col => col.xOffset),
-      allVisibleColumnIds: visualState.visibleColumns.map(col => col.id),
-      totalVisibleColumns: visualState.visibleColumns.length
-    });
+    // Render ALL columns at their absolute positions
+    // The header viewport transform will handle the scrolling
+    allColumnLayouts.forEach((columnLayout, columnIndex) => {
+      const column = columns.find(c => c.id === columnLayout.id);
+      if (!column) return;
 
-    // Render virtualized columns with unified visual state positioning
-    // The header viewport will be transformed by ScrollController, so we position cells
-    // relative to the first visible column, not their absolute xOffset
-    const firstVisibleXOffset = virtualColumns.length > 0 ? virtualColumns[0].xOffset : 40;
+      const headerCell = this.createColumnHeader(column, columnIndex, 0);
 
-    virtualColumns.forEach((columnLayout, columnIndex) => {
-      // Position relative to the first visible column since header viewport will be transformed
-      const relativeXOffset = columnLayout.xOffset - firstVisibleXOffset;
-      const headerCell = this.createColumnHeader(columnLayout, columnIndex, relativeXOffset);
+      // Position at absolute xOffset - transform handles scrolling
+      headerCell.style.position = 'absolute';
+      headerCell.style.left = `${columnLayout.xOffset}px`;
+      headerCell.style.top = '0';
+      headerCell.style.width = `${columnLayout.width}px`;
+      headerCell.style.height = `${HEADER_HEIGHT}px`;
+
       headerRow.appendChild(headerCell);
-
-      fileLog.debug('🎯 Header cell positioned', {
-        columnId: columnLayout.id,
-        absoluteXOffset: columnLayout.xOffset,
-        firstVisibleXOffset,
-        relativeXOffset,
-        scrollLeft: visualState.geometry.scrollLeft
-      });
     });
 
-    // Add end drop zone for placing columns at the end
-    const endDropZone = this.createEndDropZone();
-    headerRow.appendChild(endDropZone);
+    // End drop zone removed - users can drop between columns instead
 
     // Set total width for proper overflow handling (include end drop zone)
     // Use UNIFIED visual state's totalWidth - no duplicate calculation
@@ -418,7 +397,7 @@ export class HeaderRenderer {
         const resizeState = this.tableInteraction$.columnResize.get();
         if (resizeState && resizeState.newWidth) {
           // Apply the new width
-          this.tableCore$.updateColumnWidth(column.id, resizeState.newWidth);
+          visualOperations.setColumnWidth(column.id, resizeState.newWidth);
         }
         
         // Clear resize state
@@ -467,7 +446,7 @@ export class HeaderRenderer {
             targetColumnId,
             insertBefore
           });
-          this.tableCore$.reorderColumn(sourceColumnId, targetColumnId, insertBefore);
+          visualOperations.reorderColumns(sourceColumnId, targetColumnId, insertBefore);
         }
       }
     );

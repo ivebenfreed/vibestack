@@ -57,7 +57,7 @@
 
 /* Header */
 .vibegridx-header-viewport {
-  overflow-x: auto;
+  overflow-x: hidden;  /* Changed from auto to hidden since we handle scroll via transform */
   overflow-y: hidden;
   position: relative;
   background: hsl(var(--muted));
@@ -73,7 +73,6 @@
 }
 
 .vibegridx-header {
-  display: flex;
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
   font-weight: 600;
@@ -106,8 +105,6 @@
   min-width: var(--cell-min-width, 60px);
   max-width: var(--cell-max-width, 400px);
   overflow: hidden;
-  /* DEBUGGING: Add bright border to visualize header cell boundaries */
-  border: 2px solid magenta !important;
 }
 
 /* Active state cursor handled programmatically */
@@ -195,11 +192,16 @@
   display: none;
 }
 
-/* Column being dragged - styles handled via inline DOM manipulation */
-/* Debug: Force hide dragging columns */
-.vibegridx-header-cell[style*="visibility: hidden"] {
-  visibility: hidden !important;
-  opacity: 0 !important;
+/* Column being dragged */
+.vibegridx-header-cell.dragging {
+  opacity: 0.5;
+  cursor: grabbing !important;
+}
+
+/* Drop target column */
+.vibegridx-header-cell.drop-target {
+  background-color: hsl(var(--primary) / 0.1);
+  border: 2px dashed hsl(var(--primary));
 }
 
 /* Force grabbing cursor during column drag */
@@ -489,8 +491,6 @@ body.vibegridx-dragging-active * {
   cursor: pointer;
   color: hsl(var(--foreground));
   background: inherit;
-  /* DEBUGGING: Add bright border to visualize cell boundaries */
-  border: 2px solid lime !important;
 }
 
 /* Single-click editing hover states */

@@ -76,6 +76,7 @@ export function setupColumnDragHandlers(
   
   headerCell.addEventListener('dragover', (e: DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer!.dropEffect = 'move';
 
     // Show insertion line at the border where column will be inserted
@@ -89,23 +90,38 @@ export function setupColumnDragHandlers(
     // Remove any existing insertion lines
     document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
 
-    // Create insertion line
+    // Get the header container (parent of header cells)
+    const headerContainer = headerCell.parentElement;
+    if (!headerContainer) return;
+
+    // Create insertion line as an absolute positioned element in the header container
     const dropLine = document.createElement('div');
     dropLine.className = 'column-drop-line';
+
+    // Calculate position relative to the header container
+    const headerRect = headerContainer.getBoundingClientRect();
+    const cellRect = headerCell.getBoundingClientRect();
+    const linePosition = insertBefore ?
+      cellRect.left - headerRect.left :
+      cellRect.right - headerRect.left;
+
     dropLine.style.cssText = `
       position: absolute;
       top: 0;
       bottom: 0;
+      left: ${linePosition - 1.5}px;
       width: 3px;
       background: #3b82f6;
       border-radius: 1px;
       z-index: 9999;
       box-shadow: 0 0 4px rgba(59, 130, 246, 0.5);
-      ${insertBefore ? 'left: -1px;' : 'right: -1px;'}
+      pointer-events: none;
+      height: ${cellRect.height}px;
     `;
 
-    headerCell.style.position = 'relative';
-    headerCell.appendChild(dropLine);
+    // Append to header container, not the cell itself
+    headerContainer.style.position = 'relative';
+    headerContainer.appendChild(dropLine);
 
     onDragOver(e);
   });
@@ -119,12 +135,18 @@ export function setupColumnDragHandlers(
   
   headerCell.addEventListener('drop', (e: DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    console.log('🎯 DROP EVENT FIRED', {
+      targetColumn: column.id,
+      draggedColumn: e.dataTransfer!.getData('text/plain')
+    });
 
     // Clean up insertion lines
     document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
 
     const draggedColumnId = e.dataTransfer!.getData('text/plain');
-    if (draggedColumnId !== column.id) {
+    if (draggedColumnId && draggedColumnId !== column.id) {
       // Calculate insertion position (same logic as dragover)
       const rect = headerCell.getBoundingClientRect();
       const mouseX = e.clientX;

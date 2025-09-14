@@ -4,7 +4,7 @@
  */
 
 import { log } from '@/logger';
-import type { TableInteraction$ } from '../../../stores/pure-observables';
+import type { TableInteraction$ } from '../../stores/interaction-state';
 import { SelectionController } from './SelectionController';
 
 const fileLog = log('components/custom/vibegrid/renderers/modules/KeyboardNavigationController.ts');

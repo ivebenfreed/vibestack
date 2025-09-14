@@ -7,8 +7,9 @@ import { log } from '@/logger';
 import { CanvasOverlayDOM } from '../../overlays/CanvasOverlayDOM';
 import { EditingOverlay } from '../../overlays/EditingOverlay';
 import { ContextMenuManager } from '../../components/ContextMenu';
-import { SelectionManager } from '../managers/SelectionManager';
-import type { TableCore$, TableInteraction$ } from '../../stores/pure-observables';
+// SelectionManager functionality consolidated into interaction-state
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { ViewportInfo } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 
@@ -44,7 +45,7 @@ export class OverlayManager {
   
   // Overlay instances
   private canvasOverlay: CanvasOverlayDOM | null = null;
-  private selectionManager: SelectionManager | null = null;
+  // Selection now managed through tableInteraction$ observable
   private editingOverlay: EditingOverlay | null = null;
   private contextMenu: ContextMenuManager | null = null;
   
@@ -96,22 +97,8 @@ export class OverlayManager {
     // Canvas overlay will be initialized in initializeOverlay() method
     // after DOM is ready
     
-    // Create selection manager
-    this.selectionManager = new SelectionManager({
-      getCellElement: (rowId: string, columnId: string) => {
-        const cellElement = this.container.querySelector(`[data-cell-id="${rowId}:${columnId}"]`) as HTMLElement;
-        return cellElement;
-      },
-      forEachRowElement: (callback: (element: HTMLElement, rowId: string) => void) => {
-        const rowElements = this.container.querySelectorAll('[data-row-id]');
-        rowElements.forEach((element) => {
-          const rowId = element.getAttribute('data-row-id');
-          if (rowId) callback(element as HTMLElement, rowId);
-        });
-      },
-      getHeaderElement: () => this.headerContainer!,
-      isSelectionColumnEnabled: () => this.enableSelectionColumn
-    });
+    // Selection is now managed through tableInteraction$ observable
+    // Visual updates can be done via tableInteraction$.updateCellSelectionVisuals()
     
     // Create editing overlay
     this.editingOverlay = new EditingOverlay(this.container, {
@@ -183,9 +170,8 @@ export class OverlayManager {
    */
   updateSelection(selectedCells: Set<string>): void {
     // Quick selection manager update (lightweight)
-    if (this.selectionManager) {
-      this.selectionManager.setSelectedCells(selectedCells);
-    }
+    // Update selection visuals using interaction-state
+    this.tableInteraction$.selectedCells.set(selectedCells);
 
     // Skip expensive canvas updates if selection hasn't changed
     if (this.lastSelectedCells && this.areSetsEqual(selectedCells, this.lastSelectedCells)) {
@@ -439,9 +425,8 @@ export class OverlayManager {
     this.lastSelectedCells = null;
     this.lastCoordinateMappingVersion = -1;
 
-    if (this.selectionManager) {
-      this.selectionManager.clearAllSelections();
-    }
+    // Clear selections using interaction-state
+    this.tableInteraction$.clearSelection();
     
     if (this.canvasOverlay) {
       this.canvasOverlay.destroy();
@@ -458,7 +443,7 @@ export class OverlayManager {
       this.contextMenu = null;
     }
     
-    this.selectionManager = null;
+    // Selection cleanup not needed - handled by interaction-state
     
     fileLog.info('✅ Overlay system destroyed');
   }
@@ -473,9 +458,7 @@ export class OverlayManager {
   /**
    * Get selection manager instance
    */
-  getSelectionManager(): SelectionManager | null {
-    return this.selectionManager;
-  }
+  // Selection is managed through tableInteraction$ - no separate manager needed
   
   /**
    * Get editing overlay instance

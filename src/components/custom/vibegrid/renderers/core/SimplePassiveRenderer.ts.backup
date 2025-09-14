@@ -792,7 +792,7 @@ export class SimplePassiveRenderer {
 
     // DEBUG: Log trigger analysis to identify excessive rendering
     fileLog.info('🔍 VIEWPORT CHANGE TRIGGER FIXED', {
-      scrollLeft: this.tableViewport$?.scrollLeft?.get?.() || 0,
+      scrollLeft: this.tableViewport$.scrollLeft.get(),
       visibleColumns: visibleColumns ? `${visibleColumns.start}-${visibleColumns.end}` : 'null',
       previousColumns: `${previousColumns.start}-${previousColumns.end}`,
       columnsChanged,
@@ -800,7 +800,7 @@ export class SimplePassiveRenderer {
     });
 
     // Check if vertical rows have changed (for virtual scrolling)
-    const visibleRows = this.tableViewport$?.visibleRows?.get?.() || { start: 0, end: 10 };
+    const visibleRows = this.tableViewport$.visibleRows.get();
     const previousRows = this.lastVisibleRows || { start: -1, end: -1 };
     const rowsChanged = visibleRows && (
       visibleRows.start !== previousRows.start ||
