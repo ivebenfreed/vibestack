@@ -126,6 +126,10 @@ export function VibeGrid<T extends Record<string, any> = any>(
         updateViewport(width: number, height: number) {
           tableViewport$.viewportWidth.set(width);
           tableViewport$.viewportHeight.set(height);
+        },
+        updateScroll(scrollTop: number, scrollLeft: number) {
+          tableViewport$.scrollTop.set(scrollTop);
+          tableViewport$.scrollLeft.set(scrollLeft);
         }
       };
 
