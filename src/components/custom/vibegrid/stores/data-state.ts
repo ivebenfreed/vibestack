@@ -174,8 +174,29 @@ function generateTableStateKey(entityType: string): string | null {
     const orgId = universeOrgId$.peek();
     const userId = universeUserId$.peek();
 
+    console.log('🔧 PERSISTENCE DEBUG: generateTableStateKey called', {
+      entityType,
+      orgId,
+      userId,
+      orgIdType: typeof orgId,
+      userIdType: typeof userId,
+      isOrgIdUniverse: orgId === 'universe'
+    });
+
     if (!orgId || !userId || orgId === 'universe') {
-      fileLog.debug('🔧 Cannot generate storage key - missing context', { orgId, userId });
+      const debugInfo = {
+        entityType,
+        orgId,
+        userId,
+        orgIdType: typeof orgId,
+        userIdType: typeof userId,
+        isOrgIdUniverse: orgId === 'universe',
+        hasOrgId: !!orgId,
+        hasUserId: !!userId,
+        reason: !orgId ? 'missing orgId' : !userId ? 'missing userId' : 'orgId is universe'
+      };
+      console.error('🔧 PERSISTENCE DEBUG: Cannot generate storage key - missing context', debugInfo);
+      fileLog.error('🔧 Cannot generate storage key - missing context', debugInfo);
       return null;
     }
 
@@ -318,8 +339,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
   const defaultState = createDefaultTableState(entityType, columns);
   fileLog.info('<� Default state created', { entityType, defaultSortBy: defaultState.sortBy });
 
-  // Don't generate storage key immediately - defer until orgId/userId are available
-  let storageKey: string | null = null;
+  // Generate storage key for persistence
+  let storageKey: string | null = generateTableStateKey(entityType);
   let tableCoreSync$: any = null;
 
   // Create the core observable with default values
@@ -804,7 +825,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     }
   }
 
-  // Create persistent sync observable for table state (variable declared earlier)
+  // Create persistent sync observable for table state
 
   // Only configure persistence if we have a valid storage key
   if (storageKey) {
@@ -851,7 +872,24 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       fileLog.error('❌ Failed to configure Legend State persistence', { entityType, error: error.message });
     }
   } else {
-    fileLog.warn('❌ Cannot configure persistence - no storage key available (orgId/userId not ready)', { entityType });
+    const orgId = universeOrgId$.peek();
+    const userId = universeUserId$.peek();
+    const debugInfo = {
+      entityType,
+      orgId,
+      userId,
+      orgIdType: typeof orgId,
+      userIdType: typeof userId,
+      isOrgIdUniverse: orgId === 'universe',
+      hasOrgId: !!orgId,
+      hasUserId: !!userId
+    };
+
+    console.error('🔥 PERSISTENCE FAILURE: Cannot configure persistence - storage key generation failed!', debugInfo);
+    fileLog.error('❌ PERSISTENCE FAILURE: Cannot configure persistence - no storage key available', debugInfo);
+
+    // This is a critical error that breaks functionality
+    throw new Error(`VibeGrid persistence configuration failed for ${entityType}. orgId: ${orgId}, userId: ${userId}. This will break table state persistence.`);
   }
 
   // Initialize columns observable with current state
