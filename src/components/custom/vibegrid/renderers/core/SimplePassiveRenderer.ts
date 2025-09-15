@@ -422,6 +422,11 @@ export class SimplePassiveRenderer {
    * Initialize DOM structure
    */
   private initDOM(): void {
+    if (!this.container) {
+      fileLog.error('❌ Container is null - cannot initialize DOM');
+      return;
+    }
+
     this.container.innerHTML = '';
     
     // Create basic table structure

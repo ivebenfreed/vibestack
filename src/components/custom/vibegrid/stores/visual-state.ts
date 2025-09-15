@@ -353,6 +353,12 @@ export function createVisualRows$(
 }
 
 // ====================================
+// VISUAL STATE SYNC STATUS (exported for persistence checking)
+// ====================================
+
+export let visualSyncStatus$: any = null;
+
+// ====================================
 // VISUAL STATE OPERATIONS
 // ====================================
 
@@ -743,11 +749,23 @@ export const visualOperations = {
     // Add persistence debugging as recommended by Legend State docs
     const syncStatus$ = syncState(visualInputs$);
 
-    // Wait for persistence to load, then log status
+    // Create a custom persistence loaded tracker that waits for actual data loading
+    const persistenceComplete$ = observable(false);
+
+    // Export both sync status and our custom completion tracker for persistence checking in VibeGrid
+    visualSyncStatus$ = {
+      ...syncStatus$,
+      isPersistenceDataLoaded: persistenceComplete$
+    };
+
+    // Wait for persistence to load, then log status and mark as complete
     when(syncStatus$.isPersistLoaded).then(() => {
-      fileLog.info('🎯 Columns observable persistence loaded', {
-        entityType,
-        orgId,
+      // Give the load transform a chance to complete
+      setTimeout(() => {
+        persistenceComplete$.set(true);
+        fileLog.info('🎯 Columns observable persistence loaded', {
+          entityType,
+          orgId,
         userId,
         columnsCount: columns.length,
         persistKey,
@@ -772,6 +790,7 @@ export const visualOperations = {
       } catch (e) {
         fileLog.error('❌ Failed to check persistence content', e);
       }
+      }, 10); // Small delay to allow load transform to complete
     });
 
     fileLog.info('🎯 Columns observable initialized', {

@@ -5,7 +5,7 @@ import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
 import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
 import type { Column } from './types';
 import { log } from '@/logger';
-import { visualOperations, visualState$ } from './stores/visual-state';
+import { visualOperations, visualState$, visualSyncStatus$ } from './stores/visual-state';
 import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { observable } from '@legendapp/state';
 
@@ -104,7 +104,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // ====================================
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    // Add a small delay to ensure the container ref is ready
+    const initializeVibeGrid = () => {
+      if (!containerRef.current) {
+        fileLog.warn('⚠️ Container ref not ready, will initialize when persistence is checked');
+        return;
+      }
 
     try {
       fileLog.info('🚀 Initializing VibeGrid', {
@@ -147,29 +152,56 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const orgId = universeOrgId$.get();
       const userId = universeUserId$.get();
       if (orgId && userId) {
-        visualOperations.initialize(columns, entityType, orgId, userId);
-        fileLog.info('🎯 Visual state initialized', { entityType, orgId, userId });
+        visualOperations.initializeColumns(columns, entityType, orgId, userId);
+        fileLog.info('🎯 Visual state initialized with persistence', { entityType, orgId, userId });
       } else {
         fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
       }
 
       // Wait for persistence to load before initializing renderer
+      let retryCount = 0;
+      const maxRetries = 50; // Max 2.5 seconds (50ms * 50)
+
       const checkPersistLoaded = () => {
-        // Check if persistence is loaded - handle case where isPersistLoaded might not exist
-        let isLoaded = true; // Default to true for now since we fixed the columns parameter
+        // Check if BOTH data and visual persistence is loaded
+        let dataLoaded = true; // Default to true since we fixed the columns parameter
         if (observables.tableCoreSync$ && typeof observables.tableCoreSync$.isPersistLoaded !== 'undefined') {
-          isLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
+          dataLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
         }
+
+        let visualLoaded = false;
+        if (visualSyncStatus$ && typeof visualSyncStatus$.isPersistenceDataLoaded !== 'undefined') {
+          visualLoaded = visualSyncStatus$.isPersistenceDataLoaded?.get();
+        }
+
+        const isLoaded = dataLoaded && visualLoaded;
 
         fileLog.debug('🔄 Checking persistence loaded state', {
           entityType,
-          isPersistLoaded: isLoaded,
-          hasIsPersistLoaded: !!(observables.tableCoreSync$?.isPersistLoaded)
+          dataLoaded,
+          visualLoaded,
+          isLoaded,
+          hasDataPersist: !!(observables.tableCoreSync$?.isPersistLoaded),
+          hasVisualPersist: !!(visualSyncStatus$?.isPersistenceDataLoaded)
         });
 
         if (isLoaded) {
           fileLog.debug('✅ Persistence loaded, initializing renderer', { entityType });
-          
+
+          // Ensure container is available before creating renderer
+          if (!containerRef.current) {
+            retryCount++;
+            if (retryCount < maxRetries) {
+              fileLog.error(`❌ Container ref is null, retrying in 50ms (attempt ${retryCount}/${maxRetries})`);
+              setTimeout(checkPersistLoaded, 50);
+              return;
+            } else {
+              fileLog.error('❌ Container ref is null after max retries, giving up');
+              setError('Container element not available for VibeGrid initialization');
+              return;
+            }
+          }
+
           // Create the SimplePassiveRenderer with enhanced selection
           const renderer = new SimplePassiveRenderer({
             container: containerRef.current,
@@ -234,7 +266,13 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         } else {
           // Keep checking until persistence loads
-          setTimeout(checkPersistLoaded, 50);
+          retryCount++;
+          if (retryCount < maxRetries) {
+            setTimeout(checkPersistLoaded, 50);
+          } else {
+            fileLog.error('❌ Persistence loading timed out, giving up');
+            setError('Persistence loading timed out');
+          }
         }
       };
 
@@ -246,6 +284,10 @@ export function VibeGrid<T extends Record<string, any> = any>(
       fileLog.error('❌ Failed to initialize VibeGrid', err);
       setError(errorMsg);
     }
+    };
+
+    // Call the initialization function
+    initializeVibeGrid();
 
     // Cleanup
     return () => {
