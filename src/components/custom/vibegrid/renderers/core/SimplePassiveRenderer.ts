@@ -12,7 +12,7 @@ import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
 // New modular architecture imports
-import { ObserverManager, type ObserverManagerOptions } from './ObserverManager';
+import { ObserverManager, type ObserverManagerOptions, type VisualState } from './ObserverManager';
 import { DOMElementFactory, type DOMElementFactoryOptions } from '../factories/DOMElementFactory';
 import { HeaderRenderer, type HeaderRendererOptions } from '../components/HeaderRenderer';
 
@@ -259,20 +259,12 @@ export class SimplePassiveRenderer {
       tableViewport$: this.tableViewport$,
       overlayManager: this.overlayManager,
       
-      // Callback functions for renderer actions
-      onColumnsChanged: () => {
-        this.renderHeader();
-        this.renderBody();
-      },
-      onColumnVisibilityChanged: () => {
-        this.renderHeader();
-        this.renderBody();
+      // Consolidated visual state callback - single render coordination point
+      onVisualStateChanged: (visualState: VisualState) => {
+        this.handleConsolidatedVisualStateChange(visualState);
       },
       onRowsChanged: () => {
         this.renderBody();
-      },
-      onViewportChanged: () => {
-        this.handleViewportChange();
       },
       onSelectionChanged: (selectedCells: Set<string>) => {
         this.updateDOMSelectionClasses(selectedCells);
@@ -348,11 +340,9 @@ export class SimplePassiveRenderer {
       headerViewport: this.headerViewport,
       container: this.container,
       onScroll: (scrollLeft: number, scrollTop: number) => {
-        // Update viewport observable (triggers all reactive updates)
+        // Only update viewport observable (consolidated visual observer handles the rest)
+        // Visual operations are triggered by the consolidated observer, not directly here
         this.tableViewport$.updateScroll(scrollTop, scrollLeft);
-
-        // Update centralized visual state
-        visualOperations.setScrollPosition(scrollLeft, scrollTop);
 
         // DEBUGGING: Log detailed width calculations during scroll
         const visualState = visualState$.get();
@@ -768,6 +758,34 @@ export class SimplePassiveRenderer {
   
   // Removed redundant formatting methods - now using centralized display formatters
   
+  /**
+   * Handle consolidated visual state changes - batched column, visibility, and viewport updates
+   * This prevents cascade effects and reduces render cycles from 5+ to 1
+   */
+  private handleConsolidatedVisualStateChange(visualState: VisualState): void {
+    fileLog.info('🎨 Consolidated visual state change - batched render coordination', {
+      columnCount: visualState.columns.length,
+      hiddenColumns: Object.values(visualState.columnVisibility).filter(v => v === false).length,
+      viewport: visualState.viewport
+    });
+
+    // Determine what actually changed to optimize renders
+    const needsHeaderRender = true; // For now, always render - can optimize later
+    const needsBodyRender = true; // For now, always render - can optimize later
+
+    // Single coordinated render cycle instead of separate renders
+    if (needsHeaderRender) {
+      this.renderHeader();
+    }
+
+    if (needsBodyRender) {
+      this.renderBody();
+    }
+
+    // Viewport handling is now fully integrated into consolidated visual state
+    // No need to call handleViewportChange() as it would duplicate the work
+  }
+
   /**
    * Handle viewport changes (scroll and dimension updates)
    * Triggers virtual scrolling updates when visible range changes

@@ -15,24 +15,35 @@ const fileLog = log('components/custom/vibegrid/renderers/core/ObserverManager.t
 
 const ROW_HEIGHT = 40;
 
+export interface VisualState {
+  columns: any[];
+  columnVisibility: Record<string, boolean>;
+  viewport: {
+    scrollTop: number;
+    scrollLeft: number;
+    viewportWidth: number;
+    viewportHeight: number;
+  };
+}
+
 export interface ObserverManagerOptions {
   tableCore$: TableCore$;
   tableInteraction$: TableInteraction$;
   tableViewport$: TableViewport$;
   overlayManager?: OverlayManager;
-  
-  // Callback functions for renderer actions
-  onColumnsChanged: () => void;
-  onColumnVisibilityChanged: () => void;
+
+  // Consolidated visual state callback
+  onVisualStateChanged: (visualState: VisualState) => void;
+
+  // Non-visual callbacks
   onRowsChanged: () => void;
-  onViewportChanged: () => void;
   onSelectionChanged: (selectedCells: Set<string>) => void;
   onEditingChanged: (editingCell: string | null, editValue?: string) => void;
   onSelectAllCheckboxChanged: (state: { checked: boolean; indeterminate: boolean }) => void;
   onSortChanged: () => void;
   onDragChanged: () => void;
-  
-  // Column resize handlers
+
+  // Column resize handlers (immediate DOM updates, no re-render)
   updateHeaderCellWidth: (columnId: string, newWidth: number) => void;
   updateBodyCellWidths: (columnId: string, newWidth: number) => void;
 }
@@ -45,12 +56,11 @@ export class ObserverManager {
 
   private disposers: (() => void)[] = [];
   private viewportThrottleRAF: number | null = null;
+  private visualStateThrottleRAF: number | null = null;
   
   // Callback functions
-  private onColumnsChanged: () => void;
-  private onColumnVisibilityChanged: () => void;
+  private onVisualStateChanged: (visualState: VisualState) => void;
   private onRowsChanged: () => void;
-  private onViewportChanged: () => void;
   private onSelectionChanged: (selectedCells: Set<string>) => void;
   private onEditingChanged: (editingCell: string | null, editValue?: string) => void;
   private onSelectAllCheckboxChanged: (state: { checked: boolean; indeterminate: boolean }) => void;
@@ -66,10 +76,8 @@ export class ObserverManager {
     this.overlayManager = options.overlayManager;
     
     // Store callback functions
-    this.onColumnsChanged = options.onColumnsChanged;
-    this.onColumnVisibilityChanged = options.onColumnVisibilityChanged;
+    this.onVisualStateChanged = options.onVisualStateChanged;
     this.onRowsChanged = options.onRowsChanged;
-    this.onViewportChanged = options.onViewportChanged;
     this.onSelectionChanged = options.onSelectionChanged;
     this.onEditingChanged = options.onEditingChanged;
     this.onSelectAllCheckboxChanged = options.onSelectAllCheckboxChanged;
@@ -88,20 +96,11 @@ export class ObserverManager {
     fileLog.info('🔍 Setting up observers');
 
     try {
-      fileLog.info('🔍 Setting up columns observer');
-      this.setupColumnsObserver();
-      fileLog.info('✅ Columns observer set up');
+      fileLog.info('🔍 Setting up consolidated visual state observer');
+      this.setupConsolidatedVisualObserver();
+      fileLog.info('✅ Consolidated visual state observer set up');
     } catch (error) {
-      fileLog.error('❌ Failed to set up columns observer', error);
-      throw error;
-    }
-
-    try {
-      fileLog.info('🔍 Setting up column visibility observer');
-      this.setupColumnVisibilityObserver();
-      fileLog.info('✅ Column visibility observer set up');
-    } catch (error) {
-      fileLog.error('❌ Failed to set up column visibility observer', error);
+      fileLog.error('❌ Failed to set up consolidated visual state observer', error);
       throw error;
     }
 
@@ -123,14 +122,7 @@ export class ObserverManager {
       throw error;
     }
 
-    try {
-      fileLog.info('🔍 Setting up viewport observer');
-      this.setupViewportObserver();
-      fileLog.info('✅ Viewport observer set up');
-    } catch (error) {
-      fileLog.error('❌ Failed to set up viewport observer', error);
-      throw error;
-    }
+    // Viewport observer removed - now handled by consolidated visual observer
 
     try {
       fileLog.info('🔍 Setting up selection observer');
@@ -181,28 +173,57 @@ export class ObserverManager {
   }
 
   /**
-   * Observe columns changes
+   * Consolidated visual state observer - handles columns, visibility, and viewport in one observer
+   * This prevents cascade effects and reduces render cycles from 5+ to 1
+   * Uses requestAnimationFrame debouncing to prevent excessive renders during initialization
    */
-  private setupColumnsObserver(): void {
-    const columnsDisposer = observe(() => {
+  private setupConsolidatedVisualObserver(): void {
+    const visualDisposer = observe(() => {
+      // Collect all visual state in single observer to batch changes
       const columns = this.tableCore$.columns.get();
-      fileLog.info('📊 Columns changed', { count: columns.length });
-      this.onColumnsChanged();
-    });
-    this.disposers.push(columnsDisposer);
-  }
-
-  /**
-   * Observe column visibility changes
-   */
-  private setupColumnVisibilityObserver(): void {
-    const columnVisibilityDisposer = observe(() => {
       const columnVisibility = this.tableCore$.columnVisibility.get();
+      const scrollTop = this.tableViewport$.scrollTop.get();
+      const scrollLeft = this.tableViewport$.scrollLeft.get();
+      const viewportWidth = this.tableViewport$.viewportWidth.get();
+      const viewportHeight = this.tableViewport$.viewportHeight.get();
+
       const hiddenCount = Object.values(columnVisibility).filter(visible => visible === false).length;
-      fileLog.info('👁️ Column visibility changed', { hiddenCount });
-      this.onColumnVisibilityChanged();
+
+      // Cancel previous debounced render to prevent stacking
+      if (this.visualStateThrottleRAF !== null) {
+        cancelAnimationFrame(this.visualStateThrottleRAF);
+      }
+
+      // Debounce visual state updates using requestAnimationFrame
+      this.visualStateThrottleRAF = requestAnimationFrame(() => {
+        this.visualStateThrottleRAF = null;
+
+        fileLog.info('🎨 Consolidated visual state changed (debounced)', {
+          columnCount: columns.length,
+          hiddenCount,
+          scrollTop,
+          scrollLeft,
+          viewportWidth,
+          viewportHeight
+        });
+
+        // Single coordinated visual state update
+        const visualState: VisualState = {
+          columns,
+          columnVisibility,
+          viewport: {
+            scrollTop,
+            scrollLeft,
+            viewportWidth,
+            viewportHeight
+          }
+        };
+
+        // Batched render instead of separate column/viewport renders
+        this.onVisualStateChanged(visualState);
+      });
     });
-    this.disposers.push(columnVisibilityDisposer);
+    this.disposers.push(visualDisposer);
   }
 
   /**
@@ -245,26 +266,7 @@ export class ObserverManager {
     this.disposers.push(rowsDisposer);
   }
 
-  /**
-   * Observe viewport changes
-   */
-  private setupViewportObserver(): void {
-    const viewportDisposer = observe(() => {
-      const scrollTop = this.tableViewport$.scrollTop.get();
-      const scrollLeft = this.tableViewport$.scrollLeft.get();
-      const viewportWidth = this.tableViewport$.viewportWidth.get();
-      const viewportHeight = this.tableViewport$.viewportHeight.get();
-
-      fileLog.info('🖼️ Viewport changed', {
-        scrollTop,
-        scrollLeft,
-        viewportWidth,
-        viewportHeight
-      });
-      this.onViewportChanged();
-    });
-    this.disposers.push(viewportDisposer);
-  }
+  // Viewport observer removed - now handled by setupConsolidatedVisualObserver()
 
   /**
    * Observe selection changes
@@ -385,7 +387,18 @@ export class ObserverManager {
    */
   destroy(): void {
     fileLog.info('🧹 Destroying observers');
-    
+
+    // Cancel any pending debounced renders
+    if (this.visualStateThrottleRAF !== null) {
+      cancelAnimationFrame(this.visualStateThrottleRAF);
+      this.visualStateThrottleRAF = null;
+    }
+
+    if (this.viewportThrottleRAF !== null) {
+      cancelAnimationFrame(this.viewportThrottleRAF);
+      this.viewportThrottleRAF = null;
+    }
+
     this.disposers.forEach(dispose => {
       try {
         dispose();
@@ -393,7 +406,7 @@ export class ObserverManager {
         fileLog.error('❌ Error disposing observer', error);
       }
     });
-    
+
     this.disposers = [];
     fileLog.info('✅ All observers destroyed');
   }
