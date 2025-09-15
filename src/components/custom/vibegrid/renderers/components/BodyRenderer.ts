@@ -15,11 +15,12 @@ import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatt
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
-import { visualState$, getColumnWidth } from '../../stores/visual-state';
+import { visualState$, getColumnWidth, visualOperations } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
+import { DragDropManager } from '../../utils/drag-drop-handlers';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/BodyRenderer.ts');
 
@@ -64,6 +65,8 @@ export class BodyRenderer {
 
   // Row state
   private activeRows: Map<string, HTMLElement> = new Map();
+  private dragDropManager?: DragDropManager;
+  private isGroupedMode: boolean = false;
 
   constructor(options: BodyRendererOptions) {
     this.tableCore$ = options.tableCore$;
@@ -76,6 +79,9 @@ export class BodyRenderer {
     this.container = options.container;
     this.createElement = options.createElement;
     this.onEntityUpdate = options.onEntityUpdate;
+
+    // Initialize drag and drop manager with container
+    this.initializeDragDrop();
 
     fileLog.info('🏗️ BodyRenderer initialized (Phase 2.1 consolidated)');
   }
@@ -94,8 +100,14 @@ export class BodyRenderer {
     columnVisibility: Record<string, boolean>,
     startX: number = 40
   ): HTMLElement {
+    // Update grouped mode status
+    this.updateGroupedModeStatus();
     const rowElement = this.createElement('div', 'vibegridx-row');
     rowElement.dataset.rowId = row.id;
+
+    // startX now comes from visual state which already includes drag + checkbox columns (70px total)
+    const adjustedStartX = startX;
+
     rowElement.style.cssText = `
       position: absolute;
       top: ${rowIndex * ROW_HEIGHT}px;
@@ -106,15 +118,22 @@ export class BodyRenderer {
       background: ${rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa'};
     `;
 
-    // Add row header (row number or checkbox selector) with absolute positioning
+    // Add drag column (always present for consistent layout)
+    const dragColumn = this.createDragColumn(row);
+    dragColumn.style.position = 'absolute';
+    dragColumn.style.left = '0';
+    dragColumn.style.top = '0';
+    rowElement.appendChild(dragColumn);
+
+    // Add row header (checkbox or row number) with absolute positioning
     const rowHeader = this.createRowHeader(row, rowIndex);
     rowHeader.style.position = 'absolute';
-    rowHeader.style.left = '0';
+    rowHeader.style.left = '30px';  // After 30px drag column
     rowHeader.style.top = '0';
     rowElement.appendChild(rowHeader);
 
     // Add cells with absolute positioning
-    let currentX = startX;
+    let currentX = adjustedStartX;
     columns.forEach((column, colIndex) => {
       const cell = this.createCellElement(row, column, colIndex, currentX);
       rowElement.appendChild(cell);
@@ -130,14 +149,74 @@ export class BodyRenderer {
     // Track active row
     this.activeRows.set(row.id, rowElement);
 
+    // Set up drag and drop for data rows in both grouped and flat modes
+    if (row.type === 'data' && this.dragDropManager) {
+      // Use simplified VibeGrid pattern for drag setup
+      this.dragDropManager.setupRowDragHandlers(
+        rowElement,
+        row.id,
+        row.type,
+        row.groupId
+      );
+    }
+
     return rowElement;
   }
 
   /**
-   * Create row header with number or checkbox
+   * Create dedicated drag column (always present for consistent layout)
+   */
+  private createDragColumn(row: any): HTMLElement {
+    const dragColumn = this.createElement('div', 'vibegridx-drag-column');
+
+    const isDataRow = row.type === 'data' && this.dragDropManager;
+    const canDragRow = isDataRow; // Support drag in both grouped and flat modes
+
+    dragColumn.style.cssText = `
+      width: 30px;
+      height: ${ROW_HEIGHT}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8f9fa;
+      border-right: 1px solid #e9ecef;
+      cursor: ${canDragRow ? 'grab' : 'default'};
+      user-select: none;
+      position: relative;
+    `;
+    dragColumn.dataset.rowId = row.id;
+
+    // Add drag functionality for data rows in both grouped and flat modes
+    if (canDragRow) {
+      // Add drag handle
+      const dragHandle = this.dragDropManager!.createDragHandle();
+      dragHandle.style.cssText += 'opacity: 0; transition: opacity 0.2s ease;';
+      dragColumn.appendChild(dragHandle);
+
+      // Show drag handle on hover
+      dragColumn.addEventListener('mouseenter', () => {
+        dragHandle.style.opacity = '1';
+      });
+      dragColumn.addEventListener('mouseleave', () => {
+        dragHandle.style.opacity = '0';
+      });
+
+      // Drag functionality is now handled at the row level
+      // The drag column just provides the visual handle
+    } else {
+      // Empty space when not draggable (for consistent layout)
+      dragColumn.innerHTML = '';
+    }
+
+    return dragColumn;
+  }
+
+  /**
+   * Create row header with number or checkbox (no longer handles drag)
    */
   private createRowHeader(row: any, rowIndex: number): HTMLElement {
     const rowHeader = this.createElement('div', 'vibegridx-row-header');
+
     rowHeader.style.cssText = `
       width: 40px;
       height: ${ROW_HEIGHT}px;
@@ -150,6 +229,7 @@ export class BodyRenderer {
       color: #6c757d;
       cursor: pointer;
       user-select: none;
+      position: relative;
     `;
     rowHeader.dataset.rowId = row.id;
 
@@ -432,7 +512,9 @@ export class BodyRenderer {
     }
 
     // Get cell value and determine content type for proper CSS classes
-    const value = row[column.id];
+    // Handle virtual row structure: row.data contains the actual data
+    const rowData = row.data || row;
+    const value = rowData[column.id];
 
     // Create content element with proper CSS classes based on type
     // The content element should only take up the space it needs, not flex: 1
@@ -466,7 +548,7 @@ export class BodyRenderer {
       }
     } else if (this.isTagsField(column.id, value)) {
       // Tags field with comma-separated values - create multiple badges
-      contentElement = this.createTagsElement(value, row, column);
+      contentElement = this.createTagsElement(value, rowData, column);
     } else if (['number', 'integer', 'float'].includes(cellType)) {
       // Number content - only use specific classes, NOT vibegridx-cell-content
       contentElement = this.domFactory.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
@@ -785,6 +867,154 @@ export class BodyRenderer {
         checkbox.checked = isRowSelected;
       }
     });
+  }
+
+  // ====================================
+  // DRAG AND DROP METHODS
+  // ====================================
+
+  /**
+   * Initialize drag and drop functionality
+   */
+  private initializeDragDrop(): void {
+    this.dragDropManager = new DragDropManager({
+      onRowMove: (draggedRowId: string, targetGroupId: string, newIndex: number) => {
+        fileLog.info('🔄 Row move requested via drag and drop (grouped)', {
+          draggedRowId,
+          targetGroupId,
+          newIndex
+        });
+
+        // Get current group structure to determine the source group
+        const processedRows = this.tableCore$.processedRows.get();
+        const draggedRow = processedRows.find(r => r.id === draggedRowId);
+        if (!draggedRow || draggedRow.type !== 'data') {
+          fileLog.error('❌ Invalid dragged row or not a data row', { draggedRowId });
+          return false;
+        }
+
+        // Find the source group by looking at the group hierarchy
+        const sourceGroupId = draggedRow.groupId || this.findRowGroupId(draggedRowId);
+        if (!sourceGroupId) {
+          fileLog.error('❌ Could not determine source group for dragged row', { draggedRowId });
+          return false;
+        }
+
+        // Handle async row movement (fire and forget for now, success determined by UI state)
+        (async () => {
+          try {
+            const success = await this.tableCore$.moveRowInGroup(sourceGroupId, targetGroupId, draggedRowId, newIndex);
+            fileLog.info('✅ Row moved successfully (grouped)', {
+              draggedRowId,
+              sourceGroupId,
+              targetGroupId,
+              newIndex,
+              success
+            });
+          } catch (error) {
+            fileLog.error('❌ Failed to move row (grouped)', {
+              draggedRowId,
+              sourceGroupId,
+              targetGroupId,
+              newIndex,
+              error: error.message
+            });
+          }
+        })();
+
+        // Return true immediately for UI responsiveness
+        return true;
+      },
+
+      onFlatRowMove: (fromIndex: number, toIndex: number) => {
+        fileLog.info('🔄 Row move requested via drag and drop (flat)', {
+          fromIndex,
+          toIndex
+        });
+
+        // Move row in flat mode
+        const success = this.tableCore$.moveRowInFlat(fromIndex, toIndex);
+
+        fileLog.info('✅ Row moved in flat mode', {
+          success,
+          fromIndex,
+          toIndex
+        });
+
+        return success;
+      },
+
+      isGroupMode: () => {
+        this.updateGroupedModeStatus();
+        return this.isGroupedMode;
+      },
+
+      onDragStart: () => {
+        fileLog.debug('🎯 Drag operation started');
+      },
+
+      onDragEnd: () => {
+        fileLog.debug('🎯 Drag operation ended');
+      }
+    });
+
+    // Set the container for drag operations
+    if (this.dragDropManager) {
+      this.dragDropManager.setContainer(this.container);
+    }
+  }
+
+  /**
+   * Update grouped mode status based on current table state
+   */
+  private updateGroupedModeStatus(): void {
+    try {
+      // Get grouping configuration from visual operations
+      const groupConfig = visualOperations.getGroupConfig();
+      this.isGroupedMode = !!(groupConfig && groupConfig.fields && groupConfig.fields.length > 0);
+    } catch (error) {
+      // Fallback: assume not grouped if unable to get config
+      this.isGroupedMode = false;
+      fileLog.warn('Failed to get group config, assuming not grouped', { error });
+    }
+  }
+
+  /**
+   * Find the group ID for a given row ID by traversing the processed rows
+   */
+  private findRowGroupId(rowId: string): string | null {
+    const processedRows = this.tableCore$.processedRows.get();
+    let currentGroupId: string | null = null;
+
+    for (const row of processedRows) {
+      if (row.type === 'group') {
+        currentGroupId = row.id;
+      } else if (row.type === 'data' && row.id === rowId) {
+        return currentGroupId;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Refresh drag and drop setup for all active rows
+   */
+  refreshDragDropSetup(): void {
+    this.updateGroupedModeStatus();
+
+    if (!this.dragDropManager) {
+      return;
+    }
+
+    this.activeRows.forEach((rowElement, rowId) => {
+      const row = this.tableCore$.processedRows.get().find(r => r.id === rowId);
+      if (row && row.type === 'data') {
+        this.dragDropManager!.setupRowForDragDrop(rowElement, row);
+      }
+    });
+
+    fileLog.debug('🔄 Drag and drop setup refreshed for all active rows');
   }
 }
 

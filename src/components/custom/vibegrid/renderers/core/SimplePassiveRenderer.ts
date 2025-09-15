@@ -625,8 +625,11 @@ export class SimplePassiveRenderer {
     const endColIndex = visibleColumnRange.end;
     const virtualColumnLayouts = visibleColumnLayouts.slice(startColIndex, endColIndex);
 
+    // Calculate base offset including drag column width for grouped mode
+    const baseOffset = this.calculateBaseOffset();
+
     // Use pre-computed starting x position from unified visual state - NO duplicate calculation
-    const startX = startColIndex > 0 ? visibleColumnLayouts[startColIndex].xOffset : 40;
+    const startX = startColIndex > 0 ? visibleColumnLayouts[startColIndex].xOffset : baseOffset;
 
     // Convert column layouts back to columns for compatibility with existing renderer
     const virtualColumns = virtualColumnLayouts.map(layout =>
@@ -649,7 +652,7 @@ export class SimplePassiveRenderer {
         });
         rowElement = this.bodyRenderer.createGroupHeaderElement(row, actualRowIndex);
       } else {
-        rowElement = this.bodyRenderer.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility, startX);
+        rowElement = this.bodyRenderer.createRowElement(row, actualRowIndex, virtualColumns, columnVisibility, startX);
       }
       
       this.bodyContainer.appendChild(rowElement);
@@ -821,7 +824,36 @@ export class SimplePassiveRenderer {
       fileLog.debug('⏭️ Viewport change skipped re-render (no visible range changes)');
     }
   }
-  
+
+  // ====================================
+  // UTILITY METHODS
+  // ====================================
+
+  /**
+   * Calculate base X offset including drag column width (always present for consistent layout)
+   */
+  private calculateBaseOffset(): number {
+    const ROW_HEADER_WIDTH = 40;
+    const DRAG_COLUMN_WIDTH = 30;
+
+    // Always include both columns for consistent layout
+    return DRAG_COLUMN_WIDTH + ROW_HEADER_WIDTH;  // 30px + 40px = 70px
+  }
+
+  /**
+   * Check if we're currently in grouped mode
+   */
+  private isGroupedMode(): boolean {
+    try {
+      const groupConfig = visualOperations.getGroupConfig();
+      return groupConfig && groupConfig.fields && groupConfig.fields.length > 0;
+    } catch (error) {
+      // If visual operations aren't available, fallback to direct check
+      const tableCore = this.tableCore$.get();
+      return tableCore.grouping && tableCore.grouping.fields && tableCore.grouping.fields.length > 0;
+    }
+  }
+
   /**
    * Destroy the renderer
    */

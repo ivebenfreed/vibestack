@@ -10,11 +10,11 @@
  * All renderers, managers, and components should read from this computed state ONLY.
  */
 
-import { computed, observable, batch } from '@legendapp/state';
+import { computed, observable, batch, when, syncState } from '@legendapp/state';
 import { syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { log } from '@/logger';
-import type { Column, GroupConfig, VirtualRow } from '../types';
+import type { Column, GroupConfig, SortConfig, VirtualRow } from '../types';
 import { GroupProcessor } from '../processors/GroupProcessor';
 
 const fileLog = log('components/custom/vibegrid/stores/visual-state.ts');
@@ -112,6 +112,9 @@ export const visualInputs$ = observable({
   // Grouping configuration
   groupConfig: null as GroupConfig | null,
 
+  // Sorting configuration
+  sortBy: [] as SortConfig[],
+
   // Entity context
   entityType: '',
   orgId: '',
@@ -133,7 +136,7 @@ export const visualState$ = computed((): VisualState => {
   const inputs = visualInputs$.get();
 
   // Calculate column layouts with cumulative positioning
-  let cumulativeX = 40; // Start after row header
+  let cumulativeX = 70; // Start after drag column (30px) + row header (40px)
   const columnLayouts: ColumnLayout[] = [];
 
   inputs.columnOrder.forEach((columnId, index) => {
@@ -645,18 +648,31 @@ export const visualOperations = {
     const defaultState = this.createDefaultColumnState(columns, entityType, orgId, userId);
 
     // Set up persistence based on entity type, org, and user
-    const persistKey = `vibeGrid-columns-${entityType}-${orgId}-${userId}`;
+    const persistKey = `vibeGrid-visual-${entityType}-${orgId}-${userId}`;
 
-    syncObservable(visualInputs$, {
+    const syncObservableInstance = syncObservable(visualInputs$, {
       persist: {
         plugin: ObservablePersistLocalStorage,
         name: persistKey,
         transform: {
           load: (value: any) => {
-            if (!value) return { ...visualInputs$.get(), ...defaultState };
+            fileLog.debug('🔍 Loading visual state from persistence', { value, persistKey });
+
+            // Handle missing or invalid data
+            if (!value || typeof value !== 'object') {
+              fileLog.warn('⚠️ No valid persisted state found, using defaults');
+              return { ...visualInputs$.get(), ...defaultState };
+            }
 
             // Merge with current state (in case schema changed)
             const currentInputs = visualInputs$.get();
+
+            // Ensure sortBy is valid array
+            const persistedSortBy = Array.isArray(value.sortBy) ? value.sortBy : [];
+            const validSortBy = persistedSortBy.filter(item =>
+              item && typeof item === 'object' && item.field && item.direction
+            );
+
             const merged = {
               ...currentInputs,
               ...value,
@@ -670,17 +686,52 @@ export const visualOperations = {
                 ...defaultState.columnVisibility,
                 ...value.columnVisibility
               },
-              columnOrder: value.columnOrder?.length ? value.columnOrder : defaultState.columnOrder
+              columnOrder: value.columnOrder?.length ? value.columnOrder : defaultState.columnOrder,
+              // Include group configuration in persistence
+              groupConfig: value.groupConfig || null,
+              // Include sort configuration in persistence - validated
+              sortBy: validSortBy
             };
 
-            fileLog.info('📁 Columns state loaded from persistence', {
+            fileLog.info('📁 Visual state loaded from persistence', {
               persistKey,
               columnsCount: merged.columns.length,
               persistedWidths: Object.keys(merged.columnWidths).length,
-              visibleColumns: Object.values(merged.columnVisibility).filter(Boolean).length
+              visibleColumns: Object.values(merged.columnVisibility).filter(Boolean).length,
+              hasGroupConfig: !!merged.groupConfig,
+              groupFields: merged.groupConfig?.fields?.length || 0
             });
 
             return merged;
+          },
+          save: (value: any) => {
+            // Ensure sortBy is valid before saving
+            const validSortBy = Array.isArray(value.sortBy) ? value.sortBy.filter(item =>
+              item && typeof item === 'object' && item.field && item.direction
+            ) : [];
+
+            // Only persist configuration state, not transient data
+            const persistedState = {
+              columnWidths: value.columnWidths || {},
+              columnVisibility: value.columnVisibility || {},
+              columnOrder: value.columnOrder || [],
+              groupConfig: value.groupConfig || null,
+              sortBy: validSortBy,
+              entityType: value.entityType,
+              orgId: value.orgId,
+              userId: value.userId,
+              version: '1.0',
+              lastUpdated: new Date().toISOString()
+            };
+
+            fileLog.debug('💾 Saving visual state to persistence', {
+              persistKey,
+              hasGroupConfig: !!persistedState.groupConfig,
+              groupFields: persistedState.groupConfig?.fields?.length || 0,
+              columnCount: Object.keys(persistedState.columnWidths).length
+            });
+
+            return persistedState;
           }
         }
       }
@@ -688,6 +739,40 @@ export const visualOperations = {
 
     // Initialize with default state (persistence will override if available)
     visualInputs$.set({ ...visualInputs$.get(), ...defaultState });
+
+    // Add persistence debugging as recommended by Legend State docs
+    const syncStatus$ = syncState(visualInputs$);
+
+    // Wait for persistence to load, then log status
+    when(syncStatus$.isPersistLoaded).then(() => {
+      fileLog.info('🎯 Columns observable persistence loaded', {
+        entityType,
+        orgId,
+        userId,
+        columnsCount: columns.length,
+        persistKey,
+        isPersistLoaded: syncStatus$.isPersistLoaded.get(),
+        isPersistEnabled: syncStatus$.isPersistEnabled.get(),
+        currentSortBy: visualInputs$.sortBy.get(),
+        error: syncStatus$.error.get()
+      });
+
+      // Debug localStorage content
+      try {
+        const stored = localStorage.getItem(persistKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          fileLog.debug('📦 Persistence content check', {
+            persistKey,
+            hasSortBy: !!parsed.sortBy,
+            sortByLength: Array.isArray(parsed.sortBy) ? parsed.sortBy.length : 0,
+            sortBy: parsed.sortBy
+          });
+        }
+      } catch (e) {
+        fileLog.error('❌ Failed to check persistence content', e);
+      }
+    });
 
     fileLog.info('🎯 Columns observable initialized', {
       entityType,
@@ -712,6 +797,8 @@ export const visualOperations = {
       columnWidths: Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
       columnVisibility: Object.fromEntries(columns.map(col => [col.id, true])),
       columnOrder: columns.map(col => col.id),
+      groupConfig: null, // Include groupConfig in default state
+      sortBy: [], // Include sortBy in default state
       entityType,
       orgId,
       userId
@@ -825,6 +912,32 @@ export const visualOperations = {
     fileLog.info('🔄 Columns reset to defaults', {
       columnsCount: columns.length
     });
+  },
+
+  /**
+   * Show all columns - set all to visible
+   */
+  showAllColumns() {
+    const columns = visualInputs$.columns.get();
+    const allVisible = Object.fromEntries(
+      columns.map(col => [col.id, true])
+    );
+
+    visualInputs$.columnVisibility.set(allVisible);
+    fileLog.info('👁️ All columns shown', { columnCount: columns.length });
+  },
+
+  /**
+   * Hide all columns except system columns
+   */
+  hideAllColumns() {
+    const columns = visualInputs$.columns.get();
+    const allHidden = Object.fromEntries(
+      columns.map(col => [col.id, col.id === 'id' || col.id === '__selection']) // Keep ID and selection columns visible
+    );
+
+    visualInputs$.columnVisibility.set(allHidden);
+    fileLog.info('🫥 All columns hidden (except system)', { columnCount: columns.length });
   }
 };
 

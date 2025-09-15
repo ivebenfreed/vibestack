@@ -4,7 +4,7 @@
 // Processes raw entity data into grouped virtual rows
 // Handles hierarchical grouping and aggregations
 
-import type { 
+import type {
   TableRow,
   Column,
   GroupNode,
@@ -15,6 +15,7 @@ import type {
   VirtualRow,
   VirtualRowType
 } from '../types';
+import type { GroupRowOrderConfig } from '../stores/data-state';
 import { createLogger, type LogLevel } from '@/logger/simple-logger';
 
 // File-level log control
@@ -51,9 +52,10 @@ export class GroupProcessor {
   // ====================================
   
   static processData(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupTree {
     log.info('GroupProcessor: processData called', {
       rowCount: rows.length,
@@ -68,8 +70,8 @@ export class GroupProcessor {
     }
     
     // Build group hierarchy
-    const groupTree = this.buildGroupHierarchy(rows, columns, config);
-    
+    const groupTree = this.buildGroupHierarchy(rows, columns, config, groupRowOrders);
+
     // Calculate aggregations
     this.calculateAggregations(groupTree.groups, rows, columns, config);
     
@@ -101,22 +103,24 @@ export class GroupProcessor {
   // ====================================
   
   private static buildGroupHierarchy(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): { groups: GroupNode[] } {
-    
+
     if (config.fields.length === 1) {
-      return { groups: this.buildSingleLevelGroups(rows, columns, config) };
+      return { groups: this.buildSingleLevelGroups(rows, columns, config, groupRowOrders) };
     } else {
-      return { groups: this.buildMultiLevelGroups(rows, columns, config) };
+      return { groups: this.buildMultiLevelGroups(rows, columns, config, groupRowOrders) };
     }
   }
   
   private static buildSingleLevelGroups(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupNode[] {
     const groupField = config.fields[0];
     const fieldName = groupField.field;
@@ -178,20 +182,33 @@ export class GroupProcessor {
         return;
       }
       
+      const groupId = `group_${fieldName}_${groupKey}`;
+
+      // Apply custom row ordering if available
+      let orderedChildren = groupRows;
+      if (groupRowOrders && groupRowOrders[groupId]) {
+        orderedChildren = this.applyCustomRowOrdering(groupRows, groupRowOrders[groupId]);
+        log.debug('✅ Applied custom row ordering', {
+          groupId,
+          originalCount: groupRows.length,
+          orderedCount: orderedChildren.length
+        });
+      }
+
       const groupNode: GroupNode = {
-        id: `group_${fieldName}_${groupKey}`,
+        id: groupId,
         field: fieldName,
         value: value,
         displayValue: this.formatGroupValue(value, fieldName, columns),
         level: 0,
-        rowCount: groupRows.length,
-        totalCount: groupRows.length,
-        children: groupRows,
-        isCollapsed: !config.expandedGroups.has(`group_${fieldName}_${groupKey}`),
+        rowCount: orderedChildren.length,
+        totalCount: orderedChildren.length,
+        children: orderedChildren,
+        isCollapsed: !config.expandedGroups.has(groupId),
         sortOrder: sortOrder++,
         aggregations: [] // Will be filled by calculateAggregations
       };
-      
+
       groups.push(groupNode);
     });
     
@@ -202,9 +219,10 @@ export class GroupProcessor {
   }
   
   private static buildMultiLevelGroups(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupNode[] {
     
     const buildLevel = (
@@ -461,7 +479,8 @@ export class GroupProcessor {
               height: DATA_ROW_HEIGHT,
               data: child,
               level: level + 1,
-              parentGroupId: group.id
+              parentGroupId: group.id,
+              groupId: group.id  // Add groupId for drag-drop compatibility
             });
           }
         });
@@ -612,5 +631,34 @@ export class GroupProcessor {
     });
     
     return count;
+  }
+
+  /**
+   * Apply custom row ordering from GroupRowOrderConfig
+   */
+  private static applyCustomRowOrdering(
+    rows: TableRow[],
+    orderConfig: GroupRowOrderConfig
+  ): TableRow[] {
+    if (!orderConfig.rowIds.length) {
+      return rows;
+    }
+
+    const orderedRows: TableRow[] = [];
+    const rowsById = new Map(rows.map(row => [row.id, row]));
+
+    // Add rows in specified order
+    orderConfig.rowIds.forEach(rowId => {
+      const row = rowsById.get(rowId);
+      if (row) {
+        orderedRows.push(row);
+        rowsById.delete(rowId);
+      }
+    });
+
+    // Add any remaining rows that weren't in the order config
+    rowsById.forEach(row => orderedRows.push(row));
+
+    return orderedRows;
   }
 }

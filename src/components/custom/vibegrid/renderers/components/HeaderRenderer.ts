@@ -87,13 +87,21 @@ export class HeaderRenderer {
       height: ${HEADER_HEIGHT}px;
     `;
     
-    // Add corner header cell (aligns with row headers)
+    // Add drag column header (for grouped mode) - always present for consistent layout
+    const dragColumnHeader = this.createDragColumnHeader();
+    dragColumnHeader.style.position = 'absolute';
+    dragColumnHeader.style.left = '0';
+    dragColumnHeader.style.top = '0';
+    dragColumnHeader.style.zIndex = '1';
+    headerRow.appendChild(dragColumnHeader);
+
+    // Add corner header cell (aligns with row headers) - positioned after drag column
     const { cornerCell, selectAllCheckbox } = this.domFactory.createCornerHeaderCell();
     this.selectAllCheckbox = selectAllCheckbox || null;
 
-    // Position corner cell absolutely
+    // Position corner cell absolutely after drag column
     cornerCell.style.position = 'absolute';
-    cornerCell.style.left = '0';
+    cornerCell.style.left = '30px';  // After 30px drag column
     cornerCell.style.top = '0';
     cornerCell.style.zIndex = '1';
 
@@ -129,7 +137,7 @@ export class HeaderRenderer {
 
       const headerCell = this.createColumnHeader(column, columnIndex, 0);
 
-      // Position at absolute xOffset - transform handles scrolling
+      // Position at xOffset from visual state (already includes drag + row header columns)
       headerCell.style.position = 'absolute';
       headerCell.style.left = `${columnLayout.xOffset}px`;
       headerCell.style.top = '0';
@@ -262,7 +270,7 @@ export class HeaderRenderer {
    */
   private updateColumnCoordinateMapping(allVisibleColumns: any[]): boolean {
     const newColumns: any[] = [];
-    let xOffset = 40; // Start after row header
+    let xOffset = 70; // Start after drag column (30px) + row header (40px)
 
     // Build new coordinate mapping for all visible columns
     // Get reactive column widths
@@ -566,5 +574,64 @@ export class HeaderRenderer {
    */
   getSelectAllCheckbox(): HTMLInputElement | null {
     return this.selectAllCheckbox;
+  }
+
+  /**
+   * Create drag column header (permanently present for consistent layout)
+   */
+  private createDragColumnHeader(): HTMLElement {
+    const dragColumnHeader = this.domFactory.createElement('div', 'vibegridx-drag-column-header');
+
+    // Style to match drag column in body (30px wide)
+    dragColumnHeader.style.cssText = `
+      width: 30px;
+      min-width: 30px;
+      height: ${HEADER_HEIGHT}px;
+      background: #f8f9fa;
+      border-right: 1px solid #e9ecef;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      font-size: 11px;
+      color: #9ca3af;
+    `;
+
+    // Add visual indicator when in grouped mode
+    const isGroupedMode = this.isGroupedMode();
+    if (isGroupedMode) {
+      // Add a small drag indicator icon
+      dragColumnHeader.innerHTML = `
+        <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" style="opacity: 0.4;">
+          <circle cx="2" cy="3" r="1"/>
+          <circle cx="6" cy="3" r="1"/>
+          <circle cx="2" cy="6" r="1"/>
+          <circle cx="6" cy="6" r="1"/>
+          <circle cx="2" cy="9" r="1"/>
+          <circle cx="6" cy="9" r="1"/>
+        </svg>
+      `;
+      dragColumnHeader.title = 'Drag to reorder rows within groups';
+    } else {
+      // Empty space when not in grouped mode
+      dragColumnHeader.innerHTML = '';
+    }
+
+    return dragColumnHeader;
+  }
+
+  /**
+   * Check if we're currently in grouped mode
+   */
+  private isGroupedMode(): boolean {
+    try {
+      const groupConfig = visualOperations.getGroupConfig();
+      return groupConfig && groupConfig.fields && groupConfig.fields.length > 0;
+    } catch (error) {
+      // If visual operations aren't available, fallback to direct check
+      const tableCore = this.tableCore$.get();
+      return tableCore.grouping && tableCore.grouping.fields && tableCore.grouping.fields.length > 0;
+    }
   }
 }
