@@ -21,6 +21,7 @@ import type { SelectionController } from '../modules/SelectionController';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import { DragDropManager } from '../../utils/drag-drop-handlers';
+import { isSelectType, SELECT_CELL_TYPES } from '../../column-types';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/BodyRenderer.ts');
 
@@ -523,7 +524,7 @@ export class BodyRenderer {
     // The content element should only take up the space it needs, not flex: 1
     let contentElement: HTMLElement;
 
-    if (cellType === 'enum' || cellType === 'select' || cellType === 'tags') {
+    if (isSelectType(cellType) || cellType === 'tags') {
       // Badge/enum content - use centralized formatter for schema-based styling
       contentElement = this.domFactory.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
       const displayValue = this.formatCellValue(value, cellType, column);
@@ -680,10 +681,6 @@ export class BodyRenderer {
       case 'phone':
         return this.formatPhoneNumber(String(value));
 
-      case 'enum':
-      case 'select':
-        return String(value);
-
       case 'tags':
         if (Array.isArray(value)) {
           return value.join(', ');
@@ -697,6 +694,10 @@ export class BodyRenderer {
         return String(value);
 
       default:
+        // Optimized: Handle all select types uniformly
+        if (SELECT_CELL_TYPES.has(type as any)) {
+          return String(value);
+        }
         return String(value);
     }
   }
@@ -718,6 +719,7 @@ export class BodyRenderer {
     // Return original if not a standard format
     return phone;
   }
+
 
   /**
    * Check if a column should use tags field rendering

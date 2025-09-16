@@ -122,10 +122,62 @@ export class OverlayManager {
     
     // Create context menu
     this.contextMenu = new ContextMenuManager(this.container);
-    
+
+    // Setup reactive observer for editing state changes
+    this.setupReactiveEditingObserver();
+
     fileLog.info('✅ Overlay system initialized');
   }
   
+  /**
+   * Setup reactive observer for editing state changes
+   * This replaces the imperative updateEditingOverlay method
+   */
+  private setupReactiveEditingObserver(): void {
+    // Observe editing state changes and reactively show/hide overlay
+    observe(() => {
+      const editingCell = this.tableInteraction$.editingCell.get();
+      const editValue = this.tableInteraction$.editValue.get();
+      const isEditing = this.tableInteraction$.isEditing.get();
+
+      fileLog.debug('🔍 REACTIVE: Editing observer triggered', {
+        editingCell,
+        editValue,
+        isEditing,
+        hasOverlay: !!this.editingOverlay
+      });
+
+      if (isEditing && editingCell && this.editingOverlay) {
+        // Show editing overlay
+        const [rowId, columnId] = editingCell.split(':');
+        const columns = this.tableCore$.columns.get();
+        const column = columns.find((c: any) => c.id === columnId);
+
+        if (column) {
+          const position = this.getCellPosition(rowId, columnId);
+          if (position) {
+            const cell = { rowId, columnId };
+            const actualValue = editValue !== undefined ? editValue : this.getCellValue(rowId, columnId);
+
+            fileLog.info('🔍 REACTIVE: Showing editing overlay', {
+              cellId: editingCell,
+              position,
+              value: actualValue
+            });
+
+            this.editingOverlay.showAt(position, cell, column, actualValue);
+          }
+        }
+      } else if (!isEditing && this.editingOverlay) {
+        // Hide editing overlay
+        fileLog.info('🔍 REACTIVE: Hiding editing overlay');
+        this.editingOverlay.hide();
+      }
+    });
+
+    fileLog.info('✅ Reactive editing observer setup complete');
+  }
+
   /**
    * Update coordinate mapping for overlays (optimized with change detection)
    */

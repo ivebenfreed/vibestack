@@ -333,8 +333,15 @@ export class ScrollController {
 
     if (shouldClearSelection) {
       const clickType = viewportElement ? 'empty space within viewport' : 'outside VibeGrid container';
-      fileLog.info(`🖱️ Click on ${clickType} - clearing selection`);
+      fileLog.info(`🖱️ Click on ${clickType} - clearing selection and canceling edit`);
 
+      // Cancel any active editing first
+      if (this.tableInteraction$?.isEditing.get()) {
+        fileLog.info('🖱️ Canceling edit due to outside click');
+        this.tableInteraction$.cancelEdit();
+      }
+
+      // Then clear selection
       if (this.onClickOutside) {
         this.onClickOutside();
       } else if (this.tableInteraction$?.clearSelection) {

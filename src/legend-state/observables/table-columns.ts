@@ -106,6 +106,21 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
       if (field.type === 'entity_reference') {
         column.referenceEntity = inferTargetEntity(field.name, entity.archetype);
       }
+
+      // Auto-detect options for reference fields that should have select options
+      if (shouldDetectOptions(field.name)) {
+        const detectedOptions = detectColumnOptions(entityName, field.name);
+        if (detectedOptions && detectedOptions.length > 0) {
+          column.options = detectedOptions;
+
+          fileLog.info(`🎯 Auto-detected options for reference field: ${field.name}`, {
+            entityName,
+            columnId: column.id,
+            referenceType: field.type,
+            detectedOptions: detectedOptions.slice(0, 3)
+          });
+        }
+      }
     }
 
     // Handle single-select fields with enum arrays

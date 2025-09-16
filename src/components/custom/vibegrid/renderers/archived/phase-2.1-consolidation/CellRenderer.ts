@@ -116,7 +116,7 @@ export class CellRenderer {
     // The content element should only take up the space it needs, not flex: 1
     let contentElement: HTMLElement;
     
-    if (cellType === 'enum' || cellType === 'select' || cellType === 'tags') {
+    if (cellType === 'enum' || cellType === 'select' || cellType === 'single-select' || cellType === 'select-multi' || cellType === 'multi-select' || cellType === 'reference-select' || cellType === 'tags') {
       // Badge/enum content - use centralized formatter for schema-based styling
       contentElement = this.domFactory.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
       const displayValue = this.formatCellValue(value, cellType, column);

@@ -97,9 +97,9 @@ export class MouseController {
       const isEditableElement = target.matches('input, textarea, select') ||
                                 target.contentEditable === 'true' ||
                                 target.closest('input, textarea, select, [contenteditable="true"]') ||
-                                // VibeGrid specific editable element classes
-                                target.classList.contains('vibegridx-cell-text-editable') ||
-                                target.closest('.vibegridx-cell-text-editable');
+                                // VibeGrid specific editable element classes (pattern-based for robustness)
+                                this.hasEditableClass(target) ||
+                                target.closest('[class*="-editable"]');
 
       fileLog.info('🖱️ Cell mouse down - pure event coordination', {
         cellId,
@@ -264,6 +264,18 @@ export class MouseController {
         fileLog.warn('⚠️ ScrollController handleOutsideClick method not available');
       }
     }
+  }
+
+  /**
+   * Robust check for VibeGrid editable elements using pattern matching
+   * This approach is more maintainable than hardcoding class names
+   */
+  private hasEditableClass(element: HTMLElement): boolean {
+    // Check if any class name matches the editable pattern
+    const classList = Array.from(element.classList);
+    return classList.some(className =>
+      className.startsWith('vibegridx-cell-') && className.endsWith('-editable')
+    );
   }
 
   /**

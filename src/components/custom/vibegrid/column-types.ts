@@ -44,15 +44,15 @@ export type ColumnDef<T> = {
 }[keyof T];
 
 // Export cell type union for use elsewhere - aligned with DataForge field types
-export type CellType = 
+export type CellType =
   // Basic types
-  | 'text' 
+  | 'text'
   | 'longtext'
   | 'rich-text'
   | 'number'
   | 'integer'
   | 'decimal'
-  | 'boolean' 
+  | 'boolean'
   | 'date'
   | 'datetime'
   // Selection types
@@ -79,3 +79,34 @@ export type CellType =
   | 'rollup_concat'
   | 'computed_expression'
   | 'computed_formula';
+
+// OPTIMIZED: Pre-computed Sets for O(1) lookup performance
+export const SELECT_CELL_TYPES = new Set<CellType>([
+  'enum' as CellType,
+  'select',
+  'single-select',
+  'select-multi',
+  'multi-select',
+  'reference-select'
+] as const);
+
+export const DROPDOWN_CELL_TYPES = new Set<CellType>([
+  ...SELECT_CELL_TYPES,
+  'boolean',
+  'date',
+  'datetime'
+] as const);
+
+export const TEXT_CELL_TYPES = new Set<CellType>([
+  'text',
+  'longtext',
+  'rich-text',
+  'email',
+  'url',
+  'phone'
+] as const);
+
+// Utility functions for optimal type checking
+export const isSelectType = (cellType: string): boolean => SELECT_CELL_TYPES.has(cellType as CellType);
+export const isDropdownType = (cellType: string): boolean => DROPDOWN_CELL_TYPES.has(cellType as CellType);
+export const isTextType = (cellType: string): boolean => TEXT_CELL_TYPES.has(cellType as CellType);

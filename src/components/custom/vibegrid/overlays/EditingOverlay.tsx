@@ -4,6 +4,7 @@ import type { CellRef, Column } from '../types';
 import type { VisualCellPosition } from './OverlayTypes';
 // Pure Observable architecture - no XState dependencies
 import { createEditor, type EditorProps } from './editors';
+import { isDropdownType as isDropdownCellType } from '../column-types';
 
 // ====================================
 // EDITING OVERLAY - React Portal for Cell Editing
@@ -139,7 +140,7 @@ export class EditingOverlay {
     
     // Check editor type to determine positioning strategy
     const isTextType = ['text', 'string', 'email', 'url', 'textarea', 'longtext', 'number', 'integer', 'float'].includes(column.cellType || column.type || 'text');
-    const isDropdownType = ['enum', 'select', 'boolean', 'relationship', 'relationship-single', 'relationship-multi', 'relationship-collection', 'date', 'datetime', 'timestamp'].includes(column.cellType || column.type || 'text');
+    const isDropdownType = ['boolean', 'relationship', 'relationship-single', 'relationship-multi', 'relationship-collection', 'date', 'datetime', 'timestamp'].includes(column.cellType || column.type || 'text') || isDropdownCellType(column.cellType || column.type || 'text');
     
     console.log('🔧 EditingOverlay: Editor type detection', {
       columnType: column.cellType || column.type || 'text',
@@ -164,12 +165,21 @@ export class EditingOverlay {
       
       // No outline needed - canvas overlay handles the border
     } else if (isDropdownType) {
-      // Dropdown editors: Position below the cell and keep cell content visible
+      // Dropdown editors: Use the position from visual state (single source of truth)
+      const dropdownWidth = Math.max(position.width, 300);
+      const dropdownHeight = 300; // Max height
+
+      console.log('🔧 EditingOverlay: Using visual state coordinates', {
+        position: { x: position.x, y: position.y, width: position.width, height: position.height },
+        cellId: `${cell.rowId}:${cell.columnId}`
+      });
+
+      // Position dropdown directly below cell using visual state coordinates
       this.portal.style.left = `${position.x}px`;
-      this.portal.style.top = `${position.y + position.height}px`; // Position below cell
-      this.portal.style.width = `${Math.max(position.width, 300)}px`; // Minimum width for dropdowns (increased for relationships)
-      this.portal.style.height = 'auto'; // Auto height for dropdown
-      this.portal.style.maxHeight = '300px'; // Prevent dropdown from becoming too tall
+      this.portal.style.top = `${position.y + position.height}px`;
+      this.portal.style.width = `${dropdownWidth}px`;
+      this.portal.style.height = 'auto';
+      this.portal.style.maxHeight = `${dropdownHeight}px`;
       this.portal.style.padding = '4px';
       this.portal.style.boxSizing = 'border-box';
       this.portal.style.backgroundColor = 'white';
@@ -177,8 +187,33 @@ export class EditingOverlay {
       this.portal.style.borderRadius = '4px';
       this.portal.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
       this.portal.style.zIndex = '1001'; // Above everything
-      this.portal.style.overflow = 'auto'; // Allow scrolling if content is too tall
-      
+      this.portal.style.overflow = 'auto';
+
+      // Check if dropdown would be cut off and adjust viewport if needed
+      const containerRect = this.container.getBoundingClientRect();
+      const dropdownBottom = position.y + position.height + dropdownHeight;
+      const dropdownRight = position.x + dropdownWidth;
+
+      // Shift viewport to accommodate dropdown (unless at scroll edge)
+      const viewport = this.container.querySelector('.vibegridx-viewport') as HTMLElement;
+      if (viewport) {
+        if (dropdownBottom > containerRect.height) {
+          const scrollDown = Math.min(dropdownBottom - containerRect.height + 20,
+                                    viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight);
+          if (scrollDown > 0) {
+            viewport.scrollTop += scrollDown;
+          }
+        }
+
+        if (dropdownRight > containerRect.width) {
+          const scrollRight = Math.min(dropdownRight - containerRect.width + 20,
+                                     viewport.scrollWidth - viewport.scrollLeft - viewport.clientWidth);
+          if (scrollRight > 0) {
+            viewport.scrollLeft += scrollRight;
+          }
+        }
+      }
+
       // Add editing indicator to the original cell
       this.addEditingIndicatorToCell(cell, mode);
     } else {
