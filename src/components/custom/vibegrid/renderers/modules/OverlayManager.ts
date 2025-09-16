@@ -169,27 +169,27 @@ export class OverlayManager {
    * Update selection display (optimized with change detection and throttling)
    */
   updateSelection(selectedCells: Set<string>): void {
-    // Quick selection manager update (lightweight)
+    fileLog.info('🔄 OverlayManager.updateSelection called', {
+      selectedCells: Array.from(selectedCells),
+      cellCount: selectedCells.size
+    });
+
     // Update selection visuals using interaction-state
     this.tableInteraction$.selectedCells.set(selectedCells);
 
-    // Skip expensive canvas updates if selection hasn't changed
-    if (this.lastSelectedCells && this.areSetsEqual(selectedCells, this.lastSelectedCells)) {
-      return;
-    }
+    // Always update overlays - no change detection
+    fileLog.info('🎯 Updating overlay for selection', {
+      selectedCells: Array.from(selectedCells)
+    });
 
-    // Store current selection
-    this.lastSelectedCells = new Set(selectedCells);
-
-    // Throttle expensive canvas overlay updates
+    // Cancel any pending updates and run immediately
     if (this.updateSelectionRAF !== null) {
       cancelAnimationFrame(this.updateSelectionRAF);
+      this.updateSelectionRAF = null;
     }
 
-    this.updateSelectionRAF = requestAnimationFrame(() => {
-      this.updateSelectionRAF = null;
-      this.performCanvasSelectionUpdate(selectedCells);
-    });
+    // Update overlay directly without RAF throttling for better responsiveness
+    this.performCanvasSelectionUpdate(selectedCells);
   }
 
   /**
@@ -308,41 +308,83 @@ export class OverlayManager {
    */
   private getVisualCellPositions(selectedCells: Set<string>): VisualCellPosition[] {
     const visualPositions: VisualCellPosition[] = [];
-    
+
     fileLog.info('🎨 Getting visual cell positions', {
       selectedCount: selectedCells.size,
       coordinateMappingRows: this.coordinateMapping.rows.length,
-      coordinateMappingColumns: this.coordinateMapping.columns.length
+      coordinateMappingColumns: this.coordinateMapping.columns.length,
+      coordinateMappingVersion: this.coordinateMapping.version
     });
-    
+
+    // DEBUG: Log the actual cells being requested vs available
+    const availableRowIds = this.coordinateMapping.rows.map(r => r.rowId);
+    const availableColumnIds = this.coordinateMapping.columns.map(c => c.columnId);
+    fileLog.debug('🔍 Available coordinate mapping data:', {
+      availableRowIds: availableRowIds.slice(0, 5), // First 5 for brevity
+      availableColumnIds: availableColumnIds.slice(0, 5), // First 5 for brevity
+      requestedCells: Array.from(selectedCells)
+    });
+
     selectedCells.forEach(cellId => {
       const [rowId, columnId] = cellId.split(':');
+
+      // Debug: Log the coordinate lookup process
+      fileLog.debug('🔍 Looking up coordinates for cell', {
+        cellId,
+        lookingForRowId: rowId,
+        lookingForColumnId: columnId
+      });
+
       const rowInfo = this.coordinateMapping.rows.find(r => r.rowId === rowId);
       const colInfo = this.coordinateMapping.columns.find(c => c.columnId === columnId);
-      
+
       if (rowInfo && colInfo) {
-        visualPositions.push({
+        const visualPos = {
           cellKey: cellId,  // Changed from cellId to cellKey to match VisualCellPosition interface
           x: colInfo.x,
           y: rowInfo.y, // No need to add header height since overlay is inside viewport
           width: colInfo.width,
           height: rowInfo.height
+        };
+        visualPositions.push(visualPos);
+        fileLog.info('✅ Found coordinates for cell', {
+          requestedCell: cellId,
+          foundRowId: rowInfo.rowId,
+          foundColumnId: colInfo.columnId,
+          coordinates: { x: colInfo.x, y: rowInfo.y, width: colInfo.width, height: rowInfo.height }
         });
       } else {
         if (!rowInfo) {
-          fileLog.debug('🔍 Row not found in coordinate mapping', { rowId });
+          fileLog.warn('🔍 Row not found in coordinate mapping', {
+            rowId,
+            cellId,
+            availableCount: this.coordinateMapping.rows.length,
+            firstFewAvailableRowIds: this.coordinateMapping.rows.slice(0, 5).map(r => r.rowId)
+          });
         }
         if (!colInfo) {
-          fileLog.debug('🔍 Column not found in coordinate mapping', { columnId });
+          fileLog.warn('🔍 Column not found in coordinate mapping', {
+            columnId,
+            cellId,
+            availableCount: this.coordinateMapping.columns.length,
+            availableColumnIds: this.coordinateMapping.columns.map(c => c.columnId)
+          });
         }
       }
     });
-    
+
     fileLog.info('✅ Visual positions calculated', {
       inputCells: selectedCells.size,
-      outputPositions: visualPositions.length
+      outputPositions: visualPositions.length,
+      actualPositions: visualPositions.map(pos => ({
+        cellKey: pos.cellKey,
+        x: pos.x,
+        y: pos.y,
+        width: pos.width,
+        height: pos.height
+      }))
     });
-    
+
     return visualPositions;
   }
   

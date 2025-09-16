@@ -145,12 +145,12 @@ export class HeaderRenderer {
 
     headerRow.appendChild(cornerCell);
     
-    // Filter visible columns and get virtual column range
-    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-
-    // Render ALL visible columns - headers don't need virtualization
-    // The transform on the header viewport handles scrolling
+    // Get visible columns from unified visual state (same as DOM rendering)
+    // This ensures coordinate mapping matches exactly what's rendered in DOM
     const allColumnLayouts = visualState.visibleColumns;
+    const allVisibleColumns = allColumnLayouts.map(layout =>
+      columns.find(col => col.id === layout.id)
+    ).filter(Boolean);
 
     fileLog.info('🎨 Header rendering ALL columns (no virtualization)', {
       totalColumns: columns.length,
@@ -160,6 +160,7 @@ export class HeaderRenderer {
     });
 
     // Update column coordinate mapping only if columns have changed
+    // Now uses the SAME column source as DOM rendering (visualState.visibleColumns)
     const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
 
     // Render ALL columns at their absolute positions
@@ -334,6 +335,14 @@ export class HeaderRenderer {
 
     if (hasChanged) {
       this.coordinateMapping.columns = newColumns;
+
+      fileLog.debug('🔄 Column coordinate mapping updated', {
+        newColumnCount: newColumns.length,
+        firstColumnId: newColumns[0]?.columnId,
+        mappingVersion: this.coordinateMapping.version,
+        sampleColumns: newColumns.slice(0, 3).map(c => ({ id: c.columnId, x: c.x, width: c.width }))
+      });
+
       return true;
     }
 

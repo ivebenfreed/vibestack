@@ -391,6 +391,12 @@ export class SimplePassiveRenderer {
   private updateAllOverlays(completeState: CompleteGridState): void {
     const { interaction, columnResize } = completeState;
 
+    fileLog.debug('🎯 updateAllOverlays called', {
+      completeStateSelectedCells: Array.from(interaction.selectedCells),
+      directSelectedCells: Array.from(this.tableInteraction$.selectedCells.get()),
+      areEqual: this.areSetsEqual(interaction.selectedCells, this.tableInteraction$.selectedCells.get())
+    });
+
     // Selection overlay - always update to reflect current state
     this.overlayManager?.updateSelection(interaction.selectedCells);
 
@@ -807,6 +813,14 @@ export class SimplePassiveRenderer {
     if (rowMappingChanged) {
       this.coordinateMapping.rows = newRows;
       this.coordinateMapping.version++;
+
+      fileLog.debug('🔄 Row coordinate mapping updated', {
+        newRowCount: newRows.length,
+        firstRowId: newRows[0]?.rowId,
+        mappingVersion: this.coordinateMapping.version,
+        sampleRows: newRows.slice(0, 3).map(r => ({ id: r.rowId, y: r.y }))
+      });
+
       // Sync coordinate mapping with overlay manager
       this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
     }
