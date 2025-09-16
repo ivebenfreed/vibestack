@@ -223,9 +223,9 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
           <div 
             className={cn(
               "grid h-full transition-all duration-200",
-              sidebarCollapsed 
-                ? "grid-cols-[64px_1fr]" 
-                : "grid-cols-[240px_1fr]"
+              sidebarCollapsed
+                ? "grid-cols-[64px_1fr]"
+                : "grid-cols-[280px_1fr]"
             )}
           >
             {/* Desktop Sidebar */}

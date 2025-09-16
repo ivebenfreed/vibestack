@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { observer } from '@legendapp/state/react'
-import { createEntityGroups } from '@/legend-state'
+import { createEntityGroups, getEntity$ } from '@/legend-state'
 import { use$ } from '@legendapp/state/react'
 import {
   Home,
@@ -33,7 +33,9 @@ import {
   File,
   Circle,
   BarChart3,
-  ChevronsLeft
+  ChevronsLeft,
+  Vault,
+  FolderKanban
 } from 'lucide-react'
 
 // Icon resolver for dynamic entity icons
@@ -47,7 +49,9 @@ const IconMap: Record<string, React.ElementType> = {
   File,
   Globe,
   Map,
-  Circle
+  Circle,
+  Vault,
+  FolderKanban
 }
 
 function getIconComponent(iconName: string): React.ElementType {
@@ -268,7 +272,6 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
 
   const universeNavItems = [
     { id: 'universe-dashboard', label: 'Universe Dashboard', icon: Globe, href: '/universe' },
-    { id: 'universe-analytics', label: 'Analytics', icon: Activity, href: '/universe/analytics' },
   ]
 
   if (isCollapsed) {
@@ -378,6 +381,31 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
   // Create organization-specific entity groups
   const orgEntityGroups$ = React.useMemo(() => createEntityGroups(orgId), [orgId])
   const entityNavGroups = use$(orgEntityGroups$)
+
+  // Get project entities for the expandable Projects section
+  const projectEntities = React.useMemo(() => {
+    if (!entityNavGroups) return []
+
+    // Find the projects group from entity nav groups
+    const projectsGroup = entityNavGroups.find(group => group.name === 'Projects')
+    return projectsGroup?.items || []
+  }, [entityNavGroups])
+
+  // State for expanded projects in sidebar
+  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set())
+
+  // Helper function to toggle project expansion
+  const toggleProjectExpansion = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId)
+      } else {
+        newSet.add(projectId)
+      }
+      return newSet
+    })
+  }
   const location = useLocation()
 
   const currentOrg = (userOrganizations || []).find(org => org.id === orgId)
@@ -474,11 +502,49 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
         </Link>
       </div>
 
-      {/* All Entities Dropdown */}
+      {/* Projects Section - Expandable with individual records */}
+      {projectEntities.length > 0 && (
+        <div className="space-y-1 mb-4">
+          <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+            Projects
+          </div>
+          {projectEntities.map((projectEntity) => {
+            // Use the fullEntityName from createEntityGroups which is already correctly prefixed
+            const fullEntityName = projectEntity.fullEntityName || `${projectEntity.organizationId}_${projectEntity.originalEntityName || projectEntity.title}`
+            const projectId = `${projectEntity.organizationId}-${projectEntity.originalEntityName || projectEntity.title}`
+            const isExpanded = expandedProjects.has(projectId)
+
+            // Debug logging for entity name construction
+            console.log('[Sidebar] Project entity debug:', {
+              projectEntityTitle: projectEntity.title,
+              originalEntityName: projectEntity.originalEntityName,
+              fullEntityName: projectEntity.fullEntityName,
+              constructedFullEntityName: fullEntityName,
+              url: projectEntity.url,
+              organizationId: projectEntity.organizationId,
+              projectId
+            })
+
+            return (
+              <ProjectEntitySection
+                key={projectId}
+                projectEntity={projectEntity}
+                fullEntityName={fullEntityName}
+                projectId={projectId}
+                isExpanded={isExpanded}
+                onToggle={() => toggleProjectExpansion(projectId)}
+                location={location}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {/* Vault Section (formerly All Entities) */}
       <Accordion type="single" collapsible defaultValue="entities">
         <AccordionItem value="entities">
           <AccordionTrigger className="px-2 py-2 text-xs text-muted-foreground hover:bg-sidebar-accent/50 rounded-md [&[data-state=open]>svg]:rotate-180">
-            <span>All Entities</span>
+            <span>Vault</span>
           </AccordionTrigger>
           <AccordionContent className="pb-2">
             <div className="space-y-1 ml-2">
@@ -515,3 +581,135 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
     </div>
   )
 }
+
+// Component for rendering individual project records using reactive observables
+interface ProjectEntitySectionProps {
+  projectEntity: any
+  fullEntityName: string
+  projectId: string
+  isExpanded: boolean
+  onToggle: () => void
+  location: any
+}
+
+const ProjectEntitySection = observer(({
+  projectEntity,
+  fullEntityName,
+  projectId,
+  isExpanded,
+  onToggle,
+  location
+}: ProjectEntitySectionProps) => {
+  // Use the same pattern as dashboard - getEntity$ + use$
+  const entityStore = getEntity$(fullEntityName)
+  const rawEntityData = use$(entityStore)
+  const IconComponent = getIconComponent(projectEntity.icon)
+
+  // Process data to array format (same as dashboard pattern)
+  const records = React.useMemo(() => {
+    if (!rawEntityData || typeof rawEntityData !== 'object') return []
+
+    // getEntity$ returns an object with IDs as keys, not an array
+    return Object.values(rawEntityData)
+  }, [rawEntityData])
+
+  const loading = rawEntityData === undefined
+  const count = rawEntityData && typeof rawEntityData === 'object' ? Object.keys(rawEntityData).length : 0
+
+  console.log('[ProjectEntitySection] Dashboard pattern - entity access:', {
+    fullEntityName,
+    projectEntityTitle: projectEntity.title,
+    projectEntityOriginalName: projectEntity.originalEntityName,
+    hasEntityStore: !!entityStore,
+    hasRawData: !!rawEntityData,
+    rawDataType: typeof rawEntityData,
+    count,
+    recordsLength: records?.length || 0,
+    loading,
+    firstRecords: records?.slice(0, 2), // Show first 2 records for debugging
+    comparison: {
+      'dashboard would use': projectEntity.fullEntityName,
+      'sidebar now uses': fullEntityName,
+      'matches': projectEntity.fullEntityName === fullEntityName
+    }
+  })
+
+  if (loading) {
+    return (
+      <div className="px-3 py-2 text-sm text-muted-foreground animate-pulse">
+        <div className="flex items-center gap-3">
+          <IconComponent className="h-4 w-4" />
+          <span>Loading {projectEntity.title}...</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Project Entity Header - Clickable to toggle */}
+      <button
+        onClick={onToggle}
+        className={cn(
+          'flex items-center justify-between w-full rounded-md px-3 py-2 text-sm transition-colors',
+          'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+          'text-sidebar-foreground'
+        )}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <ChevronRight className="h-4 w-4 flex-shrink-0" />
+          )}
+          <IconComponent className="h-4 w-4 flex-shrink-0" />
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="font-medium truncate w-full" title={projectEntity.title}>
+              {projectEntity.title}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {loading ? '...' : count} records
+            </span>
+          </div>
+        </div>
+      </button>
+
+      {/* Individual Records - Shown when expanded */}
+      {isExpanded && (
+        <div className="ml-6 space-y-1 mt-1">
+          {records.map((record: any, index: number) => (
+            <Link
+              key={record.id || index}
+              to={`${projectEntity.url}/${record.id}`}
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                location.pathname === `${projectEntity.url}/${record.id}`
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground'
+              )}
+            >
+              <FileText className="h-3 w-3 flex-shrink-0" />
+              <div className="flex flex-col items-start min-w-0 flex-1">
+                <span className="text-sm truncate w-full" title={record.name || record.title || 'Untitled'}>
+                  {record.name || record.title || 'Untitled'}
+                </span>
+                {record.description && (
+                  <span className="text-xs text-muted-foreground truncate w-full" title={record.description}>
+                    {record.description.substring(0, 30)}...
+                  </span>
+                )}
+              </div>
+            </Link>
+          ))}
+
+          {records.length === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              No records found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+})

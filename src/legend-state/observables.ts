@@ -1545,7 +1545,9 @@ export const createEntityGroups = (filterOrgId?: string) => observable(() => {
         url: `/org/${orgId}/entities/${urlSafeEntityName}`,
         icon: getArchetypeIcon(archetype),
         organizationName: orgName,
-        organizationId: orgId
+        organizationId: orgId,
+        originalEntityName: cleanEntityName, // Add the clean entity name for data access
+        fullEntityName: entityName // Add the full prefixed entity name for reference
       })
     })
     
