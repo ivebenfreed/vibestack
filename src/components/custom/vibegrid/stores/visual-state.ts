@@ -166,7 +166,7 @@ export const visualState$ = computed((): VisualState => {
 
   // Calculate total dimensions
   const totalColumnsWidth = visibleColumns.reduce((sum, col) => sum + col.width, 0);
-  const totalWidth = 40 + totalColumnsWidth; // row header + columns (no end buffer needed)
+  const totalWidth = 70 + totalColumnsWidth; // drag column (30px) + row header (40px) + columns
   const totalHeight = inputs.rowCount * inputs.rowHeight;
 
   // Calculate visible ranges

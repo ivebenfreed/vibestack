@@ -349,19 +349,57 @@ export class SimplePassiveRenderer {
       }
     });
 
-    // SCROLL OBSERVER: Only watches scroll position (most frequent updates)
+    // SCROLL OBSERVER: Watches scroll position and triggers re-render when virtual range changes
     this.scrollObserverDisposer = observe(() => {
       const scrollLeft = visualInputs$.scrollLeft.get();
       const scrollTop = visualInputs$.scrollTop.get();
 
-      fileLog.debug('📜 Scroll changed - updating transforms only', {
+      // Get current visual state to check if virtual ranges changed
+      const visualState = visualState$.get();
+      const currentColumnRange = visualState.geometry.visibleColumnRange;
+      const currentRowRange = visualState.geometry.visibleRowRange;
+
+      fileLog.debug('📜 Scroll changed - checking if virtual ranges changed', {
         scrollLeft,
-        scrollTop
+        scrollTop,
+        currentColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`,
+        currentRowRange: `${currentRowRange.start}-${currentRowRange.end}`
       });
 
-      // Only update CSS transforms, no re-renders
+      // Check if visible column range changed (horizontal virtual scrolling)
+      const previousColumnRange = this.lastVisibleColumns || { start: -1, end: -1 };
+      const columnRangeChanged =
+        currentColumnRange.start !== previousColumnRange.start ||
+        currentColumnRange.end !== previousColumnRange.end;
+
+      // Check if visible row range changed (vertical virtual scrolling)
+      const previousRowRange = this.lastVisibleRows || { start: -1, end: -1 };
+      const rowRangeChanged =
+        currentRowRange.start !== previousRowRange.start ||
+        currentRowRange.end !== previousRowRange.end;
+
+      // Always update CSS transforms immediately (lightweight)
       if (this.headerViewport) {
         this.headerViewport.style.transform = `translateX(-${scrollLeft}px)`;
+      }
+
+      // Re-render body if virtual ranges changed (heavy operation)
+      if (columnRangeChanged || rowRangeChanged) {
+        fileLog.info('🔄 Virtual range changed - triggering body re-render', {
+          columnRangeChanged,
+          rowRangeChanged,
+          oldColumnRange: `${previousColumnRange.start}-${previousColumnRange.end}`,
+          newColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`,
+          oldRowRange: `${previousRowRange.start}-${previousRowRange.end}`,
+          newRowRange: `${currentRowRange.start}-${currentRowRange.end}`
+        });
+
+        // Update tracking
+        this.lastVisibleColumns = currentColumnRange;
+        this.lastVisibleRows = currentRowRange;
+
+        // Trigger body re-render with new virtual columns
+        this.renderBody();
       }
     });
 
@@ -446,9 +484,8 @@ export class SimplePassiveRenderer {
       headerViewport: this.headerViewport,
       container: this.container,
       onScroll: (scrollLeft: number, scrollTop: number) => {
-        // Only update viewport observable (consolidated visual observer handles the rest)
-        // Visual operations are triggered by the consolidated observer, not directly here
-        this.tableViewport$.updateScroll(scrollTop, scrollLeft);
+        // Use the UNIFIED visual operations instead of legacy tableViewport$
+        visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');
 
         // DEBUGGING: Log detailed width calculations during scroll
         const visualState = visualState$.get();
@@ -710,12 +747,19 @@ export class SimplePassiveRenderer {
     // Update content dimensions in visual state
     const totalHeight = rows.length * 40; // ROW_HEIGHT
     visualOperations.setRowCount(rows.length);
-    
+
     // Update row coordinate mapping
     this.coordinateMapping.rows = [];
-    
+
     // Virtual scrolling: Only render visible rows - use visual observables
     const visualState = visualState$.get();
+
+    // CRITICAL FIX: Set body container width to enable proper horizontal scrolling
+    // The body container must be wide enough to accommodate all content
+    if (this.bodyContainer) {
+      this.bodyContainer.style.width = `${visualState.geometry.totalWidth}px`;
+      this.bodyContainer.style.minWidth = `${visualState.geometry.totalWidth}px`;
+    }
     const visibleRange = visualState.geometry.visibleRowRange;
     const startIndex = Math.max(0, visibleRange.start);
     const endIndex = Math.min(rows.length, visibleRange.end);
@@ -942,39 +986,9 @@ export class SimplePassiveRenderer {
 
   /**
    * Handle viewport changes (scroll and dimension updates)
-   * Triggers virtual scrolling updates when visible range changes
+   * SIMPLIFIED: Virtual scrolling updates now handled by focused scroll observer
    */
   private handleViewportChange(): void {
-    // FIXED: Use unified visual state instead of broken tableViewport$ observable
-    const visualState = visualState$.get();
-    const visibleColumns = visualState.geometry.visibleColumnRange;
-    const previousColumns = this.lastVisibleColumns || { start: -1, end: -1 };
-
-    const columnsChanged = visibleColumns && (
-      visibleColumns.start !== previousColumns.start ||
-      visibleColumns.end !== previousColumns.end
-    );
-
-    // DEBUG: Log trigger analysis to identify excessive rendering
-    fileLog.info('🔍 VIEWPORT CHANGE TRIGGER FIXED', {
-      scrollLeft: this.tableViewport$?.scrollLeft?.get?.() || 0,
-      visibleColumns: visibleColumns ? `${visibleColumns.start}-${visibleColumns.end}` : 'null',
-      previousColumns: `${previousColumns.start}-${previousColumns.end}`,
-      columnsChanged,
-      willTriggerHeaderRender: columnsChanged && visibleColumns
-    });
-
-    // Check if vertical rows have changed (for virtual scrolling)
-    const visibleRows = this.tableViewport$?.visibleRows?.get?.() || { start: 0, end: 10 };
-    const previousRows = this.lastVisibleRows || { start: -1, end: -1 };
-    const rowsChanged = visibleRows && (
-      visibleRows.start !== previousRows.start ||
-      visibleRows.end !== previousRows.end
-    );
-
-    // Update viewport manager
-    // Viewport changes are handled by visual-state observables
-
     // Update overlay selection with current viewport position (lightweight)
     if (this.overlayManager) {
       // Re-update selection overlay which will internally update viewport info
@@ -984,27 +998,7 @@ export class SimplePassiveRenderer {
       }
     }
 
-    // Only re-render when necessary to prevent excessive rendering during scroll
-    if (columnsChanged && visibleColumns) {
-      // Horizontal scrolling with column changes - full re-render
-      this.lastVisibleColumns = visibleColumns;
-
-      // Apply Legend State batching for coordinated header/body re-render
-      batch(() => {
-        this.renderHeader();
-        this.renderBody();
-      });
-
-      fileLog.info('🔄 Full re-render: columns changed', { visibleColumns });
-    } else if (rowsChanged && visibleRows) {
-      // Vertical scrolling with row changes - body only
-      this.lastVisibleRows = visibleRows;
-      this.renderBody();
-      fileLog.info('🔄 Body re-render: rows changed', { visibleRows });
-    } else {
-      // No visible range changes - skip expensive re-renders
-      fileLog.debug('⏭️ Viewport change skipped re-render (no visible range changes)');
-    }
+    fileLog.debug('⏭️ Viewport change - virtual scrolling handled by scroll observer');
   }
 
   // ====================================
