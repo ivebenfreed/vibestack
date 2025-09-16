@@ -22,7 +22,8 @@ export class MouseController {
 
   // Mouse state tracking
   private isDragging = false;
-  private dragThreshold = 3; // pixels
+  private isTracking = false; // Flag to track if we're monitoring for drag
+  private dragThreshold = 8; // pixels (increased to be less sensitive)
   private startPosition: { x: number; y: number } = { x: 0, y: 0 };
 
   // Event listeners for cleanup
@@ -67,7 +68,7 @@ export class MouseController {
   }
 
   /**
-   * Handle mouse down - start tracking potential drag
+   * Handle mouse down - start tracking potential drag and provide immediate feedback
    */
   private onMouseDown(e: MouseEvent): void {
     // Only handle events within our container
@@ -77,22 +78,60 @@ export class MouseController {
 
     this.startPosition = { x: e.clientX, y: e.clientY };
     this.isDragging = false;
+    this.isTracking = true;
 
     // Prevent default text selection behavior
     e.preventDefault();
 
+    // Provide immediate visual feedback on mouse down
+    const target = e.target as HTMLElement;
+    const cellElement = target.closest('[data-row-id][data-column-id]');
+
+    if (cellElement) {
+      // This is a cell mouse down - delegate to BodyRenderer for immediate selection feedback
+      fileLog.info('🖱️ Cell mouse down - providing immediate feedback', {
+        rowId: cellElement.getAttribute('data-row-id'),
+        columnId: cellElement.getAttribute('data-column-id')
+      });
+
+      if (this.bodyRenderer && this.bodyRenderer.handleCellMouseDown) {
+        try {
+          this.bodyRenderer.handleCellMouseDown(e, cellElement, target);
+        } catch (error) {
+          fileLog.error('❌ Error calling handleCellMouseDown:', error);
+        }
+      }
+    }
+
     fileLog.info('🖱️ Mouse down tracked', {
       position: this.startPosition,
-      target: (e.target as HTMLElement).tagName
+      target: target.tagName
     });
   }
 
   /**
-   * Handle mouse move - detect drag threshold
+   * Handle mouse move - detect drag threshold and update drag selection
    */
   private onMouseMove(e: MouseEvent): void {
+    // Debug all mouse moves to see if they're being detected
+    if (this.isTracking) {
+      const distance = Math.hypot(
+        e.clientX - this.startPosition.x,
+        e.clientY - this.startPosition.y
+      );
+
+      fileLog.info('🖱️ Mouse move while tracking', {
+        distance,
+        threshold: this.dragThreshold,
+        startPos: this.startPosition,
+        currentPos: { x: e.clientX, y: e.clientY },
+        isTracking: this.isTracking,
+        isDragging: this.isDragging
+      });
+    }
+
     // Only track if we started within our container
-    if (!this.startPosition.x && !this.startPosition.y) {
+    if (!this.isTracking) {
       return;
     }
 
@@ -109,6 +148,32 @@ export class MouseController {
         distance,
         threshold: this.dragThreshold
       });
+
+      // Notify BodyRenderer to start drag selection now that actual dragging is detected
+      if (this.bodyRenderer && this.bodyRenderer.startDragSelectionOnDrag) {
+        try {
+          fileLog.info('🖱️ Starting drag selection via BodyRenderer');
+          this.bodyRenderer.startDragSelectionOnDrag(e);
+        } catch (error) {
+          fileLog.error('❌ Error calling startDragSelectionOnDrag:', error);
+        }
+      } else {
+        fileLog.warn('⚠️ BodyRenderer or startDragSelectionOnDrag method not available', {
+          hasBodyRenderer: !!this.bodyRenderer,
+          hasMethod: !!(this.bodyRenderer && this.bodyRenderer.startDragSelectionOnDrag)
+        });
+      }
+    }
+
+    // If we're actively dragging, update drag selection
+    if (this.isDragging) {
+      if (this.bodyRenderer && this.bodyRenderer.updateDragSelectionOnMove) {
+        try {
+          this.bodyRenderer.updateDragSelectionOnMove(e);
+        } catch (error) {
+          fileLog.error('❌ Error calling updateDragSelectionOnMove:', error);
+        }
+      }
     }
   }
 
@@ -122,6 +187,15 @@ export class MouseController {
     }
 
     if (this.isDragging) {
+      // End drag selection through BodyRenderer
+      if (this.bodyRenderer && this.bodyRenderer.endDragSelectionOnMouseUp) {
+        try {
+          this.bodyRenderer.endDragSelectionOnMouseUp();
+        } catch (error) {
+          fileLog.error('❌ Error calling endDragSelectionOnMouseUp:', error);
+        }
+      }
+
       fileLog.info('🖱️ Mouse up after drag - preventing synthetic click');
       // Prevent the browser from generating a click event after drag
       e.preventDefault();
@@ -131,12 +205,14 @@ export class MouseController {
       // The browser may still generate a click event after this mouseup
       setTimeout(() => {
         this.isDragging = false;
+        this.isTracking = false;
         this.startPosition = { x: 0, y: 0 };
         fileLog.info('🖱️ Drag state reset after delay');
       }, 10);
     } else {
       // No drag was happening, reset immediately
       this.isDragging = false;
+      this.isTracking = false;
       this.startPosition = { x: 0, y: 0 };
     }
   }
@@ -169,8 +245,12 @@ export class MouseController {
         columnId: cellElement.getAttribute('data-column-id')
       });
 
-      if (this.bodyRenderer?.handleCellClick) {
-        this.bodyRenderer.handleCellClick(e, cellElement, target);
+      if (this.bodyRenderer && this.bodyRenderer.handleCellClick) {
+        try {
+          this.bodyRenderer.handleCellClick(e, cellElement, target);
+        } catch (error) {
+          fileLog.error('❌ Error calling handleCellClick:', error);
+        }
       } else {
         fileLog.warn('⚠️ BodyRenderer handleCellClick method not available');
       }

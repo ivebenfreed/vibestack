@@ -68,6 +68,9 @@ export class BodyRenderer {
   private dragDropManager?: DragDropManager;
   private isGroupedMode: boolean = false;
 
+  // Store context for potential drag selection
+  private lastClickedCell: { cellId: string; row: any; column: any } | null = null;
+
   constructor(options: BodyRendererOptions) {
     this.tableCore$ = options.tableCore$;
     this.tableInteraction$ = options.tableInteraction$;
@@ -936,6 +939,64 @@ export class BodyRenderer {
   }
 
   /**
+   * Handle cell mouse down events delegated from MouseController
+   * Provides immediate visual feedback when user presses mouse down on a cell
+   */
+  handleCellMouseDown(e: MouseEvent, cellElement: HTMLElement, target: HTMLElement): void {
+    const rowId = cellElement.getAttribute('data-row-id');
+    const columnId = cellElement.getAttribute('data-column-id');
+
+    if (!rowId || !columnId) {
+      fileLog.warn('⚠️ Cell mouse down on element without row/column data');
+      return;
+    }
+
+    // Find the row and column data
+    const rows = this.tableCore$.processedRows.get();
+    const columns = this.tableCore$.columns.get();
+    const row = rows.find(r => r.id === rowId);
+    const column = columns.find(c => c.id === columnId);
+
+    if (!row || !column) {
+      fileLog.warn('⚠️ Row or column not found for cell mouse down');
+      return;
+    }
+
+    const isCtrlKey = e.ctrlKey || e.metaKey;
+    const isShiftKey = e.shiftKey;
+    const cellId = `${row.id}:${column.id}`;
+
+    fileLog.info('🖱️ Cell mouse down - immediate selection', {
+      rowId: row.id,
+      columnId: column.id,
+      ctrl: isCtrlKey,
+      shift: isShiftKey,
+      target: target.className
+    });
+
+    // Provide immediate selection feedback
+    // Update keyboard navigation focus - use interaction state instead of local state
+    this.tableInteraction$.setFocusedCell(cellId);
+
+    // Focus the container so it can receive keyboard events
+    this.container.focus();
+
+    if (isShiftKey && this.tableInteraction$.anchorCell.get()) {
+      // Shift+click for range selection
+      this.tableInteraction$.selectRange(this.tableInteraction$.anchorCell.get()!, cellId);
+    } else if (isCtrlKey) {
+      // Ctrl/Cmd+click for multi-selection toggle
+      this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
+    } else {
+      // Regular click - use toggleCellSelection to properly set anchor
+      this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
+
+      // Store context in case drag selection starts later
+      this.lastClickedCell = { cellId, row, column };
+    }
+  }
+
+  /**
    * Handle cell click events delegated from MouseController
    * Extracts row/column context and applies selection logic based on click target
    */
@@ -1001,44 +1062,16 @@ export class BodyRenderer {
       // Ctrl/Cmd+click for multi-selection toggle
       this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
     } else {
-      // Regular click - use toggleCellSelection to properly set anchor, then start potential drag selection
+      // Regular click - use toggleCellSelection to properly set anchor
+      // NOTE: Do NOT start drag selection immediately - wait for MouseController to detect actual dragging
       this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-      this.tableInteraction$.startDragSelection(cellId);
+
+      // Store context in case drag selection starts later
+      this.lastClickedCell = { cellId, row, column };
     }
 
-    // Set up document-level mouse move and up handlers for drag selection
-    const handleMouseMove = (e: MouseEvent) => {
-      // Find the cell element under the mouse
-      const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-      const cellUnderMouse = elementUnderMouse?.closest('[data-row-id][data-column-id]') as HTMLElement;
-
-      if (cellUnderMouse) {
-        const rowId = cellUnderMouse.dataset.rowId;
-        const columnId = cellUnderMouse.dataset.columnId;
-        if (rowId && columnId) {
-          const currentCellId = `${rowId}:${columnId}`;
-          // Create data context for the interaction state
-          const dataContext = {
-            rows: this.tableCore$.processedRows.get(),
-            columns: this.tableCore$.columns.get(),
-            columnVisibility: this.tableCore$.columnVisibility.get()
-          };
-          this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
-        }
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      fileLog.info('🖱️ Mouse up - ending drag selection');
-      this.tableInteraction$.endDragSelection();
-
-      // Clean up listeners
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // NOTE: Mouse move and up handlers are now managed by MouseController
+    // This avoids duplicate event listeners and conflicting drag detection logic
   }
 }
 
@@ -1182,5 +1215,62 @@ export class CellFormatter {
       default:
         return value;
     }
+  }
+
+  /**
+   * Called by MouseController when actual dragging is detected
+   * This starts drag selection using the previously clicked cell context
+   */
+  startDragSelectionOnDrag(e: MouseEvent): void {
+    if (!this.lastClickedCell) {
+      fileLog.warn('⚠️ Drag selection triggered but no last clicked cell context available');
+      return;
+    }
+
+    const { cellId } = this.lastClickedCell;
+
+    fileLog.info('🖱️ Starting drag selection on actual drag detection', {
+      startCell: cellId,
+      mousePosition: { x: e.clientX, y: e.clientY }
+    });
+
+    // Now start drag selection since actual dragging is detected
+    this.tableInteraction$.startDragSelection(cellId);
+    // NOTE: No additional event listeners - MouseController handles all mouse events
+  }
+
+  /**
+   * Called by MouseController during mouse move to update drag selection
+   */
+  updateDragSelectionOnMove(e: MouseEvent): void {
+    // Find the cell element under the mouse
+    const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+    const cellUnderMouse = elementUnderMouse?.closest('[data-row-id][data-column-id]') as HTMLElement;
+
+    if (cellUnderMouse) {
+      const rowId = cellUnderMouse.dataset.rowId;
+      const columnId = cellUnderMouse.dataset.columnId;
+      if (rowId && columnId) {
+        const currentCellId = `${rowId}:${columnId}`;
+        // Create data context for the interaction state
+        const dataContext = {
+          rows: this.tableCore$.processedRows.get(),
+          columns: this.tableCore$.columns.get(),
+          columnVisibility: this.tableCore$.columnVisibility.get()
+        };
+        this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
+      }
+    }
+  }
+
+  /**
+   * Called by MouseController when mouse up occurs during drag
+   */
+  endDragSelectionOnMouseUp(): void {
+    fileLog.info('🖱️ Ending drag selection on mouse up');
+    this.tableInteraction$.endDragSelection();
+
+    // Clean up context since interaction is complete
+    this.lastClickedCell = null;
   }
 }
