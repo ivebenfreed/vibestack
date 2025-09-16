@@ -98,9 +98,10 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
     if (isReferenceField(field.type)) {
       column.referenceType = field.type as any;
       column.type = 'select'; // Reference fields are rendered as selects
-      
+      column.cellType = 'select'; // FIXED: Ensure cellType is set for reference fields
+
       // System options are deprecated - modern system uses custom fields with enum arrays
-      
+
       // Infer target entity for entity_reference
       if (field.type === 'entity_reference') {
         column.referenceEntity = inferTargetEntity(field.name, entity.archetype);
@@ -127,14 +128,15 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
         // Determine if this should be a multi-select tags field
         const isTagsField = isTagsFieldName(field.name);
         column.type = isTagsField ? 'tags' : 'select';
-        column.cellType = isTagsField ? 'tags' : 'select'; // Ensure cellType is set for editor selection
+        column.cellType = isTagsField ? 'tags' : 'select'; // FIXED: Ensure cellType is set for ALL auto-detected select fields
         column.options = detectedOptions;
-        
+
         fileLog.info(`🎯 Auto-detected ${isTagsField ? 'tags' : 'select'} field: ${field.name}`, {
           entityName,
           columnId: column.id,
           detectedOptions: detectedOptions.slice(0, 3),
-          isTagsField
+          isTagsField,
+          cellType: column.cellType // Added cellType to debug logs
         });
       }
     }
