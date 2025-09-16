@@ -27,6 +27,7 @@ import { CellFormatter } from '../components/BodyRenderer';
 import { SelectionController } from '../modules/SelectionController';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import { ScrollController } from '../modules/ScrollController';
+import { MouseController } from '../modules/MouseController';
 import { GroupRenderer } from '../components/GroupRenderer';
 import { ColumnWidthManager } from '../modules/ColumnWidthManager';
 
@@ -102,6 +103,7 @@ export class SimplePassiveRenderer {
   private selectionController: SelectionController | null = null;
   private keyboardNavController: KeyboardNavigationController | null = null;
   private scrollController: ScrollController | null = null;
+  private mouseController: MouseController | null = null;
   private groupRenderer: GroupRenderer | null = null;
   private columnWidthManager: ColumnWidthManager | null = null;
   
@@ -496,6 +498,13 @@ export class SimplePassiveRenderer {
       keyboardNavController: this.keyboardNavController,
       selectionController: this.selectionController,
       tableInteraction$: this.tableInteraction$
+    });
+
+    // Initialize MouseController for centralized mouse event handling
+    this.mouseController = new MouseController({
+      container: this.container,
+      bodyRenderer: this.bodyRenderer,
+      scrollController: this.scrollController
     });
 
     // Configure ColumnWidthManager with DOM containers
@@ -1057,6 +1066,12 @@ export class SimplePassiveRenderer {
     if (this.scrollController) {
       this.scrollController.destroy();
       this.scrollController = null;
+    }
+
+    // Clean up MouseController
+    if (this.mouseController) {
+      this.mouseController.destroy();
+      this.mouseController = null;
     }
 
     // Clean up ColumnWidthManager

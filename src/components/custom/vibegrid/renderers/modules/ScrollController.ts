@@ -76,29 +76,7 @@ export class ScrollController {
   private setupInteractionHandling(): void {
     if (!this.container) return;
 
-    // Add click-outside handler to clear selection
-    const clickHandler = (e: Event) => {
-      const target = e.target as HTMLElement;
-      const cellElement = target.closest('[data-row-id][data-column-id]');
-      const headerElement = target.closest('.vibegridx-header-cell');
-      const viewportElement = target.closest('.vibegridx-viewport');
-
-      // Only clear selection if the click is DIRECTLY on the viewport element (empty space)
-      // Not if it bubbled up from a cell or other element
-      const isDirectViewportClick = target === viewportElement ||
-                                   target.classList.contains('vibegridx-viewport') ||
-                                   target.classList.contains('vibegridx-body');
-
-      if (viewportElement && !cellElement && !headerElement && isDirectViewportClick) {
-        fileLog.info('🖱️ Click outside cells - clearing selection');
-        if (this.onClickOutside) {
-          this.onClickOutside();
-        } else if (this.tableInteraction$?.clearSelection) {
-          this.tableInteraction$.clearSelection();
-        }
-      }
-    };
-    this.addEventListenerTracked(this.container, 'click', clickHandler);
+    // Click handling is now managed by MouseController - no click listener needed here
 
     // Add keyboard event handling for advanced selection and navigation
     const keydownHandler = (e: KeyboardEvent) => {
@@ -326,6 +304,32 @@ export class ScrollController {
    */
   setHeaderViewport(headerViewport: HTMLElement | null): void {
     this.headerViewport = headerViewport;
+  }
+
+  /**
+   * Handle outside click events delegated from MouseController
+   * Clears selection when clicking on empty space outside cells
+   */
+  handleOutsideClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    const cellElement = target.closest('[data-row-id][data-column-id]');
+    const headerElement = target.closest('.vibegridx-header-cell');
+    const viewportElement = target.closest('.vibegridx-viewport');
+
+    // Only clear selection if the click is DIRECTLY on the viewport element (empty space)
+    // Not if it bubbled up from a cell or other element
+    const isDirectViewportClick = target === viewportElement ||
+                                 target.classList.contains('vibegridx-viewport') ||
+                                 target.classList.contains('vibegridx-body');
+
+    if (viewportElement && !cellElement && !headerElement && isDirectViewportClick) {
+      fileLog.info('🖱️ Click outside cells - clearing selection');
+      if (this.onClickOutside) {
+        this.onClickOutside();
+      } else if (this.tableInteraction$?.clearSelection) {
+        this.tableInteraction$.clearSelection();
+      }
+    }
   }
 
   /**

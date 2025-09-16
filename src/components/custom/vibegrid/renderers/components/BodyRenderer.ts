@@ -601,92 +601,6 @@ export class BodyRenderer {
 
     cellElement.appendChild(contentElement);
 
-    // Mouse down handler for cell selection
-    cellElement.addEventListener('mousedown', (e) => {
-      const target = e.target as Element;
-
-      // If click is on content element with editable class, ignore for selection
-      // These elements have their own click handlers for editing
-      if (target && target.classList && (
-          target.classList.contains('vibegridx-cell-text-editable') ||
-          target.classList.contains('vibegridx-cell-badge-editable') ||
-          target.classList.contains('vibegridx-cell-number-editable') ||
-          target.classList.contains('vibegridx-cell-boolean-editable') ||
-          target.classList.contains('vibegridx-cell-empty-editable') ||
-          target.classList.contains('vibegridx-enum-badge'))) {
-        fileLog.info('📝 Content element clicked, ignoring for selection');
-        return; // Content clicks are handled separately for editing
-      }
-
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      const isShiftKey = e.shiftKey;
-      const cellId = `${row.id}:${column.id}`;
-
-      fileLog.info('🖱️ Cell whitespace clicked - selection mode', {
-        rowId: row.id,
-        columnId: column.id,
-        ctrl: isCtrlKey,
-        shift: isShiftKey,
-        target: (e.target as HTMLElement).className
-      });
-
-      // Update keyboard navigation focus - use interaction state instead of local state
-      this.tableInteraction$.setFocusedCell(cellId);
-      // Note: anchorCell is handled by setFocusedCell when no anchor exists
-
-      // Focus the container so it can receive keyboard events
-      this.container.focus();
-
-      // Prevent text selection during drag
-      e.preventDefault();
-
-      if (isShiftKey && this.tableInteraction$.anchorCell.get()) {
-        // Shift+click for range selection
-        this.tableInteraction$.selectRange(this.tableInteraction$.anchorCell.get()!, cellId);
-      } else if (isCtrlKey) {
-        // Ctrl/Cmd+click for multi-selection toggle
-        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-      } else {
-        // Regular click - use toggleCellSelection to properly set anchor, then start potential drag selection
-        this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
-        this.tableInteraction$.startDragSelection(cellId);
-      }
-
-      // Set up document-level mouse move and up handlers for drag selection
-      const handleMouseMove = (e: MouseEvent) => {
-        // Find the cell element under the mouse
-        const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-        const cellUnderMouse = elementUnderMouse?.closest('[data-row-id][data-column-id]') as HTMLElement;
-
-        if (cellUnderMouse) {
-          const rowId = cellUnderMouse.dataset.rowId;
-          const columnId = cellUnderMouse.dataset.columnId;
-          if (rowId && columnId) {
-            const currentCellId = `${rowId}:${columnId}`;
-            // Create data context for the interaction state
-            const dataContext = {
-              rows: this.tableCore$.processedRows.get(),
-              columns: this.tableCore$.columns.get(),
-              columnVisibility: this.tableCore$.columnVisibility.get()
-            };
-            this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
-          }
-        }
-      };
-
-      const handleMouseUp = (e: MouseEvent) => {
-        fileLog.info('🖱️ Mouse up - ending drag selection');
-        this.tableInteraction$.endDragSelection();
-
-        // Clean up listeners
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    });
-
     return cellElement;
   }
 
@@ -1012,6 +926,112 @@ export class BodyRenderer {
     });
 
     fileLog.debug('🔄 Drag and drop setup refreshed for all active rows');
+  }
+
+  /**
+   * Handle cell click events delegated from MouseController
+   * Extracts row/column context and applies selection logic based on click target
+   */
+  handleCellClick(e: MouseEvent, cellElement: HTMLElement, target: HTMLElement): void {
+    const rowId = cellElement.getAttribute('data-row-id');
+    const columnId = cellElement.getAttribute('data-column-id');
+
+    if (!rowId || !columnId) {
+      fileLog.warn('⚠️ Cell click on element without row/column data');
+      return;
+    }
+
+    // Find the row and column data
+    const rows = this.tableCore$.processedRows.get();
+    const columns = this.tableCore$.columns.get();
+    const row = rows.find(r => r.id === rowId);
+    const column = columns.find(c => c.id === columnId);
+
+    if (!row || !column) {
+      fileLog.warn('⚠️ Cell click on unknown row/column', { rowId, columnId });
+      return;
+    }
+
+    // If click is on content element with editable class, ignore for selection
+    // These elements have their own click handlers for editing
+    if (target && target.classList && (
+        target.classList.contains('vibegridx-cell-text-editable') ||
+        target.classList.contains('vibegridx-cell-badge-editable') ||
+        target.classList.contains('vibegridx-cell-number-editable') ||
+        target.classList.contains('vibegridx-cell-boolean-editable') ||
+        target.classList.contains('vibegridx-cell-empty-editable') ||
+        target.classList.contains('vibegridx-enum-badge'))) {
+      fileLog.info('📝 Content element clicked, ignoring for selection');
+      return; // Content clicks are handled separately for editing
+    }
+
+    const isCtrlKey = e.ctrlKey || e.metaKey;
+    const isShiftKey = e.shiftKey;
+    const cellId = `${row.id}:${column.id}`;
+
+    fileLog.info('🖱️ Cell whitespace clicked - selection mode', {
+      rowId: row.id,
+      columnId: column.id,
+      ctrl: isCtrlKey,
+      shift: isShiftKey,
+      target: target.className
+    });
+
+    // Update keyboard navigation focus - use interaction state instead of local state
+    this.tableInteraction$.setFocusedCell(cellId);
+    // Note: anchorCell is handled by setFocusedCell when no anchor exists
+
+    // Focus the container so it can receive keyboard events
+    this.container.focus();
+
+    // Prevent text selection during drag
+    e.preventDefault();
+
+    if (isShiftKey && this.tableInteraction$.anchorCell.get()) {
+      // Shift+click for range selection
+      this.tableInteraction$.selectRange(this.tableInteraction$.anchorCell.get()!, cellId);
+    } else if (isCtrlKey) {
+      // Ctrl/Cmd+click for multi-selection toggle
+      this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
+    } else {
+      // Regular click - use toggleCellSelection to properly set anchor, then start potential drag selection
+      this.tableInteraction$.toggleCellSelection(row.id, column.id, isCtrlKey, isShiftKey);
+      this.tableInteraction$.startDragSelection(cellId);
+    }
+
+    // Set up document-level mouse move and up handlers for drag selection
+    const handleMouseMove = (e: MouseEvent) => {
+      // Find the cell element under the mouse
+      const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+      const cellUnderMouse = elementUnderMouse?.closest('[data-row-id][data-column-id]') as HTMLElement;
+
+      if (cellUnderMouse) {
+        const rowId = cellUnderMouse.dataset.rowId;
+        const columnId = cellUnderMouse.dataset.columnId;
+        if (rowId && columnId) {
+          const currentCellId = `${rowId}:${columnId}`;
+          // Create data context for the interaction state
+          const dataContext = {
+            rows: this.tableCore$.processedRows.get(),
+            columns: this.tableCore$.columns.get(),
+            columnVisibility: this.tableCore$.columnVisibility.get()
+          };
+          this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
+        }
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      fileLog.info('🖱️ Mouse up - ending drag selection');
+      this.tableInteraction$.endDragSelection();
+
+      // Clean up listeners
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   }
 }
 
