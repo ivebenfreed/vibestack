@@ -214,11 +214,6 @@ export class MouseController {
    * This is the ONLY click handler in the entire VibeGrid system
    */
   private onClick(e: MouseEvent): void {
-    // Only handle events within our container
-    if (!this.container.contains(e.target as Node)) {
-      return;
-    }
-
     // Ignore clicks that resulted from drag operations
     if (this.isDragging) {
       fileLog.info('🖱️ Click blocked - was result of drag operation');
@@ -228,11 +223,26 @@ export class MouseController {
     }
 
     const target = e.target as HTMLElement;
-    const cellElement = target.closest('[data-row-id][data-column-id]');
+    const isWithinContainer = this.container.contains(e.target as Node);
 
-    if (!cellElement) {
-      // This is an outside click - delegate to ScrollController
-      fileLog.info('🖱️ Outside click detected - delegating to ScrollController');
+    if (isWithinContainer) {
+      // Handle clicks within the container
+      const cellElement = target.closest('[data-row-id][data-column-id]');
+
+      if (!cellElement) {
+        // Click within container but outside cells - delegate to ScrollController
+        fileLog.info('🖱️ Container click (non-cell) detected - delegating to ScrollController');
+
+        if (this.scrollController?.handleOutsideClick) {
+          this.scrollController.handleOutsideClick(e);
+        } else {
+          fileLog.warn('⚠️ ScrollController handleOutsideClick method not available');
+        }
+      }
+      // Note: Cell clicks are handled by mouse down for immediate selection
+    } else {
+      // Click outside the container - this is a true outside click for blur
+      fileLog.info('🖱️ Outside container click detected - delegating to ScrollController for blur');
 
       if (this.scrollController?.handleOutsideClick) {
         this.scrollController.handleOutsideClick(e);

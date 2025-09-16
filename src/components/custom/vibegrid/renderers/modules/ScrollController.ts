@@ -322,13 +322,33 @@ export class ScrollController {
                                  target.classList.contains('vibegridx-viewport') ||
                                  target.classList.contains('vibegridx-body');
 
-    if (viewportElement && !cellElement && !headerElement && isDirectViewportClick) {
-      fileLog.info('🖱️ Click outside cells - clearing selection');
+    // Two scenarios to clear selection:
+    // 1. Click within viewport but outside cells (empty space)
+    // 2. Click completely outside the VibeGrid container
+    const shouldClearSelection =
+      // Scenario 1: Click within viewport on empty space
+      (viewportElement && !cellElement && !headerElement && isDirectViewportClick) ||
+      // Scenario 2: Click outside the entire VibeGrid container
+      (!viewportElement && !cellElement && !headerElement);
+
+    if (shouldClearSelection) {
+      const clickType = viewportElement ? 'empty space within viewport' : 'outside VibeGrid container';
+      fileLog.info(`🖱️ Click on ${clickType} - clearing selection`);
+
       if (this.onClickOutside) {
         this.onClickOutside();
       } else if (this.tableInteraction$?.clearSelection) {
         this.tableInteraction$.clearSelection();
+      } else {
+        fileLog.warn('⚠️ No selection clearing method available');
       }
+    } else {
+      fileLog.debug('🖱️ Outside click ignored - within interactive elements', {
+        hasViewport: !!viewportElement,
+        hasCell: !!cellElement,
+        hasHeader: !!headerElement,
+        isDirectViewport: isDirectViewportClick
+      });
     }
   }
 
