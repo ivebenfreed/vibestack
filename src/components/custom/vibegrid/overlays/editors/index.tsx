@@ -106,6 +106,7 @@ export function createEditor(props: EditorProps): React.ReactElement {
       return <NumberEditor {...props} />;
       
     case 'select':
+    case 'single-select':
     case 'enum':
       return <SelectEditor {...props} />;
       
