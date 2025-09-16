@@ -597,20 +597,17 @@ export class OverlayManager {
     const colInfo = this.coordinateMapping.columns.find(c => c.columnId === columnId);
 
     if (rowInfo && colInfo) {
-      // EditingOverlay is attached to main container, so we need to add header height
-      const HEADER_HEIGHT = 48;
-      const adjustedY = rowInfo.y + HEADER_HEIGHT;
-
+      // Use raw coordinates directly - same as selection overlay
+      // Both overlays are now attached to the same container after reactive architecture changes
       console.log('🔍 getCellPosition debug:');
       console.log('  rowId:', rowId, 'columnId:', columnId);
       console.log('  rowInfo:', `y=${rowInfo.y}, height=${rowInfo.height}, index=${rowInfo.index}`);
       console.log('  colInfo:', `x=${colInfo.x}, width=${colInfo.width}, index=${colInfo.index}`);
-      console.log('  HEADER_HEIGHT:', HEADER_HEIGHT);
-      console.log('  ADJUSTED POSITION: x=' + colInfo.x + ', y=' + adjustedY + ' (was ' + rowInfo.y + '), width=' + colInfo.width + ', height=' + rowInfo.height);
+      console.log('  RAW POSITION: x=' + colInfo.x + ', y=' + rowInfo.y + ', width=' + colInfo.width + ', height=' + rowInfo.height);
 
       return {
         x: colInfo.x,
-        y: adjustedY,
+        y: rowInfo.y,
         width: colInfo.width,
         height: rowInfo.height
       };
