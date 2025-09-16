@@ -36,6 +36,10 @@ export interface TableInteractionState {
   isEditing: boolean;
   editValidation: { isValid: boolean; message?: string } | null;
 
+  // Focus state (keyboard navigation)
+  focusedCell: string | null;
+  anchorCell: string | null;
+
   // Hover state
   hoveredCell: string | null;
   hoveredRow: string | null;
@@ -117,7 +121,11 @@ export function createTableInteraction$() {
     editingCell: null as string | null,
     editValue: null as any,
     isEditing: false,
+    isCancelling: false, // Prevents saveEdit() from executing during cancelEdit()
     editValidation: null as { isValid: boolean; message?: string } | null,
+
+    // Focus state (keyboard navigation)
+    focusedCell: null as string | null,
 
     // Hover state
     hoveredCell: null as string | null,
@@ -248,7 +256,20 @@ export function createTableInteraction$() {
         tableInteraction$.anchorCell.set(null);
       });
 
+
       fileLog.info('<� Selection cleared');
+    },
+
+    setFocusedCell(cellId: string | null) {
+      batch(() => {
+        tableInteraction$.focusedCell.set(cellId);
+        // If no anchor cell is set, use focused cell as anchor
+        if (cellId && !tableInteraction$.anchorCell.get()) {
+          tableInteraction$.anchorCell.set(cellId);
+        }
+      });
+
+      fileLog.info('<� Focused cell changed', { cellId });
     },
 
     selectRange(startCellId: string, endCellId: string, dataContext?: { rows: any[], columns: any[], columnVisibility: Record<string, boolean> }) {
@@ -361,7 +382,14 @@ export function createTableInteraction$() {
 
     saveEdit(finalValue?: any) {
       const editingCell = tableInteraction$.editingCell.get();
+      const isCancelling = tableInteraction$.isCancelling.get();
       const editValue = finalValue !== undefined ? finalValue : tableInteraction$.editValue.get();
+
+      // Prevent saveEdit during cancellation race condition
+      if (isCancelling) {
+        fileLog.warn('⚠ saveEdit blocked - edit operation is being cancelled');
+        return;
+      }
 
       if (!editingCell) {
         fileLog.warn('� saveEdit called but no cell is being edited');
@@ -375,6 +403,7 @@ export function createTableInteraction$() {
         tableInteraction$.editingCell.set(null);
         tableInteraction$.editValue.set(null);
         tableInteraction$.isEditing.set(false);
+        tableInteraction$.isCancelling.set(false); // Reset cancelling flag
         tableInteraction$.editValidation.set(null);
       });
 

@@ -78,13 +78,18 @@ export class ScrollController {
 
     // Add click-outside handler to clear selection
     const clickHandler = (e: Event) => {
-      const cellElement = (e.target as HTMLElement).closest('[data-row-id][data-column-id]');
-      const headerElement = (e.target as HTMLElement).closest('.vibegridx-header-cell');
-      const viewportElement = (e.target as HTMLElement).closest('.vibegridx-viewport');
+      const target = e.target as HTMLElement;
+      const cellElement = target.closest('[data-row-id][data-column-id]');
+      const headerElement = target.closest('.vibegridx-header-cell');
+      const viewportElement = target.closest('.vibegridx-viewport');
 
-      // Only clear selection if click is in the viewport area but not on a cell or header
-      // This prevents clearing when clicking on cells (event bubbling) or outside the table entirely
-      if (viewportElement && !cellElement && !headerElement) {
+      // Only clear selection if the click is DIRECTLY on the viewport element (empty space)
+      // Not if it bubbled up from a cell or other element
+      const isDirectViewportClick = target === viewportElement ||
+                                   target.classList.contains('vibegridx-viewport') ||
+                                   target.classList.contains('vibegridx-body');
+
+      if (viewportElement && !cellElement && !headerElement && isDirectViewportClick) {
         fileLog.info('🖱️ Click outside cells - clearing selection');
         if (this.onClickOutside) {
           this.onClickOutside();
@@ -114,6 +119,14 @@ export class ScrollController {
           break;
         case 'Escape':
           e.preventDefault();
+
+          // Cancel editing if currently editing
+          if (this.tableInteraction$?.isEditing.get()) {
+            this.tableInteraction$?.cancelEdit();
+            fileLog.info('⌨️ Escape - Edit canceled');
+          }
+
+          // Clear selection and focus
           this.tableInteraction$?.clearSelection();
           this.keyboardNavController?.clear();
           fileLog.info('⌨️ Escape - Clear selection and focus');

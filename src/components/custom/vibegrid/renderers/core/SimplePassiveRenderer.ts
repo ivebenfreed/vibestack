@@ -7,12 +7,12 @@
 
 import { observe, batch } from '@legendapp/state';
 import { log } from '@/logger';
-import { visualOperations, visualState$ } from '../../stores/visual-state';
+import { visualOperations, visualState$, createCompleteGridState$, type CompleteGridState } from '../../stores/visual-state';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
-// New modular architecture imports
-import { ObserverManager, type ObserverManagerOptions, type VisualState } from './ObserverManager';
+// New modular architecture imports - ObserverManager will be removed
+// import { ObserverManager, type ObserverManagerOptions, type VisualState } from './ObserverManager';
 import { DOMElementFactory, type DOMElementFactoryOptions } from '../factories/DOMElementFactory';
 import { HeaderRenderer, type HeaderRendererOptions } from '../components/HeaderRenderer';
 
@@ -105,8 +105,9 @@ export class SimplePassiveRenderer {
   private groupRenderer: GroupRenderer | null = null;
   private columnWidthManager: ColumnWidthManager | null = null;
   
-  // New modular components (Phase 1 additions)
-  private observerManager: ObserverManager | null = null;
+  // New modular components (Phase 1 additions) - ObserverManager replaced with complete grid state
+  private completeGridState$: any = null;
+  private gridStateDisposer: (() => void) | null = null;
   private domFactory: DOMElementFactory | null = null;
   private headerRenderer: HeaderRenderer | null = null;
   
@@ -129,7 +130,7 @@ export class SimplePassiveRenderer {
     this.initPhase2Managers();
     this.initOverlayManager();
     this.initHeaderRenderer();
-    this.initObserverManager();
+    this.initCompleteGridStateObserver();
     this.postInitialization();
   }
   
@@ -251,50 +252,163 @@ export class SimplePassiveRenderer {
   }
 
   /**
-   * Initialize Observer Manager (replaces setupObservers)
+   * Initialize Complete Grid State Observer - Legend State best practice
+   * Replaces ObserverManager with single computed observable observation
    */
-  private initObserverManager(): void {
-    fileLog.info('🔍 Initializing Observer Manager');
-    
-    this.observerManager = new ObserverManager({
-      tableCore$: this.tableCore$,
-      tableInteraction$: this.tableInteraction$,
-      tableViewport$: this.tableViewport$,
-      overlayManager: this.overlayManager,
-      
-      // Consolidated visual state callback - single render coordination point
-      onVisualStateChanged: (visualState: VisualState) => {
-        this.handleConsolidatedVisualStateChange(visualState);
-      },
-      onRowsChanged: () => {
-        this.renderBody();
-      },
-      onSelectionChanged: (selectedCells: Set<string>) => {
-        this.updateDOMSelectionClasses(selectedCells);
-      },
-      onEditingChanged: (editingCell: string | null, editValue?: string) => {
-        // Editing is handled by overlay manager
-      },
-      onSelectAllCheckboxChanged: (state: { checked: boolean; indeterminate: boolean }) => {
-        this.updateSelectAllCheckboxVisual(state);
-      },
-      onSortChanged: () => {
-        this.updateSortIndicators();
-      },
-      onDragChanged: () => {
-        // Drag changes are handled by overlay manager
-      },
-      
-      // Column resize handlers - delegate to ColumnWidthManager
-      updateHeaderCellWidth: (columnId: string, newWidth: number) => {
-        this.columnWidthManager?.updateHeaderCellWidth(columnId, newWidth);
-      },
-      updateBodyCellWidths: (columnId: string, newWidth: number) => {
-        this.columnWidthManager?.updateBodyCellWidths(columnId, newWidth);
-      }
+  private initCompleteGridStateObserver(): void {
+    fileLog.info('🎯 Initializing complete grid state observer');
+    console.log('🎯 [DEBUG] Starting complete grid state observer initialization');
+
+    try {
+      // Create the complete grid state computed observable
+      this.completeGridState$ = createCompleteGridState$(
+        this.tableCore$,
+        this.tableInteraction$,
+        this.tableViewport$
+      );
+      console.log('🎯 [DEBUG] Complete grid state computed observable created successfully');
+    } catch (error) {
+      console.error('🚨 [CRITICAL] Failed to create complete grid state observable:', error);
+      fileLog.error('🚨 Failed to create complete grid state observable', error);
+      throw error;
+    }
+
+    // Single observer for ALL state changes - eliminates cascade renders
+    this.gridStateDisposer = observe(() => {
+      const completeState = this.completeGridState$.get();
+
+      fileLog.debug('🎯 Complete grid state changed - coordinated update', {
+        visualColumns: completeState.visual.columnLayouts.length,
+        dataRows: completeState.data.processedRows.length,
+        selectedCells: completeState.interaction.selectedCells.size,
+        isEditing: !!completeState.interaction.editingCell,
+        isDragging: completeState.interaction.isDragging,
+        hasColumnResize: !!completeState.columnResize
+      });
+
+      // Handle ALL state changes in coordinated fashion using Legend State batching
+      batch(() => {
+        this.handleCompleteGridStateChange(completeState);
+      });
     });
-    
-    fileLog.info('✅ Observer Manager initialized');
+
+    fileLog.info('✅ Complete grid state observer initialized');
+  }
+
+  /**
+   * Handle complete grid state changes - single coordinated update point
+   * Replaces all the individual callback handlers from ObserverManager
+   */
+  private handleCompleteGridStateChange(completeState: CompleteGridState): void {
+    // Apply change detection to only update what actually changed
+    const { visual, interaction, data, columnResize, renderState } = completeState;
+
+    // 1. Handle visual layout changes (columns, viewport, dimensions)
+    if (renderState.hasLayoutChanges) {
+      this.handleVisualLayoutChanges(visual, renderState);
+    }
+
+    // 2. Handle data changes (rows, sorting)
+    if (renderState.hasDataChanges) {
+      this.handleDataChanges(data, renderState);
+    }
+
+    // 3. Handle interaction state changes (selection, editing, drag)
+    if (renderState.hasInteractionChanges) {
+      this.handleInteractionChanges(interaction);
+    }
+
+    // 4. Handle column resize (immediate DOM updates, no re-render)
+    if (columnResize && columnResize.isResizing) {
+      this.handleColumnResize(columnResize);
+    }
+
+    // 5. Update overlays based on current state
+    if (renderState.shouldUpdateOverlays && this.overlayManager) {
+      this.updateAllOverlays(completeState);
+    }
+
+    fileLog.debug('✅ Complete grid state update finished');
+  }
+
+  /**
+   * Handle visual layout changes (columns, viewport, scroll)
+   */
+  private handleVisualLayoutChanges(visual: any, renderState: any): void {
+    // Smart rendering - only render what actually changed
+    if (renderState.shouldRenderHeader) {
+      fileLog.debug('🎨 Rendering header due to layout changes');
+      this.renderHeader();
+    }
+
+    if (renderState.shouldRenderBody) {
+      fileLog.debug('🎨 Rendering body due to layout changes');
+      this.renderBody();
+    }
+  }
+
+  /**
+   * Handle data changes (rows, sorting)
+   */
+  private handleDataChanges(data: any, renderState: any): void {
+    // Smart rendering - only render body if needed
+    if (renderState.shouldRenderBody) {
+      fileLog.debug('🎨 Rendering body due to data changes');
+      this.renderBody();
+    }
+
+    // Always update sort indicators for data changes
+    this.updateSortIndicators();
+  }
+
+  /**
+   * Handle interaction state changes (selection, editing, drag)
+   */
+  private handleInteractionChanges(interaction: any): void {
+    // Update DOM selection classes
+    this.updateDOMSelectionClasses(interaction.selectedCells);
+
+    // Update select all checkbox
+    this.updateSelectAllCheckboxVisual(interaction.selectAllCheckboxState);
+  }
+
+  /**
+   * Handle column resize (immediate DOM updates)
+   */
+  private handleColumnResize(columnResize: any): void {
+    if (columnResize.columnId && columnResize.newWidth) {
+      // Direct DOM updates without re-render
+      this.columnWidthManager?.updateHeaderCellWidth(columnResize.columnId, columnResize.newWidth);
+      this.columnWidthManager?.updateBodyCellWidths(columnResize.columnId, columnResize.newWidth);
+    }
+  }
+
+  /**
+   * Update all overlays based on complete state
+   */
+  private updateAllOverlays(completeState: CompleteGridState): void {
+    const { interaction, columnResize } = completeState;
+
+    // Selection overlay - always update to reflect current state
+    this.overlayManager?.updateSelection(interaction.selectedCells);
+
+    // Editing overlay - always update to handle both show and hide cases
+    this.overlayManager?.updateEditingOverlay(interaction.editingCell, interaction.editValue);
+
+    // Drag preview
+    if (interaction.isDragging && interaction.dragSource) {
+      const dragState = {
+        isDragging: true,
+        startCell: interaction.dragSource,
+        currentCell: interaction.dragTarget || interaction.dragSource
+      };
+      this.overlayManager?.updateColumnDragPreview(dragState);
+    } else {
+      this.overlayManager?.updateColumnDragPreview(null);
+    }
+
+    // Column resize preview - always update to handle both show and hide cases
+    this.overlayManager?.updateColumnResizePreview(columnResize);
   }
 
   /**
@@ -923,11 +1037,13 @@ export class SimplePassiveRenderer {
   destroy(): void {
     fileLog.info('🧹 Destroying SimplePassiveRenderer with Phase 2 managers');
     
-    // Clean up observers (managed by ObserverManager)
-    if (this.observerManager) {
-      this.observerManager.destroy();
-      this.observerManager = null;
+    // Clean up complete grid state observer
+    if (this.gridStateDisposer) {
+      this.gridStateDisposer();
+      this.gridStateDisposer = null;
     }
+
+    this.completeGridState$ = null;
     
     // Clean up Phase 2 managers
     if (this.eventManager) {

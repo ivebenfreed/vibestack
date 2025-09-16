@@ -630,12 +630,9 @@ export class BodyRenderer {
         target: (e.target as HTMLElement).className
       });
 
-      // Update keyboard navigation focus
-      this.keyboardNavController?.setFocusedCell(cellId);
-      if (!isCtrlKey && !isShiftKey) {
-        // For single clicks, update the anchor
-        this.keyboardNavController?.setSelectionAnchor(cellId);
-      }
+      // Update keyboard navigation focus - use interaction state instead of local state
+      this.tableInteraction$.setFocusedCell(cellId);
+      // Note: anchorCell is handled by setFocusedCell when no anchor exists
 
       // Focus the container so it can receive keyboard events
       this.container.focus();

@@ -26,6 +26,7 @@ export function DateEditor({
 }: DateEditorProps) {
   const [value, setValue] = React.useState(initialValue || '');
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(true); // Open by default
+  const [escapePressed, setEscapePressed] = React.useState(false);
   
   const parseDate = (dateString: string): Date | null => {
     if (!dateString) return null;

@@ -23,9 +23,6 @@ export class KeyboardNavigationController {
   private getProcessedRows: () => any[];
   private getVisibleColumns: () => any[];
   private container: HTMLElement;
-  
-  private focusedCell: string | null = null;
-  private selectionAnchor: string | null = null;
 
   constructor(options: KeyboardNavigationOptions) {
     this.tableInteraction$ = options.tableInteraction$;
@@ -41,25 +38,26 @@ export class KeyboardNavigationController {
   handleArrowKey(direction: 'up' | 'down' | 'left' | 'right', isShiftKey: boolean): void {
     const processedRows = this.getProcessedRows();
     const visibleColumns = this.getVisibleColumns();
-    
-    fileLog.info('Handling arrow key', { direction, isShiftKey, focusedCell: this.focusedCell });
-    
+    const focusedCell = this.tableInteraction$.focusedCell.get();
+
+    fileLog.info('Handling arrow key', { direction, isShiftKey, focusedCell });
+
     // Ensure we have rows and columns
     if (processedRows.length === 0 || visibleColumns.length === 0) {
       return;
     }
-    
+
     // If no focused cell, focus the first cell
-    if (!this.focusedCell) {
+    if (!focusedCell) {
       const firstRow = processedRows[0];
       const firstColumn = visibleColumns.find(c => c.id !== 'selection') || visibleColumns[0];
-      this.focusedCell = `${firstRow.id}:${firstColumn.id}`;
-      this.selectionAnchor = this.focusedCell;
+      const firstCellId = `${firstRow.id}:${firstColumn.id}`;
+      this.tableInteraction$.setFocusedCell(firstCellId);
       this.tableInteraction$.toggleCellSelection(firstRow.id, firstColumn.id, false, false);
       return;
     }
-    
-    const [currentRowId, currentColumnId] = this.focusedCell.split(':');
+
+    const [currentRowId, currentColumnId] = focusedCell.split(':');
     const currentRowIndex = processedRows.findIndex(r => r.id === currentRowId);
     const currentColIndex = visibleColumns.findIndex(c => c.id === currentColumnId);
     
@@ -96,18 +94,16 @@ export class KeyboardNavigationController {
     const newRow = processedRows[newRowIndex];
     const newColumn = visibleColumns[newColIndex];
     const newCellId = `${newRow.id}:${newColumn.id}`;
-    
-    this.focusedCell = newCellId;
-    
+
+    this.tableInteraction$.setFocusedCell(newCellId);
+
     if (isShiftKey) {
       // Range selection
-      if (!this.selectionAnchor) {
-        this.selectionAnchor = `${currentRowId}:${currentColumnId}`;
-      }
-      this.selectKeyboardRange(this.selectionAnchor, newCellId);
+      const anchorCell = this.tableInteraction$.anchorCell.get();
+      const selectionAnchor = anchorCell || `${currentRowId}:${currentColumnId}`;
+      this.selectKeyboardRange(selectionAnchor, newCellId);
     } else {
-      // Single cell selection
-      this.selectionAnchor = newCellId;
+      // Single cell selection - anchor will be set by setFocusedCell
       this.tableInteraction$.toggleCellSelection(newRow.id, newColumn.id, false, false);
     }
     
@@ -177,15 +173,17 @@ export class KeyboardNavigationController {
         return true;
       
       case 'Enter':
-        if (this.focusedCell) {
-          const [rowId, columnId] = this.focusedCell.split(':');
+        // Use interaction state focused cell instead of local focusedCell
+        const focusedCell = this.tableInteraction$.focusedCell.get();
+        if (focusedCell) {
+          const [rowId, columnId] = focusedCell.split(':');
           const cellId = `${rowId}:${columnId}`;
-          
+
           // Get current value
           const processedRows = this.getProcessedRows();
           const row = processedRows.find(r => r.id === rowId);
           const value = row ? row[columnId] : '';
-          
+
           // Start editing
           this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
           return true;
@@ -193,17 +191,23 @@ export class KeyboardNavigationController {
         break;
       
       case 'Escape':
-        this.selectionController.clearSelection();
-        this.focusedCell = null;
-        this.selectionAnchor = null;
+        // Clear editing state if currently editing
+        if (this.tableInteraction$.isEditing.get()) {
+          this.tableInteraction$.cancelEdit();
+        }
+
+        // Clear selection and focus state
+        this.tableInteraction$.clearSelection();
+        this.tableInteraction$.setFocusedCell(null);
         return true;
       
       case 'Delete':
       case 'Backspace':
-        if (this.focusedCell && !event.target || 
+        const currentFocusedCell = this.tableInteraction$.focusedCell.get();
+        if (currentFocusedCell && !event.target ||
             (event.target as HTMLElement).tagName !== 'INPUT') {
           // Could trigger delete action here
-          fileLog.info('Delete key pressed on focused cell', { focusedCell: this.focusedCell });
+          fileLog.info('Delete key pressed on focused cell', { focusedCell: currentFocusedCell });
           return true;
         }
         break;
@@ -216,38 +220,36 @@ export class KeyboardNavigationController {
    * Set focused cell from external interaction
    */
   setFocusedCell(cellId: string | null): void {
-    this.focusedCell = cellId;
-    if (cellId && !this.selectionAnchor) {
-      this.selectionAnchor = cellId;
-    }
+    // Use interaction state only - no local state
+    this.tableInteraction$.setFocusedCell(cellId);
   }
 
   /**
    * Get current focused cell
    */
   getFocusedCell(): string | null {
-    return this.focusedCell;
+    return this.tableInteraction$.focusedCell.get();
   }
 
   /**
    * Set selection anchor for range selection
    */
   setSelectionAnchor(cellId: string | null): void {
-    this.selectionAnchor = cellId;
+    this.tableInteraction$.anchorCell.set(cellId);
   }
 
   /**
    * Get current selection anchor
    */
   getSelectionAnchor(): string | null {
-    return this.selectionAnchor;
+    return this.tableInteraction$.anchorCell.get();
   }
 
   /**
    * Clear keyboard navigation state
    */
   clear(): void {
-    this.focusedCell = null;
-    this.selectionAnchor = null;
+    this.tableInteraction$.setFocusedCell(null);
+    this.tableInteraction$.anchorCell.set(null);
   }
 }

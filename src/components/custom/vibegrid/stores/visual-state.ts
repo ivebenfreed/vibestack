@@ -1051,3 +1051,226 @@ export const getVisibleColumns = (): ColumnLayout[] => {
 export const getViewportGeometry = (): ViewportGeometry => {
   return visualState$.get().geometry;
 };
+
+// ====================================
+// COMPLETE GRID STATE OBSERVABLE
+// ====================================
+
+/**
+ * Complete grid state interface - combines all state sources
+ * This is the TRUE SINGLE SOURCE OF TRUTH for the entire grid
+ */
+export interface CompleteGridState {
+  // Visual layout state (from visualState$)
+  visual: VisualState;
+
+  // Interaction state
+  interaction: {
+    selectedCells: Set<string>;
+    selectAllCheckboxState: { checked: boolean; indeterminate: boolean };
+    editingCell: string | null;
+    editValue: string;
+    isDragging: boolean;
+    dragSource: string | null;
+    dragTarget: string | null;
+  };
+
+  // Data state
+  data: {
+    processedRows: any[];
+    sortBy: any[];
+  };
+
+  // Column resize state
+  columnResize: {
+    isResizing: boolean;
+    columnId: string | null;
+    newWidth: number | null;
+  } | null;
+
+  // Derived state for rendering decisions
+  renderState: {
+    shouldRenderHeader: boolean;
+    shouldRenderBody: boolean;
+    shouldUpdateSelection: boolean;
+    shouldUpdateOverlays: boolean;
+    hasDataChanges: boolean;
+    hasLayoutChanges: boolean;
+    hasInteractionChanges: boolean;
+  };
+}
+
+/**
+ * Create complete grid state observable - Legend State best practice
+ * Combines all state sources into a single computed observable
+ */
+export function createCompleteGridState$(
+  tableCore$: any,
+  tableInteraction$: any,
+  tableViewport$: any
+) {
+  fileLog.info('🎯 Creating complete grid state observable');
+
+  // Previous state tracking for change detection
+  let previousState: CompleteGridState | null = null;
+
+  return computed((): CompleteGridState => {
+    try {
+      // Get all state in one computed - this creates the dependency tracking
+      const visual = visualState$.get();
+      const selectedCells = tableInteraction$.selectedCells.get();
+      const selectAllCheckboxState = tableInteraction$.selectAllCheckboxState.get();
+      const focusedCell = tableInteraction$.focusedCell.get();
+      const editingCell = tableInteraction$.editingCell.get();
+      const editValue = tableInteraction$.editValue.get();
+      const isDragging = tableInteraction$.isDragging.get();
+      const dragSource = tableInteraction$.dragSource.get();
+      const dragTarget = tableInteraction$.dragTarget.get();
+      const processedRows = tableCore$.processedRows.get(true); // shallow for performance
+      const sortBy = tableCore$.sortBy.get(true); // shallow for performance
+      const columnResize = tableInteraction$.columnResize.get();
+
+    // Smart change detection - compare with previous state
+    let hasLayoutChanges = true;
+    let hasDataChanges = true;
+    let hasInteractionChanges = true;
+
+    if (previousState) {
+      // Check layout changes (visual state)
+      hasLayoutChanges =
+        visual.columnLayouts.length !== previousState.visual.columnLayouts.length ||
+        visual.geometry.totalWidth !== previousState.visual.geometry.totalWidth ||
+        visual.geometry.scrollLeft !== previousState.visual.geometry.scrollLeft ||
+        visual.geometry.scrollTop !== previousState.visual.geometry.scrollTop ||
+        visual.geometry.viewportWidth !== previousState.visual.geometry.viewportWidth ||
+        visual.geometry.viewportHeight !== previousState.visual.geometry.viewportHeight;
+
+      // Check data changes (rows, sorting)
+      hasDataChanges =
+        processedRows.length !== previousState.data.processedRows.length ||
+        sortBy.length !== previousState.data.sortBy.length ||
+        JSON.stringify(sortBy.map(s => s.id)) !== JSON.stringify(previousState.data.sortBy.map(s => s.id));
+
+      // Check interaction changes (selection, editing, drag, focus)
+      hasInteractionChanges =
+        selectedCells.size !== previousState.interaction.selectedCells.size ||
+        focusedCell !== previousState.interaction.focusedCell ||
+        editingCell !== previousState.interaction.editingCell ||
+        isDragging !== previousState.interaction.isDragging ||
+        dragSource !== previousState.interaction.dragSource;
+    }
+
+    // Calculate smart render state based on actual changes
+    const renderState = {
+      shouldRenderHeader: hasLayoutChanges, // Only render header when layout changes
+      shouldRenderBody: hasLayoutChanges || hasDataChanges, // Render body for layout or data changes
+      shouldUpdateSelection: hasInteractionChanges && selectedCells.size > 0,
+      shouldUpdateOverlays: hasInteractionChanges || isDragging || editingCell !== null || columnResize !== null,
+      hasDataChanges,
+      hasLayoutChanges,
+      hasInteractionChanges
+    };
+
+    const completeState: CompleteGridState = {
+      visual,
+      interaction: {
+        selectedCells,
+        selectAllCheckboxState,
+        focusedCell,
+        editingCell,
+        editValue,
+        isDragging,
+        dragSource,
+        dragTarget
+      },
+      data: {
+        processedRows,
+        sortBy
+      },
+      columnResize,
+      renderState
+    };
+
+    fileLog.debug('🎯 Complete grid state computed', {
+      visualColumns: visual.columnLayouts.length,
+      dataRows: processedRows.length,
+      selectedCells: selectedCells.size,
+      isEditing: !!editingCell,
+      isDragging,
+      hasColumnResize: !!columnResize,
+      changeDetection: {
+        hasLayoutChanges,
+        hasDataChanges,
+        hasInteractionChanges,
+        shouldRenderHeader: renderState.shouldRenderHeader,
+        shouldRenderBody: renderState.shouldRenderBody,
+        shouldUpdateOverlays: renderState.shouldUpdateOverlays
+      }
+    });
+
+    // Update previous state for next change detection cycle
+    previousState = completeState;
+
+    return completeState;
+    } catch (error) {
+      fileLog.error('🚨 Error in createCompleteGridState$ computed', error);
+      console.error('🚨 CRITICAL: VibeGrid createCompleteGridState$ error:', error);
+
+      // Return minimal fallback state to prevent complete failure
+      return {
+        visual: {
+          columnLayouts: [],
+          visibleColumns: [],
+          totalColumnsWidth: 0,
+          geometry: {
+            viewportWidth: 0,
+            viewportHeight: 0,
+            scrollLeft: 0,
+            scrollTop: 0,
+            totalWidth: 0,
+            totalHeight: 0,
+            visibleColumnRange: { start: 0, end: 0 },
+            visibleRowRange: { start: 0, end: 0 }
+          },
+          headerScrollLeft: 0,
+          bodyScrollLeft: 0,
+          scrollSynchronized: false,
+          visualRows: [],
+          totalRowsHeight: 0,
+          columnState: {
+            columns: [],
+            columnWidths: {},
+            columnVisibility: {},
+            columnOrder: [],
+            entityType: '',
+            orgId: '',
+            userId: ''
+          }
+        },
+        data: {
+          processedRows: [],
+          sortBy: []
+        },
+        interaction: {
+          selectedCells: new Set(),
+          selectAllCheckboxState: { checked: false, indeterminate: false },
+          focusedCell: null,
+          editingCell: null,
+          editValue: '',
+          isDragging: false,
+          dragSource: null,
+          dragTarget: null
+        },
+        columnResize: null,
+        renderState: {
+          hasLayoutChanges: false,
+          hasDataChanges: false,
+          hasInteractionChanges: false,
+          shouldRenderHeader: false,
+          shouldRenderBody: false,
+          shouldUpdateOverlays: false
+        }
+      };
+    }
+  });
+}
