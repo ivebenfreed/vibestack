@@ -103,7 +103,16 @@ export function DateEditor({
 
   // For date only, show calendar directly
   return (
-    <div className="p-2 bg-background border rounded-md shadow-lg">
+    <div
+      className="p-2 bg-background border rounded-md shadow-lg"
+      onBlur={(e) => {
+        // Only commit if the blur event is not going to another element within this container
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          handleBlur();
+        }
+      }}
+      tabIndex={-1}
+    >
       <Calendar
         mode="single"
         selected={currentDate || undefined}
