@@ -13,12 +13,14 @@ export interface MouseControllerOptions {
   container: HTMLElement;
   bodyRenderer?: any; // Will delegate cell clicks here
   scrollController?: any; // Will delegate outside clicks here
+  tableInteraction$: any; // For reactive state updates
 }
 
 export class MouseController {
   private container: HTMLElement;
   private bodyRenderer?: any;
   private scrollController?: any;
+  private tableInteraction$: any;
 
   // Mouse state tracking
   private isDragging = false;
@@ -37,6 +39,7 @@ export class MouseController {
     this.container = options.container;
     this.bodyRenderer = options.bodyRenderer;
     this.scrollController = options.scrollController;
+    this.tableInteraction$ = options.tableInteraction$;
 
     // Prevent text selection during drag operations
     this.container.style.userSelect = 'none';
@@ -89,18 +92,26 @@ export class MouseController {
 
     if (cellElement) {
       // This is a cell mouse down - delegate to BodyRenderer for immediate selection feedback
-      fileLog.info('🖱️ Cell mouse down - providing immediate feedback', {
-        rowId: cellElement.getAttribute('data-row-id'),
-        columnId: cellElement.getAttribute('data-column-id')
-      });
+      // PURE: Just update coordinates and mouse state
+      const rowId = cellElement.getAttribute('data-row-id');
+      const columnId = cellElement.getAttribute('data-column-id');
+      const cellId = `${rowId}:${columnId}`;
 
-      if (this.bodyRenderer && this.bodyRenderer.handleCellMouseDown) {
-        try {
-          this.bodyRenderer.handleCellMouseDown(e, cellElement, target);
-        } catch (error) {
-          fileLog.error('❌ Error calling handleCellMouseDown:', error);
-        }
+      fileLog.info('🖱️ Cell mouse down - pure coordinate tracking', { cellId });
+
+      // PURE: Update state directly - this is the ONLY selection path needed
+      this.tableInteraction$.setMousePosition(e.clientX, e.clientY);
+      this.tableInteraction$.setMouseDown(true);
+      this.tableInteraction$.setFocusedCell(cellId);
+
+      // IMMEDIATE SELECTION: Always select on mouse down (click is just drag with no movement)
+      if (!e.ctrlKey && !e.shiftKey) {
+        this.tableInteraction$.selectCell(cellId, false);
+      } else if (e.ctrlKey) {
+        this.tableInteraction$.selectCell(cellId, true);
       }
+
+      fileLog.debug('🎯 Immediate selection on mouse down', { cellId, selectedCount: this.tableInteraction$.selectedCells.get().size });
     }
 
     fileLog.info('🖱️ Mouse down tracked', {
@@ -149,32 +160,18 @@ export class MouseController {
         threshold: this.dragThreshold
       });
 
-      // Notify BodyRenderer to start drag selection now that actual dragging is detected
-      if (this.bodyRenderer && this.bodyRenderer.startDragSelectionOnDrag) {
-        try {
-          fileLog.info('🖱️ Starting drag selection via BodyRenderer');
-          this.bodyRenderer.startDragSelectionOnDrag(e);
-        } catch (error) {
-          fileLog.error('❌ Error calling startDragSelectionOnDrag:', error);
-        }
+      // PURE: Start drag selection with focused cell as anchor
+      const startCell = this.tableInteraction$.focusedCell.get();
+      if (startCell) {
+        this.tableInteraction$.startDragSelect(startCell);
+        fileLog.info('🖱️ Started drag selection reactively', { startCell });
       } else {
-        fileLog.warn('⚠️ BodyRenderer or startDragSelectionOnDrag method not available', {
-          hasBodyRenderer: !!this.bodyRenderer,
-          hasMethod: !!(this.bodyRenderer && this.bodyRenderer.startDragSelectionOnDrag)
-        });
+        fileLog.warn('⚠️ No focused cell for drag start');
       }
     }
 
-    // If we're actively dragging, update drag selection
-    if (this.isDragging) {
-      if (this.bodyRenderer && this.bodyRenderer.updateDragSelectionOnMove) {
-        try {
-          this.bodyRenderer.updateDragSelectionOnMove(e);
-        } catch (error) {
-          fileLog.error('❌ Error calling updateDragSelectionOnMove:', error);
-        }
-      }
-    }
+    // PURE: Always update mouse coordinates (computed observables react to changes)
+    this.tableInteraction$.setMousePosition(e.clientX, e.clientY);
   }
 
   /**
@@ -187,14 +184,9 @@ export class MouseController {
     }
 
     if (this.isDragging) {
-      // End drag selection through BodyRenderer
-      if (this.bodyRenderer && this.bodyRenderer.endDragSelectionOnMouseUp) {
-        try {
-          this.bodyRenderer.endDragSelectionOnMouseUp();
-        } catch (error) {
-          fileLog.error('❌ Error calling endDragSelectionOnMouseUp:', error);
-        }
-      }
+      // PURE: End drag selection reactively
+      const dragResult = this.tableInteraction$.endDragSelect();
+      fileLog.info('🖱️ Ended drag selection reactively', dragResult);
 
       fileLog.info('🖱️ Mouse up after drag - preventing synthetic click');
       // Prevent the browser from generating a click event after drag
@@ -238,23 +230,7 @@ export class MouseController {
     const target = e.target as HTMLElement;
     const cellElement = target.closest('[data-row-id][data-column-id]');
 
-    if (cellElement) {
-      // This is a cell click - delegate to BodyRenderer
-      fileLog.info('🖱️ Cell click detected - delegating to BodyRenderer', {
-        rowId: cellElement.getAttribute('data-row-id'),
-        columnId: cellElement.getAttribute('data-column-id')
-      });
-
-      if (this.bodyRenderer && this.bodyRenderer.handleCellClick) {
-        try {
-          this.bodyRenderer.handleCellClick(e, cellElement, target);
-        } catch (error) {
-          fileLog.error('❌ Error calling handleCellClick:', error);
-        }
-      } else {
-        fileLog.warn('⚠️ BodyRenderer handleCellClick method not available');
-      }
-    } else {
+    if (!cellElement) {
       // This is an outside click - delegate to ScrollController
       fileLog.info('🖱️ Outside click detected - delegating to ScrollController');
 

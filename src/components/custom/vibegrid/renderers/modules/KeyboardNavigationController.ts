@@ -147,7 +147,15 @@ export class KeyboardNavigationController {
       case 'A':
         if (isCtrlKey) {
           event.preventDefault();
-          this.selectionController.selectAllCells();
+          // REACTIVE: Select all directly via state
+          const processedRows = this.getProcessedRows();
+          const visibleColumns = this.getVisibleColumns();
+          this.tableInteraction$.selectAll({
+            rows: processedRows,
+            columns: visibleColumns,
+            columnVisibility: Object.fromEntries(visibleColumns.map(col => [col.id, true]))
+          });
+          fileLog.info('⌨️ Ctrl+A select all triggered reactively');
           return true;
         }
         break;

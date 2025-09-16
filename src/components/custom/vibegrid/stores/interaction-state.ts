@@ -89,6 +89,11 @@ export function createTableInteraction$() {
   fileLog.info('<� Creating tableInteraction$ observable');
 
   const tableInteraction$ = observable({
+    // Mouse coordinate state (pure input)
+    mouseX: 0,
+    mouseY: 0,
+    isMouseDown: false,
+
     // Selection state
     selectedCells: new Set<string>(),
     selectedRows: new Set<string>(),
@@ -177,26 +182,65 @@ export function createTableInteraction$() {
       isOpen: false
     },
 
+    // Computed: Cell at current mouse position (pure reactive function)
+    get currentHoveredCell() {
+      const mouseX = tableInteraction$.mouseX.get();
+      const mouseY = tableInteraction$.mouseY.get();
+
+      if (mouseX === 0 && mouseY === 0) return null;
+
+      // Pure function: Find cell at coordinates using DOM
+      const targetElement = document.elementFromPoint(mouseX, mouseY);
+      const cellElement = targetElement?.closest('[data-row-id][data-column-id]');
+
+      if (cellElement) {
+        const rowId = cellElement.getAttribute('data-row-id');
+        const columnId = cellElement.getAttribute('data-column-id');
+        return `${rowId}:${columnId}`;
+      }
+
+      return null;
+    },
+
+
+    // Pure mouse coordinate methods
+    setMousePosition(x: number, y: number) {
+      tableInteraction$.mouseX.set(x);
+      tableInteraction$.mouseY.set(y);
+    },
+
+    setMouseDown(isDown: boolean) {
+      tableInteraction$.isMouseDown.set(isDown);
+    },
+
     // Direct manipulation methods
     selectCell(cellId: string, isMulti: boolean = false) {
       batch(() => {
-        const selected = tableInteraction$.selectedCells.get();
+        // CLEAR ROW SELECTION: Cell selection clears row selection mode
+        tableInteraction$.selectedRows.set(new Set());
 
         if (!isMulti) {
-          // Clear existing selection if not multi-select
-          tableInteraction$.selectedCells.set(new Set());
-        }
+          // CLEAR SELECTION: Single selection replaces all
+          const newSelection = new Set([cellId]);
+          tableInteraction$.selectedCells.set(newSelection);
+          tableInteraction$.anchorCell.set(cellId);
 
-        // Toggle cell selection
-        const newSelected = new Set(tableInteraction$.selectedCells.get());
-        if (newSelected.has(cellId)) {
-          newSelected.delete(cellId);
+          fileLog.debug('🎯 Single cell selection (cleared others)', { cellId });
         } else {
-          newSelected.add(cellId);
-        }
+          // MULTI SELECTION: Toggle cell in existing selection
+          const currentSelected = new Set(tableInteraction$.selectedCells.get());
 
-        tableInteraction$.selectedCells.set(newSelected);
-        tableInteraction$.anchorCell.set(cellId);
+          if (currentSelected.has(cellId)) {
+            currentSelected.delete(cellId);
+            fileLog.debug('🎯 Removed cell from multi-selection', { cellId });
+          } else {
+            currentSelected.add(cellId);
+            fileLog.debug('🎯 Added cell to multi-selection', { cellId });
+          }
+
+          tableInteraction$.selectedCells.set(currentSelected);
+          tableInteraction$.anchorCell.set(cellId);
+        }
       });
 
       fileLog.info('<� Cell selected', { cellId, isMulti, selectionCount: tableInteraction$.selectedCells.get().size });
@@ -204,20 +248,29 @@ export function createTableInteraction$() {
 
     selectRow(rowId: string, isMulti: boolean = false) {
       batch(() => {
+        // CLEAR CELL SELECTION: Row selection clears cell selection mode
+        tableInteraction$.selectedCells.set(new Set());
+
         if (!isMulti) {
-          // Clear existing selection if not multi-select
-          tableInteraction$.selectedRows.set(new Set());
-        }
+          // CLEAR SELECTION: Single row selection replaces all
+          const newSelection = new Set([rowId]);
+          tableInteraction$.selectedRows.set(newSelection);
 
-        // Toggle row selection
-        const newSelected = new Set(tableInteraction$.selectedRows.get());
-        if (newSelected.has(rowId)) {
-          newSelected.delete(rowId);
+          fileLog.debug('🎯 Single row selection (cleared others)', { rowId });
         } else {
-          newSelected.add(rowId);
-        }
+          // MULTI SELECTION: Toggle row in existing selection
+          const currentSelected = new Set(tableInteraction$.selectedRows.get());
 
-        tableInteraction$.selectedRows.set(newSelected);
+          if (currentSelected.has(rowId)) {
+            currentSelected.delete(rowId);
+            fileLog.debug('🎯 Removed row from multi-selection', { rowId });
+          } else {
+            currentSelected.add(rowId);
+            fileLog.debug('🎯 Added row to multi-selection', { rowId });
+          }
+
+          tableInteraction$.selectedRows.set(currentSelected);
+        }
       });
 
       fileLog.info('<� Row selected', { rowId, isMulti, selectionCount: tableInteraction$.selectedRows.get().size });

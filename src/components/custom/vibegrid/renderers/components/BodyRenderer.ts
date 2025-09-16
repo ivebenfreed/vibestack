@@ -939,8 +939,9 @@ export class BodyRenderer {
   }
 
   /**
-   * Handle cell mouse down events delegated from MouseController
-   * Provides immediate visual feedback when user presses mouse down on a cell
+   * @deprecated OBSOLETE: Mouse handling moved to reactive MouseController
+   * This method is no longer called - MouseController handles all mouse events reactively
+   * Can be removed after verifying no references exist
    */
   handleCellMouseDown(e: MouseEvent, cellElement: HTMLElement, target: HTMLElement): void {
     const rowId = cellElement.getAttribute('data-row-id');
@@ -997,8 +998,9 @@ export class BodyRenderer {
   }
 
   /**
-   * Handle cell click events delegated from MouseController
-   * Extracts row/column context and applies selection logic based on click target
+   * @deprecated OBSOLETE: Click handling moved to reactive MouseController
+   * This method is no longer called - MouseController handles all interactions reactively
+   * Can be removed after verifying no references exist
    */
   handleCellClick(e: MouseEvent, cellElement: HTMLElement, target: HTMLElement): void {
     const rowId = cellElement.getAttribute('data-row-id');
@@ -1218,8 +1220,9 @@ export class CellFormatter {
   }
 
   /**
-   * Called by MouseController when actual dragging is detected
-   * This starts drag selection using the previously clicked cell context
+   * @deprecated OBSOLETE: Drag selection moved to reactive observer pattern
+   * This method is no longer called - drag selection handled by focused observers
+   * Can be removed after verifying no references exist
    */
   startDragSelectionOnDrag(e: MouseEvent): void {
     if (!this.lastClickedCell) {
@@ -1240,7 +1243,9 @@ export class CellFormatter {
   }
 
   /**
-   * Called by MouseController during mouse move to update drag selection
+   * @deprecated OBSOLETE: Drag selection moved to reactive observer pattern
+   * This method is no longer called - drag selection handled by focused observers
+   * Can be removed after verifying no references exist
    */
   updateDragSelectionOnMove(e: MouseEvent): void {
     // Find the cell element under the mouse
@@ -1264,7 +1269,9 @@ export class CellFormatter {
   }
 
   /**
-   * Called by MouseController when mouse up occurs during drag
+   * @deprecated OBSOLETE: Drag selection moved to reactive observer pattern
+   * This method is no longer called - drag selection handled by focused observers
+   * Can be removed after verifying no references exist
    */
   endDragSelectionOnMouseUp(): void {
     fileLog.info('🖱️ Ending drag selection on mouse up');

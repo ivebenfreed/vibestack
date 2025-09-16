@@ -372,15 +372,17 @@ export class HeaderRenderer {
       });
       
       if (selectedCells.size === 0) {
-        // No selection - select all
-        if (this.selectionController) {
-          this.selectionController.selectAllCells();
-        }
+        // REACTIVE: No selection - select all directly via state
+        this.tableInteraction$.selectAll({
+          rows: processedRows,
+          columns: visibleColumns,
+          columnVisibility
+        });
+        fileLog.info('✅ Select all triggered reactively');
       } else {
-        // Has selection - clear all
-        if (this.selectionController) {
-          this.selectionController.clearSelection();
-        }
+        // REACTIVE: Has selection - clear all directly via state
+        this.tableInteraction$.clearSelection();
+        fileLog.info('✅ Clear selection triggered reactively');
       }
     });
   }
