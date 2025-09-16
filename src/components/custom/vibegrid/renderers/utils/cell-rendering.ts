@@ -28,7 +28,9 @@ export function createCellElement(
     borderRight: '1px solid var(--border)',
     flexShrink: '0',
     overflow: 'hidden',
-    minWidth: '0'
+    minWidth: '0',
+    // border: '1px solid green !important',
+    boxSizing: 'border-box'
   });
   
   return cell;

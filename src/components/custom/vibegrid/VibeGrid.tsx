@@ -1,9 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { createPureObservables } from './stores/pure-observables';
+import { createTableCore$, createTableCoreSync$ } from './stores/data-state';
+import { createTableInteraction$ } from './stores/interaction-state';
 import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
 import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
 import type { Column } from './types';
 import { log } from '@/logger';
+import { visualOperations, visualState$, visualSyncStatus$ } from './stores/visual-state';
+import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
+import { observable } from '@legendapp/state';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -54,7 +58,7 @@ interface VibeGridProps<T = any> {
 export function VibeGrid<T extends Record<string, any> = any>(
   props: VibeGridProps<T>
 ): React.ReactElement {
-  
+
   const {
     tableId,
     entityType,
@@ -100,8 +104,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // ====================================
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
+    // Initialize observables and setup persistence checking
+    const initializeVibeGrid = () => {
     try {
       fileLog.info('🚀 Initializing VibeGrid', {
         tableId,
@@ -109,23 +113,91 @@ export function VibeGrid<T extends Record<string, any> = any>(
         columnCount: columns.length
       });
 
-      // Create the three-layer observables
-      const observables = createPureObservables(entityType, columns);
+      // Create the three-layer observables directly
+      const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns);
+      const tableInteraction$ = createTableInteraction$(tableCore$);
+
+      // Create a proper viewport observable with Legend State observables for each property
+      const tableViewport$ = {
+        scrollTop: observable(0),
+        scrollLeft: observable(0),
+        viewportWidth: observable(0),
+        viewportHeight: observable(0),
+        updateViewport(width: number, height: number) {
+          tableViewport$.viewportWidth.set(width);
+          tableViewport$.viewportHeight.set(height);
+        },
+        updateScroll(scrollTop: number, scrollLeft: number) {
+          tableViewport$.scrollTop.set(scrollTop);
+          tableViewport$.scrollLeft.set(scrollLeft);
+        }
+      };
+
+      const observables = {
+        tableCore$,
+        tableCoreSync$,
+        tableInteraction$,
+        tableViewport$
+      };
       observablesRef.current = observables;
 
       fileLog.debug('✅ Created pure observables', { entityType });
 
-      // Wait for persistence to load before initializing renderer
-      const checkPersistLoaded = () => {
-        const isLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
-        fileLog.debug('🔄 Checking persistence loaded state', { 
-          entityType, 
-          isPersistLoaded: isLoaded 
+      // Initialize centralized visual state
+      const orgId = universeOrgId$.get();
+      const userId = universeUserId$.get();
+      if (orgId && userId) {
+        visualOperations.initializeColumns(columns, entityType, orgId, userId);
+        fileLog.info('🎯 Visual state initialized with persistence', { entityType, orgId, userId });
+      } else {
+        fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
+      }
+
+      // Wait for BOTH persistence to load AND container ref to be available
+      let retryCount = 0;
+      const maxRetries = 50; // Max 2.5 seconds (50ms * 50)
+
+      const checkReadyToInitializeRenderer = () => {
+        // First check if container ref is available
+        if (!containerRef.current) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            fileLog.debug(`🔄 Container ref not ready, retrying in 50ms (attempt ${retryCount}/${maxRetries})`);
+            setTimeout(checkReadyToInitializeRenderer, 50);
+            return;
+          } else {
+            fileLog.error('❌ Container ref is null after max retries, giving up');
+            setError('Container element not available for VibeGrid initialization');
+            return;
+          }
+        }
+
+        // Check if BOTH data and visual persistence is loaded
+        let dataLoaded = true; // Default to true since we fixed the columns parameter
+        if (observables.tableCoreSync$ && typeof observables.tableCoreSync$.isPersistLoaded !== 'undefined') {
+          dataLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
+        }
+
+        let visualLoaded = false;
+        if (visualSyncStatus$ && typeof visualSyncStatus$.isPersistenceDataLoaded !== 'undefined') {
+          visualLoaded = visualSyncStatus$.isPersistenceDataLoaded?.get();
+        }
+
+        const isPersistenceLoaded = dataLoaded && visualLoaded;
+
+        fileLog.debug('🔄 Checking readiness for renderer initialization', {
+          entityType,
+          containerReady: !!containerRef.current,
+          dataLoaded,
+          visualLoaded,
+          isPersistenceLoaded,
+          hasDataPersist: !!(observables.tableCoreSync$?.isPersistLoaded),
+          hasVisualPersist: !!(visualSyncStatus$?.isPersistenceDataLoaded)
         });
-        
-        if (isLoaded) {
-          fileLog.debug('✅ Persistence loaded, initializing renderer', { entityType });
-          
+
+        if (isPersistenceLoaded) {
+          fileLog.info('✅ All conditions met, initializing renderer', { entityType });
+
           // Create the SimplePassiveRenderer with enhanced selection
           const renderer = new SimplePassiveRenderer({
             container: containerRef.current,
@@ -143,7 +215,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           setIsPersistLoaded(true);
           setError(null);
 
-          fileLog.debug('✅ SimplePassiveRenderer initialized successfully');
+          fileLog.info('✅ SimplePassiveRenderer initialized successfully');
 
           // Set up event handlers after renderer is created
           if (onSelectionChange) {
@@ -190,18 +262,28 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         } else {
           // Keep checking until persistence loads
-          setTimeout(checkPersistLoaded, 50);
+          retryCount++;
+          if (retryCount < maxRetries) {
+            setTimeout(checkReadyToInitializeRenderer, 50);
+          } else {
+            fileLog.error('❌ Persistence loading timed out, giving up');
+            setError('Persistence loading timed out');
+          }
         }
       };
 
-      // Start checking for persistence loaded state
-      checkPersistLoaded();
+      // Start checking for readiness (both container ref and persistence)
+      checkReadyToInitializeRenderer();
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       fileLog.error('❌ Failed to initialize VibeGrid', err);
       setError(errorMsg);
     }
+    };
+
+    // Call the initialization function
+    initializeVibeGrid();
 
     // Cleanup
     return () => {
@@ -235,9 +317,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // ====================================
 
   const api = useMemo(() => {
-    if (!observablesRef.current) return null;
+    if (!observablesRef.current || !isInitialized || !isPersistLoaded) return null;
 
     const { tableCore$, tableInteraction$, tableViewport$ } = observablesRef.current;
+
+    // Ensure all observables exist before creating API
+    if (!tableCore$ || !tableInteraction$ || !tableViewport$) return null;
 
     return {
       // Data manipulation
@@ -275,9 +360,16 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       // Data access
       getProcessedRows: () => tableCore$.processedRows.get(),
-      getVisibleRange: () => tableViewport$.visibleRange.get(),
+      getVisibleRange: () => {
+        try {
+          return tableViewport$.visibleRange?.get() || { start: 0, end: 10 };
+        } catch (error) {
+          fileLog.error('Error getting visible range', error);
+          return { start: 0, end: 10 };
+        }
+      },
     };
-  }, [isInitialized]);
+  }, [isInitialized, isPersistLoaded]);
 
   // ====================================
   // RENDER

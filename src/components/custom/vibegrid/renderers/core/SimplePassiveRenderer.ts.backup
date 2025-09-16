@@ -5,30 +5,30 @@
  * then we can add overlays back once we have the foundation working.
  */
 
-import { observe, batch } from '@legendapp/state';
+import { observe } from '@legendapp/state';
 import { log } from '@/logger';
-import { visualOperations, visualState$, visualInputs$ } from '../../stores/visual-state';
+import { visualOperations, visualState$ } from '../../stores/visual-state';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
-// New modular architecture imports - ObserverManager will be removed
-// import { ObserverManager, type ObserverManagerOptions, type VisualState } from './ObserverManager';
+// New modular architecture imports
+import { ObserverManager, type ObserverManagerOptions } from './ObserverManager';
 import { DOMElementFactory, type DOMElementFactoryOptions } from '../factories/DOMElementFactory';
 import { HeaderRenderer, type HeaderRendererOptions } from '../components/HeaderRenderer';
 
 // Manager imports (ViewportManager consolidated into visual-state)
-import { BodyRenderer } from '../components/BodyRenderer';
+import { CellRenderer } from '../managers/CellRenderer';
+import { RowRenderer } from '../managers/RowRenderer';
 import { EventManager } from '../managers/EventManager';
 
 // Existing modular components
 import { OverlayManager, type CoordinateMapping } from '../modules/OverlayManager';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
-import { CellFormatter } from '../components/BodyRenderer';
+import { CellFormatter } from '../modules/CellFormatter';
 import { SelectionController } from '../modules/SelectionController';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import { ScrollController } from '../modules/ScrollController';
-import { MouseController } from '../modules/MouseController';
-import { GroupRenderer } from '../components/GroupRenderer';
+import { GroupRenderer } from '../modules/GroupRenderer';
 import { ColumnWidthManager } from '../modules/ColumnWidthManager';
 
 // Utility imports
@@ -70,9 +70,6 @@ export class SimplePassiveRenderer {
   private activeRows: Map<string, HTMLElement> = new Map();
   private lastVisibleColumns: { start: number; end: number } | null = null;
   private lastVisibleRows: { start: number; end: number } | null = null;
-
-  // Visual state tracking for change detection
-  private lastVisualState: VisualState | null = null;
   
   // Overlay management
   private overlayManager: OverlayManager | null = null;
@@ -103,21 +100,17 @@ export class SimplePassiveRenderer {
   private selectionController: SelectionController | null = null;
   private keyboardNavController: KeyboardNavigationController | null = null;
   private scrollController: ScrollController | null = null;
-  private mouseController: MouseController | null = null;
   private groupRenderer: GroupRenderer | null = null;
   private columnWidthManager: ColumnWidthManager | null = null;
   
-  // Focused observers - replacing mega-observer pattern
-  private dataObserverDisposer: (() => void) | null = null;
-  private visualObserverDisposer: (() => void) | null = null;
-  private interactionObserverDisposer: (() => void) | null = null;
-  private scrollObserverDisposer: (() => void) | null = null;
-  private dragSelectionObserverDisposer: (() => void) | null = null;
+  // New modular components (Phase 1 additions)
+  private observerManager: ObserverManager | null = null;
   private domFactory: DOMElementFactory | null = null;
   private headerRenderer: HeaderRenderer | null = null;
   
   // Phase 2 manager additions
-  private bodyRenderer: BodyRenderer | null = null;
+  private cellRenderer: CellRenderer | null = null;
+  private rowRenderer: RowRenderer | null = null;
   // ViewportManager consolidated into visual-state
   private eventManager: EventManager | null = null;
   
@@ -135,7 +128,7 @@ export class SimplePassiveRenderer {
     this.initPhase2Managers();
     this.initOverlayManager();
     this.initHeaderRenderer();
-    this.initFocusedObservers();
+    this.initObserverManager();
     this.postInitialization();
   }
   
@@ -202,24 +195,35 @@ export class SimplePassiveRenderer {
   private initPhase2Managers(): void {
     fileLog.info('🚀 Initializing Phase 2 managers');
     
-    // Initialize GroupRenderer first (needed by BodyRenderer)
+    // Initialize GroupRenderer first (needed by RowRenderer)
     this.groupRenderer = new GroupRenderer({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
       domFactory: this.domFactory!,
       createElement: this.createElement.bind(this)
     });
 
-    // Initialize BodyRenderer (consolidated cell and row rendering)
-    this.bodyRenderer = new BodyRenderer({
+    // Initialize CellRenderer (dependency for RowRenderer)
+    this.cellRenderer = new CellRenderer({
       tableCore$: this.tableCore$,
       tableInteraction$: this.tableInteraction$,
       tableViewport$: this.tableViewport$,
       domFactory: this.domFactory!,
-      selectionController: this.selectionController,
       keyboardNavController: this.keyboardNavController,
-      enableSelectionColumn: this.options.enableSelectionColumn,
       container: this.container,
-      createElement: this.createElement.bind(this),
       onEntityUpdate: this.options.onEntityUpdate
+    });
+    
+    // Initialize RowRenderer (depends on CellRenderer)
+    this.rowRenderer = new RowRenderer({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      domFactory: this.domFactory!,
+      cellRenderer: this.cellRenderer,
+      selectionController: this.selectionController,
+      enableSelectionColumn: this.options.enableSelectionColumn,
+      createElement: this.createElement.bind(this)
     });
     
     // ViewportManager functionality now consolidated in visual-state.ts
@@ -257,148 +261,59 @@ export class SimplePassiveRenderer {
   }
 
   /**
-   * Initialize Focused Observers - replaces mega-observer anti-pattern
-   * Each observer handles only its specific concern for optimal performance
+   * Initialize Observer Manager (replaces setupObservers)
    */
-  private initFocusedObservers(): void {
-    fileLog.info('🎯 Initializing focused observers');
-
-    // DATA OBSERVER: Only watches data changes (rows, sorting, filtering)
-    this.dataObserverDisposer = observe(() => {
-      const processedRows = this.tableCore$.processedRows.get();
-      const sortBy = this.tableCore$.sortBy.get();
-
-      fileLog.debug('📊 Data changed - rendering body only', {
-        rowCount: processedRows.length,
-        sortFields: sortBy.length
-      });
-
-      // Only render body for data changes, no layout recalc
-      this.renderBody();
-      this.updateSortIndicators();
-    });
-
-    // VISUAL OBSERVER: Only watches layout changes (columns, viewport dimensions)
-    this.visualObserverDisposer = observe(() => {
-      const visualState = visualState$.get();
-
-      fileLog.debug('🎨 Visual layout changed - updating layout only', {
-        columnCount: visualState.columnLayouts.length,
-        totalWidth: visualState.geometry.totalWidth,
-        viewportSize: `${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`
-      });
-
-      // Only update layout, no data processing
-      this.renderHeader();
-      this.renderBody(); // Body needs re-render for column changes
-    });
-
-    // INTERACTION OBSERVER: Only watches interaction changes (selection, editing, drag)
-    this.interactionObserverDisposer = observe(() => {
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      const editingCell = this.tableInteraction$.editingCell.get();
-      const editValue = this.tableInteraction$.editValue.get();
-      const selectAllState = this.tableInteraction$.selectAllCheckboxState.get();
-      const columnResize = this.tableInteraction$.columnResize.get();
-      const isDragging = this.tableInteraction$.isDragging.get();
-      const dragSource = this.tableInteraction$.dragSource.get();
-      const dragTarget = this.tableInteraction$.dragTarget.get();
-      const isDragSelecting = this.tableInteraction$.isDragSelecting.get();
-      const dragSelectStart = this.tableInteraction$.dragSelectStart.get();
-      const dragSelectCurrent = this.tableInteraction$.dragSelectCurrent.get();
-
-      fileLog.info('🖱️ INTERACTION OBSERVER TRIGGERED', {
-        selectedCount: selectedCells.size,
-        isEditing: !!editingCell,
-        isDragging,
-        isDragSelecting,
-        isResizing: !!columnResize?.isResizing
-      });
-
-      // Only update DOM classes and overlays, no re-renders
-      this.updateDOMSelectionClasses(selectedCells);
-      this.updateSelectAllCheckboxVisual(selectAllState);
-
-      if (this.overlayManager) {
-        // Update selection overlay
-        this.overlayManager.updateSelection(selectedCells);
-
-        // DISABLED: Update editing overlay (now handled by reactive observer in OverlayManager)
-        // this.overlayManager.updateEditingOverlay(editingCell, editValue);
-
-        // Update drag preview overlay
-        if (isDragging && dragSource) {
-          const dragState = {
-            isDragging: true,
-            startCell: dragSource,
-            currentCell: dragTarget || dragSource
-          };
-          this.overlayManager.updateColumnDragPreview(dragState);
-        } else {
-          this.overlayManager.updateColumnDragPreview(null);
-        }
-
-        // Update column resize preview
-        this.overlayManager.updateColumnResizePreview(columnResize);
-      }
-
-      // Handle column resize with direct DOM updates (no re-render)
-      if (columnResize?.isResizing && columnResize.columnId && columnResize.newWidth) {
-        this.columnWidthManager?.updateHeaderCellWidth(columnResize.columnId, columnResize.newWidth);
-        this.columnWidthManager?.updateBodyCellWidths(columnResize.columnId, columnResize.newWidth);
+  private initObserverManager(): void {
+    fileLog.info('🔍 Initializing Observer Manager');
+    
+    this.observerManager = new ObserverManager({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      tableViewport$: this.tableViewport$,
+      overlayManager: this.overlayManager,
+      
+      // Callback functions for renderer actions
+      onColumnsChanged: () => {
+        this.renderHeader();
+        this.renderBody();
+      },
+      onColumnVisibilityChanged: () => {
+        this.renderHeader();
+        this.renderBody();
+      },
+      onRowsChanged: () => {
+        this.renderBody();
+      },
+      onViewportChanged: () => {
+        this.handleViewportChange();
+      },
+      onSelectionChanged: (selectedCells: Set<string>) => {
+        this.updateDOMSelectionClasses(selectedCells);
+      },
+      onEditingChanged: (editingCell: string | null, editValue?: string) => {
+        // Editing is handled by overlay manager
+      },
+      onSelectAllCheckboxChanged: (state: { checked: boolean; indeterminate: boolean }) => {
+        this.updateSelectAllCheckboxVisual(state);
+      },
+      onSortChanged: () => {
+        this.updateSortIndicators();
+      },
+      onDragChanged: () => {
+        // Drag changes are handled by overlay manager
+      },
+      
+      // Column resize handlers - delegate to ColumnWidthManager
+      updateHeaderCellWidth: (columnId: string, newWidth: number) => {
+        this.columnWidthManager?.updateHeaderCellWidth(columnId, newWidth);
+      },
+      updateBodyCellWidths: (columnId: string, newWidth: number) => {
+        this.columnWidthManager?.updateBodyCellWidths(columnId, newWidth);
       }
     });
-
-    // SCROLL OBSERVER: Only watches scroll position (most frequent updates)
-    this.scrollObserverDisposer = observe(() => {
-      const scrollLeft = visualInputs$.scrollLeft.get();
-      const scrollTop = visualInputs$.scrollTop.get();
-
-      fileLog.debug('📜 Scroll changed - updating transforms only', {
-        scrollLeft,
-        scrollTop
-      });
-
-      // Only update CSS transforms, no re-renders
-      if (this.headerViewport) {
-        this.headerViewport.style.transform = `translateX(-${scrollLeft}px)`;
-      }
-    });
-
-    // DRAG SELECTION OBSERVER: Watches drag selection state and mouse coordinates
-    this.dragSelectionObserverDisposer = observe(() => {
-      const isDragSelecting = this.tableInteraction$.isDragSelecting.get();
-      const mouseX = this.tableInteraction$.mouseX.get();
-      const mouseY = this.tableInteraction$.mouseY.get();
-      const startCell = this.tableInteraction$.dragSelectStart.get();
-
-      if (isDragSelecting && startCell && mouseX > 0 && mouseY > 0) {
-        // Find current cell at mouse position
-        const targetElement = document.elementFromPoint(mouseX, mouseY);
-        const cellElement = targetElement?.closest('[data-row-id][data-column-id]');
-
-        if (cellElement) {
-          const rowId = cellElement.getAttribute('data-row-id');
-          const columnId = cellElement.getAttribute('data-column-id');
-          const currentCell = `${rowId}:${columnId}`;
-
-          // Compute rectangular selection range with all interior cells
-          const dragRange = this.calculateRectangularSelection(startCell, currentCell);
-          this.tableInteraction$.selectedCells.set(new Set(dragRange));
-
-          fileLog.debug('🎯 Drag selection updated reactively', {
-            startCell,
-            currentCell,
-            rangeSize: dragRange.length,
-            mousePos: { mouseX, mouseY }
-          });
-        }
-      }
-    });
-
-    fileLog.info('✅ Focused observers initialized');
+    
+    fileLog.info('✅ Observer Manager initialized');
   }
-
 
   /**
    * Initialize Header Renderer
@@ -446,9 +361,11 @@ export class SimplePassiveRenderer {
       headerViewport: this.headerViewport,
       container: this.container,
       onScroll: (scrollLeft: number, scrollTop: number) => {
-        // Only update viewport observable (consolidated visual observer handles the rest)
-        // Visual operations are triggered by the consolidated observer, not directly here
+        // Update viewport observable (triggers all reactive updates)
         this.tableViewport$.updateScroll(scrollTop, scrollLeft);
+
+        // Update centralized visual state
+        visualOperations.setScrollPosition(scrollLeft, scrollTop);
 
         // DEBUGGING: Log detailed width calculations during scroll
         const visualState = visualState$.get();
@@ -487,14 +404,6 @@ export class SimplePassiveRenderer {
       tableInteraction$: this.tableInteraction$
     });
 
-    // Initialize MouseController for centralized mouse event handling
-    this.mouseController = new MouseController({
-      container: this.container,
-      bodyRenderer: this.bodyRenderer,
-      scrollController: this.scrollController,
-      tableInteraction$: this.tableInteraction$
-    });
-
     // Configure ColumnWidthManager with DOM containers
     if (this.columnWidthManager) {
       this.columnWidthManager.setContainers({
@@ -515,12 +424,9 @@ export class SimplePassiveRenderer {
       this.eventManager.setupEventHandling();
     }
 
-    // Apply Legend State batching for initial render to prevent multiple layout calculations
-    batch(() => {
-      // Initial render
-      this.renderHeader();
-      this.renderBody();
-    });
+    // Initial render
+    this.renderHeader();
+    this.renderBody();
 
     fileLog.info('✅ Post-initialization complete');
   }
@@ -529,11 +435,6 @@ export class SimplePassiveRenderer {
    * Initialize DOM structure
    */
   private initDOM(): void {
-    if (!this.container) {
-      fileLog.error('❌ Container is null - cannot initialize DOM');
-      return;
-    }
-
     this.container.innerHTML = '';
     
     // Create basic table structure
@@ -685,12 +586,12 @@ export class SimplePassiveRenderer {
    * Render table body
    */
   private renderBody(): void {
-    if (!this.bodyContainer || !this.bodyRenderer) return;
+    if (!this.bodyContainer || !this.rowRenderer) return;
     
     const rows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
-
+    
     // Debug: Check if we have group rows (Legend State rows don't have type property)
     const groupRows = rows.filter((row: any) => row.type === 'group');
     const dataRows = rows.filter((row: any) => !row.type || row.type !== 'group'); // All non-group rows are data
@@ -699,13 +600,15 @@ export class SimplePassiveRenderer {
       rowCount: rows.length,
       columnCount: columns.length,
       groupRows: groupRows.length,
-      dataRows: dataRows.length
+      dataRows: dataRows.length,
+      firstRowType: rows[0]?.type || 'data (no type property)',
+      firstRowData: rows[0]
     });
-
+    
     this.bodyContainer.innerHTML = '';
     
     // Clear active rows in RowRenderer
-    this.bodyRenderer.clearActiveRows();
+    this.rowRenderer.clearActiveRows();
     
     // Update content dimensions in visual state
     const totalHeight = rows.length * 40; // ROW_HEIGHT
@@ -737,11 +640,8 @@ export class SimplePassiveRenderer {
     const endColIndex = visibleColumnRange.end;
     const virtualColumnLayouts = visibleColumnLayouts.slice(startColIndex, endColIndex);
 
-    // Calculate base offset including drag column width for grouped mode
-    const baseOffset = this.calculateBaseOffset();
-
     // Use pre-computed starting x position from unified visual state - NO duplicate calculation
-    const startX = startColIndex > 0 ? visibleColumnLayouts[startColIndex].xOffset : baseOffset;
+    const startX = startColIndex > 0 ? visibleColumnLayouts[startColIndex].xOffset : 40;
 
     // Convert column layouts back to columns for compatibility with existing renderer
     const virtualColumns = virtualColumnLayouts.map(layout =>
@@ -762,9 +662,9 @@ export class SimplePassiveRenderer {
           isExpanded: row.isExpanded,
           data: row.data
         });
-        rowElement = this.bodyRenderer.createGroupHeaderElement(row, actualRowIndex);
+        rowElement = this.rowRenderer.createGroupHeaderElement(row, actualRowIndex);
       } else {
-        rowElement = this.bodyRenderer.createRowElement(row, actualRowIndex, virtualColumns, columnVisibility, startX);
+        rowElement = this.rowRenderer.createRowElement(row.data || row, actualRowIndex, virtualColumns, columnVisibility, startX);
       }
       
       this.bodyContainer.appendChild(rowElement);
@@ -795,14 +695,6 @@ export class SimplePassiveRenderer {
     if (rowMappingChanged) {
       this.coordinateMapping.rows = newRows;
       this.coordinateMapping.version++;
-
-      fileLog.debug('🔄 Row coordinate mapping updated', {
-        newRowCount: newRows.length,
-        firstRowId: newRows[0]?.rowId,
-        mappingVersion: this.coordinateMapping.version,
-        sampleRows: newRows.slice(0, 3).map(r => ({ id: r.rowId, y: r.y }))
-      });
-
       // Sync coordinate mapping with overlay manager
       this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
     }
@@ -884,63 +776,6 @@ export class SimplePassiveRenderer {
   // Removed redundant formatting methods - now using centralized display formatters
   
   /**
-   * Handle consolidated visual state changes - batched column, visibility, and viewport updates
-   * This prevents cascade effects and reduces render cycles from 5+ to 1
-   */
-  private handleConsolidatedVisualStateChange(visualState: VisualState): void {
-    fileLog.info('🎨 Consolidated visual state change - batched render coordination', {
-      columnCount: visualState.columns.length,
-      hiddenColumns: Object.values(visualState.columnVisibility).filter(v => v === false).length,
-      viewport: visualState.viewport
-    });
-
-    // Apply Legend State batching pattern to prevent multiple DOM updates
-    batch(() => {
-      // Determine what actually changed to optimize renders
-      const previousState = this.lastVisualState;
-
-      // Check if header needs to be re-rendered
-      const needsHeaderRender = !previousState ||
-        previousState.columns.length !== visualState.columns.length ||
-        JSON.stringify(previousState.columnVisibility) !== JSON.stringify(visualState.columnVisibility) ||
-        JSON.stringify(previousState.columns.map(c => c.width)) !== JSON.stringify(visualState.columns.map(c => c.width));
-
-      // Check if body needs to be re-rendered (viewport changes affect body virtual scrolling)
-      const needsBodyRender = !previousState ||
-        previousState.viewport.scrollTop !== visualState.viewport.scrollTop ||
-        previousState.viewport.scrollLeft !== visualState.viewport.scrollLeft ||
-        previousState.viewport.viewportWidth !== visualState.viewport.viewportWidth ||
-        previousState.viewport.viewportHeight !== visualState.viewport.viewportHeight ||
-        needsHeaderRender; // Body depends on header changes
-
-      fileLog.debug('🎯 Render decisions', {
-        needsHeaderRender,
-        needsBodyRender,
-        hasLastState: !!previousState
-      });
-
-      // Single coordinated render cycle instead of separate renders
-      if (needsHeaderRender) {
-        this.renderHeader();
-      }
-
-      if (needsBodyRender) {
-        this.renderBody();
-      }
-
-      // Store current state for next comparison
-      this.lastVisualState = {
-        columns: [...visualState.columns],
-        columnVisibility: { ...visualState.columnVisibility },
-        viewport: { ...visualState.viewport }
-      };
-    });
-
-    // Viewport handling is now fully integrated into consolidated visual state
-    // No need to call handleViewportChange() as it would duplicate the work
-  }
-
-  /**
    * Handle viewport changes (scroll and dimension updates)
    * Triggers virtual scrolling updates when visible range changes
    */
@@ -957,7 +792,7 @@ export class SimplePassiveRenderer {
 
     // DEBUG: Log trigger analysis to identify excessive rendering
     fileLog.info('🔍 VIEWPORT CHANGE TRIGGER FIXED', {
-      scrollLeft: this.tableViewport$?.scrollLeft?.get?.() || 0,
+      scrollLeft: this.tableViewport$.scrollLeft.get(),
       visibleColumns: visibleColumns ? `${visibleColumns.start}-${visibleColumns.end}` : 'null',
       previousColumns: `${previousColumns.start}-${previousColumns.end}`,
       columnsChanged,
@@ -965,7 +800,7 @@ export class SimplePassiveRenderer {
     });
 
     // Check if vertical rows have changed (for virtual scrolling)
-    const visibleRows = this.tableViewport$?.visibleRows?.get?.() || { start: 0, end: 10 };
+    const visibleRows = this.tableViewport$.visibleRows.get();
     const previousRows = this.lastVisibleRows || { start: -1, end: -1 };
     const rowsChanged = visibleRows && (
       visibleRows.start !== previousRows.start ||
@@ -988,13 +823,8 @@ export class SimplePassiveRenderer {
     if (columnsChanged && visibleColumns) {
       // Horizontal scrolling with column changes - full re-render
       this.lastVisibleColumns = visibleColumns;
-
-      // Apply Legend State batching for coordinated header/body re-render
-      batch(() => {
-        this.renderHeader();
-        this.renderBody();
-      });
-
+      this.renderHeader();
+      this.renderBody();
       fileLog.info('🔄 Full re-render: columns changed', { visibleColumns });
     } else if (rowsChanged && visibleRows) {
       // Vertical scrolling with row changes - body only
@@ -1006,115 +836,17 @@ export class SimplePassiveRenderer {
       fileLog.debug('⏭️ Viewport change skipped re-render (no visible range changes)');
     }
   }
-
-  // ====================================
-  // UTILITY METHODS
-  // ====================================
-
-  /**
-   * Calculate rectangular selection range including all interior cells
-   */
-  private calculateRectangularSelection(startCell: string, endCell: string): string[] {
-    const [startRowId, startColId] = startCell.split(':');
-    const [endRowId, endColId] = endCell.split(':');
-
-    // Get current data and columns for range calculation
-    const processedRows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
-    const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-
-    // Find row and column indices
-    const startRowIndex = processedRows.findIndex((row: any) => row.id === startRowId);
-    const endRowIndex = processedRows.findIndex((row: any) => row.id === endRowId);
-    const startColIndex = visibleColumns.findIndex(col => col.id === startColId);
-    const endColIndex = visibleColumns.findIndex(col => col.id === endColId);
-
-    if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-      // Fallback to just the two cells if indices not found
-      return [startCell, endCell];
-    }
-
-    // Ensure proper ordering (top-left to bottom-right)
-    const minRowIndex = Math.min(startRowIndex, endRowIndex);
-    const maxRowIndex = Math.max(startRowIndex, endRowIndex);
-    const minColIndex = Math.min(startColIndex, endColIndex);
-    const maxColIndex = Math.max(startColIndex, endColIndex);
-
-    // Generate all cells in the rectangular range
-    const selectedCells: string[] = [];
-    for (let rowIndex = minRowIndex; rowIndex <= maxRowIndex; rowIndex++) {
-      for (let colIndex = minColIndex; colIndex <= maxColIndex; colIndex++) {
-        const row = processedRows[rowIndex];
-        const column = visibleColumns[colIndex];
-        if (row && column) {
-          selectedCells.push(`${row.id}:${column.id}`);
-        }
-      }
-    }
-
-    fileLog.debug('🔢 Calculated rectangular selection', {
-      startCell,
-      endCell,
-      rowRange: `${minRowIndex}-${maxRowIndex}`,
-      colRange: `${minColIndex}-${maxColIndex}`,
-      totalCells: selectedCells.length
-    });
-
-    return selectedCells;
-  }
-
-  /**
-   * Calculate base X offset including drag column width (always present for consistent layout)
-   */
-  private calculateBaseOffset(): number {
-    const ROW_HEADER_WIDTH = 40;
-    const DRAG_COLUMN_WIDTH = 30;
-
-    // Always include both columns for consistent layout
-    return DRAG_COLUMN_WIDTH + ROW_HEADER_WIDTH;  // 30px + 40px = 70px
-  }
-
-  /**
-   * Check if we're currently in grouped mode
-   */
-  private isGroupedMode(): boolean {
-    try {
-      const groupConfig = visualOperations.getGroupConfig();
-      return groupConfig && groupConfig.fields && groupConfig.fields.length > 0;
-    } catch (error) {
-      // If visual operations aren't available, fallback to direct check
-      const tableCore = this.tableCore$.get();
-      return tableCore.grouping && tableCore.grouping.fields && tableCore.grouping.fields.length > 0;
-    }
-  }
-
+  
   /**
    * Destroy the renderer
    */
   destroy(): void {
     fileLog.info('🧹 Destroying SimplePassiveRenderer with Phase 2 managers');
     
-    // Clean up focused observers
-    if (this.dataObserverDisposer) {
-      this.dataObserverDisposer();
-      this.dataObserverDisposer = null;
-    }
-    if (this.visualObserverDisposer) {
-      this.visualObserverDisposer();
-      this.visualObserverDisposer = null;
-    }
-    if (this.interactionObserverDisposer) {
-      this.interactionObserverDisposer();
-      this.interactionObserverDisposer = null;
-    }
-    if (this.scrollObserverDisposer) {
-      this.scrollObserverDisposer();
-      this.scrollObserverDisposer = null;
-    }
-    if (this.dragSelectionObserverDisposer) {
-      this.dragSelectionObserverDisposer();
-      this.dragSelectionObserverDisposer = null;
+    // Clean up observers (managed by ObserverManager)
+    if (this.observerManager) {
+      this.observerManager.destroy();
+      this.observerManager = null;
     }
     
     // Clean up Phase 2 managers
@@ -1131,12 +863,6 @@ export class SimplePassiveRenderer {
       this.scrollController = null;
     }
 
-    // Clean up MouseController
-    if (this.mouseController) {
-      this.mouseController.destroy();
-      this.mouseController = null;
-    }
-
     // Clean up ColumnWidthManager
     if (this.columnWidthManager) {
       this.columnWidthManager.destroy();
@@ -1150,7 +876,8 @@ export class SimplePassiveRenderer {
     }
 
     // RowRenderer and CellRenderer don't need explicit cleanup
-    this.bodyRenderer = null;
+    this.rowRenderer = null;
+    this.cellRenderer = null;
     
     // Clean up legacy disposers (if any remain)
     this.disposers.forEach(dispose => dispose());
@@ -1272,18 +999,6 @@ export class SimplePassiveRenderer {
    */
   private editTagsField(currentValue: string, row: any, column: any): void {
     const cellId = `${row.id}:${column.id}`;
-
-    // Check if column is editable before starting edit mode
-    if (column.editable === false) {
-      fileLog.info('🏷️ Tags field clicked - but column is not editable', {
-        cellId,
-        rowId: row.id,
-        columnId: column.id,
-        editable: column.editable
-      });
-      return;
-    }
-
     fileLog.info('🏷️ Starting tags field edit mode', {
       cellId,
       currentValue,
@@ -1291,7 +1006,7 @@ export class SimplePassiveRenderer {
       columnId: column.id,
       currentTags: currentValue.split(',').map(t => t.trim()).filter(t => t.length > 0)
     });
-
+    
     // Trigger the standard VibeGrid edit mode - the editor selection system
     // will automatically choose MultiSelectEditor for tags fields
     this.tableInteraction$.startEdit(cellId, currentValue);

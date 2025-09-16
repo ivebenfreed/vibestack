@@ -18,10 +18,9 @@ export function getUpdateFunction(entityType: VibeGridXEntityType | null) {
     }
     
     try {
-      // Convert entity type to proper case for Legend State entity names
-      const entityName = entityType.charAt(0).toUpperCase() + entityType.slice(1);
-      await entityOperations.updateEntity(entityName, id, updates);
-      fileLog.info(`[getUpdateFunction] Successfully updated ${entityName}:${id}`);
+      // Entity type should already be in proper PascalCase format (e.g., "WorkTask")
+      await entityOperations.updateEntity(entityType, id, updates);
+      fileLog.info(`[getUpdateFunction] Successfully updated ${entityType}:${id}`);
     } catch (error) {
       fileLog.error(`[getUpdateFunction] Failed to update ${entityType}:${id}:`, error);
       throw error;

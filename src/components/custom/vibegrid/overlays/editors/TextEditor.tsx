@@ -22,41 +22,78 @@ function TextEditorComponent({
   onBlur,
   multiline = false
 }: TextEditorProps) {
-  
+
   const [value, setValue] = React.useState(initialValue || '');
   const inputRef = React.useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-  
+  const hasUserInteracted = React.useRef(false);
+  const blurTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
   React.useEffect(() => {
-    // Select text immediately on mount
-    if (inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
+    // Select text immediately on mount with a small delay to ensure proper focus
+    const timeoutId = setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+        console.log('🔍 TextEditor: Initial focus and select completed');
+      }
+    }, 10); // Small delay to ensure DOM is ready
+
+    return () => clearTimeout(timeoutId);
   }, []);
-  
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    hasUserInteracted.current = true; // Mark as user-initiated
+
     switch (e.key) {
       case 'Enter':
         if (!multiline || !e.shiftKey) {
           e.preventDefault();
+          console.log('🔍 TextEditor: Commit via Enter key');
           onCommit(value);
         }
         break;
       case 'Escape':
         e.preventDefault();
+        console.log('🔍 TextEditor: Cancel via Escape key');
         onCancel();
         break;
       case 'Tab':
         e.preventDefault();
+        console.log('🔍 TextEditor: Commit via Tab key');
         onCommit(value);
         break;
     }
   };
 
   const handleBlur = () => {
-    // Commit on blur - this is standard behavior
-    if (onCommit) {
-      onCommit(value);
+    console.log('🔍 TextEditor: Blur event triggered', {
+      hasUserInteracted: hasUserInteracted.current,
+      value,
+      cellId: `${cell.rowId}:${cell.columnId}`
+    });
+
+    // If user has interacted, commit the changes
+    if (hasUserInteracted.current && onCommit) {
+      // Add a small delay to distinguish between accidental blur and intentional blur
+      blurTimeoutRef.current = setTimeout(() => {
+        console.log('🔍 TextEditor: Committing value on blur after delay');
+        onCommit(value);
+      }, 100);
+    } else {
+      // If no user interaction, cancel the edit (this will hide the overlay)
+      console.log('🔍 TextEditor: Cancelling edit on blur - no user interaction detected');
+      if (onCancel) {
+        onCancel();
+      }
+    }
+  };
+
+  const handleFocus = () => {
+    // Cancel any pending blur commit when regaining focus
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+      console.log('🔍 TextEditor: Cancelled blur commit due to refocus');
     }
   };
 
@@ -89,6 +126,7 @@ function TextEditorComponent({
   };
 
   const handleChange = (newValue: string) => {
+    hasUserInteracted.current = true; // Mark as user-initiated change
     console.log('🔍 TextEditor handleChange called with:', newValue);
     setValue(newValue);
     // Only call onUpdate if it's provided
@@ -119,6 +157,7 @@ function TextEditorComponent({
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
+          onFocus={handleFocus}
           style={inputStyle}
           placeholder={column.placeholder}
           onMouseDown={(e) => {
@@ -152,6 +191,7 @@ function TextEditorComponent({
         onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
+        onFocus={handleFocus}
         style={inputStyle}
         type={column.type === 'email' ? 'email' : column.type === 'url' ? 'url' : 'text'}
         placeholder={column.placeholder}

@@ -4,11 +4,13 @@
  */
 
 import { log } from '@/logger';
+import { observe } from '@legendapp/state';
 import { CanvasOverlayDOM } from '../../overlays/CanvasOverlayDOM';
 import { EditingOverlay } from '../../overlays/EditingOverlay';
 import { ContextMenuManager } from '../../components/ContextMenu';
-import { SelectionManager } from '../managers/SelectionManager';
-import type { TableCore$, TableInteraction$ } from '../../stores/pure-observables';
+// SelectionManager functionality consolidated into interaction-state
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { ViewportInfo } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 
@@ -44,7 +46,7 @@ export class OverlayManager {
   
   // Overlay instances
   private canvasOverlay: CanvasOverlayDOM | null = null;
-  private selectionManager: SelectionManager | null = null;
+  // Selection now managed through tableInteraction$ observable
   private editingOverlay: EditingOverlay | null = null;
   private contextMenu: ContextMenuManager | null = null;
   
@@ -68,8 +70,9 @@ export class OverlayManager {
     this.headerContainer = options.headerContainer || null;
     this.bodyContainer = options.bodyContainer || null;
     this.getProcessedRows = options.getProcessedRows;
-    
+
     this.initOverlays();
+    this.setupEditingObserver();
   }
   
   /**
@@ -96,22 +99,8 @@ export class OverlayManager {
     // Canvas overlay will be initialized in initializeOverlay() method
     // after DOM is ready
     
-    // Create selection manager
-    this.selectionManager = new SelectionManager({
-      getCellElement: (rowId: string, columnId: string) => {
-        const cellElement = this.container.querySelector(`[data-cell-id="${rowId}:${columnId}"]`) as HTMLElement;
-        return cellElement;
-      },
-      forEachRowElement: (callback: (element: HTMLElement, rowId: string) => void) => {
-        const rowElements = this.container.querySelectorAll('[data-row-id]');
-        rowElements.forEach((element) => {
-          const rowId = element.getAttribute('data-row-id');
-          if (rowId) callback(element as HTMLElement, rowId);
-        });
-      },
-      getHeaderElement: () => this.headerContainer!,
-      isSelectionColumnEnabled: () => this.enableSelectionColumn
-    });
+    // Selection is now managed through tableInteraction$ observable
+    // Visual updates can be done via tableInteraction$.updateCellSelectionVisuals()
     
     // Create editing overlay
     this.editingOverlay = new EditingOverlay(this.container, {
@@ -182,28 +171,27 @@ export class OverlayManager {
    * Update selection display (optimized with change detection and throttling)
    */
   updateSelection(selectedCells: Set<string>): void {
-    // Quick selection manager update (lightweight)
-    if (this.selectionManager) {
-      this.selectionManager.setSelectedCells(selectedCells);
-    }
+    fileLog.info('🔄 OverlayManager.updateSelection called', {
+      selectedCells: Array.from(selectedCells),
+      cellCount: selectedCells.size
+    });
 
-    // Skip expensive canvas updates if selection hasn't changed
-    if (this.lastSelectedCells && this.areSetsEqual(selectedCells, this.lastSelectedCells)) {
-      return;
-    }
+    // Update selection visuals using interaction-state
+    this.tableInteraction$.selectedCells.set(selectedCells);
 
-    // Store current selection
-    this.lastSelectedCells = new Set(selectedCells);
+    // Always update overlays - no change detection
+    fileLog.info('🎯 Updating overlay for selection', {
+      selectedCells: Array.from(selectedCells)
+    });
 
-    // Throttle expensive canvas overlay updates
+    // Cancel any pending updates and run immediately
     if (this.updateSelectionRAF !== null) {
       cancelAnimationFrame(this.updateSelectionRAF);
+      this.updateSelectionRAF = null;
     }
 
-    this.updateSelectionRAF = requestAnimationFrame(() => {
-      this.updateSelectionRAF = null;
-      this.performCanvasSelectionUpdate(selectedCells);
-    });
+    // Update overlay directly without RAF throttling for better responsiveness
+    this.performCanvasSelectionUpdate(selectedCells);
   }
 
   /**
@@ -241,19 +229,118 @@ export class OverlayManager {
   }
   
   /**
-   * Update editing overlay
+   * REACTIVE: Setup editing overlay observer
+   */
+  private setupEditingObserver(): void {
+    let lastShownCell: string | null = null;
+
+    observe(() => {
+      const editingCell = this.tableInteraction$.editingCell.get();
+      const editValue = this.tableInteraction$.editValue.get();
+      const isEditing = this.tableInteraction$.isEditing.get();
+
+      fileLog.debug('🔍 REACTIVE: Editing observer triggered', {
+        editingCell,
+        isEditing,
+        editValue,
+        lastShownCell,
+        hasOverlay: !!this.editingOverlay
+      });
+
+      if (isEditing && editingCell && this.editingOverlay) {
+        // Only update overlay if the cell has actually changed
+        if (lastShownCell !== editingCell) {
+          const [rowId, columnId] = editingCell.split(':');
+          const columns = this.tableCore$.columns.get();
+          const column = columns.find((c: any) => c.id === columnId);
+
+          if (column) {
+            const position = this.getCellPosition(rowId, columnId);
+            if (position) {
+              const cell = { rowId, columnId };
+              // ALWAYS use the current cell value, ignore reactive editValue for initial display
+              const actualValue = this.getCellValue(rowId, columnId);
+
+              console.log('🔍 REACTIVE OBSERVER: About to call showAt', {
+                editingCell,
+                rowId,
+                columnId,
+                freshValue: actualValue,
+                ignoredReactiveValue: editValue,
+                isLastShownCell: lastShownCell,
+                willCallShowAt: true
+              });
+
+              fileLog.debug('📝 REACTIVE: Getting fresh cell value', {
+                editingCell,
+                rowId,
+                columnId,
+                freshValue: actualValue,
+                ignoredReactiveValue: editValue
+              });
+
+              // Hide previous overlay if different cell
+              if (lastShownCell && lastShownCell !== editingCell) {
+                this.editingOverlay.hide();
+                fileLog.debug('📝 REACTIVE: Hidden previous overlay for different cell', {
+                  from: lastShownCell,
+                  to: editingCell
+                });
+              }
+
+              console.log('🔍 FINAL DEBUG: Calling showAt with exact values', {
+                cellId: `${rowId}:${columnId}`,
+                passedValue: actualValue,
+                valuePreview: typeof actualValue === 'string' ? actualValue.substring(0, 50) + '...' : actualValue
+              });
+
+              this.editingOverlay.showAt(position, cell, column, actualValue);
+
+              fileLog.info('📝 REACTIVE: Editing overlay shown', {
+                editingCell,
+                editValue: actualValue,
+                isEditing,
+                transitionFrom: lastShownCell ? 'different-cell' : 'new-edit'
+              });
+
+              lastShownCell = editingCell;
+            }
+          }
+        } else {
+          fileLog.debug('📝 REACTIVE: Skipping overlay update - same cell', { editingCell });
+        }
+      } else if (this.editingOverlay) {
+        // Clear state when editing stops
+        if (lastShownCell !== null) {
+          this.editingOverlay.hide();
+          lastShownCell = null;
+          fileLog.info('📝 REACTIVE: Editing overlay hidden', {
+            isEditing,
+            editingCell,
+            wasShowing: lastShownCell
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * @deprecated Use reactive observer instead - this will be removed
+   * Update editing overlay (IMPERATIVE - being replaced by reactive observer)
    */
   updateEditingOverlay(editingCell: string | null, editValue?: string): void {
     if (editingCell && this.editingOverlay) {
       const [rowId, columnId] = editingCell.split(':');
       const columns = this.tableCore$.columns.get();
       const column = columns.find((c: any) => c.id === columnId);
-      
+
       if (column) {
         const position = this.getCellPosition(rowId, columnId);
         if (position) {
           const cell = { rowId, columnId };
-          this.editingOverlay.showAt(position, cell, column, editValue || '');
+          // Use the actual editValue from reactive state, or get current cell value
+          const actualValue = editValue !== undefined ? editValue : this.getCellValue(rowId, columnId);
+          this.editingOverlay.showAt(position, cell, column, actualValue);
         }
       }
     } else if (this.editingOverlay) {
@@ -261,6 +348,54 @@ export class OverlayManager {
     }
   }
   
+  /**
+   * Get current cell value from data
+   */
+  private getCellValue(rowId: string, columnId: string): any {
+    const processedRows = this.tableCore$.processedRows.get();
+
+    // Debug the full data structure
+    console.log('🔍 getCellValue DETAILED DEBUG:', {
+      targetRowId: rowId,
+      targetColumnId: columnId,
+      totalRows: processedRows?.length || 0,
+      firstFewRowIds: processedRows?.slice(0, 3).map((r: any) => r.id) || [],
+      allRowIds: processedRows?.map((r: any) => r.id) || [],
+      sampleRowStructure: processedRows?.[0] ? Object.keys(processedRows[0]).slice(0, 8) : 'no rows'
+    });
+
+    const row = processedRows.find((r: any) => r.id === rowId);
+
+    if (!row) {
+      console.log('❌ getCellValue: Row NOT found!', {
+        targetRowId: rowId,
+        availableRowIds: processedRows?.map((r: any) => r.id) || []
+      });
+      return '';
+    }
+
+    const value = row[columnId];
+
+    console.log('✅ getCellValue: Row found, extracting value', {
+      targetRowId: rowId,
+      foundRowId: row.id,
+      targetColumnId: columnId,
+      extractedValue: value,
+      rowKeys: Object.keys(row).slice(0, 8),
+      hasTargetColumn: columnId in row
+    });
+
+    fileLog.info('📄 Getting cell value for editing', {
+      rowId,
+      columnId,
+      foundRow: !!row,
+      cellValue: value,
+      rowKeys: row ? Object.keys(row).slice(0, 5) : []
+    });
+
+    return value;
+  }
+
   /**
    * Update column resize preview
    */
@@ -322,41 +457,83 @@ export class OverlayManager {
    */
   private getVisualCellPositions(selectedCells: Set<string>): VisualCellPosition[] {
     const visualPositions: VisualCellPosition[] = [];
-    
+
     fileLog.info('🎨 Getting visual cell positions', {
       selectedCount: selectedCells.size,
       coordinateMappingRows: this.coordinateMapping.rows.length,
-      coordinateMappingColumns: this.coordinateMapping.columns.length
+      coordinateMappingColumns: this.coordinateMapping.columns.length,
+      coordinateMappingVersion: this.coordinateMapping.version
     });
-    
+
+    // DEBUG: Log the actual cells being requested vs available
+    const availableRowIds = this.coordinateMapping.rows.map(r => r.rowId);
+    const availableColumnIds = this.coordinateMapping.columns.map(c => c.columnId);
+    fileLog.debug('🔍 Available coordinate mapping data:', {
+      availableRowIds: availableRowIds.slice(0, 5), // First 5 for brevity
+      availableColumnIds: availableColumnIds.slice(0, 5), // First 5 for brevity
+      requestedCells: Array.from(selectedCells)
+    });
+
     selectedCells.forEach(cellId => {
       const [rowId, columnId] = cellId.split(':');
+
+      // Debug: Log the coordinate lookup process
+      fileLog.debug('🔍 Looking up coordinates for cell', {
+        cellId,
+        lookingForRowId: rowId,
+        lookingForColumnId: columnId
+      });
+
       const rowInfo = this.coordinateMapping.rows.find(r => r.rowId === rowId);
       const colInfo = this.coordinateMapping.columns.find(c => c.columnId === columnId);
-      
+
       if (rowInfo && colInfo) {
-        visualPositions.push({
+        const visualPos = {
           cellKey: cellId,  // Changed from cellId to cellKey to match VisualCellPosition interface
           x: colInfo.x,
           y: rowInfo.y, // No need to add header height since overlay is inside viewport
           width: colInfo.width,
           height: rowInfo.height
+        };
+        visualPositions.push(visualPos);
+        fileLog.info('✅ Found coordinates for cell', {
+          requestedCell: cellId,
+          foundRowId: rowInfo.rowId,
+          foundColumnId: colInfo.columnId,
+          coordinates: { x: colInfo.x, y: rowInfo.y, width: colInfo.width, height: rowInfo.height }
         });
       } else {
         if (!rowInfo) {
-          fileLog.debug('🔍 Row not found in coordinate mapping', { rowId });
+          fileLog.warn('🔍 Row not found in coordinate mapping', {
+            rowId,
+            cellId,
+            availableCount: this.coordinateMapping.rows.length,
+            firstFewAvailableRowIds: this.coordinateMapping.rows.slice(0, 5).map(r => r.rowId)
+          });
         }
         if (!colInfo) {
-          fileLog.debug('🔍 Column not found in coordinate mapping', { columnId });
+          fileLog.warn('🔍 Column not found in coordinate mapping', {
+            columnId,
+            cellId,
+            availableCount: this.coordinateMapping.columns.length,
+            availableColumnIds: this.coordinateMapping.columns.map(c => c.columnId)
+          });
         }
       }
     });
-    
+
     fileLog.info('✅ Visual positions calculated', {
       inputCells: selectedCells.size,
-      outputPositions: visualPositions.length
+      outputPositions: visualPositions.length,
+      actualPositions: visualPositions.map(pos => ({
+        cellKey: pos.cellKey,
+        x: pos.x,
+        y: pos.y,
+        width: pos.width,
+        height: pos.height
+      }))
     });
-    
+
     return visualPositions;
   }
   
@@ -439,9 +616,8 @@ export class OverlayManager {
     this.lastSelectedCells = null;
     this.lastCoordinateMappingVersion = -1;
 
-    if (this.selectionManager) {
-      this.selectionManager.clearAllSelections();
-    }
+    // Clear selections using interaction-state
+    this.tableInteraction$.clearSelection();
     
     if (this.canvasOverlay) {
       this.canvasOverlay.destroy();
@@ -458,7 +634,7 @@ export class OverlayManager {
       this.contextMenu = null;
     }
     
-    this.selectionManager = null;
+    // Selection cleanup not needed - handled by interaction-state
     
     fileLog.info('✅ Overlay system destroyed');
   }
@@ -473,9 +649,7 @@ export class OverlayManager {
   /**
    * Get selection manager instance
    */
-  getSelectionManager(): SelectionManager | null {
-    return this.selectionManager;
-  }
+  // Selection is managed through tableInteraction$ - no separate manager needed
   
   /**
    * Get editing overlay instance

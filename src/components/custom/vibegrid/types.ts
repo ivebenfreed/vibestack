@@ -257,6 +257,7 @@ export interface VirtualRow {
   level?: number; // Nesting level for groups
   isExpandable?: boolean; // Can be expanded/collapsed
   parentGroupId?: string; // Parent group for data rows
+  groupId?: string; // Group ID for drag-drop operations (same as parentGroupId for data rows)
 }
 
 // Group aggregation configuration and results

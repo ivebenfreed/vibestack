@@ -2,7 +2,8 @@ import React from 'react';
 import { observer } from '@legendapp/state/react';
 import { VibeGridXColumnVisibilityPure } from './VibeGridXColumnVisibilityPure';
 import { GroupConfigDropdownPure } from './GroupConfigDropdownPure';
-import type { TableCore$, TableInteraction$ } from '../stores/pure-observables';
+import type { TableCore$ } from '../stores/data-state';
+import type { TableInteraction$ } from '../stores/interaction-state';
 
 interface VibeGridXHeaderPureProps {
   tableCore$: TableCore$;

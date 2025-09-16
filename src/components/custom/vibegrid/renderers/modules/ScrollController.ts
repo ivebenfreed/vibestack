@@ -76,24 +76,7 @@ export class ScrollController {
   private setupInteractionHandling(): void {
     if (!this.container) return;
 
-    // Add click-outside handler to clear selection
-    const clickHandler = (e: Event) => {
-      const cellElement = (e.target as HTMLElement).closest('[data-row-id][data-column-id]');
-      const headerElement = (e.target as HTMLElement).closest('.vibegridx-header-cell');
-      const viewportElement = (e.target as HTMLElement).closest('.vibegridx-viewport');
-
-      // Only clear selection if click is in the viewport area but not on a cell or header
-      // This prevents clearing when clicking on cells (event bubbling) or outside the table entirely
-      if (viewportElement && !cellElement && !headerElement) {
-        fileLog.info('🖱️ Click outside cells - clearing selection');
-        if (this.onClickOutside) {
-          this.onClickOutside();
-        } else if (this.tableInteraction$?.clearSelection) {
-          this.tableInteraction$.clearSelection();
-        }
-      }
-    };
-    this.addEventListenerTracked(this.container, 'click', clickHandler);
+    // Click handling is now managed by MouseController - no click listener needed here
 
     // Add keyboard event handling for advanced selection and navigation
     const keydownHandler = (e: KeyboardEvent) => {
@@ -114,6 +97,14 @@ export class ScrollController {
           break;
         case 'Escape':
           e.preventDefault();
+
+          // Cancel editing if currently editing
+          if (this.tableInteraction$?.isEditing.get()) {
+            this.tableInteraction$?.cancelEdit();
+            fileLog.info('⌨️ Escape - Edit canceled');
+          }
+
+          // Clear selection and focus
           this.tableInteraction$?.clearSelection();
           this.keyboardNavController?.clear();
           fileLog.info('⌨️ Escape - Clear selection and focus');
@@ -160,20 +151,20 @@ export class ScrollController {
   private handleViewportScroll(event: Event): void {
     const scrollLeft = this.viewport.scrollLeft;
     const scrollTop = this.viewport.scrollTop;
-    
+
     // Only process if scroll position actually changed
     if (scrollLeft !== this.lastScrollLeft || scrollTop !== this.lastScrollTop) {
       this.lastScrollLeft = scrollLeft;
       this.lastScrollTop = scrollTop;
-      
-      // Sync header scroll
+
+      // Sync header scroll immediately (lightweight operation)
       this.syncHeaderScroll(scrollLeft);
-      
-      // Call external scroll handler
+
+      // Call external scroll handler (triggers viewport observer)
       if (this.onScroll) {
         this.onScroll(scrollLeft, scrollTop);
       }
-      
+
       fileLog.info('Viewport scrolled', {
         scrollLeft,
         scrollTop,
@@ -187,14 +178,44 @@ export class ScrollController {
 
   /**
    * Sync header horizontal scroll with body
+   * Uses unified visual state for scroll synchronization
    */
   private syncHeaderScroll(scrollLeft: number): void {
-    if (!this.scrollRAF && this.headerViewport) {
+    fileLog.info('🔄 syncHeaderScroll called', {
+      scrollLeft,
+      hasHeaderViewport: !!this.headerViewport,
+      headerViewportElement: this.headerViewport
+    });
+
+    if (this.headerViewport) {
+      // Cancel any pending RAF to ensure immediate sync
+      if (this.scrollRAF) {
+        cancelAnimationFrame(this.scrollRAF);
+      }
+
       this.scrollRAF = requestAnimationFrame(() => {
         if (this.headerViewport) {
-          this.headerViewport.scrollLeft = scrollLeft;
+          // Apply transform to sync header with body scroll
+          const transform = `translateX(-${scrollLeft}px)`;
+          this.headerViewport.style.transform = transform;
+
+          fileLog.info('🔄 Header transform applied', {
+            scrollLeft,
+            transform,
+            appliedTransform: this.headerViewport.style.transform,
+            headerViewportExists: !!this.headerViewport,
+            headerViewportClassName: this.headerViewport.className
+          });
+        } else {
+          fileLog.error('❌ Header viewport lost in RAF callback');
         }
         this.scrollRAF = null;
+      });
+    } else {
+      fileLog.warn('⚠️ Header viewport not found for scroll sync', {
+        scrollLeft,
+        headerViewport: this.headerViewport,
+        headerViewportType: typeof this.headerViewport
       });
     }
   }
@@ -216,9 +237,9 @@ export class ScrollController {
       behavior: options.behavior || 'auto'
     });
     
-    // Sync header if scrolling horizontally
+    // Sync header position if scrolling horizontally
     if (options.left !== undefined && this.headerViewport) {
-      this.headerViewport.scrollLeft = options.left;
+      this.headerViewport.style.transform = `translateX(-${options.left}px)`;
     }
   }
 
@@ -283,6 +304,52 @@ export class ScrollController {
    */
   setHeaderViewport(headerViewport: HTMLElement | null): void {
     this.headerViewport = headerViewport;
+  }
+
+  /**
+   * Handle outside click events delegated from MouseController
+   * Clears selection when clicking on empty space outside cells
+   */
+  handleOutsideClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    const cellElement = target.closest('[data-row-id][data-column-id]');
+    const headerElement = target.closest('.vibegridx-header-cell');
+    const viewportElement = target.closest('.vibegridx-viewport');
+
+    // Only clear selection if the click is DIRECTLY on the viewport element (empty space)
+    // Not if it bubbled up from a cell or other element
+    const isDirectViewportClick = target === viewportElement ||
+                                 target.classList.contains('vibegridx-viewport') ||
+                                 target.classList.contains('vibegridx-body');
+
+    // Two scenarios to clear selection:
+    // 1. Click within viewport but outside cells (empty space)
+    // 2. Click completely outside the VibeGrid container
+    const shouldClearSelection =
+      // Scenario 1: Click within viewport on empty space
+      (viewportElement && !cellElement && !headerElement && isDirectViewportClick) ||
+      // Scenario 2: Click outside the entire VibeGrid container
+      (!viewportElement && !cellElement && !headerElement);
+
+    if (shouldClearSelection) {
+      const clickType = viewportElement ? 'empty space within viewport' : 'outside VibeGrid container';
+      fileLog.info(`🖱️ Click on ${clickType} - clearing selection`);
+
+      if (this.onClickOutside) {
+        this.onClickOutside();
+      } else if (this.tableInteraction$?.clearSelection) {
+        this.tableInteraction$.clearSelection();
+      } else {
+        fileLog.warn('⚠️ No selection clearing method available');
+      }
+    } else {
+      fileLog.debug('🖱️ Outside click ignored - within interactive elements', {
+        hasViewport: !!viewportElement,
+        hasCell: !!cellElement,
+        hasHeader: !!headerElement,
+        isDirectViewport: isDirectViewportClick
+      });
+    }
   }
 
   /**

@@ -4,29 +4,23 @@
  */
 
 import { log } from '@/logger';
-import type { TableCore$, TableInteraction$ } from '../../stores/pure-observables';
+import { visualOperations } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 
-const fileLog = log('components/custom/vibegrid/renderers/modules/GroupRenderer.ts');
+const fileLog = log('components/custom/vibegrid/renderers/components/GroupRenderer.ts');
 
 const ROW_HEIGHT = 40;
 
 export interface GroupRendererOptions {
-  tableCore$: TableCore$;
-  tableInteraction$: TableInteraction$;
   domFactory: DOMElementFactory;
   createElement: (tag: string, className: string) => HTMLElement;
 }
 
 export class GroupRenderer {
-  private tableCore$: TableCore$;
-  private tableInteraction$: TableInteraction$;
   private domFactory: DOMElementFactory;
   private createElement: (tag: string, className: string) => HTMLElement;
 
   constructor(options: GroupRendererOptions) {
-    this.tableCore$ = options.tableCore$;
-    this.tableInteraction$ = options.tableInteraction$;
     this.domFactory = options.domFactory;
     this.createElement = options.createElement;
 
@@ -114,17 +108,13 @@ export class GroupRenderer {
 
     // Click handler for expand/collapse
     const handleToggle = () => {
-      if (this.tableCore$?.toggleGroupExpansion) {
-        this.tableCore$.toggleGroupExpansion(groupRow.id);
-        fileLog.info('🔄 Group toggled', {
-          groupId: groupRow.id,
-          wasExpanded: isExpanded,
-          field: fieldName,
-          value: displayValue
-        });
-      } else {
-        fileLog.warn('⚠️ toggleGroupExpansion method not available on tableCore$');
-      }
+      visualOperations.toggleGroupExpansion(groupRow.id);
+      fileLog.info('🔄 Group toggled', {
+        groupId: groupRow.id,
+        wasExpanded: isExpanded,
+        field: fieldName,
+        value: displayValue
+      });
     };
 
     expandButton.addEventListener('click', handleToggle);

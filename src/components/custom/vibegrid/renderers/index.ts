@@ -15,6 +15,8 @@ export { UnifiedTableRenderer } from './core/UnifiedTableRenderer';
 // Specialized Components
 export { HeaderRenderer } from './components/HeaderRenderer';
 export type { HeaderRendererOptions } from './components/HeaderRenderer';
+export { BodyRenderer, CellFormatter } from './components/BodyRenderer';
+export { GroupRenderer } from './components/GroupRenderer';
 
 // Factories
 export { DOMElementFactory } from './factories/DOMElementFactory';
@@ -26,7 +28,7 @@ export { SelectionController } from './modules/SelectionController';
 export { KeyboardNavigationController } from './modules/KeyboardNavigationController';
 export { ScrollController } from './modules/ScrollController';
 export { BadgeRenderer } from './modules/BadgeRenderer';
-export { CellFormatter } from './modules/CellFormatter';
+// CellFormatter moved to components/BodyRenderer.ts
 
 // Managers - State and lifecycle management
 export { SelectionManager } from './managers/SelectionManager';
@@ -40,7 +42,7 @@ export { EventSystem } from './systems/EventSystem';
 export { PerformanceSystem } from './systems/PerformanceSystem';
 
 // Engines - Complex rendering pipelines (legacy, to be migrated)
-export { HeaderEngine } from './engines/HeaderEngine';
+// HeaderEngine removed - using HeaderRenderer instead
 export { RowEngine } from './engines/RowEngine';
 export { CellPipeline } from './engines/CellPipeline';
 

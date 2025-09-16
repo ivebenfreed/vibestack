@@ -4,7 +4,8 @@
  */
 
 import { log } from '@/logger';
-import type { TableInteraction$ } from '../../stores/pure-observables';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import { visualOperations } from '../../stores/visual-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/factories/DOMElementFactory.ts');
 
@@ -102,9 +103,7 @@ export class DOMElementFactory {
 
     // Click handler for expand/collapse
     expandButton.addEventListener('click', () => {
-      if (this.tableCore$?.toggleGroupExpansion) {
-        this.tableCore$.toggleGroupExpansion(groupRow.id);
-      }
+      visualOperations.toggleGroupExpansion(groupRow.id);
     });
 
     rowElement.appendChild(expandButton);
@@ -271,7 +270,7 @@ export class DOMElementFactory {
     // Header text
     const headerText = this.createElement('span', 'vibegridx-header-text');
     headerText.style.cssText = 'flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-    headerText.textContent = column.label;
+    headerText.textContent = column.label || column.name || column.id;
     
     textGroup.appendChild(headerText);
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { observer } from '@legendapp/state/react';
-import { Columns3, Eye, EyeOff } from 'lucide-react';
+import { Columns3, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -14,7 +14,10 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import type { Column } from '../types';
-import type { TableCore$, TableInteraction$ } from '../stores/pure-observables';
+import type { TableCore$ } from '../stores/data-state';
+import type { TableInteraction$ } from '../stores/interaction-state';
+import { visualOperations, visualInputs$ } from '../stores/visual-state';
+import { formatFieldName } from '../column-defaults';
 
 interface VibeGridXColumnVisibilityPureProps {
   tableCore$: TableCore$;
@@ -28,14 +31,14 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
   className = ''
 }: VibeGridXColumnVisibilityPureProps) {
   // Get reactive data from observables
-  const columns = tableCore$.columns.get();
-  const columnVisibility = tableCore$.columnVisibility.get();
+  const columns = visualInputs$.columns.get();
+  const columnVisibility = visualInputs$.columnVisibility.get();
   const isOpen = tableInteraction$.columnVisibilityMenuState.isOpen.get();
   const searchValue = tableInteraction$.columnVisibilityMenuState.searchValue.get();
-  
-  // Computed values
-  const hiddenColumnCount = tableCore$.hiddenColumnCount.get();
-  const visibleColumnCount = tableCore$.visibleColumnCount.get();
+
+  // Computed values from visual state
+  const hiddenColumnCount = Object.values(columnVisibility).filter(visible => visible === false).length;
+  const visibleColumnCount = Object.values(columnVisibility).filter(visible => visible !== false).length;
   
   // Event handlers using observable methods
   const handleOpenChange = React.useCallback((open: boolean) => {
@@ -48,18 +51,18 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
   }, [tableInteraction$]);
 
   const handleToggleColumn = React.useCallback((columnId: string) => {
-    tableCore$.toggleColumn(columnId);
-  }, [tableCore$]);
+    visualOperations.toggleColumnVisibility(columnId);
+  }, []);
 
   const handleShowAll = React.useCallback(() => {
-    tableCore$.showAllColumns();
+    visualOperations.showAllColumns();
     tableInteraction$.setColumnVisibilitySearch('');
-  }, [tableCore$, tableInteraction$]);
+  }, [tableInteraction$]);
 
   const handleHideAll = React.useCallback(() => {
-    tableCore$.hideAllColumns();
+    visualOperations.hideAllColumns();
     tableInteraction$.setColumnVisibilitySearch('');
-  }, [tableCore$, tableInteraction$]);
+  }, [tableInteraction$]);
 
   const handleSearchChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     tableInteraction$.setColumnVisibilitySearch(e.target.value);
@@ -70,9 +73,10 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
     if (!isOpen) return []; // Don't calculate unless dropdown is open
     if (!searchValue) return columns;
     return columns.filter(column => {
-      const name = column.name || column.id;
-      return name.toLowerCase().includes(searchValue.toLowerCase()) ||
-             column.id.toLowerCase().includes(searchValue.toLowerCase());
+      const displayName = getColumnDisplayName(column);
+      return displayName.toLowerCase().includes(searchValue.toLowerCase()) ||
+             column.id.toLowerCase().includes(searchValue.toLowerCase()) ||
+             (column.field && column.field.toLowerCase().includes(searchValue.toLowerCase()));
     });
   }, [columns, searchValue, isOpen]);
 
@@ -112,6 +116,11 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
     return column.hideable !== false;
   };
 
+  const getColumnDisplayName = (column: Column): string => {
+    // Use explicit name if available, otherwise format the field/id
+    return column.name || formatFieldName(column.field || column.id);
+  };
+
   const renderColumnItem = (column: Column, isRequired: boolean, category: string = 'default') => {
     const isVisible = isColumnVisible(column.id);
     const canHide = canHideColumn(column);
@@ -131,7 +140,7 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
           }}
         />
         <span className="flex-1 text-sm">
-          {column.name || column.id}
+          {getColumnDisplayName(column)}
         </span>
         {isRequired && (
           <span className="text-xs text-muted-foreground">Required</span>
@@ -169,13 +178,13 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
       modal={false}
     >
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className={`h-8 px-2 ${className}`}
         >
-          <Columns3 className="h-4 w-4" />
-          <span className="ml-1 text-xs">
+          <Columns3 className="h-4 w-4 mr-1" />
+          <span className="text-xs">
             Columns
             {hiddenColumnCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
@@ -183,6 +192,7 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
               </span>
             )}
           </span>
+          <ChevronDown className="h-3 w-3 ml-1" />
         </Button>
       </DropdownMenuTrigger>
       

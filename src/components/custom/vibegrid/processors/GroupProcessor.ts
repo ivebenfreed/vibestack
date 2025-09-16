@@ -4,7 +4,7 @@
 // Processes raw entity data into grouped virtual rows
 // Handles hierarchical grouping and aggregations
 
-import type { 
+import type {
   TableRow,
   Column,
   GroupNode,
@@ -15,6 +15,7 @@ import type {
   VirtualRow,
   VirtualRowType
 } from '../types';
+import type { GroupRowOrderConfig } from '../stores/data-state';
 import { createLogger, type LogLevel } from '@/logger/simple-logger';
 
 // File-level log control
@@ -51,9 +52,10 @@ export class GroupProcessor {
   // ====================================
   
   static processData(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupTree {
     log.info('GroupProcessor: processData called', {
       rowCount: rows.length,
@@ -68,8 +70,8 @@ export class GroupProcessor {
     }
     
     // Build group hierarchy
-    const groupTree = this.buildGroupHierarchy(rows, columns, config);
-    
+    const groupTree = this.buildGroupHierarchy(rows, columns, config, groupRowOrders);
+
     // Calculate aggregations
     this.calculateAggregations(groupTree.groups, rows, columns, config);
     
@@ -101,22 +103,24 @@ export class GroupProcessor {
   // ====================================
   
   private static buildGroupHierarchy(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): { groups: GroupNode[] } {
-    
+
     if (config.fields.length === 1) {
-      return { groups: this.buildSingleLevelGroups(rows, columns, config) };
+      return { groups: this.buildSingleLevelGroups(rows, columns, config, groupRowOrders) };
     } else {
-      return { groups: this.buildMultiLevelGroups(rows, columns, config) };
+      return { groups: this.buildMultiLevelGroups(rows, columns, config, groupRowOrders) };
     }
   }
   
   private static buildSingleLevelGroups(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupNode[] {
     const groupField = config.fields[0];
     const fieldName = groupField.field;
@@ -124,10 +128,34 @@ export class GroupProcessor {
     // Group rows by field value
     const groupMap = new Map<string, TableRow[]>();
     
-    rows.forEach(row => {
-      const value = row.data[fieldName];
+    rows.forEach((row, index) => {
+      // Debug: log the actual data structure to understand the format
+      if (index === 0) {
+        log.info('🔍 GroupProcessor: Examining first row structure', {
+          row: row,
+          hasData: !!row?.data,
+          hasDirectAccess: !!row?.[fieldName],
+          rowKeys: Object.keys(row || {}),
+          fieldName,
+          fieldValue: row?.[fieldName] || row?.data?.[fieldName]
+        });
+      }
+
+      // Handle different data structures - try both row.data and direct row access
+      let value;
+      if (row && row.data) {
+        // Structured format: row.data.fieldName
+        value = row.data[fieldName];
+      } else if (row && typeof row === 'object') {
+        // Direct format: row.fieldName
+        value = row[fieldName];
+      } else {
+        log.warn('GroupProcessor: Skipping invalid row', { row, fieldName });
+        return;
+      }
+
       const groupKey = this.getGroupKey(value);
-      
+
       if (!groupMap.has(groupKey)) {
         groupMap.set(groupKey, []);
       }
@@ -140,22 +168,47 @@ export class GroupProcessor {
     
     groupMap.forEach((groupRows, groupKey) => {
       const firstRow = groupRows[0];
-      const value = firstRow.data[fieldName];
+
+      // Handle different data structures - try both row.data and direct row access
+      let value;
+      if (firstRow && firstRow.data) {
+        // Structured format: row.data.fieldName
+        value = firstRow.data[fieldName];
+      } else if (firstRow && typeof firstRow === 'object') {
+        // Direct format: row.fieldName
+        value = firstRow[fieldName];
+      } else {
+        log.warn('GroupProcessor: Invalid firstRow in groupMap', { firstRow, fieldName });
+        return;
+      }
       
+      const groupId = `group_${fieldName}_${groupKey}`;
+
+      // Apply custom row ordering if available
+      let orderedChildren = groupRows;
+      if (groupRowOrders && groupRowOrders[groupId]) {
+        orderedChildren = this.applyCustomRowOrdering(groupRows, groupRowOrders[groupId]);
+        log.debug('✅ Applied custom row ordering', {
+          groupId,
+          originalCount: groupRows.length,
+          orderedCount: orderedChildren.length
+        });
+      }
+
       const groupNode: GroupNode = {
-        id: `group_${fieldName}_${groupKey}`,
+        id: groupId,
         field: fieldName,
         value: value,
         displayValue: this.formatGroupValue(value, fieldName, columns),
         level: 0,
-        rowCount: groupRows.length,
-        totalCount: groupRows.length,
-        children: groupRows,
-        isCollapsed: !config.expandedGroups.has(`group_${fieldName}_${groupKey}`),
+        rowCount: orderedChildren.length,
+        totalCount: orderedChildren.length,
+        children: orderedChildren,
+        isCollapsed: !config.expandedGroups.has(groupId),
         sortOrder: sortOrder++,
         aggregations: [] // Will be filled by calculateAggregations
       };
-      
+
       groups.push(groupNode);
     });
     
@@ -166,9 +219,10 @@ export class GroupProcessor {
   }
   
   private static buildMultiLevelGroups(
-    rows: TableRow[], 
-    columns: Column[], 
-    config: GroupConfig
+    rows: TableRow[],
+    columns: Column[],
+    config: GroupConfig,
+    groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupNode[] {
     
     const buildLevel = (
@@ -189,9 +243,21 @@ export class GroupProcessor {
       const groupMap = new Map<string, TableRow[]>();
       
       remainingRows.forEach(row => {
-        const value = row.data[fieldName];
+        // Handle different data structures - try both row.data and direct row access
+        let value;
+        if (row && row.data) {
+          // Structured format: row.data.fieldName
+          value = row.data[fieldName];
+        } else if (row && typeof row === 'object') {
+          // Direct format: row.fieldName
+          value = row[fieldName];
+        } else {
+          log.warn('GroupProcessor: Skipping invalid row in multi-level grouping', { row, fieldName });
+          return;
+        }
+
         const groupKey = this.getGroupKey(value);
-        
+
         if (!groupMap.has(groupKey)) {
           groupMap.set(groupKey, []);
         }
@@ -204,7 +270,19 @@ export class GroupProcessor {
       
       groupMap.forEach((groupRows, groupKey) => {
         const firstRow = groupRows[0];
-        const value = firstRow.data[fieldName];
+
+        // Handle different data structures - try both row.data and direct row access
+        let value;
+        if (firstRow && firstRow.data) {
+          // Structured format: row.data.fieldName
+          value = firstRow.data[fieldName];
+        } else if (firstRow && typeof firstRow === 'object') {
+          // Direct format: row.fieldName
+          value = firstRow[fieldName];
+        } else {
+          log.warn('GroupProcessor: Invalid firstRow in multi-level groupMap', { firstRow, fieldName });
+          return;
+        }
         const groupId = `group_${fieldName}_${groupKey}${parentId ? `_${parentId}` : ''}`;
         
         const groupNode: GroupNode = {
@@ -265,7 +343,16 @@ export class GroupProcessor {
       
       config.aggregations.forEach(aggConfig => {
         const fieldValues = groupRows
-          .map(row => row.data[aggConfig.field])
+          .map(row => {
+            // Handle different data structures - try both row.data and direct row access
+            if (row && row.data) {
+              return row.data[aggConfig.field];
+            } else if (row && typeof row === 'object') {
+              return row[aggConfig.field];
+            } else {
+              return null;
+            }
+          })
           .filter(val => val !== null && val !== undefined && val !== '');
         
         if (fieldValues.length === 0) {
@@ -392,7 +479,8 @@ export class GroupProcessor {
               height: DATA_ROW_HEIGHT,
               data: child,
               level: level + 1,
-              parentGroupId: group.id
+              parentGroupId: group.id,
+              groupId: group.id  // Add groupId for drag-drop compatibility
             });
           }
         });
@@ -543,5 +631,34 @@ export class GroupProcessor {
     });
     
     return count;
+  }
+
+  /**
+   * Apply custom row ordering from GroupRowOrderConfig
+   */
+  private static applyCustomRowOrdering(
+    rows: TableRow[],
+    orderConfig: GroupRowOrderConfig
+  ): TableRow[] {
+    if (!orderConfig.rowIds.length) {
+      return rows;
+    }
+
+    const orderedRows: TableRow[] = [];
+    const rowsById = new Map(rows.map(row => [row.id, row]));
+
+    // Add rows in specified order
+    orderConfig.rowIds.forEach(rowId => {
+      const row = rowsById.get(rowId);
+      if (row) {
+        orderedRows.push(row);
+        rowsById.delete(rowId);
+      }
+    });
+
+    // Add any remaining rows that weren't in the order config
+    rowsById.forEach(row => orderedRows.push(row));
+
+    return orderedRows;
   }
 }

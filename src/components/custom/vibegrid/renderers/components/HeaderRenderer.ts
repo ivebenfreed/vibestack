@@ -5,7 +5,10 @@
 
 import { log } from '@/logger';
 import { observe } from '@legendapp/state';
-import type { TableCore$, TableInteraction$, TableViewport$ } from '../../stores/pure-observables';
+import { visualState$, visualOperations, getColumnWidth, getColumnXOffset, getVisibleColumns } from '../../stores/visual-state';
+import type { TableCore$ } from '../../stores/data-state';
+import type { TableInteraction$ } from '../../stores/interaction-state';
+import type { TableViewport$ } from '../../stores/pure-observables';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import type { CoordinateMapping } from '../modules/OverlayManager';
@@ -39,6 +42,15 @@ export class HeaderRenderer {
   private selectionController?: SelectionController;
   private coordinateMapping: CoordinateMapping;
   private enableSelectionColumn: boolean;
+
+  // Legend State performance optimization: track last render state to prevent redundant renders
+  private lastRenderState: {
+    columnCount: number;
+    scrollLeft: number;
+    visibleColumnsLength: number;
+    visibleRangeStart: number;
+    visibleRangeEnd: number;
+  } | null = null;
   private updateCoordinateMapping: (mapping: CoordinateMapping) => void;
   
   // Header state
@@ -61,64 +73,119 @@ export class HeaderRenderer {
    */
   render(): void {
     if (!this.headerContainer) return;
-    
+
+    // Get visual state early for debugging
+    const visualState = visualState$.get();
+
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
-    fileLog.info('🎨 Rendering header', { columnCount: columns.length });
+
+    // Legend State change detection pattern: check if render is actually needed
+    const currentRenderState = {
+      columnCount: columns.length,
+      scrollLeft: visualState.geometry.scrollLeft,
+      visibleColumnsLength: visualState.visibleColumns.length,
+      visibleRangeStart: visualState.geometry.visibleColumnRange.start,
+      visibleRangeEnd: visualState.geometry.visibleColumnRange.end
+    };
+
+    // Skip render if nothing actually changed (Legend State optimization pattern)
+    if (this.lastRenderState &&
+        this.lastRenderState.columnCount === currentRenderState.columnCount &&
+        this.lastRenderState.scrollLeft === currentRenderState.scrollLeft &&
+        this.lastRenderState.visibleColumnsLength === currentRenderState.visibleColumnsLength &&
+        this.lastRenderState.visibleRangeStart === currentRenderState.visibleRangeStart &&
+        this.lastRenderState.visibleRangeEnd === currentRenderState.visibleRangeEnd) {
+
+      fileLog.debug('🔄 HEADER RENDER SKIPPED - no changes detected', currentRenderState);
+      return;
+    }
+
+    // Update last render state
+    this.lastRenderState = currentRenderState;
+
+    fileLog.info('🔄 HEADER RENDER TRIGGERED', {
+      columnCount: columns.length,
+      scrollLeft: visualState.geometry.scrollLeft,
+      visibleRange: `${visualState.geometry.visibleColumnRange.start}-${visualState.geometry.visibleColumnRange.end}`,
+      totalColumns: visualState.visibleColumns.length,
+      virtualRangeCount: visualState.geometry.visibleColumnRange.end - visualState.geometry.visibleColumnRange.start
+    });
     
     this.headerContainer.innerHTML = '';
     
     const headerRow = this.domFactory.createElement('div', 'vibegridx-header-row');
     headerRow.style.cssText = `
-      display: flex;
+      position: relative;
       height: ${HEADER_HEIGHT}px;
-      align-items: center;
     `;
     
-    // Add corner header cell (aligns with row headers)
+    // Add drag column header (for grouped mode) - always present for consistent layout
+    const dragColumnHeader = this.createDragColumnHeader();
+    dragColumnHeader.style.position = 'absolute';
+    dragColumnHeader.style.left = '0';
+    dragColumnHeader.style.top = '0';
+    dragColumnHeader.style.zIndex = '1';
+    headerRow.appendChild(dragColumnHeader);
+
+    // Add corner header cell (aligns with row headers) - positioned after drag column
     const { cornerCell, selectAllCheckbox } = this.domFactory.createCornerHeaderCell();
     this.selectAllCheckbox = selectAllCheckbox || null;
-    
+
+    // Position corner cell absolutely after drag column
+    cornerCell.style.position = 'absolute';
+    cornerCell.style.left = '30px';  // After 30px drag column
+    cornerCell.style.top = '0';
+    cornerCell.style.zIndex = '1';
+
     // Add select all checkbox handler
     if (this.selectAllCheckbox) {
       this.setupSelectAllHandler();
     }
-    
+
     headerRow.appendChild(cornerCell);
     
-    // Filter visible columns and get virtual column range
-    const allVisibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-    const visibleColumnRange = this.tableViewport$.visibleColumns.get();
-    const startColIndex = Math.max(0, visibleColumnRange.start);
-    const endColIndex = Math.min(allVisibleColumns.length, visibleColumnRange.end);
-    const virtualColumns = allVisibleColumns.slice(startColIndex, endColIndex);
-    
-    fileLog.info('🎨 Header virtual scrolling', {
+    // Get visible columns from unified visual state (same as DOM rendering)
+    // This ensures coordinate mapping matches exactly what's rendered in DOM
+    const allColumnLayouts = visualState.visibleColumns;
+    const allVisibleColumns = allColumnLayouts.map(layout =>
+      columns.find(col => col.id === layout.id)
+    ).filter(Boolean);
+
+    fileLog.info('🎨 Header rendering ALL columns (no virtualization)', {
       totalColumns: columns.length,
-      allVisibleColumns: allVisibleColumns.length,
-      virtualRange: `${startColIndex}-${endColIndex}`,
-      renderingColumns: virtualColumns.length
+      visibleColumns: allColumnLayouts.length,
+      scrollLeft: visualState.geometry.scrollLeft,
+      columnIds: allColumnLayouts.slice(0, 5).map(col => col.id)
     });
-    
+
     // Update column coordinate mapping only if columns have changed
+    // Now uses the SAME column source as DOM rendering (visualState.visibleColumns)
     const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
 
-    // Calculate column positioning for virtual scrolling
-    let xOffset = 40; // Start after row header
-    for (let i = 0; i < startColIndex; i++) {
-      xOffset += allVisibleColumns[i].width;
-    }
+    // Render ALL columns at their absolute positions
+    // The header viewport transform will handle the scrolling
+    allColumnLayouts.forEach((columnLayout, columnIndex) => {
+      const column = columns.find(c => c.id === columnLayout.id);
+      if (!column) return;
 
-    // Render virtual columns
-    virtualColumns.forEach((column, virtualIndex) => {
-      const actualIndex = startColIndex + virtualIndex;
-      const headerCell = this.createColumnHeader(column, actualIndex, xOffset);
+      const headerCell = this.createColumnHeader(column, columnIndex, 0);
+
+      // Position at xOffset from visual state (already includes drag + row header columns)
+      headerCell.style.position = 'absolute';
+      headerCell.style.left = `${columnLayout.xOffset}px`;
+      headerCell.style.top = '0';
+      headerCell.style.width = `${columnLayout.width}px`;
+      headerCell.style.height = `${HEADER_HEIGHT}px`;
+
       headerRow.appendChild(headerCell);
-      xOffset += column.width;
     });
 
-    // Set total width for proper overflow handling
-    const totalHeaderWidth = 40 + allVisibleColumns.reduce((sum, col) => sum + col.width, 0);
+    // End drop zone removed - users can drop between columns instead
+
+    // Set total width for proper overflow handling (include end drop zone)
+    // Use UNIFIED visual state's totalWidth - no duplicate calculation
+    const totalHeaderWidth = visualState.geometry.totalWidth;
     headerRow.style.width = `${totalHeaderWidth}px`;
     headerRow.style.minWidth = `${totalHeaderWidth}px`;
 
@@ -141,7 +208,9 @@ export class HeaderRenderer {
    * Create column header element
    */
   private createColumnHeader(column: any, actualIndex: number, xOffset: number): HTMLElement {
-    const headerCell = this.domFactory.createHeaderCell(column, column.width);
+    // Use single source of truth for column width
+    const actualWidth = getColumnWidth(column.id);
+    const headerCell = this.domFactory.createHeaderCell(column, actualWidth);
     
     // Create header content with text and sort icon
     const textGroup = this.domFactory.createHeaderTextGroup(column);
@@ -165,23 +234,92 @@ export class HeaderRenderer {
   }
 
   /**
+   * Create end drop zone for placing columns at the end
+   */
+  private createEndDropZone(): HTMLElement {
+    const endDropZone = document.createElement('div');
+    endDropZone.className = 'vibegridx-end-drop-zone';
+    endDropZone.style.cssText = `
+      position: relative;
+      width: 20px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      border-left: 1px dashed transparent;
+      transition: border-color 0.15s ease;
+    `;
+
+    // Add drop handlers for inserting at the end
+    endDropZone.addEventListener('dragover', (e: DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'move';
+
+      // Remove any existing insertion lines from column headers
+      document.querySelectorAll('.column-drop-line').forEach(line => line.remove());
+
+      // Show visual feedback for end insertion
+      endDropZone.style.borderLeftColor = '#3b82f6';
+      endDropZone.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+    });
+
+    endDropZone.addEventListener('dragleave', (e: DragEvent) => {
+      // Only remove if actually leaving (not moving to child elements)
+      if (!endDropZone.contains(e.relatedTarget as Node)) {
+        endDropZone.style.borderLeftColor = 'transparent';
+        endDropZone.style.backgroundColor = 'transparent';
+      }
+    });
+
+    endDropZone.addEventListener('drop', (e: DragEvent) => {
+      e.preventDefault();
+
+      // Clear visual feedback
+      endDropZone.style.borderLeftColor = 'transparent';
+      endDropZone.style.backgroundColor = 'transparent';
+
+      const draggedColumnId = e.dataTransfer!.getData('text/plain');
+      if (draggedColumnId) {
+        fileLog.info('🎯 Column dropped at end position', { draggedColumnId });
+
+        // Move column to the end by using the last column as target with insertBefore=false
+        const columns = this.tableCore$.columns.get();
+        if (columns.length > 0) {
+          const lastColumn = columns[columns.length - 1];
+          if (lastColumn.id !== draggedColumnId) {
+            // Insert after the last column (insertBefore=false)
+            this.tableCore$.reorderColumn(draggedColumnId, lastColumn.id, false);
+          }
+        }
+      }
+    });
+
+    return endDropZone;
+  }
+
+  /**
    * Update column coordinate mapping
    * @returns true if mapping changed, false if unchanged
    */
   private updateColumnCoordinateMapping(allVisibleColumns: any[]): boolean {
     const newColumns: any[] = [];
-    let xOffset = 40; // Start after row header
+    let xOffset = 70; // Start after drag column (30px) + row header (40px)
 
     // Build new coordinate mapping for all visible columns
+    // Get reactive column widths
+    const columnWidths = this.tableCore$.columnWidths.get();
+
     allVisibleColumns.forEach((column, index) => {
+      const actualWidth = getColumnWidth(column.id);
       newColumns.push({
         columnId: column.id,
         x: xOffset,
-        width: column.width,
+        width: actualWidth,
         index: index,
         offset: xOffset
       });
-      xOffset += column.width;
+      xOffset += actualWidth;
     });
 
     // Check if coordinate mapping has changed (including position)
@@ -197,6 +335,14 @@ export class HeaderRenderer {
 
     if (hasChanged) {
       this.coordinateMapping.columns = newColumns;
+
+      fileLog.debug('🔄 Column coordinate mapping updated', {
+        newColumnCount: newColumns.length,
+        firstColumnId: newColumns[0]?.columnId,
+        mappingVersion: this.coordinateMapping.version,
+        sampleColumns: newColumns.slice(0, 3).map(c => ({ id: c.columnId, x: c.x, width: c.width }))
+      });
+
       return true;
     }
 
@@ -226,15 +372,17 @@ export class HeaderRenderer {
       });
       
       if (selectedCells.size === 0) {
-        // No selection - select all
-        if (this.selectionController) {
-          this.selectionController.selectAllCells();
-        }
+        // REACTIVE: No selection - select all directly via state
+        this.tableInteraction$.selectAll({
+          rows: processedRows,
+          columns: visibleColumns,
+          columnVisibility
+        });
+        fileLog.info('✅ Select all triggered reactively');
       } else {
-        // Has selection - clear all
-        if (this.selectionController) {
-          this.selectionController.clearSelection();
-        }
+        // REACTIVE: Has selection - clear all directly via state
+        this.tableInteraction$.clearSelection();
+        fileLog.info('✅ Clear selection triggered reactively');
       }
     });
   }
@@ -245,13 +393,16 @@ export class HeaderRenderer {
   private setupResizeHandler(resizeHandle: HTMLElement, column: any): void {
     let isResizing = false;
     let startX = 0;
-    let startWidth = column.width;
-    
+    // Get actual width from centralized visual state
+    let startWidth = getColumnWidth(column.id);
+
     resizeHandle.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       isResizing = true;
       startX = e.pageX;
-      startWidth = column.width;
+      // Update startWidth from current reactive state
+      const currentColumnWidths = this.tableCore$.columnWidths.get();
+      startWidth = currentColumnWidths[column.id] || column.width || 150;
       
       // Update interaction state
       this.tableInteraction$.columnResize.set({
@@ -298,7 +449,7 @@ export class HeaderRenderer {
         const resizeState = this.tableInteraction$.columnResize.get();
         if (resizeState && resizeState.newWidth) {
           // Apply the new width
-          this.tableCore$.updateColumnWidth(column.id, resizeState.newWidth);
+          visualOperations.setColumnWidth(column.id, resizeState.newWidth);
         }
         
         // Clear resize state
@@ -338,15 +489,16 @@ export class HeaderRenderer {
         // On drag over
         // Visual feedback is handled by overlay manager
       },
-      (targetColumnId: string, e: DragEvent) => {
+      (targetColumnId: string, insertBefore: boolean, e: DragEvent) => {
         // On drop - reorder columns
         const sourceColumnId = this.tableInteraction$.dragSource.get();
         if (sourceColumnId && sourceColumnId !== targetColumnId) {
           fileLog.info('🎯 Column dropped for reordering', {
             sourceColumnId,
-            targetColumnId
+            targetColumnId,
+            insertBefore
           });
-          this.tableCore$.reorderColumn(sourceColumnId, targetColumnId);
+          visualOperations.reorderColumns(sourceColumnId, targetColumnId, insertBefore);
         }
       }
     );
@@ -466,5 +618,64 @@ export class HeaderRenderer {
    */
   getSelectAllCheckbox(): HTMLInputElement | null {
     return this.selectAllCheckbox;
+  }
+
+  /**
+   * Create drag column header (permanently present for consistent layout)
+   */
+  private createDragColumnHeader(): HTMLElement {
+    const dragColumnHeader = this.domFactory.createElement('div', 'vibegridx-drag-column-header');
+
+    // Style to match drag column in body (30px wide)
+    dragColumnHeader.style.cssText = `
+      width: 30px;
+      min-width: 30px;
+      height: ${HEADER_HEIGHT}px;
+      background: #f8f9fa;
+      border-right: 1px solid #e9ecef;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      font-size: 11px;
+      color: #9ca3af;
+    `;
+
+    // Add visual indicator when in grouped mode
+    const isGroupedMode = this.isGroupedMode();
+    if (isGroupedMode) {
+      // Add a small drag indicator icon
+      dragColumnHeader.innerHTML = `
+        <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" style="opacity: 0.4;">
+          <circle cx="2" cy="3" r="1"/>
+          <circle cx="6" cy="3" r="1"/>
+          <circle cx="2" cy="6" r="1"/>
+          <circle cx="6" cy="6" r="1"/>
+          <circle cx="2" cy="9" r="1"/>
+          <circle cx="6" cy="9" r="1"/>
+        </svg>
+      `;
+      dragColumnHeader.title = 'Drag to reorder rows within groups';
+    } else {
+      // Empty space when not in grouped mode
+      dragColumnHeader.innerHTML = '';
+    }
+
+    return dragColumnHeader;
+  }
+
+  /**
+   * Check if we're currently in grouped mode
+   */
+  private isGroupedMode(): boolean {
+    try {
+      const groupConfig = visualOperations.getGroupConfig();
+      return groupConfig && groupConfig.fields && groupConfig.fields.length > 0;
+    } catch (error) {
+      // If visual operations aren't available, fallback to direct check
+      const tableCore = this.tableCore$.get();
+      return tableCore.grouping && tableCore.grouping.fields && tableCore.grouping.fields.length > 0;
+    }
   }
 }

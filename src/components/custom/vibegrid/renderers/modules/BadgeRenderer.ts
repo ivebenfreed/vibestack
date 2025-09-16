@@ -206,6 +206,17 @@ export class BadgeRenderer {
     column: any,
     startEdit: (cellId: string, value: string) => void
   ): void {
+    // Check if column is editable before starting edit mode
+    if (column.editable === false) {
+      fileLog.info('🏷️ Tags field clicked - but column is not editable', {
+        cellId,
+        rowId: row.id,
+        columnId: column.id,
+        editable: column.editable
+      });
+      return;
+    }
+
     fileLog.info('🏷️ Starting tags field edit mode', {
       cellId,
       currentValue,
@@ -213,7 +224,7 @@ export class BadgeRenderer {
       columnId: column.id,
       currentTags: currentValue.split(',').map(t => t.trim()).filter(t => t.length > 0)
     });
-    
+
     // Trigger the standard VibeGrid edit mode
     startEdit(cellId, currentValue);
   }

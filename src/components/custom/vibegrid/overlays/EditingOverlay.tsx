@@ -100,11 +100,15 @@ export class EditingOverlay {
       this.container.appendChild(this.portal);
     }
     
-    console.log('EditingOverlay: Showing editor', {
-      cell,
+    console.log('🔍 EditingOverlay: Showing editor - VALUE DEBUG', {
+      cell: cell,
+      cellId: `${cell.rowId}:${cell.columnId}`,
       column: column.id,
       position,
-      value,
+      receivedValue: value,
+      valueType: typeof value,
+      valueLength: typeof value === 'string' ? value.length : 'N/A',
+      firstChars: typeof value === 'string' ? value.substring(0, 50) + '...' : value,
       mode,
       immediate
     });
