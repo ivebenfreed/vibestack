@@ -5,7 +5,7 @@
  * then we can add overlays back once we have the foundation working.
  */
 
-import { observe } from '@legendapp/state';
+import { observe, batch } from '@legendapp/state';
 import { log } from '@/logger';
 import { visualOperations, visualState$ } from '../../stores/visual-state';
 import type { TableCore$ } from '../../stores/data-state';
@@ -69,6 +69,9 @@ export class SimplePassiveRenderer {
   private activeRows: Map<string, HTMLElement> = new Map();
   private lastVisibleColumns: { start: number; end: number } | null = null;
   private lastVisibleRows: { start: number; end: number } | null = null;
+
+  // Visual state tracking for change detection
+  private lastVisualState: VisualState | null = null;
   
   // Overlay management
   private overlayManager: OverlayManager | null = null;
@@ -401,9 +404,12 @@ export class SimplePassiveRenderer {
       this.eventManager.setupEventHandling();
     }
 
-    // Initial render
-    this.renderHeader();
-    this.renderBody();
+    // Apply Legend State batching for initial render to prevent multiple layout calculations
+    batch(() => {
+      // Initial render
+      this.renderHeader();
+      this.renderBody();
+    });
 
     fileLog.info('✅ Post-initialization complete');
   }
@@ -769,18 +775,47 @@ export class SimplePassiveRenderer {
       viewport: visualState.viewport
     });
 
-    // Determine what actually changed to optimize renders
-    const needsHeaderRender = true; // For now, always render - can optimize later
-    const needsBodyRender = true; // For now, always render - can optimize later
+    // Apply Legend State batching pattern to prevent multiple DOM updates
+    batch(() => {
+      // Determine what actually changed to optimize renders
+      const previousState = this.lastVisualState;
 
-    // Single coordinated render cycle instead of separate renders
-    if (needsHeaderRender) {
-      this.renderHeader();
-    }
+      // Check if header needs to be re-rendered
+      const needsHeaderRender = !previousState ||
+        previousState.columns.length !== visualState.columns.length ||
+        JSON.stringify(previousState.columnVisibility) !== JSON.stringify(visualState.columnVisibility) ||
+        JSON.stringify(previousState.columns.map(c => c.width)) !== JSON.stringify(visualState.columns.map(c => c.width));
 
-    if (needsBodyRender) {
-      this.renderBody();
-    }
+      // Check if body needs to be re-rendered (viewport changes affect body virtual scrolling)
+      const needsBodyRender = !previousState ||
+        previousState.viewport.scrollTop !== visualState.viewport.scrollTop ||
+        previousState.viewport.scrollLeft !== visualState.viewport.scrollLeft ||
+        previousState.viewport.viewportWidth !== visualState.viewport.viewportWidth ||
+        previousState.viewport.viewportHeight !== visualState.viewport.viewportHeight ||
+        needsHeaderRender; // Body depends on header changes
+
+      fileLog.debug('🎯 Render decisions', {
+        needsHeaderRender,
+        needsBodyRender,
+        hasLastState: !!previousState
+      });
+
+      // Single coordinated render cycle instead of separate renders
+      if (needsHeaderRender) {
+        this.renderHeader();
+      }
+
+      if (needsBodyRender) {
+        this.renderBody();
+      }
+
+      // Store current state for next comparison
+      this.lastVisualState = {
+        columns: [...visualState.columns],
+        columnVisibility: { ...visualState.columnVisibility },
+        viewport: { ...visualState.viewport }
+      };
+    });
 
     // Viewport handling is now fully integrated into consolidated visual state
     // No need to call handleViewportChange() as it would duplicate the work
@@ -834,8 +869,13 @@ export class SimplePassiveRenderer {
     if (columnsChanged && visibleColumns) {
       // Horizontal scrolling with column changes - full re-render
       this.lastVisibleColumns = visibleColumns;
-      this.renderHeader();
-      this.renderBody();
+
+      // Apply Legend State batching for coordinated header/body re-render
+      batch(() => {
+        this.renderHeader();
+        this.renderBody();
+      });
+
       fileLog.info('🔄 Full re-render: columns changed', { visibleColumns });
     } else if (rowsChanged && visibleRows) {
       // Vertical scrolling with row changes - body only

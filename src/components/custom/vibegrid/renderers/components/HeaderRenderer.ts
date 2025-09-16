@@ -42,6 +42,15 @@ export class HeaderRenderer {
   private selectionController?: SelectionController;
   private coordinateMapping: CoordinateMapping;
   private enableSelectionColumn: boolean;
+
+  // Legend State performance optimization: track last render state to prevent redundant renders
+  private lastRenderState: {
+    columnCount: number;
+    scrollLeft: number;
+    visibleColumnsLength: number;
+    visibleRangeStart: number;
+    visibleRangeEnd: number;
+  } | null = null;
   private updateCoordinateMapping: (mapping: CoordinateMapping) => void;
   
   // Header state
@@ -70,6 +79,30 @@ export class HeaderRenderer {
 
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
+
+    // Legend State change detection pattern: check if render is actually needed
+    const currentRenderState = {
+      columnCount: columns.length,
+      scrollLeft: visualState.geometry.scrollLeft,
+      visibleColumnsLength: visualState.visibleColumns.length,
+      visibleRangeStart: visualState.geometry.visibleColumnRange.start,
+      visibleRangeEnd: visualState.geometry.visibleColumnRange.end
+    };
+
+    // Skip render if nothing actually changed (Legend State optimization pattern)
+    if (this.lastRenderState &&
+        this.lastRenderState.columnCount === currentRenderState.columnCount &&
+        this.lastRenderState.scrollLeft === currentRenderState.scrollLeft &&
+        this.lastRenderState.visibleColumnsLength === currentRenderState.visibleColumnsLength &&
+        this.lastRenderState.visibleRangeStart === currentRenderState.visibleRangeStart &&
+        this.lastRenderState.visibleRangeEnd === currentRenderState.visibleRangeEnd) {
+
+      fileLog.debug('🔄 HEADER RENDER SKIPPED - no changes detected', currentRenderState);
+      return;
+    }
+
+    // Update last render state
+    this.lastRenderState = currentRenderState;
 
     fileLog.info('🔄 HEADER RENDER TRIGGERED', {
       columnCount: columns.length,

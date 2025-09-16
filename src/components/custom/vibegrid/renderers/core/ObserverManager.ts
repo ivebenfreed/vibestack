@@ -178,16 +178,143 @@ export class ObserverManager {
    * Uses requestAnimationFrame debouncing to prevent excessive renders during initialization
    */
   private setupConsolidatedVisualObserver(): void {
+    let previousState: VisualState | null = null;
+    let isViewportStable = false;
+    let lastStableViewport: { width: number; height: number } | null = null;
+
     const visualDisposer = observe(() => {
-      // Collect all visual state in single observer to batch changes
-      const columns = this.tableCore$.columns.get();
-      const columnVisibility = this.tableCore$.columnVisibility.get();
+      // Collect ALL visual state in single observer to batch changes and prevent cascades
+      // Use shallow tracking for better performance on structural changes
+      const columns = this.tableCore$.columns.get(true); // shallow tracking for array structure
+      const columnVisibility = this.tableCore$.columnVisibility.get(true); // shallow tracking for object keys
       const scrollTop = this.tableViewport$.scrollTop.get();
       const scrollLeft = this.tableViewport$.scrollLeft.get();
       const viewportWidth = this.tableViewport$.viewportWidth.get();
       const viewportHeight = this.tableViewport$.viewportHeight.get();
 
+      // Include ALL other visual state that was previously observed separately
+      const processedRows = this.tableCore$.processedRows.get(true); // shallow tracking for array structure
+      const selectedCells = this.tableInteraction$.selectedCells.get();
+      const selectAllCheckboxState = this.tableInteraction$.selectAllCheckboxState.get();
+      const editingCell = this.tableInteraction$.editingCell.get();
+      const editValue = this.tableInteraction$.editValue.get();
+      const sortBy = this.tableCore$.sortBy.get(true); // shallow tracking for array structure
+      const isDragging = this.tableInteraction$.isDragging.get();
+      const dragSource = this.tableInteraction$.dragSource.get();
+      const dragTarget = this.tableInteraction$.dragTarget.get();
+
       const hiddenCount = Object.values(columnVisibility).filter(visible => visible === false).length;
+
+      // Skip processing during invalid viewport states (zero dimensions)
+      if (viewportWidth <= 0 || viewportHeight <= 0) {
+        fileLog.debug('🎨 Skipping render - invalid viewport dimensions', {
+          viewportWidth,
+          viewportHeight
+        });
+        return;
+      }
+
+      // Check if viewport dimensions have actually stabilized
+      if (!isViewportStable) {
+        if (lastStableViewport) {
+          // Check if dimensions have changed significantly from last stable state
+          const widthDiff = Math.abs(viewportWidth - lastStableViewport.width);
+          const heightDiff = Math.abs(viewportHeight - lastStableViewport.height);
+
+          if (widthDiff < 1 && heightDiff < 1) {
+            // Dimensions are stable - allow renders to proceed
+            isViewportStable = true;
+            fileLog.debug('🎨 Viewport dimensions stabilized', {
+              viewportWidth,
+              viewportHeight,
+              previousWidth: lastStableViewport.width,
+              previousHeight: lastStableViewport.height
+            });
+          } else {
+            // Dimensions still changing - update tracking and skip render
+            lastStableViewport = { width: viewportWidth, height: viewportHeight };
+            fileLog.debug('🎨 Viewport dimensions still changing, skipping render', {
+              viewportWidth,
+              viewportHeight,
+              widthDiff,
+              heightDiff
+            });
+            return;
+          }
+        } else {
+          // First time seeing valid dimensions - start tracking
+          lastStableViewport = { width: viewportWidth, height: viewportHeight };
+          fileLog.debug('🎨 Starting viewport dimension tracking', {
+            viewportWidth,
+            viewportHeight
+          });
+          return;
+        }
+      }
+
+      // Create new visual state
+      const newVisualState: VisualState = {
+        columns,
+        columnVisibility,
+        viewport: {
+          scrollTop,
+          scrollLeft,
+          viewportWidth,
+          viewportHeight
+        }
+      };
+
+      // Apply comprehensive Legend State change detection pattern
+      if (previousState) {
+        // Check viewport changes with tolerance for floating point precision
+        const VIEWPORT_TOLERANCE = 0.5; // Allow sub-pixel differences
+        const viewportChanged =
+          Math.abs(previousState.viewport.scrollTop - newVisualState.viewport.scrollTop) > VIEWPORT_TOLERANCE ||
+          Math.abs(previousState.viewport.scrollLeft - newVisualState.viewport.scrollLeft) > VIEWPORT_TOLERANCE ||
+          Math.abs(previousState.viewport.viewportWidth - newVisualState.viewport.viewportWidth) > VIEWPORT_TOLERANCE ||
+          Math.abs(previousState.viewport.viewportHeight - newVisualState.viewport.viewportHeight) > VIEWPORT_TOLERANCE;
+
+        // Check column visibility changes
+        const visibilityChanged = JSON.stringify(previousState.columnVisibility) !== JSON.stringify(newVisualState.columnVisibility);
+
+        // Check column structure changes (more comprehensive than just length)
+        const columnsChanged =
+          previousState.columns.length !== newVisualState.columns.length ||
+          // Check if column IDs have changed (structural change)
+          JSON.stringify(previousState.columns.map(c => c.id)) !== JSON.stringify(newVisualState.columns.map(c => c.id)) ||
+          // Check if column widths have changed (layout change)
+          JSON.stringify(previousState.columns.map(c => c.width)) !== JSON.stringify(newVisualState.columns.map(c => c.width));
+
+        // Only render if something actually changed
+        if (!viewportChanged && !visibilityChanged && !columnsChanged) {
+          fileLog.debug('🎨 Visual state unchanged, skipping render', {
+            columnCount: columns.length,
+            hiddenCount,
+            scrollTop,
+            scrollLeft,
+            viewportWidth,
+            viewportHeight,
+            columnsChanged,
+            viewportChanged,
+            visibilityChanged
+          });
+          return; // Skip render if nothing actually changed
+        }
+
+        fileLog.debug('🎨 Visual state changes detected', {
+          columnsChanged,
+          viewportChanged,
+          visibilityChanged,
+          columnCount: columns.length,
+          hiddenCount,
+          // Detailed viewport values for debugging
+          currentViewport: newVisualState.viewport,
+          previousViewport: previousState?.viewport || null
+        });
+      }
+
+      // Update previous state reference
+      previousState = newVisualState;
 
       // Cancel previous debounced render to prevent stacking
       if (this.visualStateThrottleRAF !== null) {
@@ -207,20 +334,8 @@ export class ObserverManager {
           viewportHeight
         });
 
-        // Single coordinated visual state update
-        const visualState: VisualState = {
-          columns,
-          columnVisibility,
-          viewport: {
-            scrollTop,
-            scrollLeft,
-            viewportWidth,
-            viewportHeight
-          }
-        };
-
         // Batched render instead of separate column/viewport renders
-        this.onVisualStateChanged(visualState);
+        this.onVisualStateChanged(newVisualState);
       });
     });
     this.disposers.push(visualDisposer);
@@ -258,9 +373,43 @@ export class ObserverManager {
    * Observe processed rows changes
    */
   private setupRowsObserver(): void {
+    let previousRowCount: number | null = null;
+    let previousRowIds: string[] | null = null;
+
     const rowsDisposer = observe(() => {
       const rows = this.tableCore$.processedRows.get();
-      fileLog.info('📋 Rows changed', { count: rows.length });
+      const currentRowCount = rows.length;
+
+      // Create a lightweight identifier for row changes (using IDs to detect actual data changes)
+      const currentRowIds = rows.map(row => row.id).slice(0, 10); // Sample first 10 for performance
+
+      // Only trigger if rows actually changed (count or identity)
+      if (previousRowCount !== null && previousRowIds !== null) {
+        const countChanged = previousRowCount !== currentRowCount;
+        const identityChanged = JSON.stringify(previousRowIds) !== JSON.stringify(currentRowIds);
+
+        if (!countChanged && !identityChanged) {
+          fileLog.debug('📋 Rows observer fired but no meaningful changes detected', {
+            count: currentRowCount,
+            sampleIds: currentRowIds.slice(0, 3)
+          });
+          return; // Skip redundant row changes
+        }
+
+        fileLog.info('📋 Rows changed', {
+          count: currentRowCount,
+          countChanged,
+          identityChanged,
+          previousCount: previousRowCount
+        });
+      } else {
+        fileLog.info('📋 Rows initialized', { count: currentRowCount });
+      }
+
+      // Update tracking state
+      previousRowCount = currentRowCount;
+      previousRowIds = currentRowIds;
+
       this.onRowsChanged();
     });
     this.disposers.push(rowsDisposer);

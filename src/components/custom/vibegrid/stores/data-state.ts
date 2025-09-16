@@ -9,7 +9,7 @@
 import { observable, computed, batch } from '@legendapp/state';
 import { syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
-import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$ } from '@/legend-state/observables';
+import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$, universeContext$ } from '@/legend-state/observables';
 import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
@@ -171,8 +171,19 @@ function applyFlatRowOrdering(rows: any[], flatRowOrder: string[]): any[] {
  */
 function generateTableStateKey(entityType: string): string | null {
   try {
-    const orgId = universeOrgId$.peek();
+    let orgId = universeOrgId$.peek();
     const userId = universeUserId$.peek();
+
+    // Handle universe mode - fallback to first available organization
+    if (orgId === 'universe') {
+      const universeContext = universeContext$.peek();
+      const organizations = universeContext?.organizations || {};
+      const orgIds = Object.keys(organizations);
+      if (orgIds.length > 0) {
+        orgId = orgIds[0]; // Use first available organization
+        fileLog.debug('🔧 Universe mode detected, using fallback orgId', { originalOrgId: 'universe', fallbackOrgId: orgId });
+      }
+    }
 
     console.log('🔧 PERSISTENCE DEBUG: generateTableStateKey called', {
       entityType,
