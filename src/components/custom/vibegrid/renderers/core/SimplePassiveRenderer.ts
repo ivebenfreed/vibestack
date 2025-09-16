@@ -1209,6 +1209,18 @@ export class SimplePassiveRenderer {
    */
   private editTagsField(currentValue: string, row: any, column: any): void {
     const cellId = `${row.id}:${column.id}`;
+
+    // Check if column is editable before starting edit mode
+    if (column.editable === false) {
+      fileLog.info('🏷️ Tags field clicked - but column is not editable', {
+        cellId,
+        rowId: row.id,
+        columnId: column.id,
+        editable: column.editable
+      });
+      return;
+    }
+
     fileLog.info('🏷️ Starting tags field edit mode', {
       cellId,
       currentValue,
@@ -1216,7 +1228,7 @@ export class SimplePassiveRenderer {
       columnId: column.id,
       currentTags: currentValue.split(',').map(t => t.trim()).filter(t => t.length > 0)
     });
-    
+
     // Trigger the standard VibeGrid edit mode - the editor selection system
     // will automatically choose MultiSelectEditor for tags fields
     this.tableInteraction$.startEdit(cellId, currentValue);

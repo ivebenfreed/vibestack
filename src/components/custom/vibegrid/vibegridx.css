@@ -493,6 +493,21 @@ body.vibegridx-dragging-active * {
   background: inherit;
 }
 
+/* Non-editable cell content - no cursor pointer, no hover effects */
+.vibegridx-cell-text,
+.vibegridx-cell-empty,
+.vibegridx-number-content:not(.vibegridx-cell-number-editable),
+.vibegridx-boolean-text:not(.vibegridx-cell-boolean-editable) {
+  cursor: default;
+}
+
+.vibegridx-cell-text:hover,
+.vibegridx-cell-empty:hover,
+.vibegridx-number-content:not(.vibegridx-cell-number-editable):hover,
+.vibegridx-boolean-text:not(.vibegridx-cell-boolean-editable):hover {
+  background-color: transparent;
+}
+
 /* Single-click editing hover states */
 .vibegridx-cell-content-editable {
   cursor: pointer;

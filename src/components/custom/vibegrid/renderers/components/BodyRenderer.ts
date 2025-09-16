@@ -550,22 +550,26 @@ export class BodyRenderer {
       // Tags field with comma-separated values - create multiple badges
       contentElement = this.createTagsElement(value, rowData, column);
     } else if (['number', 'integer', 'float'].includes(cellType)) {
-      // Number content - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.domFactory.createElement('span', 'vibegridx-number-content vibegridx-cell-number-editable');
+      // Number content - use editable class only if column is editable
+      const editableClass = column.editable === false ? '' : 'vibegridx-cell-number-editable';
+      contentElement = this.domFactory.createElement('span', `vibegridx-number-content ${editableClass}`.trim());
       contentElement.textContent = this.formatCellValue(value, cellType, column);
     } else if (cellType === 'boolean') {
-      // Boolean content - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.domFactory.createElement('span', 'vibegridx-boolean-text vibegridx-cell-boolean-editable');
+      // Boolean content - use editable class only if column is editable
+      const editableClass = column.editable === false ? '' : 'vibegridx-cell-boolean-editable';
+      contentElement = this.domFactory.createElement('span', `vibegridx-boolean-text ${editableClass}`.trim());
       contentElement.textContent = this.formatCellValue(value, cellType, column);
     } else if (value == null || value === '') {
-      // Empty content - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.domFactory.createElement('span', 'vibegridx-cell-empty-editable');
-      contentElement.textContent = 'Click to edit';
+      // Empty content - use editable class only if column is editable
+      const className = column.editable === false ? 'vibegridx-cell-empty' : 'vibegridx-cell-empty-editable';
+      contentElement = this.domFactory.createElement('span', className);
+      contentElement.textContent = column.editable === false ? '' : 'Click to edit';
       contentElement.style.fontSize = '12px';
       contentElement.style.opacity = '0.6';
     } else {
-      // Text content (default) - only use specific classes, NOT vibegridx-cell-content
-      contentElement = this.domFactory.createElement('span', 'vibegridx-cell-text-editable');
+      // Text content (default) - use editable class only if column is editable
+      const className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
+      contentElement = this.domFactory.createElement('span', className);
       contentElement.textContent = this.formatCellValue(value, cellType, column);
 
       // Add proper text overflow handling for long text
@@ -583,21 +587,24 @@ export class BodyRenderer {
       contentElement.style.whiteSpace = 'nowrap';
     }
 
-    // Add click handler for content area - immediate edit mode
-    contentElement.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const cellId = `${row.id}:${column.id}`;
+    // Add click handler for content area - immediate edit mode (only for editable columns)
+    if (column.editable !== false) {
+      contentElement.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cellId = `${row.id}:${column.id}`;
 
-      fileLog.info('📝 Content clicked - entering edit mode', {
-        rowId: row.id,
-        columnId: column.id,
-        value,
-        cellType
+        fileLog.info('📝 Content clicked - entering edit mode', {
+          rowId: row.id,
+          columnId: column.id,
+          value,
+          cellType
+        });
+
+        // Start edit immediately
+        this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
       });
-
-      // Start edit immediately
-      this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
-    });
+    }
+    // For non-editable columns, don't add click handler - let clicks bubble up for cell selection
 
     cellElement.appendChild(contentElement);
 

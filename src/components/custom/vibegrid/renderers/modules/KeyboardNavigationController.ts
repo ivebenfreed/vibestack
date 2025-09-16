@@ -179,6 +179,13 @@ export class KeyboardNavigationController {
           const [rowId, columnId] = focusedCell.split(':');
           const cellId = `${rowId}:${columnId}`;
 
+          // Check if column is editable before starting edit mode
+          const columns = this.getColumns();
+          const column = columns.find(c => c.id === columnId);
+          if (column && column.editable === false) {
+            return true; // Consume the event but don't start editing
+          }
+
           // Get current value
           const processedRows = this.getProcessedRows();
           const row = processedRows.find(r => r.id === rowId);
