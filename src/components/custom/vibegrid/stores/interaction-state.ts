@@ -85,7 +85,7 @@ export type TableInteraction$ = ReturnType<typeof createTableInteraction$>;
 // INTERACTION STATE OBSERVABLE FACTORY
 // ====================================
 
-export function createTableInteraction$() {
+export function createTableInteraction$(tableCore$?: any) {
   fileLog.info('<� Creating tableInteraction$ observable');
 
   const tableInteraction$ = observable({
@@ -260,7 +260,26 @@ export function createTableInteraction$() {
 
       // 3. For editable cells, start editing (this is the key missing piece)
       if (isEditable && !ctrlKey && !shiftKey) {
-        this.startEdit(cellId);
+        // Get the actual cell value for editing
+        const [rowId, columnId] = cellId.split(':');
+        const processedRows = tableCore$?.processedRows?.get() || [];
+        const row = processedRows.find((r: any) => r.id === rowId);
+        const cellValue = row ? row[columnId] : '';
+
+        fileLog.info('🔍 Cell value retrieval debug', {
+          cellId,
+          rowId,
+          columnId,
+          hasTableCore: !!tableCore$,
+          hasProcessedRows: !!tableCore$?.processedRows,
+          processedRowsCount: processedRows.length,
+          foundRow: !!row,
+          cellValue,
+          firstRowId: processedRows[0]?.id,
+          rowIds: processedRows.map(r => r.id).slice(0, 3)
+        });
+
+        tableInteraction$.startEdit(cellId, cellValue);
       }
 
       fileLog.info('🖱️ Cell click handled', {

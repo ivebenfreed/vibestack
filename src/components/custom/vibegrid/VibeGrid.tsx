@@ -115,7 +115,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       // Create the three-layer observables directly
       const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns);
-      const tableInteraction$ = createTableInteraction$();
+      const tableInteraction$ = createTableInteraction$(tableCore$);
 
       // Create a proper viewport observable with Legend State observables for each property
       const tableViewport$ = {

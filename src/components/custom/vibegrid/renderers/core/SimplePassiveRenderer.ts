@@ -323,8 +323,8 @@ export class SimplePassiveRenderer {
         // Update selection overlay
         this.overlayManager.updateSelection(selectedCells);
 
-        // Update editing overlay
-        this.overlayManager.updateEditingOverlay(editingCell, editValue);
+        // DISABLED: Update editing overlay (now handled by reactive observer in OverlayManager)
+        // this.overlayManager.updateEditingOverlay(editingCell, editValue);
 
         // Update drag preview overlay
         if (isDragging && dragSource) {

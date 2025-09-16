@@ -4,6 +4,7 @@
  */
 
 import { log } from '@/logger';
+import { observe } from '@legendapp/state';
 import { CanvasOverlayDOM } from '../../overlays/CanvasOverlayDOM';
 import { EditingOverlay } from '../../overlays/EditingOverlay';
 import { ContextMenuManager } from '../../components/ContextMenu';
@@ -69,8 +70,9 @@ export class OverlayManager {
     this.headerContainer = options.headerContainer || null;
     this.bodyContainer = options.bodyContainer || null;
     this.getProcessedRows = options.getProcessedRows;
-    
+
     this.initOverlays();
+    this.setupEditingObserver();
   }
   
   /**
@@ -227,19 +229,118 @@ export class OverlayManager {
   }
   
   /**
-   * Update editing overlay
+   * REACTIVE: Setup editing overlay observer
+   */
+  private setupEditingObserver(): void {
+    let lastShownCell: string | null = null;
+
+    observe(() => {
+      const editingCell = this.tableInteraction$.editingCell.get();
+      const editValue = this.tableInteraction$.editValue.get();
+      const isEditing = this.tableInteraction$.isEditing.get();
+
+      fileLog.debug('🔍 REACTIVE: Editing observer triggered', {
+        editingCell,
+        isEditing,
+        editValue,
+        lastShownCell,
+        hasOverlay: !!this.editingOverlay
+      });
+
+      if (isEditing && editingCell && this.editingOverlay) {
+        // Only update overlay if the cell has actually changed
+        if (lastShownCell !== editingCell) {
+          const [rowId, columnId] = editingCell.split(':');
+          const columns = this.tableCore$.columns.get();
+          const column = columns.find((c: any) => c.id === columnId);
+
+          if (column) {
+            const position = this.getCellPosition(rowId, columnId);
+            if (position) {
+              const cell = { rowId, columnId };
+              // ALWAYS use the current cell value, ignore reactive editValue for initial display
+              const actualValue = this.getCellValue(rowId, columnId);
+
+              console.log('🔍 REACTIVE OBSERVER: About to call showAt', {
+                editingCell,
+                rowId,
+                columnId,
+                freshValue: actualValue,
+                ignoredReactiveValue: editValue,
+                isLastShownCell: lastShownCell,
+                willCallShowAt: true
+              });
+
+              fileLog.debug('📝 REACTIVE: Getting fresh cell value', {
+                editingCell,
+                rowId,
+                columnId,
+                freshValue: actualValue,
+                ignoredReactiveValue: editValue
+              });
+
+              // Hide previous overlay if different cell
+              if (lastShownCell && lastShownCell !== editingCell) {
+                this.editingOverlay.hide();
+                fileLog.debug('📝 REACTIVE: Hidden previous overlay for different cell', {
+                  from: lastShownCell,
+                  to: editingCell
+                });
+              }
+
+              console.log('🔍 FINAL DEBUG: Calling showAt with exact values', {
+                cellId: `${rowId}:${columnId}`,
+                passedValue: actualValue,
+                valuePreview: typeof actualValue === 'string' ? actualValue.substring(0, 50) + '...' : actualValue
+              });
+
+              this.editingOverlay.showAt(position, cell, column, actualValue);
+
+              fileLog.info('📝 REACTIVE: Editing overlay shown', {
+                editingCell,
+                editValue: actualValue,
+                isEditing,
+                transitionFrom: lastShownCell ? 'different-cell' : 'new-edit'
+              });
+
+              lastShownCell = editingCell;
+            }
+          }
+        } else {
+          fileLog.debug('📝 REACTIVE: Skipping overlay update - same cell', { editingCell });
+        }
+      } else if (this.editingOverlay) {
+        // Clear state when editing stops
+        if (lastShownCell !== null) {
+          this.editingOverlay.hide();
+          lastShownCell = null;
+          fileLog.info('📝 REACTIVE: Editing overlay hidden', {
+            isEditing,
+            editingCell,
+            wasShowing: lastShownCell
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * @deprecated Use reactive observer instead - this will be removed
+   * Update editing overlay (IMPERATIVE - being replaced by reactive observer)
    */
   updateEditingOverlay(editingCell: string | null, editValue?: string): void {
     if (editingCell && this.editingOverlay) {
       const [rowId, columnId] = editingCell.split(':');
       const columns = this.tableCore$.columns.get();
       const column = columns.find((c: any) => c.id === columnId);
-      
+
       if (column) {
         const position = this.getCellPosition(rowId, columnId);
         if (position) {
           const cell = { rowId, columnId };
-          this.editingOverlay.showAt(position, cell, column, editValue || '');
+          // Use the actual editValue from reactive state, or get current cell value
+          const actualValue = editValue !== undefined ? editValue : this.getCellValue(rowId, columnId);
+          this.editingOverlay.showAt(position, cell, column, actualValue);
         }
       }
     } else if (this.editingOverlay) {
@@ -247,6 +348,54 @@ export class OverlayManager {
     }
   }
   
+  /**
+   * Get current cell value from data
+   */
+  private getCellValue(rowId: string, columnId: string): any {
+    const processedRows = this.tableCore$.processedRows.get();
+
+    // Debug the full data structure
+    console.log('🔍 getCellValue DETAILED DEBUG:', {
+      targetRowId: rowId,
+      targetColumnId: columnId,
+      totalRows: processedRows?.length || 0,
+      firstFewRowIds: processedRows?.slice(0, 3).map((r: any) => r.id) || [],
+      allRowIds: processedRows?.map((r: any) => r.id) || [],
+      sampleRowStructure: processedRows?.[0] ? Object.keys(processedRows[0]).slice(0, 8) : 'no rows'
+    });
+
+    const row = processedRows.find((r: any) => r.id === rowId);
+
+    if (!row) {
+      console.log('❌ getCellValue: Row NOT found!', {
+        targetRowId: rowId,
+        availableRowIds: processedRows?.map((r: any) => r.id) || []
+      });
+      return '';
+    }
+
+    const value = row[columnId];
+
+    console.log('✅ getCellValue: Row found, extracting value', {
+      targetRowId: rowId,
+      foundRowId: row.id,
+      targetColumnId: columnId,
+      extractedValue: value,
+      rowKeys: Object.keys(row).slice(0, 8),
+      hasTargetColumn: columnId in row
+    });
+
+    fileLog.info('📄 Getting cell value for editing', {
+      rowId,
+      columnId,
+      foundRow: !!row,
+      cellValue: value,
+      rowKeys: row ? Object.keys(row).slice(0, 5) : []
+    });
+
+    return value;
+  }
+
   /**
    * Update column resize preview
    */
