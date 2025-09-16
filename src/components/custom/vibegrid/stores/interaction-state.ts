@@ -246,6 +246,32 @@ export function createTableInteraction$() {
       fileLog.info('<� Cell selected', { cellId, isMulti, selectionCount: tableInteraction$.selectedCells.get().size });
     },
 
+    // Pure cell click handler - minimal logic, reactive approach
+    handleCellClick(cellId: string, isEditable: boolean, ctrlKey: boolean, shiftKey: boolean) {
+      // 1. Always set focus
+      this.setFocusedCell(cellId);
+
+      // 2. Handle selection
+      if (!ctrlKey && !shiftKey) {
+        this.selectCell(cellId, false);
+      } else if (ctrlKey) {
+        this.selectCell(cellId, true);
+      }
+
+      // 3. For editable cells, start editing (this is the key missing piece)
+      if (isEditable && !ctrlKey && !shiftKey) {
+        this.startEdit(cellId);
+      }
+
+      fileLog.info('🖱️ Cell click handled', {
+        cellId,
+        isEditable,
+        ctrlKey,
+        shiftKey,
+        didStartEdit: isEditable && !ctrlKey && !shiftKey
+      });
+    },
+
     selectRow(rowId: string, isMulti: boolean = false) {
       batch(() => {
         // CLEAR CELL SELECTION: Row selection clears cell selection mode

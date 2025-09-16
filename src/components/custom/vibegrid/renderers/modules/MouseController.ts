@@ -83,35 +83,49 @@ export class MouseController {
     this.isDragging = false;
     this.isTracking = true;
 
-    // Prevent default text selection behavior
-    e.preventDefault();
-
     // Provide immediate visual feedback on mouse down
     const target = e.target as HTMLElement;
     const cellElement = target.closest('[data-row-id][data-column-id]');
 
     if (cellElement) {
-      // This is a cell mouse down - delegate to BodyRenderer for immediate selection feedback
-      // PURE: Just update coordinates and mouse state
+      // Get cell info
       const rowId = cellElement.getAttribute('data-row-id');
       const columnId = cellElement.getAttribute('data-column-id');
       const cellId = `${rowId}:${columnId}`;
 
-      fileLog.info('🖱️ Cell mouse down - pure coordinate tracking', { cellId });
+      // Detect if click is on an editable element
+      const isEditableElement = target.matches('input, textarea, select') ||
+                                target.contentEditable === 'true' ||
+                                target.closest('input, textarea, select, [contenteditable="true"]') ||
+                                // VibeGrid specific editable element classes
+                                target.classList.contains('vibegridx-cell-text-editable') ||
+                                target.closest('.vibegridx-cell-text-editable');
 
-      // PURE: Update state directly - this is the ONLY selection path needed
+      fileLog.info('🖱️ Cell mouse down - pure event coordination', {
+        cellId,
+        tagName: target.tagName,
+        className: target.className,
+        isEditableElement
+      });
+
+      // PURE: Update mouse coordinates
       this.tableInteraction$.setMousePosition(e.clientX, e.clientY);
       this.tableInteraction$.setMouseDown(true);
-      this.tableInteraction$.setFocusedCell(cellId);
 
-      // IMMEDIATE SELECTION: Always select on mouse down (click is just drag with no movement)
-      if (!e.ctrlKey && !e.shiftKey) {
-        this.tableInteraction$.selectCell(cellId, false);
-      } else if (e.ctrlKey) {
-        this.tableInteraction$.selectCell(cellId, true);
+      // PURE: Delegate to minimal, focused handler
+      this.tableInteraction$.handleCellClick(cellId, isEditableElement, e.ctrlKey, e.shiftKey);
+
+      // Handle mouse tracking and preventDefault based on element type
+      if (isEditableElement) {
+        // Don't prevent default or track mouse for editable elements - allow normal editing behavior
+        this.isDragging = false;
+        this.isTracking = false;
+        this.startPosition = { x: 0, y: 0 };
+        return;
+      } else {
+        // Prevent default text selection behavior for non-editable elements
+        e.preventDefault();
       }
-
-      fileLog.debug('🎯 Immediate selection on mouse down', { cellId, selectedCount: this.tableInteraction$.selectedCells.get().size });
     }
 
     fileLog.info('🖱️ Mouse down tracked', {
