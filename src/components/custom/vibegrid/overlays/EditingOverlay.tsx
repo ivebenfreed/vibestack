@@ -35,17 +35,21 @@ export class EditingOverlay {
   private currentValue: any = null;
   
   constructor(container: HTMLElement, config: EditingOverlayConfig) {
-    this.container = container;
+    // Find the viewport container which is where cells are positioned
+    const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement || container;
+    this.container = viewportContainer;
     this.config = config;
-    
+
     console.log('🔧 EditingOverlay: Constructor called', {
-      container,
-      containerClass: container.className,
-      containerInDOM: document.contains(container),
-      containerVisible: container.offsetWidth > 0 && container.offsetHeight > 0,
-      containerBounds: container.getBoundingClientRect()
+      originalContainer: container,
+      actualContainer: this.container,
+      containerClass: this.container.className,
+      usingViewport: this.container !== container,
+      containerInDOM: document.contains(this.container),
+      containerVisible: this.container.offsetWidth > 0 && this.container.offsetHeight > 0,
+      containerBounds: this.container.getBoundingClientRect()
     });
-    
+
     this.createPortal();
   }
   

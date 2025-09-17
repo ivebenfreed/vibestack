@@ -16,6 +16,7 @@ import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
 import { visualState$, getColumnWidth, visualOperations } from '../../stores/visual-state';
+import { GRID_DIMENSIONS } from '../../constants/grid-dimensions';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import { BadgeRenderer } from '../modules/BadgeRenderer';
@@ -102,7 +103,7 @@ export class BodyRenderer {
     rowIndex: number,
     columns: any[],
     columnVisibility: Record<string, boolean>,
-    startX: number = 40
+    startX: number = GRID_DIMENSIONS.CONTENT_OFFSET_X  // Use constant from centralized dimensions
   ): HTMLElement {
     // Update grouped mode status
     this.updateGroupedModeStatus();
@@ -132,7 +133,7 @@ export class BodyRenderer {
     // Add row header (checkbox or row number) with absolute positioning
     const rowHeader = this.createRowHeader(row, rowIndex);
     rowHeader.style.position = 'absolute';
-    rowHeader.style.left = '30px';  // After 30px drag column
+    rowHeader.style.left = `${GRID_DIMENSIONS.DRAG_COLUMN_WIDTH}px`;  // After drag column
     rowHeader.style.top = '0';
     rowElement.appendChild(rowHeader);
 
@@ -177,7 +178,7 @@ export class BodyRenderer {
     const canDragRow = isDataRow; // Support drag in both grouped and flat modes
 
     dragColumn.style.cssText = `
-      width: 30px;
+      width: ${GRID_DIMENSIONS.DRAG_COLUMN_WIDTH}px;
       height: ${ROW_HEIGHT}px;
       display: flex;
       align-items: center;
@@ -222,7 +223,7 @@ export class BodyRenderer {
     const rowHeader = this.createElement('div', 'vibegridx-row-header');
 
     rowHeader.style.cssText = `
-      width: 40px;
+      width: ${GRID_DIMENSIONS.ROW_HEADER_WIDTH}px;
       height: ${ROW_HEIGHT}px;
       display: flex;
       align-items: center;

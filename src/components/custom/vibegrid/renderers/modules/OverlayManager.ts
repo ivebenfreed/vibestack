@@ -590,7 +590,7 @@ export class OverlayManager {
     });
 
     if (domPosition && domPosition.isVisible) {
-      fileLog.info('✅ HYBRID: Using DOM position (high accuracy)', {
+      fileLog.info('✅ Using DOM position', {
         cellKey,
         position: { x: domPosition.x, y: domPosition.y, width: domPosition.width, height: domPosition.height },
         source: 'dom'
@@ -604,77 +604,16 @@ export class OverlayManager {
       };
     }
 
-    // Fall back to virtual calculation (for non-rendered cells)
-    // Convert actual IDs to logical coordinates for virtual calculation
-    const logicalCoords = this.convertToLogicalCoordinates(rowId, columnId);
-
-    if (logicalCoords) {
-      const virtualCalc = virtualCellPosition$.get();
-      const virtualPosition = virtualCalc.getCellPosition(logicalCoords.rowIndex, logicalCoords.columnIndex);
-
-      if (virtualPosition) {
-        fileLog.debug('⚡ Using virtual position (fallback)', {
-          cellKey,
-          actualIds: { rowId, columnId },
-          logicalCoords,
-          position: virtualPosition,
-          source: 'virtual'
-        });
-
-        return {
-          x: virtualPosition.x,
-          y: virtualPosition.y,
-          width: virtualPosition.width,
-          height: virtualPosition.height
-        };
-      }
-    }
-
-    fileLog.warn('❌ Could not find position for cell', {
+    // No DOM position means cell is not visible - overlays only render for visible cells
+    fileLog.debug('Cell not visible in DOM, no overlay needed', {
       cellKey,
       rowId,
-      columnId,
-      domAvailable: !!domPosition,
-      virtualAvailable: !!logicalCoords
+      columnId
     });
 
     return null;
   }
 
-  /**
-   * Convert actual row/column IDs to logical coordinates for virtual calculation
-   */
-  private convertToLogicalCoordinates(rowId: string, columnId: string): { rowIndex: number; columnIndex: number } | null {
-    try {
-      const processedRows = this.tableCore$.processedRows.get();
-      const visibleColumns = this.tableCore$.visibleColumns.get();
-
-      // Find row index by ID
-      const rowIndex = processedRows.findIndex((row: any) => row.id === rowId);
-      if (rowIndex === -1) {
-        fileLog.warn('❌ Row ID not found in processed rows', { rowId });
-        return null;
-      }
-
-      // Find column index by ID
-      const columnIndex = visibleColumns.findIndex((col: any) => col.id === columnId);
-      if (columnIndex === -1) {
-        fileLog.warn('❌ Column ID not found in visible columns', { columnId });
-        return null;
-      }
-
-      fileLog.debug('✅ Converted to logical coordinates', {
-        actualIds: { rowId, columnId },
-        logicalCoords: { rowIndex, columnIndex }
-      });
-
-      return { rowIndex, columnIndex };
-    } catch (error) {
-      fileLog.error('❌ Error converting to logical coordinates', { rowId, columnId, error });
-      return null;
-    }
-  }
-  
   /**
    * Get viewport info
    */

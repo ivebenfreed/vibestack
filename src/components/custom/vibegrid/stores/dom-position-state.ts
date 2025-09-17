@@ -63,17 +63,23 @@ class ReactivePositionTracker {
       this.cleanup();
     }
 
+    // Find the viewport container which is where cells and overlays live
+    const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement || container;
+
     fileLog.info('🎯 Initializing DOM position tracking', {
       containerClass: container.className,
-      existingCells: container.querySelectorAll('[data-row-id][data-column-id]').length
+      viewportClass: viewportContainer.className,
+      existingCells: viewportContainer.querySelectorAll('[data-row-id][data-column-id]').length,
+      usingViewport: viewportContainer !== container
     });
 
-    tableContainer = container;
+    tableContainer = viewportContainer;
     domPositions$.isTracking.set(true);
 
     // Re-enable observers now that recursive updates are fixed
-    this.setupObservers(container);
-    this.observeAllCells(container);
+    // Use viewport container for all observations since that's where cells live
+    this.setupObservers(viewportContainer);
+    this.observeAllCells(viewportContainer);
     this.isInitialized = true;
 
     // Initial position update
@@ -252,7 +258,6 @@ class ReactivePositionTracker {
     // Update lastUpdateTime to prevent throttle issues
     this.lastUpdateTime = timestamp;
 
-    const containerRect = container.getBoundingClientRect();
     const currentPositions = domPositions$.cellPositions.get();
     const newPositions = new Map(currentPositions);
 
@@ -272,37 +277,37 @@ class ReactivePositionTracker {
       ) as HTMLElement;
 
       if (cell) {
-        const rect = cell.getBoundingClientRect();
         const oldPosition = currentPositions.get(cellKey);
 
-        // Calculate position relative to content area (excluding header and fixed columns)
-        const rawX = rect.left - containerRect.left;
-        const rawY = rect.top - containerRect.top;
+        // Calculate cumulative offset by traversing up the offset parent chain
+        // This gives us the position relative to the viewport container
+        let relativeX = 0;
+        let relativeY = 0;
+        let element: HTMLElement | null = cell;
 
-        // Adjust Y position to be relative to content area, not entire grid
-        // The header takes up HEADER_HEIGHT pixels at the top
-        const adjustedY = rawY - GRID_DIMENSIONS.HEADER_HEIGHT;
-
-        // Adjust X position to be relative to content area, not entire grid
-        // Only subtract the drag column width (32px offset identified by testing)
-        const adjustedX = rawX - 32;
+        // Traverse up the offset parent chain until we reach the viewport container
+        while (element && !element.classList.contains('vibegridx-viewport')) {
+          relativeX += element.offsetLeft;
+          relativeY += element.offsetTop;
+          element = element.offsetParent as HTMLElement;
+        }
 
         const newPosition: CellCoordinates = {
-          x: adjustedX,
-          y: adjustedY,
-          width: rect.width,
-          height: rect.height,
+          x: relativeX,
+          y: relativeY,
+          width: cell.offsetWidth,
+          height: cell.offsetHeight,
           source: 'dom',
-          isVisible: rect.width > 0 && rect.height > 0,
+          isVisible: cell.offsetWidth > 0 && cell.offsetHeight > 0,
           timestamp
         };
 
-        fileLog.debug('📐 DOM position calculated', {
+        fileLog.info('📐 DOM position calculated (content-relative)', {
           cellKey,
-          rawPosition: { x: rawX, y: rawY },
-          adjustedPosition: { x: adjustedX, y: adjustedY },
-          headerOffset: GRID_DIMENSIONS.HEADER_HEIGHT,
-          contentOffsetX: 32 // Empirically determined offset
+          contentPosition: { x: relativeX, y: relativeY },
+          cellSize: { width: cell.offsetWidth, height: cell.offsetHeight },
+          offsetParent: cell.offsetParent?.className,
+          note: 'Using offset positions - not affected by scroll'
         });
 
         newPositions.set(cellKey, newPosition);
