@@ -18,6 +18,7 @@ import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 import { PositionEvents, domPositions$, positionTracker } from '../../stores/dom-position-state';
 import { virtualCellPosition$ } from '../../virtualization/VirtualScrollManager';
 import { GRID_DIMENSIONS } from '../../constants/grid-dimensions';
+import type { CoordinateMapping } from '../../coordinates/VibeGridXCoordinateManager';
 
 const fileLog = log('components/custom/vibegrid/renderers/modules/OverlayManager.ts');
 
@@ -920,5 +921,22 @@ export class OverlayManager {
    */
   getContextMenu(): ContextMenuManager | null {
     return this.contextMenu;
+  }
+
+  /**
+   * Update coordinate mapping for all overlays
+   * This method is called by SimplePassiveRenderer when coordinates change
+   */
+  updateCoordinateMapping(mapping: CoordinateMapping): void {
+    fileLog.info('🔄 Coordinate mapping updated for overlays', {
+      version: mapping.version,
+      rowCount: mapping.rows.length,
+      columnCount: mapping.columns.length
+    });
+
+    // Delegate to canvas overlay which handles all sub-overlays
+    if (this.canvasOverlay) {
+      this.canvasOverlay.updateCoordinateMapping(mapping);
+    }
   }
 }

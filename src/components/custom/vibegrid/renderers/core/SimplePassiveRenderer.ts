@@ -305,16 +305,29 @@ export class SimplePassiveRenderer {
       const visualState = visualState$.get(true);
 
       // Create a signature of layout-only changes (exclude scroll position)
-      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`;
+      // Include column order in signature to detect reordering
+      const columnOrderSignature = visualState.columnState.columnOrder?.join(',') || '';
+      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}-${columnOrderSignature}`;
+
+      fileLog.debug('🔍 Visual observer triggered', {
+        columnOrderSignature,
+        currentLayoutSignature: layoutSignature,
+        previousLayoutSignature: lastVisualLayout,
+        columnOrderLength: visualState.columnState.columnOrder?.length || 0,
+        willTriggerRender: layoutSignature !== lastVisualLayout
+      });
 
       // Only render if actual layout changed, not just scroll position
       if (layoutSignature !== lastVisualLayout) {
         lastVisualLayout = layoutSignature;
 
-        fileLog.debug('🎨 Visual layout changed - updating layout only', {
+        fileLog.info('🎨 Visual layout changed - updating layout only', {
           columnCount: visualState.columnLayouts.length,
           totalWidth: visualState.geometry.totalWidth,
-          viewportSize: `${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`
+          viewportSize: `${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`,
+          columnOrder: columnOrderSignature || 'default',
+          previousLayoutSignature: lastVisualLayout,
+          currentLayoutSignature: layoutSignature
         });
 
         // Batch the render operations to prevent cascade
@@ -456,7 +469,13 @@ export class SimplePassiveRenderer {
       enableSelectionColumn: this.options.enableSelectionColumn,
       updateCoordinateMapping: (mapping: CoordinateMapping) => {
         this.coordinateMapping = mapping;
-        // Note: Overlay manager now uses hybrid coordinate system - no manual updates needed
+        // CRITICAL: OverlayManager still needs coordinate mapping for positioning overlays
+        this.overlayManager?.updateCoordinateMapping(mapping);
+        fileLog.debug('🔄 Coordinate mapping updated for overlays', {
+          rowCount: mapping.rows.length,
+          columnCount: mapping.columns.length,
+          version: mapping.version
+        });
       }
     });
     
@@ -850,30 +869,26 @@ export class SimplePassiveRenderer {
     const endIndex = Math.min(rows.length, visibleRange.end);
     const visibleRows = rows.slice(startIndex, endIndex);
     
-    fileLog.debug('🎨 Virtual scrolling with Phase 2', { 
-      totalRows: rows.length, 
+    fileLog.debug('🎨 Body rendering ALL columns (no virtualization) - matches HeaderRenderer', {
+      totalRows: rows.length,
       visibleRange: `${startIndex}-${endIndex}`,
-      rendering: visibleRows.length
+      rendering: visibleRows.length,
+      totalColumns: visualState.visibleColumns.length
     });
     
-    // Get virtual column range and layouts from the unified visual state (single source of truth)
-    const visibleColumnRange = visualState.geometry.visibleColumnRange;
-    const allColumnLayouts = visualState.columnLayouts;
-    const visibleColumnLayouts = visualState.visibleColumns;
-
-    // Use the EXACT same range as header (from observable with buffer already included)
-    const startColIndex = visibleColumnRange.start;
-    const endColIndex = visibleColumnRange.end;
-    const virtualColumnLayouts = visibleColumnLayouts.slice(startColIndex, endColIndex);
+    // Get ALL visible columns from unified visual state (same as HeaderRenderer - no virtualization)
+    // This ensures header and body are always in sync after column reordering
+    const allVisibleColumnLayouts = visualState.visibleColumns;
 
     // Calculate base offset including drag column width for grouped mode
     const baseOffset = this.calculateBaseOffset();
 
-    // Use pre-computed starting x position from unified visual state - NO duplicate calculation
-    const startX = startColIndex > 0 ? visibleColumnLayouts[startColIndex].xOffset : baseOffset;
+    // Always start from base offset when rendering all columns (matches HeaderRenderer)
+    const startX = baseOffset;
 
     // Convert column layouts back to columns for compatibility with existing renderer
-    const virtualColumns = virtualColumnLayouts.map(layout =>
+    // Use ALL visible columns like HeaderRenderer to maintain sync after column reorder
+    const virtualColumns = allVisibleColumnLayouts.map(layout =>
       columns.find(col => col.id === layout.id)
     ).filter(Boolean);
     
@@ -932,7 +947,8 @@ export class SimplePassiveRenderer {
         sampleRows: newRows.slice(0, 3).map(r => ({ id: r.rowId, y: r.y }))
       });
 
-      // Note: Overlay manager now uses hybrid coordinate system - no manual coordinate sync needed
+      // CRITICAL: OverlayManager still needs coordinate mapping for positioning overlays
+      this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
     }
 
     // Force DOM position tracker to update after cells are rendered

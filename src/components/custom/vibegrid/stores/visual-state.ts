@@ -169,34 +169,24 @@ export const visualState$ = computed((): VisualState => {
   const totalWidth = 70 + totalColumnsWidth; // drag column (30px) + row header (40px) + columns
   const totalHeight = inputs.rowCount * inputs.rowHeight;
 
-  // Calculate visible ranges
-  const startColIndexResult = visibleColumns.findIndex(col => col.xOffset + col.width > inputs.scrollLeft);
-  const startColIndex = Math.max(0, startColIndexResult === -1 ? 0 : startColIndexResult);
+  // DISABLED: Column virtualization to fix header/body sync issues after reordering
+  // Always render ALL columns to maintain sync between header and body
+  const startColIndex = 0;
+  const endColIndex = visibleColumns.length;
 
-  const endColIndexResult = visibleColumns.findIndex(col => col.xOffset > inputs.scrollLeft + inputs.viewportWidth);
-  const endColIndex = Math.min(visibleColumns.length, endColIndexResult === -1 ? visibleColumns.length : endColIndexResult + 1);
-
-  // DEBUG: Log column virtualization calculations
+  // DEBUG: Log column rendering status (virtualization disabled)
   if (inputs.scrollLeft > 0) {
-    console.log('🔍 COLUMN VIRTUALIZATION DEBUG', {
+    console.log('🔍 COLUMN RENDERING DEBUG (NO VIRTUALIZATION)', {
       scrollLeft: inputs.scrollLeft,
       viewportWidth: inputs.viewportWidth,
       scrollRightEdge: inputs.scrollLeft + inputs.viewportWidth,
-      startColIndexResult,
       startColIndex,
-      endColIndexResult,
       endColIndex,
       visibleColumnsCount: visibleColumns.length,
-      virtualRangeCount: endColIndex - startColIndex,
+      renderAllColumns: true,
       firstColXOffset: visibleColumns[0]?.xOffset,
-      startColXOffset: visibleColumns[startColIndex]?.xOffset,
-      endColXOffset: visibleColumns[endColIndex - 1]?.xOffset,
-      columnOffsets: visibleColumns.slice(Math.max(0, startColIndex - 2), endColIndex + 2).map(col => ({
-        id: col.id,
-        xOffset: col.xOffset,
-        width: col.width,
-        rightEdge: col.xOffset + col.width
-      }))
+      lastColXOffset: visibleColumns[endColIndex - 1]?.xOffset,
+      totalWidth: totalColumnsWidth
     });
   }
 

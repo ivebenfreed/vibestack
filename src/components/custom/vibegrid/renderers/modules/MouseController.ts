@@ -6,6 +6,7 @@
  */
 
 import { log } from '@/logger';
+import { visualOperations } from '../../stores/visual-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/modules/MouseController.ts');
 
@@ -27,6 +28,12 @@ export class MouseController {
   private isTracking = false; // Flag to track if we're monitoring for drag
   private dragThreshold = 8; // pixels (increased to be less sensitive)
   private startPosition: { x: number; y: number } = { x: 0, y: 0 };
+
+  // Column drag state
+  private isColumnDrag = false;
+  private dragColumnId: string | null = null;
+  private dragPreviewElement: HTMLElement | null = null;
+  private dropLineElement: HTMLElement | null = null;
 
   // Event listeners for cleanup
   private eventListeners: Array<{
@@ -67,6 +74,8 @@ export class MouseController {
     this.addEventListenerTracked(document, 'mouseup', mouseUpHandler);
     this.addEventListenerTracked(document, 'click', clickHandler);
 
+    // NOTE: No HTML5 drag events needed - we use pure mouse events for column drag
+
     fileLog.info('✅ Global mouse event coordination setup complete');
   }
 
@@ -82,9 +91,45 @@ export class MouseController {
     this.startPosition = { x: e.clientX, y: e.clientY };
     this.isDragging = false;
     this.isTracking = true;
+    this.isColumnDrag = false;
+    this.dragColumnId = null;
 
     // Provide immediate visual feedback on mouse down
     const target = e.target as HTMLElement;
+
+    fileLog.debug('🖱️ Mouse down on element', {
+      tagName: target.tagName,
+      className: target.className,
+      id: target.id,
+      hasDataColumnId: target.hasAttribute('data-column-id'),
+      hasDataRowId: target.hasAttribute('data-row-id'),
+      parentTagName: target.parentElement?.tagName,
+      parentClassName: target.parentElement?.className
+    });
+
+    // Check for column header drag first
+    const headerElement = target.closest('[data-column-id]:not([data-row-id])');
+    if (headerElement) {
+      const columnId = headerElement.getAttribute('data-column-id');
+      fileLog.debug('🎯 Header element detected', {
+        element: headerElement.tagName,
+        columnId,
+        hasColumnId: !!columnId,
+        attributes: Array.from(headerElement.attributes).map(a => `${a.name}="${a.value}"`).join(' ')
+      });
+      if (columnId) {
+        this.isColumnDrag = true;
+        this.dragColumnId = columnId;
+        fileLog.info('🎯 Column header mouse down - preparing for drag', { columnId });
+        return;
+      } else {
+        fileLog.warn('⚠️ Header element found but no column ID', {
+          element: headerElement.tagName,
+          attributes: Array.from(headerElement.attributes).map(a => `${a.name}="${a.value}"`).join(' ')
+        });
+      }
+    }
+
     const cellElement = target.closest('[data-row-id][data-column-id]');
 
     if (cellElement) {
@@ -172,55 +217,142 @@ export class MouseController {
       this.isDragging = true;
       fileLog.info('🖱️ Drag threshold exceeded - now dragging', {
         distance,
-        threshold: this.dragThreshold
+        threshold: this.dragThreshold,
+        isColumnDrag: this.isColumnDrag,
+        dragColumnId: this.dragColumnId
       });
 
-      // PURE: Start drag selection with focused cell as anchor
-      const startCell = this.tableInteraction$.focusedCell.get();
-      if (startCell) {
-        this.tableInteraction$.startDragSelect(startCell);
-        fileLog.info('🖱️ Started drag selection reactively', { startCell });
+      if (this.isColumnDrag && this.dragColumnId) {
+        // Start column drag
+        fileLog.info('🎯 Column drag started', { columnId: this.dragColumnId });
+        this.tableInteraction$.isDragging.set(true);
+        this.tableInteraction$.dragSource.set(this.dragColumnId);
+        this.createDragPreview(this.dragColumnId);
+      } else if (this.isColumnDrag) {
+        // Column drag was attempted but failed - don't fall back to cell selection
+        fileLog.warn('⚠️ Column drag detected but dragColumnId is missing');
       } else {
-        fileLog.warn('⚠️ No focused cell for drag start');
+        // PURE: Start drag selection with focused cell as anchor (only for cell drags)
+        const startCell = this.tableInteraction$.focusedCell.get();
+        if (startCell) {
+          this.tableInteraction$.startDragSelect(startCell);
+          fileLog.info('🖱️ Started drag selection reactively', { startCell });
+        } else {
+          fileLog.warn('⚠️ No focused cell for drag start');
+        }
+      }
+    }
+
+    // Handle column drag target detection
+    if (this.isDragging && this.isColumnDrag && this.dragColumnId) {
+      const target = e.target as HTMLElement;
+      const targetHeaderElement = target.closest('[data-column-id]:not([data-row-id])');
+      if (targetHeaderElement) {
+        const targetColumnId = targetHeaderElement.getAttribute('data-column-id');
+        if (targetColumnId && targetColumnId !== this.dragColumnId) {
+          this.tableInteraction$.dragTarget.set(targetColumnId);
+          this.showDropLine(targetHeaderElement, e.clientX);
+          fileLog.info('🎯 Column drag over target', {
+            sourceColumnId: this.dragColumnId,
+            targetColumnId
+          });
+        }
+      } else {
+        // Clear drop line when not over a valid target
+        this.hideDropLine();
       }
     }
 
     // PURE: Always update mouse coordinates (computed observables react to changes)
     this.tableInteraction$.setMousePosition(e.clientX, e.clientY);
+
+    // Update drag preview position for column drag
+    if (this.isDragging && this.isColumnDrag && this.dragPreviewElement) {
+      this.updateDragPreviewPosition(e.clientX, e.clientY);
+    }
   }
+
 
   /**
    * Handle mouse up - reset drag state
    */
   private onMouseUp(e: MouseEvent): void {
-    // Only handle events within our container
-    if (!this.container.contains(e.target as Node)) {
-      return;
-    }
+    // CRITICAL FIX: Always reset drag state on mouse up, regardless of where the mouse is released
+    // The check for container was causing drag state to persist when mouse is released outside container
+    fileLog.info('🖱️ Mouse up detected', {
+      withinContainer: this.container.contains(e.target as Node),
+      wasTracking: this.isTracking,
+      wasDragging: this.isDragging,
+      wasColumnDrag: this.isColumnDrag
+    });
 
     if (this.isDragging) {
-      // PURE: End drag selection reactively
-      const dragResult = this.tableInteraction$.endDragSelect();
-      fileLog.info('🖱️ Ended drag selection reactively', dragResult);
+      if (this.isColumnDrag && this.dragColumnId) {
+        // Handle column drag completion
+        const targetColumnId = this.tableInteraction$.dragTarget.get();
+        if (targetColumnId && targetColumnId !== this.dragColumnId) {
+          // Calculate the same insertBefore logic used for drop line positioning
+          const targetHeaderElement = this.container.querySelector(`[data-column-id="${targetColumnId}"]:not([data-row-id])`);
+          let insertBefore = true; // default
+
+          if (targetHeaderElement) {
+            const rect = targetHeaderElement.getBoundingClientRect();
+            const cellCenterX = rect.left + rect.width / 2;
+            insertBefore = e.clientX < cellCenterX;
+          }
+
+          fileLog.info('🎯 Column dropped for reordering', {
+            sourceColumnId: this.dragColumnId,
+            targetColumnId,
+            insertBefore,
+            mouseX: e.clientX
+          });
+          visualOperations.reorderColumns(this.dragColumnId, targetColumnId, insertBefore);
+        }
+
+        // Reset column drag state
+        fileLog.info('🎯 Column drag ended', { columnId: this.dragColumnId });
+        this.tableInteraction$.isDragging.set(false);
+        this.tableInteraction$.dragSource.set(null);
+        this.tableInteraction$.dragTarget.set(null);
+        this.removeDragPreview();
+        this.hideDropLine();
+        fileLog.info('🎯 Column drag state reset, continuing to general reset');
+      } else {
+        // PURE: End drag selection reactively
+        const dragResult = this.tableInteraction$.endDragSelect();
+        fileLog.info('🖱️ Ended drag selection reactively', dragResult);
+      }
 
       fileLog.info('🖱️ Mouse up after drag - preventing synthetic click');
+      fileLog.info('🖱️ About to reset all drag state');
       // Prevent the browser from generating a click event after drag
       e.preventDefault();
       e.stopPropagation();
 
-      // Delay resetting drag state to catch any synthetic click events
-      // The browser may still generate a click event after this mouseup
-      setTimeout(() => {
-        this.isDragging = false;
-        this.isTracking = false;
-        this.startPosition = { x: 0, y: 0 };
-        fileLog.info('🖱️ Drag state reset after delay');
-      }, 10);
+      // Reset drag state immediately - no delay needed
+      this.isDragging = false;
+      this.isTracking = false;
+      this.isColumnDrag = false;
+      this.dragColumnId = null;
+      this.startPosition = { x: 0, y: 0 };
+      fileLog.info('🖱️ Drag state reset immediately', {
+        isDragging: this.isDragging,
+        isTracking: this.isTracking,
+        isColumnDrag: this.isColumnDrag
+      });
     } else {
       // No drag was happening, reset immediately
       this.isDragging = false;
       this.isTracking = false;
+      this.isColumnDrag = false;
+      this.dragColumnId = null;
       this.startPosition = { x: 0, y: 0 };
+      fileLog.info('🖱️ Non-drag mouse up - state reset', {
+        isDragging: this.isDragging,
+        isTracking: this.isTracking,
+        isColumnDrag: this.isColumnDrag
+      });
     }
   }
 
@@ -287,6 +419,26 @@ export class MouseController {
   }
 
   /**
+   * Force reset drag state - called by external components when drag ends
+   */
+  resetDragState(): void {
+    fileLog.info('🖱️ Force resetting drag state', {
+      wasTracking: this.isTracking,
+      wasDragging: this.isDragging,
+      wasColumnDrag: this.isColumnDrag,
+      dragColumnId: this.dragColumnId
+    });
+
+    this.isDragging = false;
+    this.isTracking = false;
+    this.isColumnDrag = false;
+    this.dragColumnId = null;
+    this.startPosition = { x: 0, y: 0 };
+    this.removeDragPreview();
+    this.hideDropLine();
+  }
+
+  /**
    * Update renderer references (for late initialization)
    */
   setBodyRenderer(bodyRenderer: any): void {
@@ -308,6 +460,124 @@ export class MouseController {
   }
 
   /**
+   * Create floating drag preview for column drag
+   */
+  private createDragPreview(columnId: string): void {
+    // Get column info for preview text
+    const headerElement = this.container.querySelector(`[data-column-id="${columnId}"]:not([data-row-id])`);
+    const columnText = headerElement?.textContent?.trim() || columnId;
+
+    // Create floating preview element
+    this.dragPreviewElement = document.createElement('div');
+    this.dragPreviewElement.className = 'vibegridx-column-drag-preview';
+    this.dragPreviewElement.textContent = columnText;
+
+    // Style the preview (similar to interaction-handlers.ts drag image)
+    Object.assign(this.dragPreviewElement.style, {
+      position: 'fixed',
+      background: 'hsl(var(--background))',
+      color: 'hsl(var(--muted-foreground))',
+      padding: '4px 8px',
+      borderRadius: '4px',
+      fontSize: '12px',
+      fontWeight: '600',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+      border: '1px solid hsl(var(--border))',
+      whiteSpace: 'nowrap',
+      zIndex: '99999',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      pointerEvents: 'none',
+      opacity: '0.9',
+      transform: 'translate(-50%, -100%)', // Center horizontally, above cursor
+      transition: 'none' // No transitions during drag
+    });
+
+    document.body.appendChild(this.dragPreviewElement);
+    fileLog.info('🎯 Column drag preview created', { columnId, text: columnText });
+  }
+
+  /**
+   * Update drag preview position to follow mouse
+   */
+  private updateDragPreviewPosition(x: number, y: number): void {
+    if (!this.dragPreviewElement) return;
+
+    this.dragPreviewElement.style.left = `${x}px`;
+    this.dragPreviewElement.style.top = `${y - 10}px`; // Slight offset above cursor
+  }
+
+  /**
+   * Remove drag preview element
+   */
+  private removeDragPreview(): void {
+    if (this.dragPreviewElement) {
+      this.dragPreviewElement.remove();
+      this.dragPreviewElement = null;
+      fileLog.info('🎯 Column drag preview removed');
+    }
+  }
+
+  /**
+   * Show drop line indicator (blue line between columns)
+   */
+  private showDropLine(targetHeaderElement: HTMLElement, mouseX: number): void {
+    // Calculate if inserting before or after based on mouse position
+    const rect = targetHeaderElement.getBoundingClientRect();
+    const cellCenterX = rect.left + rect.width / 2;
+    const insertBefore = mouseX < cellCenterX;
+
+    // Get the header container
+    const headerContainer = targetHeaderElement.parentElement;
+    if (!headerContainer) return;
+
+    // Remove existing drop line
+    this.hideDropLine();
+
+    // Create new drop line
+    this.dropLineElement = document.createElement('div');
+    this.dropLineElement.className = 'vibegridx-column-drop-line';
+
+    // Calculate position relative to the header container
+    const headerRect = headerContainer.getBoundingClientRect();
+    const cellRect = targetHeaderElement.getBoundingClientRect();
+    const linePosition = insertBefore ?
+      cellRect.left - headerRect.left :
+      cellRect.right - headerRect.left;
+
+    // Style the drop line
+    Object.assign(this.dropLineElement.style, {
+      position: 'absolute',
+      top: '0',
+      bottom: '0',
+      left: `${linePosition - 1.5}px`,
+      width: '3px',
+      background: '#3b82f6',
+      borderRadius: '1px',
+      zIndex: '9999',
+      boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)',
+      pointerEvents: 'none',
+      height: `${cellRect.height}px`
+    });
+
+    // Ensure header container has relative positioning
+    headerContainer.style.position = 'relative';
+    headerContainer.appendChild(this.dropLineElement);
+
+    fileLog.debug('🎯 Drop line shown', { insertBefore, linePosition });
+  }
+
+  /**
+   * Hide drop line indicator
+   */
+  private hideDropLine(): void {
+    if (this.dropLineElement) {
+      this.dropLineElement.remove();
+      this.dropLineElement = null;
+      fileLog.debug('🎯 Drop line hidden');
+    }
+  }
+
+  /**
    * Clean up all mouse event handling
    */
   destroy(): void {
@@ -320,6 +590,10 @@ export class MouseController {
       }
     });
     this.eventListeners = [];
+
+    // Clean up drag preview and drop line
+    this.removeDragPreview();
+    this.hideDropLine();
 
     // Restore text selection
     this.container.style.userSelect = '';

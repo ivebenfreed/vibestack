@@ -12,7 +12,7 @@ import type { TableViewport$ } from '../../stores/pure-observables';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
 import type { CoordinateMapping } from '../modules/OverlayManager';
-import { setupColumnDragHandlers } from '../utils/interaction-handlers';
+// import { setupColumnDragHandlers } from '../utils/interaction-handlers'; // REMOVED: Consolidating drag handling in MouseController
 
 const fileLog = log('components/custom/vibegrid/renderers/components/HeaderRenderer.ts');
 
@@ -50,6 +50,7 @@ export class HeaderRenderer {
     visibleColumnsLength: number;
     visibleRangeStart: number;
     visibleRangeEnd: number;
+    columnOrderString: string; // Track column order for drag operations
   } | null = null;
   private updateCoordinateMapping: (mapping: CoordinateMapping) => void;
   
@@ -86,7 +87,8 @@ export class HeaderRenderer {
       scrollLeft: visualState.geometry.scrollLeft,
       visibleColumnsLength: visualState.visibleColumns.length,
       visibleRangeStart: visualState.geometry.visibleColumnRange.start,
-      visibleRangeEnd: visualState.geometry.visibleColumnRange.end
+      visibleRangeEnd: visualState.geometry.visibleColumnRange.end,
+      columnOrderString: (visualState.columnState.columnOrder || []).join(',') // Track column order for drag operations
     };
 
     // Skip render if nothing actually changed (Legend State optimization pattern)
@@ -95,7 +97,8 @@ export class HeaderRenderer {
         this.lastRenderState.scrollLeft === currentRenderState.scrollLeft &&
         this.lastRenderState.visibleColumnsLength === currentRenderState.visibleColumnsLength &&
         this.lastRenderState.visibleRangeStart === currentRenderState.visibleRangeStart &&
-        this.lastRenderState.visibleRangeEnd === currentRenderState.visibleRangeEnd) {
+        this.lastRenderState.visibleRangeEnd === currentRenderState.visibleRangeEnd &&
+        this.lastRenderState.columnOrderString === currentRenderState.columnOrderString) {
 
       fileLog.debug('🔄 HEADER RENDER SKIPPED - no changes detected', currentRenderState);
       return;
@@ -227,8 +230,14 @@ export class HeaderRenderer {
     // Add click handler for sorting and column selection
     this.setupHeaderClickHandler(headerCell, column);
 
-    // Add drag handling for column reordering
-    this.setupColumnDragHandlers(headerCell, column);
+    // Add drag handling for column reordering - MOVED TO MOUSECONTROLLER
+    // this.setupColumnDragHandlers(headerCell, column);
+
+    // Disable HTML5 drag on header cells - MouseController will handle all dragging
+    headerCell.draggable = false;
+
+    // Add data attribute for MouseController to identify column
+    headerCell.setAttribute('data-column-id', column.id);
 
     return headerCell;
   }
@@ -465,44 +474,6 @@ export class HeaderRenderer {
     });
   }
 
-  /**
-   * Set up column drag handlers for column reordering
-   */
-  private setupColumnDragHandlers(headerCell: HTMLElement, column: any): void {
-    setupColumnDragHandlers(
-      headerCell,
-      column,
-      (columnId: string, e: DragEvent) => {
-        // On drag start
-        fileLog.info('🎯 Column drag started', { columnId });
-        this.tableInteraction$.isDragging.set(true);
-        this.tableInteraction$.dragSource.set(columnId);
-      },
-      (columnId: string, e: DragEvent) => {
-        // On drag end
-        fileLog.info('🎯 Column drag ended', { columnId });
-        this.tableInteraction$.isDragging.set(false);
-        this.tableInteraction$.dragSource.set(null);
-        this.tableInteraction$.dragTarget.set(null);
-      },
-      (e: DragEvent) => {
-        // On drag over
-        // Visual feedback is handled by overlay manager
-      },
-      (targetColumnId: string, insertBefore: boolean, e: DragEvent) => {
-        // On drop - reorder columns
-        const sourceColumnId = this.tableInteraction$.dragSource.get();
-        if (sourceColumnId && sourceColumnId !== targetColumnId) {
-          fileLog.info('🎯 Column dropped for reordering', {
-            sourceColumnId,
-            targetColumnId,
-            insertBefore
-          });
-          visualOperations.reorderColumns(sourceColumnId, targetColumnId, insertBefore);
-        }
-      }
-    );
-  }
 
   /**
    * Set up header click handler for sorting and column selection
