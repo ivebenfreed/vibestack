@@ -97,9 +97,26 @@ export class DragPreviewOverlayDOM {
    */
   private isColumnDragOperation(): boolean {
     // Column drags are handled by interaction-handlers.ts with setDragImage
-    // We can detect them by checking for active column drag via DOM
+    // We can detect them by checking for active column drag via DOM or by checking if the drag preview exists in body
     const draggingHeaders = document.querySelectorAll('.vibegridx-header-cell.dragging, .vibegridx-dragging');
-    return draggingHeaders.length > 0;
+    const bodyDragPreview = document.body.querySelector('.vibegridx-column-drag-preview');
+
+    // Also check if any header elements are currently being dragged (via drag state in DOM)
+    const headerContainer = document.querySelector('.vibegridx-header-container');
+    const isDragInProgress = headerContainer?.classList.contains('dragging') ||
+                            headerContainer?.querySelector('.dragging') !== null;
+
+    const isColumnDrag = draggingHeaders.length > 0 || bodyDragPreview !== null || isDragInProgress;
+
+    if (isColumnDrag) {
+      fileLog.info('DragPreviewOverlayDOM: Column drag detected, skipping general drag preview', {
+        draggingHeaders: draggingHeaders.length,
+        bodyDragPreview: !!bodyDragPreview,
+        isDragInProgress
+      });
+    }
+
+    return isColumnDrag;
   }
   
   /**
@@ -138,20 +155,49 @@ export class DragPreviewOverlayDOM {
    * Calculate drag bounds
    */
   private calculateDragBounds(dragState: DragState, viewport: ViewportInfo): { x: number; y: number; width: number; height: number } {
-    const minRow = Math.min(dragState.startCell!.row, dragState.currentCell!.row);
-    const maxRow = Math.max(dragState.startCell!.row, dragState.currentCell!.row);
-    const minCol = Math.min(dragState.startCell!.column, dragState.currentCell!.column);
-    const maxCol = Math.max(dragState.startCell!.column, dragState.currentCell!.column);
-    
+    // Validate input data to avoid NaN calculations
+    const startRow = this.parseNumeric(dragState.startCell!.row);
+    const startCol = this.parseNumeric(dragState.startCell!.column);
+    const currentRow = this.parseNumeric(dragState.currentCell!.row);
+    const currentCol = this.parseNumeric(dragState.currentCell!.column);
+
+    // If any values are invalid, return zero bounds
+    if (startRow === null || startCol === null || currentRow === null || currentCol === null) {
+      fileLog.info('DragPreviewOverlayDOM: Invalid cell coordinates detected, skipping preview', {
+        startCell: dragState.startCell,
+        currentCell: dragState.currentCell
+      });
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
+    const minRow = Math.min(startRow, currentRow);
+    const maxRow = Math.max(startRow, currentRow);
+    const minCol = Math.min(startCol, currentCol);
+    const maxCol = Math.max(startCol, currentCol);
+
     // Adjust for viewport offset
     const viewportOffset = viewport.start * this.config.cellHeight;
-    
+
     return {
       x: minCol * this.config.cellWidth,
       y: minRow * this.config.cellHeight - viewportOffset,
       width: (maxCol - minCol + 1) * this.config.cellWidth,
       height: (maxRow - minRow + 1) * this.config.cellHeight
     };
+  }
+
+  /**
+   * Parse a value to a numeric value, returning null if invalid
+   */
+  private parseNumeric(value: any): number | null {
+    if (typeof value === 'number' && !isNaN(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
   }
   
   /**
