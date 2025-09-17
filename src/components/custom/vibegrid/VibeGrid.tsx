@@ -97,7 +97,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPersistLoaded, setIsPersistLoaded] = useState(false);
 
   // ====================================
   // INITIALIZATION
@@ -153,7 +152,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
       }
 
-      // Wait for BOTH persistence to load AND container ref to be available
+      // Wait for container ref to be available for renderer initialization
       let retryCount = 0;
       const maxRetries = 50; // Max 2.5 seconds (50ms * 50)
 
@@ -172,107 +171,72 @@ export function VibeGrid<T extends Record<string, any> = any>(
           }
         }
 
-        // Check if BOTH data and visual persistence is loaded
-        let dataLoaded = true; // Default to true since we fixed the columns parameter
-        if (observables.tableCoreSync$ && typeof observables.tableCoreSync$.isPersistLoaded !== 'undefined') {
-          dataLoaded = observables.tableCoreSync$.isPersistLoaded?.get();
-        }
+        // Initialize renderer directly (persistence is automatic with Legend State)
+        fileLog.info('✅ Container ready, initializing renderer', { entityType });
 
-        let visualLoaded = false;
-        if (visualSyncStatus$ && typeof visualSyncStatus$.isPersistenceDataLoaded !== 'undefined') {
-          visualLoaded = visualSyncStatus$.isPersistenceDataLoaded?.get();
-        }
-
-        const isPersistenceLoaded = dataLoaded && visualLoaded;
-
-        fileLog.debug('🔄 Checking readiness for renderer initialization', {
-          entityType,
-          containerReady: !!containerRef.current,
-          dataLoaded,
-          visualLoaded,
-          isPersistenceLoaded,
-          hasDataPersist: !!(observables.tableCoreSync$?.isPersistLoaded),
-          hasVisualPersist: !!(visualSyncStatus$?.isPersistenceDataLoaded)
+        // Create the SimplePassiveRenderer with enhanced selection
+        const renderer = new SimplePassiveRenderer({
+          container: containerRef.current,
+          tableCore$: observables.tableCore$,
+          tableInteraction$: observables.tableInteraction$,
+          tableViewport$: observables.tableViewport$,
+          enableSelectionColumn,
+          bufferSize,
+          onEntityUpdate,
+          onBatchEntityUpdate
         });
 
-        if (isPersistenceLoaded) {
-          fileLog.info('✅ All conditions met, initializing renderer', { entityType });
+        rendererRef.current = renderer;
+        setIsInitialized(true);
+        setError(null);
 
-          // Create the SimplePassiveRenderer with enhanced selection
-          const renderer = new SimplePassiveRenderer({
-            container: containerRef.current,
-            tableCore$: observables.tableCore$,
-            tableInteraction$: observables.tableInteraction$,
-            tableViewport$: observables.tableViewport$,
-            enableSelectionColumn,
-            bufferSize,
-            onEntityUpdate,
-            onBatchEntityUpdate
+        fileLog.info('✅ SimplePassiveRenderer initialized successfully');
+
+        // Set up event handlers after renderer is created
+        if (onSelectionChange) {
+          // Subscribe to selection changes
+          const unsubscribe = observables.tableInteraction$.selectedCells.onChange(() => {
+            const selectedCells = observables.tableInteraction$.selectedCells.get();
+            onSelectionChange(selectedCells);
           });
 
-          rendererRef.current = renderer;
-          setIsInitialized(true);
-          setIsPersistLoaded(true);
-          setError(null);
+          // Store unsubscribe function
+          (renderer as any).selectionUnsubscribe = unsubscribe;
+        }
 
-          fileLog.info('✅ SimplePassiveRenderer initialized successfully');
-
-          // Set up event handlers after renderer is created
-          if (onSelectionChange) {
-            // Subscribe to selection changes
-            const unsubscribe = observables.tableInteraction$.selectedCells.onChange(() => {
-              const selectedCells = observables.tableInteraction$.selectedCells.get();
-              onSelectionChange(selectedCells);
-            });
-
-            // Store unsubscribe function
-            (renderer as any).selectionUnsubscribe = unsubscribe;
-          }
-
-          if (onEditingChange) {
-            // Subscribe to editing changes
-            const unsubscribe = observables.tableInteraction$.editingCell.onChange(() => {
-              const editingCell = observables.tableInteraction$.editingCell.get();
-              if (editingCell) {
-                const [rowId, columnId] = editingCell.split(':');
-                onEditingChange({ rowId, columnId });
-              } else {
-                onEditingChange(null);
-              }
-            });
-
-            // Store unsubscribe function
-            (renderer as any).editingUnsubscribe = unsubscribe;
-          }
-
-          // Update viewport when container size changes
-          const resizeObserver = new ResizeObserver(() => {
-            if (containerRef.current) {
-              const rect = containerRef.current.getBoundingClientRect();
-              observables.tableViewport$.updateViewport(rect.width, rect.height);
+        if (onEditingChange) {
+          // Subscribe to editing changes
+          const unsubscribe = observables.tableInteraction$.editingCell.onChange(() => {
+            const editingCell = observables.tableInteraction$.editingCell.get();
+            if (editingCell) {
+              const [rowId, columnId] = editingCell.split(':');
+              onEditingChange({ rowId, columnId });
+            } else {
+              onEditingChange(null);
             }
           });
 
-          resizeObserver.observe(containerRef.current);
-          (renderer as any).resizeObserver = resizeObserver;
-
-          // Initial viewport update
-          const rect = containerRef.current.getBoundingClientRect();
-          observables.tableViewport$.updateViewport(rect.width, rect.height);
-
-        } else {
-          // Keep checking until persistence loads
-          retryCount++;
-          if (retryCount < maxRetries) {
-            setTimeout(checkReadyToInitializeRenderer, 50);
-          } else {
-            fileLog.error('❌ Persistence loading timed out, giving up');
-            setError('Persistence loading timed out');
-          }
+          // Store unsubscribe function
+          (renderer as any).editingUnsubscribe = unsubscribe;
         }
+
+        // Update viewport when container size changes
+        const resizeObserver = new ResizeObserver(() => {
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            observables.tableViewport$.updateViewport(rect.width, rect.height);
+          }
+        });
+
+        resizeObserver.observe(containerRef.current);
+        (renderer as any).resizeObserver = resizeObserver;
+
+        // Initial viewport update
+        const rect = containerRef.current.getBoundingClientRect();
+        observables.tableViewport$.updateViewport(rect.width, rect.height);
       };
 
-      // Start checking for readiness (both container ref and persistence)
+      // Start checking for container readiness
       checkReadyToInitializeRenderer();
 
     } catch (err) {
@@ -307,7 +271,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       observablesRef.current = null;
       setIsInitialized(false);
-      setIsPersistLoaded(false);
     };
   }, [tableId, entityType]); // Only re-initialize if table identity changes
 
@@ -317,7 +280,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // ====================================
 
   const api = useMemo(() => {
-    if (!observablesRef.current || !isInitialized || !isPersistLoaded) return null;
+    if (!observablesRef.current || !isInitialized) return null;
 
     const { tableCore$, tableInteraction$, tableViewport$ } = observablesRef.current;
 
@@ -369,7 +332,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         }
       },
     };
-  }, [isInitialized, isPersistLoaded]);
+  }, [isInitialized]);
 
   // ====================================
   // RENDER
@@ -407,20 +370,14 @@ export function VibeGrid<T extends Record<string, any> = any>(
         </div>
       )}
       
-      {!isPersistLoaded && !error && (
-        <div className="p-2 mb-2 bg-yellow-100 text-yellow-700 rounded text-sm">
-          🔄 Loading table state persistence...
-        </div>
-      )}
-      
-      {isInitialized && isPersistLoaded && !error && (
+      {isInitialized && !error && (
         <div className="p-2 mb-2 bg-green-100 text-green-700 rounded text-sm">
-          ✅ Pure Observable VibeGrid initialized with persistence ({entityType})
+          ✅ Pure Observable VibeGrid initialized with automatic persistence ({entityType})
         </div>
       )}
 
       {/* Header with menu components */}
-      {isInitialized && isPersistLoaded && !error && observablesRef.current && (
+      {isInitialized && !error && observablesRef.current && (
         <VibeGridXHeaderPure
           tableCore$={observablesRef.current.tableCore$}
           tableInteraction$={observablesRef.current.tableInteraction$}

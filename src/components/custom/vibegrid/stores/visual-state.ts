@@ -660,8 +660,8 @@ export const visualOperations = {
   ) {
     const defaultState = this.createDefaultColumnState(columns, entityType, orgId, userId);
 
-    // Set up persistence based on entity type, org, and user
-    const persistKey = `vibeGrid-visual-${entityType}-${orgId}-${userId}`;
+    // Set up persistence with simplified storage key using entity name
+    const persistKey = `vibegrid-visual-${entityType}`;
 
     const syncObservableInstance = syncObservable(visualInputs$, {
       persist: {
@@ -737,11 +737,12 @@ export const visualOperations = {
               lastUpdated: new Date().toISOString()
             };
 
-            fileLog.debug('💾 Saving visual state to persistence', {
+            fileLog.info('💾 Saving visual state to persistence', {
               persistKey,
               hasGroupConfig: !!persistedState.groupConfig,
               groupFields: persistedState.groupConfig?.fields?.length || 0,
-              columnCount: Object.keys(persistedState.columnWidths).length
+              columnCount: Object.keys(persistedState.columnWidths).length,
+              columnOrder: persistedState.columnOrder
             });
 
             return persistedState;
