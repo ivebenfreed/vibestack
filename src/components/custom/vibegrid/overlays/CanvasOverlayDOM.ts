@@ -104,12 +104,23 @@ export class CanvasOverlayDOM {
     if (!this.selectionOverlay && this.overlayContainer) {
       fileLog.info('CanvasOverlayDOM: Lazily creating SelectionOverlayDOM');
       
-      // Create selection container
+      // Create selection container positioned to match the actual viewport
       const selectionContainer = document.createElement('div');
       selectionContainer.className = 'vibegridx-selection-container';
-      selectionContainer.style.position = 'relative';
+
+      // Position overlay container to match the coordinate system used for positioning
+      fileLog.info('🎯 Setting up overlay container positioning');
+
+      selectionContainer.style.position = 'absolute';
+      selectionContainer.style.top = '0';
+      selectionContainer.style.left = '0';
       selectionContainer.style.width = '100%';
       selectionContainer.style.height = '100%';
+
+      fileLog.info('✅ Overlay container positioned to fill parent');
+
+      selectionContainer.style.pointerEvents = 'none';
+      selectionContainer.style.overflow = 'hidden';
       this.overlayContainer.appendChild(selectionContainer);
       
       this.selectionOverlay = new SelectionOverlayDOM(

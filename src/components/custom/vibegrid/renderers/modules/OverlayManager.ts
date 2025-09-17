@@ -134,11 +134,27 @@ export class OverlayManager {
       const focusedCell = this.tableInteraction$.focusedCell.get(true);
       const hoveredCell = this.tableInteraction$.hoveredCell.get(true);
 
+      // DEDUPLICATION: Skip if selection hasn't actually changed
+      if (this.lastSelectedCells &&
+          this.lastSelectedCells.size === selectedCells.size &&
+          Array.from(selectedCells).every(cell => this.lastSelectedCells!.has(cell))) {
+        fileLog.debug('🔍 REACTIVE: Selection unchanged, skipping update', {
+          selectedCells: Array.from(selectedCells)
+        });
+        return;
+      }
+
+      // STACK TRACE: Find what's triggering the reactive observer
+      const reactiveStack = new Error().stack;
       fileLog.debug('🔍 REACTIVE: Selection state changed', {
         selectedCells: Array.from(selectedCells),
         focusedCell,
-        hoveredCell
+        hoveredCell,
+        reactiveStackTrace: reactiveStack?.split('\n').slice(1, 6) // Show first 5 stack frames
       });
+
+      // Update cached selection for deduplication
+      this.lastSelectedCells = new Set(selectedCells);
 
       // Update selection overlay when selection changes
       if (selectedCells.size > 0) {
@@ -242,9 +258,12 @@ export class OverlayManager {
    * Update selection display (optimized with change detection and throttling)
    */
   updateSelection(selectedCells: Set<string>): void {
+    // STACK TRACE: Find who's calling this multiple times
+    const stack = new Error().stack;
     fileLog.info('🔄 OverlayManager.updateSelection called', {
       selectedCells: Array.from(selectedCells),
-      cellCount: selectedCells.size
+      cellCount: selectedCells.size,
+      stackTrace: stack?.split('\n').slice(1, 8).map(line => line.trim()) // Show first 7 stack frames, trimmed
     });
 
     // Update selection visuals using interaction-state
@@ -602,6 +621,85 @@ export class OverlayManager {
         width: domPosition.width,
         height: domPosition.height
       };
+    }
+
+    // DIRECT SOLUTION: Calculate position directly from DOM
+    fileLog.warn('🔄 DOM position not cached, calculating directly', { cellKey });
+
+    const cell = this.container.querySelector(`[data-row-id="${rowId}"][data-column-id="${columnId}"]`) as HTMLElement;
+    if (cell) {
+      // Find the actual scrollable container that contains this cell
+      let viewportContainer = cell.closest('.vibegridx-viewport') as HTMLElement;
+      if (!viewportContainer) {
+        // Try finding from the main container
+        viewportContainer = this.container.querySelector('.vibegridx-viewport') as HTMLElement;
+      }
+      if (!viewportContainer) {
+        // Fallback: find the scrollable parent of the cell
+        let parent = cell.parentElement;
+        while (parent && parent !== this.container) {
+          const overflow = getComputedStyle(parent).overflow;
+          if (overflow === 'auto' || overflow === 'scroll' || overflow === 'hidden') {
+            viewportContainer = parent;
+            break;
+          }
+          parent = parent.parentElement;
+        }
+      }
+      if (!viewportContainer) {
+        fileLog.error('❌ No viewport container found - using main container', {
+          cellKey,
+          containerClass: this.container.className,
+          cellParentClass: cell.parentElement?.className
+        });
+        viewportContainer = this.container;
+      }
+
+      fileLog.info('🔍 Container debug info', {
+        cellKey,
+        foundCell: !!cell,
+        foundViewport: !!viewportContainer,
+        containerClass: this.container.className,
+        viewportClass: viewportContainer?.className,
+        cellParentClass: cell.parentElement?.className,
+        isViewportSameAsContainer: viewportContainer === this.container
+      });
+
+      if (viewportContainer) {
+        const cellRect = cell.getBoundingClientRect();
+        const viewportRect = viewportContainer.getBoundingClientRect();
+
+        const directPosition = {
+          x: cellRect.left - viewportRect.left,
+          y: cellRect.top - viewportRect.top,
+          width: cellRect.width,
+          height: cellRect.height
+        };
+
+        fileLog.info('✅ Using direct DOM calculation', {
+          cellKey,
+          position: directPosition,
+          source: 'direct',
+          rawCellRect: {
+            left: cellRect.left,
+            top: cellRect.top,
+            width: cellRect.width,
+            height: cellRect.height
+          },
+          rawViewportRect: {
+            left: viewportRect.left,
+            top: viewportRect.top,
+            width: viewportRect.width,
+            height: viewportRect.height
+          },
+          calculation: {
+            xCalc: `${cellRect.left} - ${viewportRect.left} = ${cellRect.left - viewportRect.left}`,
+            yCalc: `${cellRect.top} - ${viewportRect.top} = ${cellRect.top - viewportRect.top}`
+          }
+        });
+
+        return directPosition;
+      }
     }
 
     // No DOM position means cell is not visible - overlays only render for visible cells

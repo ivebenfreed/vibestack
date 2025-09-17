@@ -2,7 +2,7 @@
  * DOM Position State - Reactive DOM Position Tracking
  *
  * This observable tracks actual DOM positions of rendered cells using
- * ResizeObserver and IntersectionObserver for perfect accuracy.
+ * a single scroll-based trigger for reliable position updates.
  */
 
 import { observable, batch, ObservableHint } from '@legendapp/state';
@@ -41,15 +41,12 @@ let tableContainer: HTMLElement | null = null;
 /**
  * Reactive Position Tracker
  *
- * Uses ResizeObserver and IntersectionObserver to track DOM changes
+ * Uses a single scroll event listener to track viewport position changes
  * and update the reactive observable automatically.
  */
 class ReactivePositionTracker {
-  private resizeObserver: ResizeObserver | null = null;
-  private intersectionObserver: IntersectionObserver | null = null;
-  private mutationObserver: MutationObserver | null = null;
+  private scrollHandler: ((event: Event) => void) | null = null;
   private rafId: number | null = null;
-  private pendingUpdates = new Set<string>();
   private isInitialized = false;
   private lastUpdateTime = 0;
   private updateThrottle = 16; // ~60fps max
@@ -76,162 +73,37 @@ class ReactivePositionTracker {
     tableContainer = viewportContainer;
     domPositions$.isTracking.set(true);
 
-    // Re-enable observers now that recursive updates are fixed
-    // Use viewport container for all observations since that's where cells live
-    this.setupObservers(viewportContainer);
-    this.observeAllCells(viewportContainer);
+    // Setup single scroll-based trigger
+    this.setupScrollListener(viewportContainer);
     this.isInitialized = true;
 
     // Initial position update
+    fileLog.info('🚀 Position tracker initialized, scheduling initial update', {
+      cellsFound: viewportContainer.querySelectorAll('[data-row-id][data-column-id]').length
+    });
     this.schedulePositionUpdate();
   }
 
   /**
-   * Setup DOM observers
+   * Setup scroll listener for position tracking
    */
-  private setupObservers(container: HTMLElement): void {
-    // Track cell size/position changes (debounced to avoid CSS outline triggers)
-    this.resizeObserver = new ResizeObserver((entries) => {
-      let hasSignificantResize = false;
+  private setupScrollListener(container: HTMLElement): void {
+    // Single scroll event listener that triggers position updates
+    this.scrollHandler = () => {
+      this.schedulePositionUpdate();
+    };
 
-      entries.forEach(entry => {
-        const cellKey = this.getCellKey(entry.target as HTMLElement);
-        if (cellKey && this.isSignificantResize(entry)) {
-          this.pendingUpdates.add(cellKey);
-          hasSignificantResize = true;
-        }
-      });
+    // Listen to scroll events on the viewport container
+    container.addEventListener('scroll', this.scrollHandler, { passive: true });
 
-      // Only schedule updates for significant resizes (not CSS outline changes)
-      if (hasSignificantResize) {
-        this.schedulePositionUpdate();
-      }
-    });
+    // Also listen to window resize which affects viewport positions
+    window.addEventListener('resize', this.scrollHandler, { passive: true });
 
-    // Track visibility changes
-    this.intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          const cellKey = this.getCellKey(entry.target as HTMLElement);
-          if (cellKey) {
-            this.pendingUpdates.add(cellKey);
-          }
-        });
-        this.schedulePositionUpdate();
-      },
-      {
-        root: container,
-        threshold: [0, 0.1, 1.0] // Track partial visibility
-      }
-    );
-
-    // Track DOM structure changes (cells added/removed)
-    this.mutationObserver = new MutationObserver((mutations) => {
-      let hasRelevantChanges = false;
-
-      mutations.forEach(mutation => {
-        if (mutation.type === 'childList') {
-          // Check for added cells
-          mutation.addedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as HTMLElement;
-              if (this.isCellElement(element)) {
-                this.observeCell(element);
-                hasRelevantChanges = true;
-              }
-              // Check children too
-              const cells = element.querySelectorAll('[data-row-id][data-column-id]');
-              cells.forEach(cell => {
-                this.observeCell(cell as HTMLElement);
-                hasRelevantChanges = true;
-              });
-            }
-          });
-
-          // Check for removed cells
-          mutation.removedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as HTMLElement;
-              if (this.isCellElement(element)) {
-                this.unobserveCell(element);
-                hasRelevantChanges = true;
-              }
-            }
-          });
-        }
-      });
-
-      if (hasRelevantChanges) {
-        this.schedulePositionUpdate();
-      }
-    });
-
-    this.mutationObserver.observe(container, {
-      childList: true,
-      subtree: true
-    });
-
-    fileLog.info('✅ DOM observers initialized');
+    fileLog.info('✅ Scroll listener initialized');
   }
 
-  /**
-   * Observe all existing cells in container
-   */
-  private observeAllCells(container: HTMLElement): void {
-    const cells = container.querySelectorAll('[data-row-id][data-column-id]');
 
-    fileLog.info('🔍 Observing cells', { cellCount: cells.length });
 
-    // Debug: Log first few cells to see their data attributes
-    const firstFewCells = Array.from(cells).slice(0, 5);
-    firstFewCells.forEach((cell, index) => {
-      const htmlCell = cell as HTMLElement;
-      const rowId = htmlCell.getAttribute('data-row-id');
-      const columnId = htmlCell.getAttribute('data-column-id');
-      fileLog.info(`🔍 Cell ${index}: data-row-id="${rowId}", data-column-id="${columnId}"`);
-    });
-
-    cells.forEach(cell => {
-      this.observeCell(cell as HTMLElement);
-    });
-  }
-
-  /**
-   * Start observing a specific cell
-   */
-  private observeCell(cell: HTMLElement): void {
-    if (this.resizeObserver) {
-      this.resizeObserver.observe(cell);
-    }
-    if (this.intersectionObserver) {
-      this.intersectionObserver.observe(cell);
-    }
-
-    const cellKey = this.getCellKey(cell);
-    if (cellKey) {
-      this.pendingUpdates.add(cellKey);
-    }
-  }
-
-  /**
-   * Stop observing a specific cell
-   */
-  private unobserveCell(cell: HTMLElement): void {
-    if (this.resizeObserver) {
-      this.resizeObserver.unobserve(cell);
-    }
-    if (this.intersectionObserver) {
-      this.intersectionObserver.unobserve(cell);
-    }
-
-    const cellKey = this.getCellKey(cell);
-    if (cellKey) {
-      // Remove from positions
-      const positions = domPositions$.cellPositions.get();
-      positions.delete(cellKey);
-      domPositions$.cellPositions.set(new Map(positions));
-    }
-  }
 
   /**
    * Schedule a position update (RAF throttled)
@@ -268,12 +140,22 @@ class ReactivePositionTracker {
     const currentPositions = domPositions$.cellPositions.get();
     const newPositions = new Map(currentPositions);
 
-    // Update only pending cells for performance
-    const cellsToUpdate = this.pendingUpdates.size > 0
-      ? Array.from(this.pendingUpdates)
-      : Array.from(currentPositions.keys());
+    // Discover all cells in the DOM to ensure complete tracking
+    const allCellsInDOM = container.querySelectorAll('[data-row-id][data-column-id]');
+    const allCellKeys = Array.from(allCellsInDOM).map(cell => {
+      const rowId = cell.getAttribute('data-row-id');
+      const columnId = cell.getAttribute('data-column-id');
+      return `${rowId}:${columnId}`;
+    });
 
-    this.pendingUpdates.clear();
+    // Always update ALL cells in DOM for single source reliability
+    const cellsToUpdate = allCellKeys;
+
+    fileLog.info('📐 Position update', {
+      cellsInDOM: allCellsInDOM.length,
+      tracked: currentPositions.size,
+      updating: cellsToUpdate.length
+    });
 
     cellsToUpdate.forEach(cellKey => {
       const { rowId, columnId } = CoordinateUtils.parseCellKey(cellKey) || {};
@@ -286,48 +168,44 @@ class ReactivePositionTracker {
       if (cell) {
         const oldPosition = currentPositions.get(cellKey);
 
-        // Calculate cumulative offset by traversing up the offset parent chain
-        // This gives us the position relative to the viewport container
-        let relativeX = 0;
-        let relativeY = 0;
-        let element: HTMLElement | null = cell;
+        // Get viewport container for relative positioning
+        const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement;
 
-        // Traverse up the offset parent chain until we reach the viewport container
-        while (element && !element.classList.contains('vibegridx-viewport')) {
-          relativeX += element.offsetLeft;
-          relativeY += element.offsetTop;
-          element = element.offsetParent as HTMLElement;
-        }
+        if (viewportContainer) {
+          // Use getBoundingClientRect to get viewport-relative coordinates
+          const cellRect = cell.getBoundingClientRect();
+          const viewportRect = viewportContainer.getBoundingClientRect();
 
-        const newPosition: CellCoordinates = {
-          x: relativeX,
-          y: relativeY,
-          width: cell.offsetWidth,
-          height: cell.offsetHeight,
-          source: 'dom',
-          isVisible: cell.offsetWidth > 0 && cell.offsetHeight > 0,
-          timestamp
-        };
+          // Calculate position relative to viewport container
+          const relativeX = cellRect.left - viewportRect.left;
+          const relativeY = cellRect.top - viewportRect.top;
 
-        fileLog.debug('📐 DOM position calculated (content-relative)', {
-          cellKey,
-          contentPosition: { x: relativeX, y: relativeY },
-          cellSize: { width: cell.offsetWidth, height: cell.offsetHeight },
-          offsetParent: cell.offsetParent?.className,
-          note: 'Using offset positions - not affected by scroll'
-        });
-
-        newPositions.set(cellKey, newPosition);
-
-        // Emit position change event
-        if (oldPosition && this.hasPositionChanged(oldPosition, newPosition)) {
-          this.emitPositionChange({
-            type: 'resize',
-            cellKey,
-            oldPosition,
-            newPosition,
+          const newPosition: CellCoordinates = {
+            x: relativeX,
+            y: relativeY,
+            width: cellRect.width,
+            height: cellRect.height,
+            source: 'dom',
+            isVisible: cellRect.width > 0 && cellRect.height > 0,
             timestamp
-          });
+          };
+
+          // Reduced logging to prevent spam
+
+          newPositions.set(cellKey, newPosition);
+
+          // Emit position change event
+          if (oldPosition && this.hasPositionChanged(oldPosition, newPosition)) {
+            this.emitPositionChange({
+              type: 'resize',
+              cellKey,
+              oldPosition,
+              newPosition,
+              timestamp
+            });
+          }
+        } else {
+          fileLog.warn('❌ No viewport container found for position calculation', { cellKey });
         }
       } else {
         // Cell no longer exists in DOM
@@ -366,38 +244,6 @@ class ReactivePositionTracker {
     this.isUpdating = false;
   }
 
-  /**
-   * Check if resize entry represents a significant size change
-   * (filters out CSS outline changes and other cosmetic effects)
-   */
-  private isSignificantResize(entry: ResizeObserverEntry): boolean {
-    const contentRect = entry.contentRect;
-    const borderBoxSize = entry.borderBoxSize?.[0];
-
-    // Ignore very small content changes (likely from CSS effects like outlines)
-    const minSignificantChange = 5; // 5px minimum change to be considered significant
-
-    // Check if this is a real content size change
-    if (contentRect.width > 0 && contentRect.height > 0) {
-      // Get the element's current stored position if available
-      const cellKey = this.getCellKey(entry.target as HTMLElement);
-      if (cellKey) {
-        const currentPos = domPositions$.cellPositions.get().get(cellKey);
-        if (currentPos) {
-          const widthChange = Math.abs(contentRect.width - currentPos.width);
-          const heightChange = Math.abs(contentRect.height - currentPos.height);
-
-          // Only trigger for significant content size changes
-          return widthChange >= minSignificantChange || heightChange >= minSignificantChange;
-        }
-      }
-
-      // First time seeing this cell - always significant
-      return true;
-    }
-
-    return false;
-  }
 
   /**
    * Check if position has changed significantly
@@ -446,19 +292,10 @@ class ReactivePositionTracker {
    * Cleanup all observers
    */
   cleanup(): void {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
-
-    if (this.intersectionObserver) {
-      this.intersectionObserver.disconnect();
-      this.intersectionObserver = null;
-    }
-
-    if (this.mutationObserver) {
-      this.mutationObserver.disconnect();
-      this.mutationObserver = null;
+    if (this.scrollHandler && tableContainer) {
+      tableContainer.removeEventListener('scroll', this.scrollHandler);
+      window.removeEventListener('resize', this.scrollHandler);
+      this.scrollHandler = null;
     }
 
     if (this.rafId) {
@@ -477,6 +314,7 @@ class ReactivePositionTracker {
    * Force immediate position update (useful for testing)
    */
   forceUpdate(): void {
+    fileLog.info('🔄 forceUpdate called - updating positions immediately');
     this.updatePositions();
   }
 

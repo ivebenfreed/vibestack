@@ -248,39 +248,41 @@ export function createTableInteraction$(tableCore$?: any) {
 
     // Pure cell click handler - minimal logic, reactive approach
     handleCellClick(cellId: string, isEditable: boolean, ctrlKey: boolean, shiftKey: boolean) {
-      // 1. Always set focus
-      this.setFocusedCell(cellId);
+      batch(() => {
+        // 1. Always set focus
+        this.setFocusedCell(cellId);
 
-      // 2. Handle selection
-      if (!ctrlKey && !shiftKey) {
-        this.selectCell(cellId, false);
-      } else if (ctrlKey) {
-        this.selectCell(cellId, true);
-      }
+        // 2. Handle selection
+        if (!ctrlKey && !shiftKey) {
+          this.selectCell(cellId, false);
+        } else if (ctrlKey) {
+          this.selectCell(cellId, true);
+        }
 
-      // 3. For editable cells, start editing (this is the key missing piece)
-      if (isEditable && !ctrlKey && !shiftKey) {
-        // Get the actual cell value for editing
-        const [rowId, columnId] = cellId.split(':');
-        const processedRows = tableCore$?.processedRows?.get() || [];
-        const row = processedRows.find((r: any) => r.id === rowId);
-        const cellValue = row ? row[columnId] : '';
+        // 3. For editable cells, start editing (this is the key missing piece)
+        if (isEditable && !ctrlKey && !shiftKey) {
+          // Get the actual cell value for editing
+          const [rowId, columnId] = cellId.split(':');
+          const processedRows = tableCore$?.processedRows?.get() || [];
+          const row = processedRows.find((r: any) => r.id === rowId);
+          const cellValue = row ? row[columnId] : '';
 
-        fileLog.info('🔍 Cell value retrieval debug', {
-          cellId,
-          rowId,
-          columnId,
-          hasTableCore: !!tableCore$,
-          hasProcessedRows: !!tableCore$?.processedRows,
-          processedRowsCount: processedRows.length,
-          foundRow: !!row,
-          cellValue,
-          firstRowId: processedRows[0]?.id,
-          rowIds: processedRows.map(r => r.id).slice(0, 3)
-        });
+          fileLog.info('🔍 Cell value retrieval debug', {
+            cellId,
+            rowId,
+            columnId,
+            hasTableCore: !!tableCore$,
+            hasProcessedRows: !!tableCore$?.processedRows,
+            processedRowsCount: processedRows.length,
+            foundRow: !!row,
+            cellValue,
+            firstRowId: processedRows[0]?.id,
+            rowIds: processedRows.map(r => r.id).slice(0, 3)
+          });
 
-        tableInteraction$.startEdit(cellId, cellValue);
-      }
+          tableInteraction$.startEdit(cellId, cellValue);
+        }
+      });
 
       fileLog.info('🖱️ Cell click handled', {
         cellId,
@@ -359,13 +361,11 @@ export function createTableInteraction$(tableCore$?: any) {
     },
 
     setFocusedCell(cellId: string | null) {
-      batch(() => {
-        tableInteraction$.focusedCell.set(cellId);
-        // If no anchor cell is set, use focused cell as anchor
-        if (cellId && !tableInteraction$.anchorCell.get()) {
-          tableInteraction$.anchorCell.set(cellId);
-        }
-      });
+      tableInteraction$.focusedCell.set(cellId);
+      // If no anchor cell is set, use focused cell as anchor
+      if (cellId && !tableInteraction$.anchorCell.get()) {
+        tableInteraction$.anchorCell.set(cellId);
+      }
 
       fileLog.info('<� Focused cell changed', { cellId });
     },

@@ -34,12 +34,12 @@ export class SelectionOverlayDOM {
     config: SelectionOverlayConfig
   ) {
     this.container = container;
-    // Make selection much more visible
+    // Make selection much more visible for debugging
     this.config = {
       ...config,
-      selectionColor: 'rgba(59, 130, 246, 0.15)', // More opaque background
-      selectionBorderColor: 'rgb(59, 130, 246)', // Solid border
-      borderWidth: 2
+      selectionColor: 'rgba(255, 0, 0, 0.5)', // Bright red background for debugging
+      selectionBorderColor: 'rgb(255, 0, 0)', // Red border
+      borderWidth: 3 // Thicker border
     };
     
     // Ensure container has relative positioning for absolute children
@@ -157,7 +157,7 @@ export class SelectionOverlayDOM {
       
       // Trigger animation on next frame
       requestAnimationFrame(() => {
-        element.style.opacity = '0.3';
+        element.style.opacity = '0.8'; // Much more visible for debugging
         element.style.transform = 'scale(1)';
         myLog.info(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
       });
@@ -196,7 +196,10 @@ export class SelectionOverlayDOM {
       height: position.height,
       actualLeft: element.style.left,
       actualTop: element.style.top,
-      positionChanged: isPositionChange
+      positionChanged: isPositionChange,
+      containerBounds: this.container.getBoundingClientRect(),
+      containerScrollTop: this.container.scrollTop,
+      containerOffsetParent: this.container.offsetParent?.tagName
     });
   }
   
