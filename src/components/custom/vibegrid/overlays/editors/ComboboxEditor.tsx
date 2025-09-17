@@ -181,6 +181,7 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
           break
         case 'Escape':
           e.preventDefault()
+          e.stopPropagation() // Stop the event from reaching KeyboardNavigationController
           handleCancel()
           break
         case 'Tab':

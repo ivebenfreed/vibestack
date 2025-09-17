@@ -206,12 +206,14 @@ export class KeyboardNavigationController {
         break;
       
       case 'Escape':
-        // Clear editing state if currently editing
+        // If currently editing, just cancel the edit and keep selection
         if (this.tableInteraction$.isEditing.get()) {
           this.tableInteraction$.cancelEdit();
+          // Keep the cell selected after canceling edit
+          return true;
         }
 
-        // Clear selection and focus state
+        // If not editing, clear selection
         this.tableInteraction$.clearSelection();
         this.tableInteraction$.setFocusedCell(null);
         return true;

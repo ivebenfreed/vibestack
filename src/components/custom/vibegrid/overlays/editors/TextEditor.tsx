@@ -54,6 +54,7 @@ function TextEditorComponent({
         break;
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation(); // Stop the event from reaching KeyboardNavigationController
         console.log('🔍 TextEditor: Cancel via Escape key');
         onCancel();
         break;
@@ -80,11 +81,8 @@ function TextEditorComponent({
         onCommit(value);
       }, 100);
     } else {
-      // If no user interaction, cancel the edit (this will hide the overlay)
-      console.log('🔍 TextEditor: Cancelling edit on blur - no user interaction detected');
-      if (onCancel) {
-        onCancel();
-      }
+      // If no user interaction, don't commit - let outside click handler decide
+      console.log('🔍 TextEditor: Blur without user interaction - not committing, leaving edit active');
     }
   };
 

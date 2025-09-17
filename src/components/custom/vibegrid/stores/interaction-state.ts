@@ -356,8 +356,21 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.anchorCell.set(null);
       });
 
-
       fileLog.info('<� Selection cleared');
+    },
+
+    // Outside click handler with editing state logic
+    handleOutsideClick() {
+      const isCurrentlyEditing = tableInteraction$.isEditing.get();
+
+      if (isCurrentlyEditing) {
+        fileLog.info('<� Outside click while editing - saving edit and preserving selection');
+        this.saveEdit();
+        // Selection is preserved when finishing an edit
+      } else {
+        fileLog.info('<� Outside click - clearing selection');
+        this.clearSelection();
+      }
     },
 
     setFocusedCell(cellId: string | null) {

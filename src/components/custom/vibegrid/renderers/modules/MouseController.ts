@@ -94,12 +94,12 @@ export class MouseController {
       const cellId = `${rowId}:${columnId}`;
 
       // Detect if click is on an editable element
+      // IMPORTANT: Content elements with -editable classes have their own click handlers
+      // that call stopPropagation(). We should NOT pass isEditableElement=true for them
+      // because they handle their own editing. Only native input elements should be
+      // marked as editable here.
       const isEditableElement = target.matches('input, textarea, select') ||
-                                target.contentEditable === 'true' ||
-                                target.closest('input, textarea, select, [contenteditable="true"]') ||
-                                // VibeGrid specific editable element classes (pattern-based for robustness)
-                                this.hasEditableClass(target) ||
-                                target.closest('[class*="-editable"]');
+                                target.contentEditable === 'true';
 
       fileLog.info('🖱️ Cell mouse down - pure event coordination', {
         cellId,
@@ -112,18 +112,19 @@ export class MouseController {
       this.tableInteraction$.setMousePosition(e.clientX, e.clientY);
       this.tableInteraction$.setMouseDown(true);
 
-      // PURE: Delegate to minimal, focused handler
+      // PURE: ALWAYS select the cell when clicked - this is the universal interaction pattern
+      // Pass isEditableElement=false for content elements since they handle their own editing
       this.tableInteraction$.handleCellClick(cellId, isEditableElement, e.ctrlKey, e.shiftKey);
 
-      // Handle mouse tracking and preventDefault based on element type
-      if (isEditableElement) {
-        // Don't prevent default or track mouse for editable elements - allow normal editing behavior
+      // Only prevent tracking for actual input elements that need native behavior
+      if (target.matches('input, textarea, select') || target.contentEditable === 'true') {
+        // Don't track mouse for native input elements - allow normal editing behavior
         this.isDragging = false;
         this.isTracking = false;
         this.startPosition = { x: 0, y: 0 };
         return;
       } else {
-        // Prevent default text selection behavior for non-editable elements
+        // For all other elements (including badges), track for drag selection
         e.preventDefault();
       }
     }

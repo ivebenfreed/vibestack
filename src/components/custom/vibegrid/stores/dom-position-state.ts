@@ -180,9 +180,35 @@ class ReactivePositionTracker {
           const relativeX = cellRect.left - viewportRect.left;
           const relativeY = cellRect.top - viewportRect.top;
 
+          // CRITICAL FIX: Since the overlay container is inside the scrolling viewport,
+          // we need absolute positions within the scrollable area, not viewport-relative
+          const scrollLeft = viewportContainer.scrollLeft || 0;
+          const scrollTop = viewportContainer.scrollTop || 0;
+
+          // Add scroll offset to get absolute position within scrollable content
+          const absoluteX = relativeX + scrollLeft;
+          const absoluteY = relativeY + scrollTop;
+
+          // Log detailed position calculation for debugging
+          if (columnId === 'satisfaction_rating') {
+            fileLog.info('🎯 SCROLL FIX: Position calculation for satisfaction_rating', {
+              cellKey,
+              cellRect: { left: cellRect.left, top: cellRect.top },
+              viewportRect: { left: viewportRect.left, top: viewportRect.top },
+              relativeX,
+              relativeY,
+              scrollLeft,
+              scrollTop,
+              absoluteX,
+              absoluteY,
+              viewportOverflow: getComputedStyle(viewportContainer).overflow,
+              containerIsViewport: container === viewportContainer
+            });
+          }
+
           const newPosition: CellCoordinates = {
-            x: relativeX,
-            y: relativeY,
+            x: absoluteX,  // Use absolute position within scrollable content
+            y: absoluteY,  // Use absolute position within scrollable content
             width: cellRect.width,
             height: cellRect.height,
             source: 'dom',

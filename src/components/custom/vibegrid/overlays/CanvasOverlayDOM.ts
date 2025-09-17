@@ -80,15 +80,21 @@ export class CanvasOverlayDOM {
     // Create overlay container
     this.overlayContainer = document.createElement('div');
     this.overlayContainer.className = 'vibegridx-overlay-container';
+
+    // CRITICAL FIX: The overlay container must be as wide as the scrollable content,
+    // not just the viewport. Otherwise, overlays for cells outside the initial viewport
+    // will be clipped. We need to match the full scrollable width of the table.
+    const scrollWidth = this.container.scrollWidth || 3000; // Use actual scroll width or fallback
+
     Object.assign(this.overlayContainer.style, {
       position: 'absolute',
       top: '0',
       left: '0',
-      right: '0',
+      width: `${scrollWidth}px`, // Full scrollable width, not viewport width
       bottom: '0',
       pointerEvents: 'none',
       zIndex: '1000',
-      overflow: 'hidden'
+      overflow: 'visible' // Don't clip overlay elements
     });
     
     // Add to container
@@ -123,10 +129,13 @@ export class CanvasOverlayDOM {
         scrollLeft: scrollContext?.scrollLeft || 0
       });
 
+      // CRITICAL: Selection container must also match full scrollable width
+      const scrollWidth = this.container?.scrollWidth || 3000;
+
       selectionContainer.style.position = 'absolute';
       selectionContainer.style.top = '0';
       selectionContainer.style.left = '0';
-      selectionContainer.style.width = '100%';
+      selectionContainer.style.width = `${scrollWidth}px`; // Match full table width
       selectionContainer.style.height = '100%';
 
       fileLog.info('✅ DIAGNOSTIC: Overlay container positioned to fill parent with scroll alignment');

@@ -34,12 +34,9 @@ export class SelectionOverlayDOM {
     config: SelectionOverlayConfig
   ) {
     this.container = container;
-    // Make selection much more visible for debugging
+    // Use nice light blue selection colors
     this.config = {
-      ...config,
-      selectionColor: 'rgba(255, 0, 0, 0.5)', // Bright red background for debugging
-      selectionBorderColor: 'rgb(255, 0, 0)', // Red border
-      borderWidth: 3 // Thicker border
+      ...config
     };
     
     // Ensure container has relative positioning for absolute children
@@ -71,44 +68,83 @@ export class SelectionOverlayDOM {
         pos: { x: c.x, y: c.y, w: c.width, h: c.height }
       }))
     });
-    
-    // Build set of new cell keys for comparison
-    const newCellKeys = new Set(visualCells.map(cell => cell.cellKey));
-    const currentCellKeys = new Set(this.selectionElements.keys());
-    
-    // Remove elements that are no longer selected (smooth fade out)
-    for (const cellKey of currentCellKeys) {
-      if (!newCellKeys.has(cellKey)) {
-        myLog.info(`SelectionOverlayDOM: Removing deselected cell ${cellKey}`);
-        this.removeSelectionElement(cellKey);
+
+    // Clear all existing selection elements
+    for (const element of this.selectionElements.values()) {
+      element.remove();
+    }
+    this.selectionElements.clear();
+
+    if (visualCells.length === 0) {
+      return;
+    }
+
+    // For single cell selection, use individual overlay
+    if (visualCells.length === 1) {
+      const cell = visualCells[0];
+      this.addOrUpdateSelectionElement(cell.cellKey, {
+        x: cell.x,
+        y: cell.y,
+        width: cell.width,
+        height: cell.height
+      });
+    } else {
+      // For multi-cell selection, create a single merged rectangle
+      // Find the bounding box of all selected cells
+      let minX = Infinity, minY = Infinity;
+      let maxX = -Infinity, maxY = -Infinity;
+
+      for (const cell of visualCells) {
+        minX = Math.min(minX, cell.x);
+        minY = Math.min(minY, cell.y);
+        maxX = Math.max(maxX, cell.x + cell.width);
+        maxY = Math.max(maxY, cell.y + cell.height);
       }
-    }
-    
-    // Add or update elements for new/existing selections
-    for (const cell of visualCells) {
-      const cellKey = cell.cellKey;
-      const isNewSelection = !currentCellKeys.has(cellKey);
-      
-      myLog.info(`SelectionOverlayDOM: ${isNewSelection ? 'Adding new' : 'Updating existing'} element for ${cellKey}`, {
-        x: cell.x,
-        y: cell.y,
-        width: cell.width,
-        height: cell.height
+
+      // Create a single overlay for the entire selection
+      const mergedKey = 'merged-selection';
+      const element = document.createElement('div');
+      element.className = 'vibegridx-selection-overlay vibegridx-selection-merged';
+      element.dataset.cellKey = mergedKey;
+
+      // Apply styles for merged selection - only show border, no fill
+      Object.assign(element.style, {
+        position: 'absolute',
+        pointerEvents: 'none',
+        backgroundColor: this.config.selectionColor, // Light fill
+        border: `${this.config.borderWidth}px solid ${this.config.selectionBorderColor}`,
+        boxSizing: 'border-box',
+        zIndex: `${GRID_DIMENSIONS.Z_INDEX.SELECTION}`,
+        left: `${minX}px`,
+        top: `${minY}px`,
+        width: `${maxX - minX}px`,
+        height: `${maxY - minY}px`,
+        opacity: '0', // Start invisible for animation
+        transform: 'scale(0.98)',
+        transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+        borderRadius: '3px'
       });
-      
-      this.addOrUpdateSelectionElement(cellKey, {
-        x: cell.x,
-        y: cell.y,
-        width: cell.width,
-        height: cell.height
+
+      this.container.appendChild(element);
+      this.selectionElements.set(mergedKey, element);
+
+      // Trigger animation
+      requestAnimationFrame(() => {
+        element.style.opacity = '1';
+        element.style.transform = 'scale(1)';
+      });
+
+      myLog.info('SelectionOverlayDOM: Created merged selection', {
+        bounds: { minX, minY, maxX, maxY },
+        width: maxX - minX,
+        height: maxY - minY,
+        cellCount: visualCells.length
       });
     }
-    
+
     myLog.info('SelectionOverlayDOM: After smooth update', {
       elementCount: this.selectionElements.size,
-      elementKeys: Array.from(this.selectionElements.keys()),
-      previousKeys: Array.from(currentCellKeys),
-      newKeys: Array.from(newCellKeys)
+      elementKeys: Array.from(this.selectionElements.keys())
     });
   }
   
@@ -157,7 +193,7 @@ export class SelectionOverlayDOM {
       
       // Trigger animation on next frame
       requestAnimationFrame(() => {
-        element.style.opacity = '0.8'; // Much more visible for debugging
+        element.style.opacity = '1'; // Full opacity - the color has transparency
         element.style.transform = 'scale(1)';
         myLog.info(`SelectionOverlayDOM: Animation triggered for ${cellKey}`);
       });

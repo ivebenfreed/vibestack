@@ -59,6 +59,7 @@ export function DateEditor({
         break;
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation(); // Stop the event from reaching KeyboardNavigationController
         onCancel();
         break;
       case 'Tab':

@@ -482,6 +482,10 @@ export class SimplePassiveRenderer {
       viewport: this.viewport!,
       headerViewport: this.headerViewport,
       container: this.container,
+      onClickOutside: () => {
+        // Delegate to interaction state with proper editing logic
+        this.tableInteraction$.handleOutsideClick();
+      },
       onScroll: (scrollLeft: number, scrollTop: number) => {
         // Use the UNIFIED visual operations instead of legacy tableViewport$
         visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');

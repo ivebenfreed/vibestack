@@ -95,20 +95,6 @@ export class ScrollController {
             fileLog.info('⌨️ Ctrl+A - Select all cells');
           }
           break;
-        case 'Escape':
-          e.preventDefault();
-
-          // Cancel editing if currently editing
-          if (this.tableInteraction$?.isEditing.get()) {
-            this.tableInteraction$?.cancelEdit();
-            fileLog.info('⌨️ Escape - Edit canceled');
-          }
-
-          // Clear selection and focus
-          this.tableInteraction$?.clearSelection();
-          this.keyboardNavController?.clear();
-          fileLog.info('⌨️ Escape - Clear selection and focus');
-          break;
         case 'ArrowUp':
           e.preventDefault();
           this.keyboardNavController?.handleArrowKey('up', isShiftKey);
@@ -333,21 +319,13 @@ export class ScrollController {
 
     if (shouldClearSelection) {
       const clickType = viewportElement ? 'empty space within viewport' : 'outside VibeGrid container';
-      fileLog.info(`🖱️ Click on ${clickType} - clearing selection and canceling edit`);
+      fileLog.info(`🖱️ Click on ${clickType} - delegating to handler`);
 
-      // Cancel any active editing first
-      if (this.tableInteraction$?.isEditing.get()) {
-        fileLog.info('🖱️ Canceling edit due to outside click');
-        this.tableInteraction$.cancelEdit();
-      }
-
-      // Then clear selection
+      // Just delegate the event, don't manage state
       if (this.onClickOutside) {
         this.onClickOutside();
-      } else if (this.tableInteraction$?.clearSelection) {
-        this.tableInteraction$.clearSelection();
       } else {
-        fileLog.warn('⚠️ No selection clearing method available');
+        fileLog.warn('⚠️ No outside click handler provided');
       }
     } else {
       fileLog.debug('🖱️ Outside click ignored - within interactive elements', {
