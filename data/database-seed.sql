@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict DOmym0DRSARzKjTvjqc6QyhhVrquSpedg1GExUUbErv2uARbOje3yKUTaKGd6Rk
+\restrict BBQ4eaptTqyKu4WcMweDDL5AHfhy6E3to6mL0y2itJXp3xRxkMlr7KL0zjaMc6t
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -898,13 +898,13 @@ b814d501-69ad-40ee-a7b5-6c99a399f9d6	01920000-1000-7000-8000-000000000001	2025-0
 6a731430-a1bc-4db1-b7fb-0e6cafe897e5	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.728	2025-09-12 01:54:22.728	Customer Analytics Dashboard	Build comprehensive analytics dashboard for customer behavior, sales trends, and business intelligence	medium	not_started	2025-06-15 00:00:00	development	50	\N	3	t	\N	\N	t
 eb6d8755-c903-4d03-9e67-0abc07fcca89	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.001	2025-09-12 01:54:23.001	Search and Recommendation Engine	Implement AI-powered search functionality with personalized product recommendations	medium	not_started	2025-07-01 00:00:00	development	55	\N	5	t	\N	\N	t
 394e27f2-0fc1-469f-ba73-bdb02d868817	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.121	2025-09-12 01:54:23.121	Multi-Platform Testing	Comprehensive testing across web, mobile, and tablet platforms with automated test suites	high	not_started	2025-08-15 00:00:00	testing	42	\N	3	t	\N	\N	f
-c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-13 02:15:28.651	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	high	active	2025-03-20 04:00:00	design	45	\N	3	t	\N	\N	f
 1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-13 14:23:53.086	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-20 22:00:00	deployment	12	14	3	t	\N	\N	f
 01d55ead-3b1d-478e-a379-22322f32dc0f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.423	2025-09-15 00:46:23.947	Process Automation Framework Design	Design automation framework for business processes using RPA and workflow tools	high	done	2025-02-01 05:00:00	development	60	\N	5	t	\N	\N	f
 a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-13 16:38:49.773	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-02-28 22:00:00	documentation	32	35	4	t	\N	\N	f
 3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-15 00:46:13.035	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
 e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-15 18:04:58.211	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	done	2025-04-01 04:00:00	development	40	\N	4	t	\N	\N	t
 2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-15 18:06:04.708	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	done	2025-03-15 21:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
+c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-17 20:04:42.881	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	high	done	2025-03-20 08:00:00	design	45	\N	3	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-12 01:54:48.69	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	not_started	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 \.
@@ -1279,5 +1279,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DOmym0DRSARzKjTvjqc6QyhhVrquSpedg1GExUUbErv2uARbOje3yKUTaKGd6Rk
+\unrestrict BBQ4eaptTqyKu4WcMweDDL5AHfhy6E3to6mL0y2itJXp3xRxkMlr7KL0zjaMc6t
 

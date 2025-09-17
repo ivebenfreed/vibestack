@@ -74,7 +74,12 @@ export class CanvasOverlayDOM {
       return;
     }
     
-    fileLog.info('CanvasOverlayDOM: Initializing in container', container);
+    fileLog.info('CanvasOverlayDOM: Initializing in container', {
+      className: container.className,
+      tagName: container.tagName,
+      scrollWidth: container.scrollWidth,
+      offsetWidth: container.offsetWidth
+    });
     this.container = container;
     
     // Create overlay container

@@ -96,6 +96,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   } | null>(null);
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isPersistenceLoaded, setIsPersistenceLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ====================================
@@ -147,7 +148,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const userId = universeUserId$.get();
       if (orgId && userId) {
         visualOperations.initializeColumns(columns, entityType, orgId, userId);
-        fileLog.info('🎯 Visual state initialized with persistence', { entityType, orgId, userId });
+        fileLog.info('🎯 Visual state initialized, waiting for persistence', { entityType, orgId, userId });
       } else {
         fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
       }
@@ -274,6 +275,29 @@ export function VibeGrid<T extends Record<string, any> = any>(
     };
   }, [tableId, entityType]); // Only re-initialize if table identity changes
 
+  // Monitor persistence loading status
+  useEffect(() => {
+    if (!visualSyncStatus$?.isPersistenceDataLoaded) {
+      // No persistence system, proceed immediately
+      setIsPersistenceLoaded(true);
+      return;
+    }
+
+    const unsubscribe = visualSyncStatus$.isPersistenceDataLoaded.onChange((loaded) => {
+      if (loaded) {
+        fileLog.info('🎯 Persistence loaded, ready to render');
+        setIsPersistenceLoaded(true);
+      }
+    });
+
+    // Check if already loaded
+    if (visualSyncStatus$.isPersistenceDataLoaded.get()) {
+      setIsPersistenceLoaded(true);
+    }
+
+    return unsubscribe;
+  }, []);
+
 
   // ====================================
   // PUBLIC API METHODS
@@ -344,6 +368,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p>Loading table structure...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for persistence to load before rendering the grid
+  if (!isPersistenceLoaded) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading user preferences...</p>
         </div>
       </div>
     );
