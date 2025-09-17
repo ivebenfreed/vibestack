@@ -54,7 +54,6 @@ export class OverlayManager {
   // Performance optimization caches
   private lastSelectedCells: Set<string> | null = null;
   private updateSelectionRAF: number | null = null;
-  private lastCoordinateMappingVersion: number = -1;
   
   constructor(options: OverlayManagerOptions) {
     this.container = options.container;
@@ -635,7 +634,7 @@ export class OverlayManager {
       rowId,
       columnId,
       domAvailable: !!domPosition,
-      virtualAvailable: !!logicalCoords
+      virtualAvailable: !!virtualPosition
     });
 
     return null;

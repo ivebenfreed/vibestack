@@ -31,6 +31,11 @@ import { MouseController } from '../modules/MouseController';
 import { GroupRenderer } from '../components/GroupRenderer';
 import { ColumnWidthManager } from '../modules/ColumnWidthManager';
 
+// New hybrid coordinate system imports
+import { GRID_DIMENSIONS } from '../../constants/grid-dimensions';
+import { updateVirtualBounds, updateVirtualViewport, updateVirtualColumns } from '../../virtualization/VirtualScrollManager';
+import { positionTracker } from '../../stores/dom-position-state';
+
 // Utility imports
 import type { ViewportInfo, TableRow } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
@@ -39,8 +44,9 @@ import { createDataLoadingStage$, createStageCallbacks } from '../../stores/data
 
 const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
-const ROW_HEIGHT = 40;
-const HEADER_HEIGHT = 48;
+// Use centralized dimensions from the new system
+const ROW_HEIGHT = GRID_DIMENSIONS.ROW_HEIGHT;
+const HEADER_HEIGHT = GRID_DIMENSIONS.HEADER_HEIGHT;
 
 export interface SimplePassiveRendererOptions {
   container: HTMLElement;
@@ -252,7 +258,10 @@ export class SimplePassiveRenderer {
       bodyContainer: this.bodyContainer,
       getProcessedRows: () => this.tableCore$.processedRows.get()
     });
-    
+
+    // Initialize the canvas overlay after the DOM is ready
+    this.overlayManager.initializeOverlay();
+
     fileLog.info('✅ Overlay manager initialized');
   }
 
@@ -320,8 +329,8 @@ export class SimplePassiveRenderer {
       this.updateSelectAllCheckboxVisual(selectAllState);
 
       if (this.overlayManager) {
-        // Update selection overlay
-        this.overlayManager.updateSelection(selectedCells);
+        // Selection overlay is now handled reactively by OverlayManager via interactions observable
+        // No need to manually update selection here
 
         // DISABLED: Update editing overlay (now handled by reactive observer in OverlayManager)
         // this.overlayManager.updateEditingOverlay(editingCell, editValue);
@@ -460,7 +469,7 @@ export class SimplePassiveRenderer {
       enableSelectionColumn: this.options.enableSelectionColumn,
       updateCoordinateMapping: (mapping: CoordinateMapping) => {
         this.coordinateMapping = mapping;
-        this.overlayManager?.updateCoordinateMapping(mapping);
+        // Note: Overlay manager now uses hybrid coordinate system - no manual updates needed
       }
     });
     
@@ -477,6 +486,9 @@ export class SimplePassiveRenderer {
     // Initialize viewport dimensions using visual operations
     const bounds = this.container.getBoundingClientRect();
     visualOperations.updateViewportDimensions(bounds.width, bounds.height);
+
+    // Initialize hybrid coordinate system position tracking
+    this.initializePositionTracking();
 
     // Initialize enhanced ScrollController with comprehensive event handling
     this.scrollController = new ScrollController({
@@ -560,6 +572,42 @@ export class SimplePassiveRenderer {
     });
 
     fileLog.info('✅ Post-initialization complete');
+  }
+
+  /**
+   * Initialize hybrid coordinate system position tracking
+   */
+  private initializePositionTracking(): void {
+    fileLog.info('🎯 Initializing hybrid position tracking system');
+
+    // Initialize DOM position tracking
+    positionTracker.initialize(this.container);
+
+    // Initialize virtual bounds with current data
+    const columns = this.tableCore$.columns.get();
+    const columnWidths = columns.map(col => col.width || GRID_DIMENSIONS.DEFAULT_COLUMN_WIDTH);
+    const totalRows = this.tableCore$.processedRows.get().length;
+
+    updateVirtualBounds({
+      totalRows,
+      columnWidths,
+      rowHeight: GRID_DIMENSIONS.ROW_HEIGHT
+    });
+
+    // Initialize virtual viewport
+    const bounds = this.container.getBoundingClientRect();
+    updateVirtualViewport({
+      viewportWidth: bounds.width,
+      viewportHeight: bounds.height,
+      scrollTop: 0,
+      scrollLeft: 0
+    });
+
+    fileLog.info('✅ Hybrid position tracking initialized', {
+      totalRows,
+      columnCount: columns.length,
+      viewportSize: `${bounds.width}x${bounds.height}`
+    });
   }
   
   /**
@@ -847,10 +895,12 @@ export class SimplePassiveRenderer {
         sampleRows: newRows.slice(0, 3).map(r => ({ id: r.rowId, y: r.y }))
       });
 
-      // Sync coordinate mapping with overlay manager
-      this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
+      // Note: Overlay manager now uses hybrid coordinate system - no manual coordinate sync needed
     }
-    
+
+    // Force DOM position tracker to update after cells are rendered
+    positionTracker.forceUpdate();
+
     fileLog.info('✅ Body rendered with Phase 2 managers');
   }
   
@@ -991,11 +1041,8 @@ export class SimplePassiveRenderer {
   private handleViewportChange(): void {
     // Update overlay selection with current viewport position (lightweight)
     if (this.overlayManager) {
-      // Re-update selection overlay which will internally update viewport info
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      if (selectedCells.size > 0) {
-        this.overlayManager.updateSelection(selectedCells);
-      }
+      // Selection overlay is now handled reactively by OverlayManager via interactions observable
+      // Viewport changes are handled automatically by the hybrid coordinate system
     }
 
     fileLog.debug('⏭️ Viewport change - virtual scrolling handled by scroll observer');
@@ -1150,6 +1197,9 @@ export class SimplePassiveRenderer {
     this.disposers.forEach(dispose => dispose());
     this.disposers = [];
     
+    // Clean up hybrid position tracking
+    positionTracker.cleanup();
+
     // Clean up overlay manager
     if (this.overlayManager) {
       this.overlayManager.destroy();

@@ -1,5 +1,3 @@
-import type { ViewportInfo } from '../types';
-import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
 import { log } from '@/logger';
 const myLog = log('components/custom/vibegrid/overlays/SelectionOverlayDOM.ts');
@@ -28,8 +26,7 @@ export class SelectionOverlayDOM {
   // Track elements being animated out for cleanup
   private animatingOut = new Set<string>();
   
-  // Track current viewport for scroll adjustment
-  private currentViewport: ViewportInfo | null = null;
+  // NOTE: Viewport tracking removed - now handled by DOM positioning system
   
   constructor(
     container: HTMLElement,
@@ -55,109 +52,9 @@ export class SelectionOverlayDOM {
     });
   }
   
-  /**
-   * Update the current viewport for scroll adjustment
-   */
-  updateViewport(viewport: ViewportInfo): void {
-    this.currentViewport = viewport;
-  }
+  // NOTE: updateViewport method removed - viewport handled by DOM positioning system
   
-  /**
-   * Update selection using coordinate mapping directly (pure XState approach)
-   */
-  updateSelectionWithMapping(selectedCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
-    myLog.info('SelectionOverlayDOM.updateSelectionWithMapping called', {
-      selectedCells: selectedCells.size,
-      selectedCellKeys: Array.from(selectedCells),
-      viewport: viewport,
-      hasCoordinateMapping: !!coordinateMapping,
-      coordinateVersion: coordinateMapping?.version,
-      rowCount: coordinateMapping?.rows?.length,
-      colCount: coordinateMapping?.columns?.length
-    });
-
-    if (selectedCells.size === 0) {
-      this.clearSelection();
-      return;
-    }
-
-    if (!viewport || !coordinateMapping) {
-      myLog.warn('SelectionOverlayDOM: Missing viewport or coordinate mapping for selection render', {
-        hasViewport: !!viewport,
-        hasCoordinateMapping: !!coordinateMapping
-      });
-      return;
-    }
-
-    // Calculate visible selected cells using coordinate mapping directly
-    const visibleCells = new Set<string>();
-    const cellPositions = new Map<string, { x: number; y: number; width: number; height: number }>();
-    
-    // Find the header height to offset the selection properly
-    const headerHeight = 48; // HEADER_HEIGHT from SimplePassiveRenderer
-    
-    for (const cellKey of selectedCells) {
-      const [rowId, columnId] = cellKey.split(':');
-      
-      // Find row and column in coordinate mapping
-      const rowCoord = coordinateMapping.rows.find((r: any) => r.rowId === rowId);
-      const colCoord = coordinateMapping.columns.find((c: any) => c.columnId === columnId);
-      
-      if (!rowCoord || !colCoord) continue;
-      
-      const rowIndex = coordinateMapping.rows.indexOf(rowCoord);
-      
-      // Always show selected cells, don't filter by viewport for now to debug alignment
-      visibleCells.add(cellKey);
-      
-      // Calculate position based on coordinate mapping
-      // Since overlay is inside viewport container, no need to add header offset
-      cellPositions.set(cellKey, {
-        x: colCoord.x,
-        y: rowCoord.y, // Row coordinates are already relative to viewport
-        width: colCoord.width,
-        height: rowCoord.height
-      });
-      
-      myLog.info('SelectionOverlayDOM: Cell position calculated', {
-        cellKey,
-        rowCoord: { y: rowCoord.y, height: rowCoord.height },
-        colCoord: { x: colCoord.x, width: colCoord.width },
-        finalPosition: {
-          x: colCoord.x,
-          y: rowCoord.y,
-          width: colCoord.width,
-          height: rowCoord.height
-        }
-      });
-    }
-
-    myLog.info('SelectionOverlayDOM: Visible cells calculated', {
-      totalSelected: selectedCells.size,
-      visibleCount: visibleCells.size,
-      viewport: {
-        start: viewport.start,
-        end: viewport.end
-      }
-    });
-
-    // Remove selection elements that are no longer selected
-    for (const [cellKey, element] of this.selectionElements) {
-      if (!visibleCells.has(cellKey)) {
-        this.removeSelectionElement(cellKey);
-      }
-    }
-
-    // Add or update selection elements for visible cells
-    for (const cellKey of visibleCells) {
-      const position = cellPositions.get(cellKey);
-      if (position) {
-        this.addOrUpdateSelectionElement(cellKey, position);
-      }
-    }
-
-    this.lastSelectedCells = new Set(selectedCells);
-  }
+  // NOTE: Old coordinate mapping method removed - now using DOM positioning only
   
   /**
    * Update with visual cell positions directly
@@ -356,90 +253,9 @@ export class SelectionOverlayDOM {
     this.lastSelectedCells.clear();
   }
   
-  /**
-   * Update selection range (for drag selection)
-   */
-  updateSelectionRange(
-    startCell: { rowId: string; columnId: string },
-    endCell: { rowId: string; columnId: string },
-    coordinateMapping: CoordinateMapping,
-    viewport: ViewportInfo
-  ): void {
-    // Find row and column indices
-    const startRowIdx = coordinateMapping.rows.findIndex(r => r.rowId === startCell.rowId);
-    const endRowIdx = coordinateMapping.rows.findIndex(r => r.rowId === endCell.rowId);
-    const startColIdx = coordinateMapping.columns.findIndex(c => c.columnId === startCell.columnId);
-    const endColIdx = coordinateMapping.columns.findIndex(c => c.columnId === endCell.columnId);
-    
-    // Calculate range bounds
-    const minRow = Math.min(startRowIdx, endRowIdx);
-    const maxRow = Math.max(startRowIdx, endRowIdx);
-    const minCol = Math.min(startColIdx, endColIdx);
-    const maxCol = Math.max(startColIdx, endColIdx);
-    
-    // Build set of cells in range
-    const rangeCells = new Set<string>();
-    for (let r = minRow; r <= maxRow; r++) {
-      for (let c = minCol; c <= maxCol; c++) {
-        if (r < coordinateMapping.rows.length && c < coordinateMapping.columns.length) {
-          const rowId = coordinateMapping.rows[r].rowId;
-          const columnId = coordinateMapping.columns[c].columnId;
-          rangeCells.add(`${rowId}:${columnId}`);
-        }
-      }
-    }
-    
-    // Update selection with the range
-    this.updateSelectionWithMapping(rangeCells, viewport, coordinateMapping);
-  }
+  // NOTE: updateSelectionRange method removed - range selection now handled by hybrid coordinate system
   
-  /**
-   * Highlight cells temporarily (e.g., for hover effects)
-   */
-  highlightCells(cellKeys: Set<string>, coordinateMapping: CoordinateMapping, viewport: ViewportInfo): void {
-    // Create temporary highlight elements with different styling
-    for (const cellKey of cellKeys) {
-      const [rowId, columnId] = cellKey.split(':');
-      const rowCoord = coordinateMapping.rows.find(r => r.rowId === rowId);
-      const colCoord = coordinateMapping.columns.find(c => c.columnId === columnId);
-      
-      if (!rowCoord || !colCoord) continue;
-      
-      const rowIndex = coordinateMapping.rows.indexOf(rowCoord);
-      if (rowIndex < viewport.start || rowIndex > viewport.end) continue;
-      
-      const element = document.createElement('div');
-      element.className = 'vibegridx-highlight-overlay';
-      
-      const viewportOffset = viewport.start * this.config.cellHeight;
-      Object.assign(element.style, {
-        position: 'absolute',
-        left: `${colCoord.x}px`,
-        top: `${rowCoord.y - viewportOffset}px`,
-        width: `${colCoord.width}px`,
-        height: `${rowCoord.height}px`,
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        border: '2px solid rgba(59, 130, 246, 0.5)',
-        pointerEvents: 'none',
-        zIndex: '11',
-        opacity: '0',
-        transition: 'opacity 150ms ease-out'
-      });
-      
-      this.container.appendChild(element);
-      
-      // Animate in
-      requestAnimationFrame(() => {
-        element.style.opacity = '1';
-      });
-      
-      // Auto-remove after a delay
-      setTimeout(() => {
-        element.style.opacity = '0';
-        setTimeout(() => element.remove(), 150);
-      }, 650);
-    }
-  }
+  // NOTE: highlightCells method removed - cell highlighting now handled by hybrid coordinate system
   
   /**
    * Destroy the overlay and clean up

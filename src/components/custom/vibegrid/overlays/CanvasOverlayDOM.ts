@@ -351,32 +351,8 @@ export class CanvasOverlayDOM {
     });
   }
   
-  /**
-   * Update selection overlay
-   */
-  updateSelection(selectedCells: Set<string>): void {
-    fileLog.info('CanvasOverlayDOM.updateSelection called', {
-      selectedCellsSize: selectedCells.size,
-      hasContainer: !!this.overlayContainer,
-      hasViewport: !!this.currentViewport,
-      hasMapping: !!this.coordinateMapping
-    });
-    
-    // Track current selected cells for fill handle
-    this.currentSelectedCells = new Set(selectedCells);
-    
-    if (!this.overlayContainer) {
-      fileLog.warn('CanvasOverlayDOM: Container not initialized');
-      return;
-    }
-    
-    const overlay = this.getSelectionOverlay();
-    overlay.updateSelectionWithMapping(
-      selectedCells,
-      this.currentViewport,
-      this.coordinateMapping
-    );
-  }
+  // NOTE: Selection overlay updates are now handled reactively by OverlayManager
+  // via the interactions observable - no need for manual updates
   
   /**
    * Update selection with visual positions
@@ -400,10 +376,7 @@ export class CanvasOverlayDOM {
     const overlay = this.getSelectionOverlay();
     fileLog.info('CanvasOverlayDOM: Got selection overlay, calling updateWithVisualPositions');
     
-    // Pass viewport info to selection overlay so it can adjust for scroll
-    if (this.currentViewport) {
-      overlay.updateViewport(this.currentViewport);
-    }
+    // NOTE: Viewport info no longer needed - hybrid DOM positioning handles this automatically
     
     overlay.updateWithVisualPositions(visualCells);
   }
@@ -516,36 +489,7 @@ export class CanvasOverlayDOM {
     }
   }
   
-  /**
-   * Update all overlays based on context
-   */
-  updateFromContext(context: SelectionContext): void {
-    if (!this.overlayContainer) {
-      fileLog.warn('CanvasOverlayDOM: Container not initialized');
-      return;
-    }
-    
-    // Update viewport if provided
-    if (context.viewport) {
-      this.updateViewport(context.viewport);
-    }
-    
-    // Update coordinate mapping if provided
-    if (context.coordinateMapping) {
-      this.updateCoordinateMapping(context.coordinateMapping);
-    }
-    
-    // Update selection
-    if (context.selectedCells) {
-      this.updateSelection(context.selectedCells);
-    }
-    
-    // TODO: Update other overlays as they're created
-    // - Fill handle
-    // - Clipboard indicator
-    // - Editing overlay
-    // - Drag preview
-  }
+  // NOTE: updateFromContext method removed - overlay updates are now handled reactively
   
   /**
    * Update clipboard indicator
