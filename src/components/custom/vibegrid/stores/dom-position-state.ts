@@ -49,7 +49,7 @@ class ReactivePositionTracker {
   private rafId: number | null = null;
   private isInitialized = false;
   private lastUpdateTime = 0;
-  private updateThrottle = 32; // ~30fps max (reduced from 60fps to reduce blocking)
+  private updateThrottle = 100; // ~10fps max (further reduced to prevent forced reflows during initialization)
   private isUpdating = false;
   private pendingUpdate = false;
 
@@ -78,11 +78,17 @@ class ReactivePositionTracker {
     this.setupScrollListener(viewportContainer);
     this.isInitialized = true;
 
-    // Initial position update
-    fileLog.info('🚀 Position tracker initialized, scheduling initial update', {
+    // Defer initial position update to prevent blocking initialization
+    fileLog.info('🚀 Position tracker initialized, deferring initial update to prevent reflows', {
       cellsFound: viewportContainer.querySelectorAll('[data-row-id][data-column-id]').length
     });
-    this.schedulePositionUpdate();
+
+    // Defer initial update by 500ms to allow DOM to settle and prevent forced reflows during initialization
+    setTimeout(() => {
+      if (this.isInitialized) {
+        this.schedulePositionUpdate();
+      }
+    }, 500);
   }
 
   /**

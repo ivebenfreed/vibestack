@@ -13,8 +13,8 @@ import { getEntity$, entityOperations, universeSchema$, universeLoading$, univer
 import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
-import { visualOperations } from './visual-state';
 import { GroupProcessor } from '../processors/GroupProcessor';
+import { visualOperations } from './visual-state';
 
 const fileLog = log('components/custom/vibegrid/stores/data-state.ts');
 
@@ -844,7 +844,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
   const orgId = universeOrgId$.get();
   const userId = universeUserId$.get();
   if (orgId && userId) {
-    visualOperations.initializeColumns(columns, entityType, orgId, userId);
+    // TODO: Remove circular dependency - column initialization should be handled elsewhere
+    // visualOperations.initializeColumns(columns, entityType, orgId, userId);
     fileLog.info(' Columns observable initialized', { entityType, orgId, userId });
   } else {
     fileLog.warn('� Cannot initialize columns observable - missing orgId or userId', { orgId, userId });

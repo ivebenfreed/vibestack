@@ -433,7 +433,7 @@ export class CanvasOverlayDOM {
     this.currentSelectedCells = new Set(visualCells.map(cell => cell.cellKey));
     
     if (!this.overlayContainer) {
-      fileLog.warn('CanvasOverlayDOM: Container not initialized');
+      fileLog.debug('CanvasOverlayDOM: Container not initialized yet, skipping selection update');
       return;
     }
     

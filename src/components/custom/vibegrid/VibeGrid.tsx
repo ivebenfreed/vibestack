@@ -183,17 +183,17 @@ export function VibeGrid<T extends Record<string, any> = any>(
         initManager.markError('visualStateReady', 'Missing orgId or userId', true);
       }
 
-      // Wait for container ref to be available for renderer initialization
+      // Wait for container ref to be available for renderer initialization (optimized)
       let retryCount = 0;
-      const maxRetries = 100; // Max 5 seconds (50ms * 100)
+      const maxRetries = 30; // Reduced max retries since we're using RAF
 
       const checkReadyToInitializeRenderer = () => {
         // First check if container ref is available
         if (!containerRef.current) {
           retryCount++;
           if (retryCount < maxRetries) {
-            fileLog.debug(`🔄 Container ref not ready, retrying in 50ms (attempt ${retryCount}/${maxRetries})`);
-            setTimeout(checkReadyToInitializeRenderer, 50);
+            fileLog.debug(`🔄 Container ref not ready, using RAF (attempt ${retryCount}/${maxRetries})`);
+            requestAnimationFrame(checkReadyToInitializeRenderer);
             return;
           } else {
             fileLog.error('❌ Container ref is null after max retries, giving up');
@@ -202,21 +202,13 @@ export function VibeGrid<T extends Record<string, any> = any>(
           }
         }
 
-        // Additional check: ensure container is actually attached to DOM and has dimensions
+        // PERFORMANCE: Skip dimension check during initialization to prevent forced reflows
+        // The container will get dimensions during the rendering process
         const containerElement = containerRef.current;
-        const rect = containerElement.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
-          retryCount++;
-          if (retryCount < maxRetries) {
-            fileLog.debug(`🔄 Container has no dimensions (${rect.width}x${rect.height}), retrying in 50ms (attempt ${retryCount}/${maxRetries})`);
-            setTimeout(checkReadyToInitializeRenderer, 50);
-            return;
-          } else {
-            fileLog.error('❌ Container has no dimensions after max retries');
-            initManager.markError('containerReady', 'Container element has no dimensions', true);
-            return;
-          }
-        }
+        fileLog.debug('🔄 Container ref ready, proceeding with initialization', {
+          hasContainer: !!containerElement,
+          className: containerElement.className
+        });
 
         // Mark container as ready
         initManager.markReady('containerReady');
@@ -294,7 +286,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
       };
 
       // Start checking for container readiness after a small delay to allow React to render
-      setTimeout(checkReadyToInitializeRenderer, 100);
+      // Use RAF instead of setTimeout for better performance
+      requestAnimationFrame(checkReadyToInitializeRenderer);
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';

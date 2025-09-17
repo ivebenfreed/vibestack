@@ -756,10 +756,21 @@ export function createVisualOperations(visualInputs$: any) {
           save: (value: any) => {
             // Skip saving during initialization - don't persist the isInitializing flag
             if (value.isInitializing) {
-              fileLog.debug('⏸️ Skipping save during initialization', { persistKey });
+              fileLog.info('⏸️ SAVE BLOCKED: Skipping save during initialization', {
+                persistKey,
+                entityType: value.entityType,
+                stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
+              });
               // Return false to prevent save according to Legend State docs
               return false;
             }
+
+            // Log what triggered this save to debug cross-entity contamination
+            fileLog.info('💾 SAVE TRIGGERED: Visual state save', {
+              persistKey,
+              entityType: value.entityType,
+              triggerStack: new Error().stack?.split('\n').slice(1, 6).join('\n')
+            });
 
             // Ensure sortBy is valid before saving
             const validSortBy = Array.isArray(value.sortBy) ? value.sortBy.filter(item =>
@@ -814,7 +825,7 @@ export function createVisualOperations(visualInputs$: any) {
 
     // Wait for persistence to load, then log status and mark as complete
     when(syncStatus$.isPersistLoaded).then(() => {
-      // Give the load transform a chance to complete
+      // Give the load transform a chance to complete AND prevent rapid saves during initialization
       setTimeout(() => {
         // Clear initialization flag to allow normal saves
         visualInputs$.isInitializing.set(false);
@@ -847,7 +858,7 @@ export function createVisualOperations(visualInputs$: any) {
       } catch (e) {
         fileLog.error('❌ Failed to check persistence content', e);
       }
-      }, 10); // Small delay to allow load transform to complete
+      }, 2000); // Increase delay to 2 seconds to prevent rapid saves during grid initialization
     });
 
     fileLog.info('🎯 Columns observable initialized', {
@@ -1336,3 +1347,26 @@ export function createCompleteGridState$(
     }
   });
 }
+
+// ====================================
+// SINGLETON INSTANCE FOR EXISTING CODE
+// ====================================
+
+// Create and export a singleton instance for the existing codebase
+const {
+  visualInputs$,
+  visualState$,
+  visibleColumns$,
+  totalColumnsWidth$,
+  visualOperations
+} = createVibeGridVisualState();
+
+// Export the singleton instances
+export {
+  visualInputs$,
+  visualState$,
+  visibleColumns$,
+  totalColumnsWidth$,
+  visualOperations
+};
+

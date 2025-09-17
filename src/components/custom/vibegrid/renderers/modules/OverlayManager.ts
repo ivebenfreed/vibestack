@@ -928,6 +928,17 @@ export class OverlayManager {
    * This method is called by SimplePassiveRenderer when coordinates change
    */
   updateCoordinateMapping(mapping: CoordinateMapping): void {
+    // PERFORMANCE: Deduplicate coordinate mapping updates
+    if (this.lastCoordinateMappingVersion === mapping.version) {
+      fileLog.debug('🔄 Coordinate mapping unchanged, skipping update', {
+        version: mapping.version,
+        lastVersion: this.lastCoordinateMappingVersion
+      });
+      return;
+    }
+
+    this.lastCoordinateMappingVersion = mapping.version;
+
     fileLog.info('🔄 Coordinate mapping updated for overlays', {
       version: mapping.version,
       rowCount: mapping.rows.length,
