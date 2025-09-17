@@ -66,6 +66,7 @@ export class SimplePassiveRenderer {
   private headerViewport: HTMLElement | null = null;
   private bodyContainer: HTMLElement | null = null;
   private disposers: (() => void)[] = [];
+
   
   // Observable references
   private tableCore$: TableCore$;
@@ -273,48 +274,71 @@ export class SimplePassiveRenderer {
     fileLog.info('🎯 Initializing focused observers');
 
     // DATA OBSERVER: Only watches data changes (rows, sorting, filtering)
+    // Track data changes to avoid unnecessary renders
+    let lastDataSignature = '';
     this.dataObserverDisposer = observe(() => {
-      const processedRows = this.tableCore$.processedRows.get();
-      const sortBy = this.tableCore$.sortBy.get();
+      const processedRows = this.tableCore$.processedRows.get(true);
+      const sortBy = this.tableCore$.sortBy.get(true);
 
-      fileLog.debug('📊 Data changed - rendering body only', {
-        rowCount: processedRows.length,
-        sortFields: sortBy.length
-      });
+      // Create a signature of actual data changes
+      const dataSignature = `${processedRows.length}-${sortBy.map(s => `${s.field}:${s.direction}`).join(',')}`;
 
-      // Only render body for data changes, no layout recalc
-      this.renderBody();
-      this.updateSortIndicators();
+      // Only render if actual data changed
+      if (dataSignature !== lastDataSignature) {
+        lastDataSignature = dataSignature;
+
+        fileLog.debug('📊 Data changed - rendering body only', {
+          rowCount: processedRows.length,
+          sortFields: sortBy.length
+        });
+
+        // Only render body for data changes, no layout recalc
+        this.renderBody();
+        this.updateSortIndicators();
+      }
     });
 
     // VISUAL OBSERVER: Only watches layout changes (columns, viewport dimensions)
+    // Track non-scroll visual changes to avoid duplicate renders with scroll observer
+    let lastVisualLayout = '';
     this.visualObserverDisposer = observe(() => {
-      const visualState = visualState$.get();
+      const visualState = visualState$.get(true);
 
-      fileLog.debug('🎨 Visual layout changed - updating layout only', {
-        columnCount: visualState.columnLayouts.length,
-        totalWidth: visualState.geometry.totalWidth,
-        viewportSize: `${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`
-      });
+      // Create a signature of layout-only changes (exclude scroll position)
+      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`;
 
-      // Only update layout, no data processing
-      this.renderHeader();
-      this.renderBody(); // Body needs re-render for column changes
+      // Only render if actual layout changed, not just scroll position
+      if (layoutSignature !== lastVisualLayout) {
+        lastVisualLayout = layoutSignature;
+
+        fileLog.debug('🎨 Visual layout changed - updating layout only', {
+          columnCount: visualState.columnLayouts.length,
+          totalWidth: visualState.geometry.totalWidth,
+          viewportSize: `${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`
+        });
+
+        // Batch the render operations to prevent cascade
+        batch(() => {
+          // Only update layout, no data processing
+          this.renderHeader();
+          this.renderBody(); // Body needs re-render for column changes
+        });
+      }
     });
 
     // INTERACTION OBSERVER: Only watches interaction changes (selection, editing, drag)
     this.interactionObserverDisposer = observe(() => {
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      const editingCell = this.tableInteraction$.editingCell.get();
-      const editValue = this.tableInteraction$.editValue.get();
-      const selectAllState = this.tableInteraction$.selectAllCheckboxState.get();
-      const columnResize = this.tableInteraction$.columnResize.get();
-      const isDragging = this.tableInteraction$.isDragging.get();
-      const dragSource = this.tableInteraction$.dragSource.get();
-      const dragTarget = this.tableInteraction$.dragTarget.get();
-      const isDragSelecting = this.tableInteraction$.isDragSelecting.get();
-      const dragSelectStart = this.tableInteraction$.dragSelectStart.get();
-      const dragSelectCurrent = this.tableInteraction$.dragSelectCurrent.get();
+      const selectedCells = this.tableInteraction$.selectedCells.get(true);
+      const editingCell = this.tableInteraction$.editingCell.get(true);
+      const editValue = this.tableInteraction$.editValue.get(true);
+      const selectAllState = this.tableInteraction$.selectAllCheckboxState.get(true);
+      const columnResize = this.tableInteraction$.columnResize.get(true);
+      const isDragging = this.tableInteraction$.isDragging.get(true);
+      const dragSource = this.tableInteraction$.dragSource.get(true);
+      const dragTarget = this.tableInteraction$.dragTarget.get(true);
+      const isDragSelecting = this.tableInteraction$.isDragSelecting.get(true);
+      const dragSelectStart = this.tableInteraction$.dragSelectStart.get(true);
+      const dragSelectCurrent = this.tableInteraction$.dragSelectCurrent.get(true);
 
       fileLog.info('🖱️ INTERACTION OBSERVER TRIGGERED', {
         selectedCount: selectedCells.size,
@@ -360,64 +384,27 @@ export class SimplePassiveRenderer {
 
     // SCROLL OBSERVER: Watches scroll position and triggers re-render when virtual range changes
     this.scrollObserverDisposer = observe(() => {
-      const scrollLeft = visualInputs$.scrollLeft.get();
-      const scrollTop = visualInputs$.scrollTop.get();
-
-      // Get current visual state to check if virtual ranges changed
-      const visualState = visualState$.get();
-      const currentColumnRange = visualState.geometry.visibleColumnRange;
-      const currentRowRange = visualState.geometry.visibleRowRange;
-
-      fileLog.debug('📜 Scroll changed - checking if virtual ranges changed', {
-        scrollLeft,
-        scrollTop,
-        currentColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`,
-        currentRowRange: `${currentRowRange.start}-${currentRowRange.end}`
-      });
-
-      // Check if visible column range changed (horizontal virtual scrolling)
-      const previousColumnRange = this.lastVisibleColumns || { start: -1, end: -1 };
-      const columnRangeChanged =
-        currentColumnRange.start !== previousColumnRange.start ||
-        currentColumnRange.end !== previousColumnRange.end;
-
-      // Check if visible row range changed (vertical virtual scrolling)
-      const previousRowRange = this.lastVisibleRows || { start: -1, end: -1 };
-      const rowRangeChanged =
-        currentRowRange.start !== previousRowRange.start ||
-        currentRowRange.end !== previousRowRange.end;
+      const scrollLeft = visualInputs$.scrollLeft.get(true);
+      const scrollTop = visualInputs$.scrollTop.get(true);
 
       // Always update CSS transforms immediately (lightweight)
       if (this.headerViewport) {
         this.headerViewport.style.transform = `translateX(-${scrollLeft}px)`;
       }
 
-      // Re-render body if virtual ranges changed (heavy operation)
-      if (columnRangeChanged || rowRangeChanged) {
-        fileLog.info('🔄 Virtual range changed - triggering body re-render', {
-          columnRangeChanged,
-          rowRangeChanged,
-          oldColumnRange: `${previousColumnRange.start}-${previousColumnRange.end}`,
-          newColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`,
-          oldRowRange: `${previousRowRange.start}-${previousRowRange.end}`,
-          newRowRange: `${currentRowRange.start}-${currentRowRange.end}`
-        });
-
-        // Update tracking
-        this.lastVisibleColumns = currentColumnRange;
-        this.lastVisibleRows = currentRowRange;
-
-        // Trigger body re-render with new virtual columns
-        this.renderBody();
-      }
+      // Defer virtual range checking to avoid reading computed state in observer
+      // Use RAF to break out of the reactive context
+      requestAnimationFrame(() => {
+        this.checkVirtualRangeChange();
+      });
     });
 
     // DRAG SELECTION OBSERVER: Watches drag selection state and mouse coordinates
     this.dragSelectionObserverDisposer = observe(() => {
-      const isDragSelecting = this.tableInteraction$.isDragSelecting.get();
-      const mouseX = this.tableInteraction$.mouseX.get();
-      const mouseY = this.tableInteraction$.mouseY.get();
-      const startCell = this.tableInteraction$.dragSelectStart.get();
+      const isDragSelecting = this.tableInteraction$.isDragSelecting.get(true);
+      const mouseX = this.tableInteraction$.mouseX.get(true);
+      const mouseY = this.tableInteraction$.mouseY.get(true);
+      const startCell = this.tableInteraction$.dragSelectStart.get(true);
 
       if (isDragSelecting && startCell && mouseX > 0 && mouseY > 0) {
         // Find current cell at mouse position
@@ -500,7 +487,7 @@ export class SimplePassiveRenderer {
         visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');
 
         // DEBUGGING: Log detailed width calculations during scroll
-        const visualState = visualState$.get();
+        const visualState = visualState$.get(true);
         const viewport = this.viewport;
         const headerViewport = this.headerViewport;
 
@@ -609,7 +596,49 @@ export class SimplePassiveRenderer {
       viewportSize: `${bounds.width}x${bounds.height}`
     });
   }
-  
+
+  /**
+   * Check if virtual range changed and trigger re-render if needed
+   * This runs outside the reactive context to avoid observer cascades
+   */
+  private checkVirtualRangeChange(): void {
+    // Get current visual state outside of observer context
+    const visualState = visualState$.get(true);
+    const currentColumnRange = visualState.geometry.visibleColumnRange;
+    const currentRowRange = visualState.geometry.visibleRowRange;
+
+    // Check if visible column range changed (horizontal virtual scrolling)
+    const previousColumnRange = this.lastVisibleColumns || { start: -1, end: -1 };
+    const columnRangeChanged =
+      currentColumnRange.start !== previousColumnRange.start ||
+      currentColumnRange.end !== previousColumnRange.end;
+
+    // Check if visible row range changed (vertical virtual scrolling)
+    const previousRowRange = this.lastVisibleRows || { start: -1, end: -1 };
+    const rowRangeChanged =
+      currentRowRange.start !== previousRowRange.start ||
+      currentRowRange.end !== previousRowRange.end;
+
+    // Re-render body if virtual ranges changed (heavy operation)
+    if (columnRangeChanged || rowRangeChanged) {
+      fileLog.info('🔄 Virtual range changed - triggering body re-render', {
+        columnRangeChanged,
+        rowRangeChanged,
+        oldColumnRange: `${previousColumnRange.start}-${previousColumnRange.end}`,
+        newColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`,
+        oldRowRange: `${previousRowRange.start}-${previousRowRange.end}`,
+        newRowRange: `${currentRowRange.start}-${currentRowRange.end}`
+      });
+
+      // Update tracking
+      this.lastVisibleColumns = currentColumnRange;
+      this.lastVisibleRows = currentRowRange;
+
+      // Trigger body re-render with new virtual columns
+      this.renderBody();
+    }
+  }
+
   /**
    * Initialize DOM structure
    */
@@ -771,20 +800,24 @@ export class SimplePassiveRenderer {
    */
   private renderBody(): void {
     if (!this.bodyContainer || !this.bodyRenderer) return;
-    
-    const rows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
+
+    const rows = this.tableCore$.processedRows.get(true);
+    const columns = this.tableCore$.columns.get(true);
+    const columnVisibility = this.tableCore$.columnVisibility.get(true);
 
     // Debug: Check if we have group rows (Legend State rows don't have type property)
     const groupRows = rows.filter((row: any) => row.type === 'group');
     const dataRows = rows.filter((row: any) => !row.type || row.type !== 'group'); // All non-group rows are data
 
+    // TEMP DEBUG: Add stack trace back to identify remaining multiple render sources
+    const stack = new Error().stack?.split('\n').slice(1, 4).join('\n') || 'No stack available';
+
     fileLog.info('🎨 Rendering body with Phase 2 managers', {
       rowCount: rows.length,
       columnCount: columns.length,
       groupRows: groupRows.length,
-      dataRows: dataRows.length
+      dataRows: dataRows.length,
+      callStack: stack
     });
 
     this.bodyContainer.innerHTML = '';
@@ -800,7 +833,7 @@ export class SimplePassiveRenderer {
     this.coordinateMapping.rows = [];
 
     // Virtual scrolling: Only render visible rows - use visual observables
-    const visualState = visualState$.get();
+    const visualState = visualState$.get(true);
 
     // CRITICAL FIX: Set body container width to enable proper horizontal scrolling
     // The body container must be wide enough to accommodate all content
@@ -1000,9 +1033,16 @@ export class SimplePassiveRenderer {
         JSON.stringify(previousState.columns.map(c => c.width)) !== JSON.stringify(visualState.columns.map(c => c.width));
 
       // Check if body needs to be re-rendered (viewport changes affect body virtual scrolling)
+      // Add scroll thresholds to prevent excessive re-renders on small scroll changes
+      const scrollThreshold = 20; // Only re-render if scroll changes by more than 20px
+      const scrollTopChanged = !previousState ||
+        Math.abs(previousState.viewport.scrollTop - visualState.viewport.scrollTop) > scrollThreshold;
+      const scrollLeftChanged = !previousState ||
+        Math.abs(previousState.viewport.scrollLeft - visualState.viewport.scrollLeft) > scrollThreshold;
+
       const needsBodyRender = !previousState ||
-        previousState.viewport.scrollTop !== visualState.viewport.scrollTop ||
-        previousState.viewport.scrollLeft !== visualState.viewport.scrollLeft ||
+        scrollTopChanged ||
+        scrollLeftChanged ||
         previousState.viewport.viewportWidth !== visualState.viewport.viewportWidth ||
         previousState.viewport.viewportHeight !== visualState.viewport.viewportHeight ||
         needsHeaderRender; // Body depends on header changes

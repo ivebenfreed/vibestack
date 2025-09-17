@@ -90,15 +90,22 @@ class ReactivePositionTracker {
    * Setup DOM observers
    */
   private setupObservers(container: HTMLElement): void {
-    // Track cell size/position changes
+    // Track cell size/position changes (debounced to avoid CSS outline triggers)
     this.resizeObserver = new ResizeObserver((entries) => {
+      let hasSignificantResize = false;
+
       entries.forEach(entry => {
         const cellKey = this.getCellKey(entry.target as HTMLElement);
-        if (cellKey) {
+        if (cellKey && this.isSignificantResize(entry)) {
           this.pendingUpdates.add(cellKey);
+          hasSignificantResize = true;
         }
       });
-      this.schedulePositionUpdate();
+
+      // Only schedule updates for significant resizes (not CSS outline changes)
+      if (hasSignificantResize) {
+        this.schedulePositionUpdate();
+      }
     });
 
     // Track visibility changes
@@ -302,7 +309,7 @@ class ReactivePositionTracker {
           timestamp
         };
 
-        fileLog.info('📐 DOM position calculated (content-relative)', {
+        fileLog.debug('📐 DOM position calculated (content-relative)', {
           cellKey,
           contentPosition: { x: relativeX, y: relativeY },
           cellSize: { width: cell.offsetWidth, height: cell.offsetHeight },
@@ -357,6 +364,39 @@ class ReactivePositionTracker {
     }
 
     this.isUpdating = false;
+  }
+
+  /**
+   * Check if resize entry represents a significant size change
+   * (filters out CSS outline changes and other cosmetic effects)
+   */
+  private isSignificantResize(entry: ResizeObserverEntry): boolean {
+    const contentRect = entry.contentRect;
+    const borderBoxSize = entry.borderBoxSize?.[0];
+
+    // Ignore very small content changes (likely from CSS effects like outlines)
+    const minSignificantChange = 5; // 5px minimum change to be considered significant
+
+    // Check if this is a real content size change
+    if (contentRect.width > 0 && contentRect.height > 0) {
+      // Get the element's current stored position if available
+      const cellKey = this.getCellKey(entry.target as HTMLElement);
+      if (cellKey) {
+        const currentPos = domPositions$.cellPositions.get().get(cellKey);
+        if (currentPos) {
+          const widthChange = Math.abs(contentRect.width - currentPos.width);
+          const heightChange = Math.abs(contentRect.height - currentPos.height);
+
+          // Only trigger for significant content size changes
+          return widthChange >= minSignificantChange || heightChange >= minSignificantChange;
+        }
+      }
+
+      // First time seeing this cell - always significant
+      return true;
+    }
+
+    return false;
   }
 
   /**

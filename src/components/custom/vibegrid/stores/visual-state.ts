@@ -345,8 +345,10 @@ export function createVisualRows$(
     const columns = columns$.get();
     const groupConfig = visualInputs$.groupConfig.get();
 
-    // Update the processed rows in visual inputs for the main computed to use
-    visualInputs$.processedRows.set(processedRows);
+    // REMOVED: This was causing circular dependency - data observer fired on scroll
+    // because scroll changes visual inputs, which triggers this computed, which sets
+    // processedRows, which triggers data observer
+    // visualInputs$.processedRows.set(processedRows);
 
     return computeVisualRows({ processedRows, columns, groupConfig });
   });
@@ -424,8 +426,11 @@ export const visualOperations = {
    * Update scroll position - SINGLE MUTATION POINT
    */
   setScrollPosition(scrollLeft: number, scrollTop: number) {
-    visualInputs$.scrollLeft.set(scrollLeft);
-    visualInputs$.scrollTop.set(scrollTop);
+    // Batch scroll updates to prevent observer from firing twice
+    batch(() => {
+      visualInputs$.scrollLeft.set(scrollLeft);
+      visualInputs$.scrollTop.set(scrollTop);
+    });
 
     fileLog.debug('📜 Scroll position updated', { scrollLeft, scrollTop });
   },
@@ -448,10 +453,22 @@ export const visualOperations = {
    * Handle viewport scroll with proper sync between header and body
    */
   handleViewportScroll(scrollLeft: number, scrollTop: number, source: 'header' | 'body' = 'body') {
-    visualInputs$.scrollLeft.set(scrollLeft);
-    visualInputs$.scrollTop.set(scrollTop);
+    // Debug: Check current values to see if this is actually a change
+    const currentScrollLeft = visualInputs$.scrollLeft.get(true);
+    const currentScrollTop = visualInputs$.scrollTop.get(true);
 
-    fileLog.debug('📜 Viewport scrolled', { scrollLeft, scrollTop, source });
+    if (currentScrollLeft === scrollLeft && currentScrollTop === scrollTop) {
+      fileLog.debug('📜 Scroll event with same values - skipping update', { scrollLeft, scrollTop, source });
+      return; // Skip update if values haven't changed
+    }
+
+    // Batch scroll updates to prevent observer from firing twice
+    batch(() => {
+      visualInputs$.scrollLeft.set(scrollLeft);
+      visualInputs$.scrollTop.set(scrollTop);
+    });
+
+    fileLog.debug('📜 Viewport scrolled', { scrollLeft, scrollTop, source, changed: true });
   },
 
   /**

@@ -130,9 +130,9 @@ export class OverlayManager {
   private linkToInteractionsObservable(): void {
     // Observe selection state changes and reactively update selection overlay
     observe(() => {
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      const focusedCell = this.tableInteraction$.focusedCell.get();
-      const hoveredCell = this.tableInteraction$.hoveredCell.get();
+      const selectedCells = this.tableInteraction$.selectedCells.get(true);
+      const focusedCell = this.tableInteraction$.focusedCell.get(true);
+      const hoveredCell = this.tableInteraction$.hoveredCell.get(true);
 
       fileLog.debug('🔍 REACTIVE: Selection state changed', {
         selectedCells: Array.from(selectedCells),
@@ -154,9 +154,9 @@ export class OverlayManager {
 
     // Observe editing state changes and reactively show/hide overlay
     observe(() => {
-      const editingCell = this.tableInteraction$.editingCell.get();
-      const editValue = this.tableInteraction$.editValue.get();
-      const isEditing = this.tableInteraction$.isEditing.get();
+      const editingCell = this.tableInteraction$.editingCell.get(true);
+      const editValue = this.tableInteraction$.editValue.get(true);
+      const isEditing = this.tableInteraction$.isEditing.get(true);
 
       fileLog.debug('🔍 REACTIVE: Linked to interactions observable', {
         editingCell,
@@ -168,7 +168,7 @@ export class OverlayManager {
       if (isEditing && editingCell && this.editingOverlay) {
         // Show editing overlay
         const [rowId, columnId] = editingCell.split(':');
-        const columns = this.tableCore$.columns.get();
+        const columns = this.tableCore$.columns.get(true);
         const column = columns.find((c: any) => c.id === columnId);
 
         if (column) {
@@ -306,9 +306,9 @@ export class OverlayManager {
     let lastShownCell: string | null = null;
 
     observe(() => {
-      const editingCell = this.tableInteraction$.editingCell.get();
-      const editValue = this.tableInteraction$.editValue.get();
-      const isEditing = this.tableInteraction$.isEditing.get();
+      const editingCell = this.tableInteraction$.editingCell.get(true);
+      const editValue = this.tableInteraction$.editValue.get(true);
+      const isEditing = this.tableInteraction$.isEditing.get(true);
 
       fileLog.debug('🔍 REACTIVE: Editing observer triggered', {
         editingCell,
@@ -322,7 +322,7 @@ export class OverlayManager {
         // Only update overlay if the cell has actually changed
         if (lastShownCell !== editingCell) {
           const [rowId, columnId] = editingCell.split(':');
-          const columns = this.tableCore$.columns.get();
+          const columns = this.tableCore$.columns.get(true);
           const column = columns.find((c: any) => c.id === columnId);
 
           if (column) {
