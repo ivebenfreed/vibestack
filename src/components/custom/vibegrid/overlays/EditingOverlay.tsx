@@ -149,7 +149,9 @@ export class EditingOverlay {
     console.log('🔧 EditingOverlay: Editor type detection', {
       columnType: column.cellType || column.type || 'text',
       isTextType,
-      isDropdownType
+      isDropdownType,
+      columnOptions: column.options,
+      columnEnumOptions: column.enumOptions
     });
     
     if (isTextType) {

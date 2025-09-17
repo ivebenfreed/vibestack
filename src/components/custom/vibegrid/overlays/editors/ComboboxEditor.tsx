@@ -130,7 +130,10 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
     console.log('🔍 ComboboxEditor: Final options', {
       columnId: column.id,
       optionCount: standardOptions.length,
-      options: standardOptions.map(opt => ({ value: opt.value, label: opt.label }))
+      options: standardOptions.map(opt => ({ value: opt.value, label: opt.label })),
+      rawColumnOptions: column.options,
+      rawEnumOptions: column.enumOptions,
+      columnType: column.cellType || column.type
     });
 
     return standardOptions

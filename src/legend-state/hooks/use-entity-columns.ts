@@ -52,9 +52,17 @@ function generateColumnsFromArchetype<T>(entityName: string, archetype: string):
         id: 'status',
         field: 'status' as keyof T & string,
         name: 'Status',
-        cellType: 'text' as const,
+        cellType: 'select' as const,
         width: 120,
-        editable: true
+        editable: true,
+        options: [
+          { value: 'not_started', label: 'Not Started', color: '#6B7280' },
+          { value: 'active', label: 'Active', color: '#10B981' },
+          { value: 'in_progress', label: 'In Progress', color: '#F59E0B' },
+          { value: 'done', label: 'Done', color: '#10B981' },
+          { value: 'completed', label: 'Completed', color: '#10B981' },
+          { value: 'archived', label: 'Archived', color: '#6B7280' }
+        ]
       },
       {
         id: 'priority',
@@ -120,9 +128,17 @@ function generateColumnsFromArchetype<T>(entityName: string, archetype: string):
         id: 'status',
         field: 'status' as keyof T & string,
         name: 'Status',
-        cellType: 'text' as const,
+        cellType: 'select' as const,
         width: 120,
-        editable: true
+        editable: true,
+        options: [
+          { value: 'not_started', label: 'Not Started', color: '#6B7280' },
+          { value: 'active', label: 'Active', color: '#10B981' },
+          { value: 'in_progress', label: 'In Progress', color: '#F59E0B' },
+          { value: 'done', label: 'Done', color: '#10B981' },
+          { value: 'completed', label: 'Completed', color: '#10B981' },
+          { value: 'archived', label: 'Archived', color: '#6B7280' }
+        ]
       }
     ]
   }
@@ -224,14 +240,17 @@ function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: s
         case 'computed_formula':
           return 'computed_formula'
         
-        // Legacy/compatibility
+        // Status and selection types
+        case 'status':
+        case 'status_set':
+          return 'select'
         case 'select':
           return 'select'
         case 'reference-select':
         case 'reference_select':
           return 'reference-select'
-        
-        default: 
+
+        default:
           return 'text'
       }
     }

@@ -13,6 +13,21 @@ import { log } from '@/logger';
 
 const fileLog = log('legend-state/table-columns');
 
+/**
+ * Convert raw database values to user-friendly labels
+ * Examples:
+ *   "not_started" -> "Not Started"
+ *   "in_progress" -> "In Progress"
+ *   "done" -> "Done"
+ *   "active" -> "Active"
+ */
+function formatValueAsLabel(value: string): string {
+  return value
+    .split(/[_\-\s]+/) // Split on underscores, dashes, or spaces
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Title case each word
+    .join(' '); // Join with spaces
+}
+
 export interface TableColumn {
   id: string;
   label: string;
@@ -123,6 +138,30 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
       }
     }
 
+    // Handle DataForge status fields
+    if (field.type === 'status' || field.type === 'status_set') {
+      column.type = 'select';
+      column.cellType = 'select'; // FIXED: Ensure status fields use select editor
+
+      fileLog.info(`🎯 DataForge status field detected: ${field.name}`, {
+        entityName,
+        fieldType: field.type,
+        hasEnumOptions: !!field.enumOptions,
+        optionCount: field.enumOptions?.length || 0
+      });
+
+      // Use field's enumOptions if available (from DataForge status sets)
+      if (field.enumOptions && field.enumOptions.length > 0) {
+        column.options = field.enumOptions;
+      } else {
+        // Fallback: auto-detect options from actual data
+        const detectedOptions = detectColumnOptions(entityName, field.name);
+        if (detectedOptions && detectedOptions.length > 0) {
+          column.options = detectedOptions;
+        }
+      }
+    }
+
     // Handle single-select fields with enum arrays
     if (field.type === 'single-select' && field.enum && Array.isArray(field.enum)) {
       column.type = 'select';
@@ -137,7 +176,10 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
     }
 
     // Enhanced Option Detection: Analyze data to detect select fields
+    fileLog.info(`🔍 FIELD CHECK: Entity: ${entityName}, Field: ${field.name}, Type: ${column.type}, ShouldDetect: ${shouldDetectOptions(field.name)}`);
+
     if ((column.type === 'text' || column.type === 'json') && shouldDetectOptions(field.name)) {
+      fileLog.info(`🔍 ATTEMPTING DETECTION: Entity: ${entityName}, Field: ${field.name}`);
       const detectedOptions = detectColumnOptions(entityName, field.name);
       if (detectedOptions && detectedOptions.length > 0) {
         // Determine if this should be a multi-select tags field
@@ -344,10 +386,12 @@ function isTagsFieldName(fieldName: string): boolean {
  */
 function detectColumnOptions(entityName: string, fieldName: string): Array<{ value: string; label: string }> | null {
   try {
+    fileLog.info(`🔍 DETECTION DEBUG: Starting detectColumnOptions for entity: ${entityName}, field: ${fieldName}`);
+
     // Get the entity data from Legend State
     const entityObs = getEntity$(entityName);
     if (!entityObs) {
-      fileLog.debug(`Entity observable not available for ${entityName}`);
+      fileLog.warn(`❌ DETECTION DEBUG: Entity observable not available for ${entityName}`);
       return null;
     }
     
@@ -375,7 +419,7 @@ function detectColumnOptions(entityName: string, fieldName: string): Array<{ val
     if (values.length >= 2 && values.length <= 20) {
       return values.map(value => ({
         value,
-        label: value.charAt(0).toUpperCase() + value.slice(1) // Capitalize first letter
+        label: formatValueAsLabel(value) // Convert to user-friendly format
       }));
     }
     

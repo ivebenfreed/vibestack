@@ -58,7 +58,7 @@ function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[]
       
       if (fieldDef.cellType) {
         cellType = fieldDef.cellType
-      } else if (fieldDef.type === 'select' || fieldDef.enumOptions) {
+      } else if (fieldDef.type === 'select' || fieldDef.type === 'status' || fieldDef.type === 'status_set' || fieldDef.enumOptions) {
         cellType = 'select'
         options = fieldDef.enumOptions
       } else if (fieldDef.type === 'boolean') {
@@ -76,10 +76,10 @@ function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[]
       // Add field-specific options for select fields
       if (fieldName === 'status' && !options) {
         options = [
-          { value: 'draft', label: 'Draft', color: '#6B7280' },
+          { value: 'not_started', label: 'Not Started', color: '#6B7280' },
           { value: 'active', label: 'Active', color: '#10B981' },
-          { value: 'pending', label: 'Pending', color: '#F59E0B' },
-          { value: 'inactive', label: 'Inactive', color: '#6B7280' },
+          { value: 'in_progress', label: 'In Progress', color: '#F59E0B' },
+          { value: 'done', label: 'Done', color: '#10B981' },
           { value: 'completed', label: 'Completed', color: '#10B981' },
           { value: 'archived', label: 'Archived', color: '#6B7280' }
         ]
