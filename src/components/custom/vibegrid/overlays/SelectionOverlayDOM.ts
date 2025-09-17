@@ -1,4 +1,5 @@
 import type { VisualCellPosition } from './OverlayTypes';
+import { GRID_DIMENSIONS } from '../constants/grid-dimensions';
 import { log } from '@/logger';
 const myLog = log('components/custom/vibegrid/overlays/SelectionOverlayDOM.ts');
 
@@ -138,7 +139,7 @@ export class SelectionOverlayDOM {
         backgroundColor: this.config.selectionColor,
         border: `${this.config.borderWidth}px solid ${this.config.selectionBorderColor}`,
         boxSizing: 'border-box',
-        zIndex: '50', // Much higher z-index to appear above everything
+        zIndex: `${GRID_DIMENSIONS.Z_INDEX.SELECTION}`, // Use SELECTION z-index from GRID_DIMENSIONS
         opacity: '0', // Start invisible for animation
         transform: 'scale(0.95)',
         transition: 'opacity 200ms ease-out, transform 200ms ease-out',
