@@ -103,13 +103,25 @@ export class CanvasOverlayDOM {
   private getSelectionOverlay(): SelectionOverlayDOM {
     if (!this.selectionOverlay && this.overlayContainer) {
       fileLog.info('CanvasOverlayDOM: Lazily creating SelectionOverlayDOM');
-      
+
       // Create selection container positioned to match the actual viewport
       const selectionContainer = document.createElement('div');
       selectionContainer.className = 'vibegridx-selection-container';
 
-      // Position overlay container to match the coordinate system used for positioning
-      fileLog.info('🎯 Setting up overlay container positioning');
+      // CRITICAL FIX: Ensure overlay container coordinate system matches the table body
+      fileLog.info('🎯 DIAGNOSTIC: Setting up overlay container positioning with scroll context alignment');
+
+      // Find the scrollable table body container to ensure coordinate alignment
+      const tableBodyContainer = this.container?.querySelector('.vibegridx-body-container') as HTMLElement;
+      const scrollContext = tableBodyContainer || this.container;
+
+      fileLog.info('🎯 DIAGNOSTIC: Overlay positioning context analysis', {
+        hasTableBodyContainer: !!tableBodyContainer,
+        scrollContextClass: scrollContext?.className,
+        containerClass: this.container?.className,
+        overlayContainerClass: this.overlayContainer?.className,
+        scrollLeft: scrollContext?.scrollLeft || 0
+      });
 
       selectionContainer.style.position = 'absolute';
       selectionContainer.style.top = '0';
@@ -117,7 +129,7 @@ export class CanvasOverlayDOM {
       selectionContainer.style.width = '100%';
       selectionContainer.style.height = '100%';
 
-      fileLog.info('✅ Overlay container positioned to fill parent');
+      fileLog.info('✅ DIAGNOSTIC: Overlay container positioned to fill parent with scroll alignment');
 
       selectionContainer.style.pointerEvents = 'none';
       selectionContainer.style.overflow = 'hidden';

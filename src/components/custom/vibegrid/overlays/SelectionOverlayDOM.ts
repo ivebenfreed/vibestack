@@ -189,20 +189,89 @@ export class SelectionOverlayDOM {
       height: `${position.height}px`
     });
     
-    myLog.info(`SelectionOverlayDOM: Element positioned for ${cellKey}`, {
-      left: position.x,
-      top: position.y,
-      width: position.width,
-      height: position.height,
-      actualLeft: element.style.left,
-      actualTop: element.style.top,
-      positionChanged: isPositionChange,
-      containerBounds: this.container.getBoundingClientRect(),
-      containerScrollTop: this.container.scrollTop,
-      containerOffsetParent: this.container.offsetParent?.tagName
+    // GET COMPREHENSIVE POSITIONING DIAGNOSTIC DATA
+    const elementBounds = element.getBoundingClientRect();
+    const containerBounds = this.container.getBoundingClientRect();
+    const scrollableParent = this.findScrollableParent();
+    const scrollParentBounds = scrollableParent ? scrollableParent.getBoundingClientRect() : null;
+    const scrollLeft = scrollableParent ? scrollableParent.scrollLeft : 0;
+
+    myLog.info(`🎯 DIAGNOSTIC: SelectionOverlayDOM element positioned`, {
+      cellKey,
+
+      // POSITION DATA
+      inputPosition: { x: position.x, y: position.y, width: position.width, height: position.height },
+      appliedStyles: {
+        left: element.style.left,
+        top: element.style.top,
+        width: element.style.width,
+        height: element.style.height,
+        position: element.style.position
+      },
+
+      // BOUNDING RECTANGLES
+      elementBounds: {
+        left: elementBounds.left,
+        top: elementBounds.top,
+        right: elementBounds.right,
+        bottom: elementBounds.bottom,
+        width: elementBounds.width,
+        height: elementBounds.height
+      },
+      containerBounds: {
+        left: containerBounds.left,
+        top: containerBounds.top,
+        right: containerBounds.right,
+        bottom: containerBounds.bottom,
+        width: containerBounds.width,
+        height: containerBounds.height
+      },
+
+      // SCROLL CONTEXT
+      scrollContext: {
+        scrollableParentClass: scrollableParent?.className,
+        scrollLeft,
+        scrollTop: scrollableParent?.scrollTop || 0,
+        scrollParentBounds: scrollParentBounds ? {
+          left: scrollParentBounds.left,
+          top: scrollParentBounds.top,
+          width: scrollParentBounds.width,
+          height: scrollParentBounds.height
+        } : null
+      },
+
+      // POSITION ANALYSIS
+      analysis: {
+        elementRelativeToContainer: {
+          x: elementBounds.left - containerBounds.left,
+          y: elementBounds.top - containerBounds.top
+        },
+        isElementVisible: elementBounds.right > containerBounds.left &&
+                         elementBounds.left < containerBounds.right &&
+                         elementBounds.bottom > containerBounds.top &&
+                         elementBounds.top < containerBounds.bottom,
+        elementOverflowsRight: elementBounds.right > containerBounds.right,
+        elementOverflowsLeft: elementBounds.left < containerBounds.left,
+        positionChanged: isPositionChange
+      }
     });
   }
   
+  /**
+   * Find the scrollable parent element for diagnostic purposes
+   */
+  private findScrollableParent(): HTMLElement | null {
+    let parent = this.container.parentElement;
+    while (parent) {
+      const overflow = getComputedStyle(parent).overflow;
+      if (overflow === 'auto' || overflow === 'scroll' || overflow === 'hidden') {
+        return parent;
+      }
+      parent = parent.parentElement;
+    }
+    return null;
+  }
+
   /**
    * Remove a selection element with animation
    */

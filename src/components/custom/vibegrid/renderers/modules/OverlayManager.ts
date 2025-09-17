@@ -526,12 +526,28 @@ export class OverlayManager {
   private getVisualCellPositions(selectedCells: Set<string>): VisualCellPosition[] {
     const visualPositions: VisualCellPosition[] = [];
 
-    fileLog.info('🎨 Getting visual cell positions (hybrid system)', {
-      selectedCount: selectedCells.size
+    // GET COMPREHENSIVE DIAGNOSTIC DATA
+    const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
+    const currentScrollLeft = scrollContainer.scrollLeft || 0;
+    const currentScrollTop = scrollContainer.scrollTop || 0;
+    const viewportWidth = scrollContainer.clientWidth || 0;
+    const columns = this.tableCore$.columns.get(true);
+
+    fileLog.info('🎨 DIAGNOSTIC: Getting visual cell positions with full context', {
+      selectedCount: selectedCells.size,
+      currentScrollLeft,
+      currentScrollTop,
+      viewportWidth,
+      totalColumns: columns.length,
+      scrollContainer: {
+        className: scrollContainer.className,
+        scrollWidth: scrollContainer.scrollWidth,
+        clientWidth: scrollContainer.clientWidth
+      }
     });
 
     selectedCells.forEach(cellId => {
-      fileLog.info('🔍 Processing cellId in getVisualCellPositions', {
+      fileLog.info('🔍 DIAGNOSTIC: Processing cellId in getVisualCellPositions', {
         cellId,
         cellIdType: typeof cellId,
         cellIdValue: cellId
@@ -539,11 +555,48 @@ export class OverlayManager {
 
       const [rowId, columnId] = cellId.split(':');
 
-      fileLog.info('🔍 After split operation', {
+      // GET COLUMN INFORMATION
+      const column = columns.find((c: any) => c.id === columnId);
+      const columnIndex = columns.findIndex((c: any) => c.id === columnId);
+
+      fileLog.info('🔍 DIAGNOSTIC: Column analysis', {
         rowId,
         columnId,
         rowIdType: typeof rowId,
-        columnIdType: typeof columnId
+        columnIdType: typeof columnId,
+        columnIndex,
+        columnExists: !!column,
+        columnData: column ? {
+          id: column.id,
+          title: column.title,
+          width: column.width,
+          type: column.type
+        } : null
+      });
+
+      // Calculate expected column X position based on column widths
+      let expectedColumnX = 0;
+      for (let i = 0; i < columnIndex; i++) {
+        const prevColumn = columns[i];
+        expectedColumnX += (prevColumn.width || 150); // Use column width or default
+      }
+
+      // CRITICAL FIX: Account for scroll position in expected calculation
+      const expectedColumnXScrollAdjusted = expectedColumnX - currentScrollLeft;
+
+      fileLog.info('🔍 DIAGNOSTIC: Expected column position calculation with scroll adjustment', {
+        columnId,
+        columnIndex,
+        expectedColumnX, // Absolute position in full table
+        expectedColumnXScrollAdjusted, // Position relative to current viewport
+        currentScrollLeft,
+        scrollAdjustment: currentScrollLeft,
+        currentColumnWidth: column?.width || 150,
+        calculationBreakdown: columns.slice(0, columnIndex).map((c: any, i: number) => ({
+          index: i,
+          id: c.id,
+          width: c.width || 150
+        }))
       });
 
       // Use the hybrid getCellPosition method
@@ -559,15 +612,46 @@ export class OverlayManager {
         };
         visualPositions.push(visualPos);
 
-        fileLog.debug('✅ Found coordinates for cell via hybrid system', {
+        // CRITICAL DIAGNOSTIC: Compare expected vs actual position using scroll-adjusted expected value
+        const positionDiscrepancy = Math.abs(position.x - expectedColumnXScrollAdjusted);
+        const isPositionAccurate = positionDiscrepancy < 5; // Allow 5px tolerance
+
+        fileLog.info('🎯 DIAGNOSTIC: Position analysis for selection overlay', {
           requestedCell: cellId,
-          coordinates: { x: position.x, y: position.y, width: position.width, height: position.height }
+          columnId,
+          columnIndex,
+          actualPosition: { x: position.x, y: position.y, width: position.width, height: position.height },
+          expectedColumnX, // Absolute position
+          expectedColumnXScrollAdjusted, // Scroll-adjusted position
+          positionDiscrepancy, // Now using scroll-adjusted comparison
+          isPositionAccurate,
+          positionAnalysis: {
+            expectedAbsolute: expectedColumnX,
+            expectedViewportRelative: expectedColumnXScrollAdjusted,
+            actualViewportRelative: position.x,
+            discrepancyFromScrollAdjusted: positionDiscrepancy,
+            discrepancyFromAbsolute: Math.abs(position.x - expectedColumnX)
+          },
+          context: {
+            scrollLeft: currentScrollLeft,
+            viewportWidth,
+            isLastColumn: columnIndex === columns.length - 1,
+            isScrolledRight: currentScrollLeft > 0
+          }
         });
       } else {
-        fileLog.warn('❌ Could not find position for cell via hybrid system', {
+        fileLog.warn('❌ DIAGNOSTIC: Could not find position for cell via hybrid system', {
           cellId,
           rowId,
-          columnId
+          columnId,
+          expectedColumnX,
+          expectedColumnXScrollAdjusted,
+          columnIndex,
+          scrollContext: {
+            scrollLeft: currentScrollLeft,
+            viewportWidth,
+            scrollWidth: scrollContainer.scrollWidth
+          }
         });
       }
     });
@@ -584,18 +668,28 @@ export class OverlayManager {
    * Get cell position for editing overlay
    */
   private getCellPosition(rowId: string, columnId: string): { x: number; y: number; width: number; height: number } | null {
-    fileLog.info('🎯 HYBRID: getCellPosition called with parameters', {
+    const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
+    const currentScrollLeft = scrollContainer.scrollLeft || 0;
+
+    fileLog.info('🎯 DIAGNOSTIC: getCellPosition called with full context', {
       rowId,
       columnId,
       rowIdType: typeof rowId,
       columnIdType: typeof columnId,
       rowIdValue: rowId,
-      columnIdValue: columnId
+      columnIdValue: columnId,
+      currentScrollLeft,
+      scrollContainerClass: scrollContainer.className
     });
 
     const cellKey = `${rowId}:${columnId}`;
 
-    fileLog.info('🎯 HYBRID: Getting cell position', { cellKey, rowId, columnId });
+    fileLog.info('🎯 DIAGNOSTIC: Getting cell position with scroll context', {
+      cellKey,
+      rowId,
+      columnId,
+      scrollLeft: currentScrollLeft
+    });
 
     // Try DOM position first (highest accuracy)
     const domPositions = domPositions$.cellPositions.get();
@@ -655,14 +749,21 @@ export class OverlayManager {
         viewportContainer = this.container;
       }
 
-      fileLog.info('🔍 Container debug info', {
+      fileLog.info('🔍 DIAGNOSTIC: Container debug info', {
         cellKey,
+        columnId,
         foundCell: !!cell,
         foundViewport: !!viewportContainer,
         containerClass: this.container.className,
         viewportClass: viewportContainer?.className,
         cellParentClass: cell.parentElement?.className,
-        isViewportSameAsContainer: viewportContainer === this.container
+        isViewportSameAsContainer: viewportContainer === this.container,
+        scrollingContext: {
+          containerScrollLeft: this.container.scrollLeft,
+          viewportScrollLeft: viewportContainer?.scrollLeft,
+          globalScrollLeft: currentScrollLeft,
+          shouldUseViewportForCalculation: !!viewportContainer && viewportContainer !== this.container
+        }
       });
 
       if (viewportContainer) {
@@ -676,25 +777,40 @@ export class OverlayManager {
           height: cellRect.height
         };
 
-        fileLog.info('✅ Using direct DOM calculation', {
+        fileLog.info('✅ DIAGNOSTIC: Using direct DOM calculation with scroll analysis', {
           cellKey,
+          columnId,
           position: directPosition,
           source: 'direct',
           rawCellRect: {
             left: cellRect.left,
             top: cellRect.top,
+            right: cellRect.right,
             width: cellRect.width,
             height: cellRect.height
           },
           rawViewportRect: {
             left: viewportRect.left,
             top: viewportRect.top,
+            right: viewportRect.right,
             width: viewportRect.width,
             height: viewportRect.height
           },
           calculation: {
             xCalc: `${cellRect.left} - ${viewportRect.left} = ${cellRect.left - viewportRect.left}`,
-            yCalc: `${cellRect.top} - ${viewportRect.top} = ${cellRect.top - viewportRect.top}`
+            yCalc: `${cellRect.top} - ${viewportRect.top} = ${cellRect.top - viewportRect.top}`,
+            cellVisibleWidth: Math.min(cellRect.right, viewportRect.right) - Math.max(cellRect.left, viewportRect.left),
+            isPartiallyVisible: cellRect.right > viewportRect.right || cellRect.left < viewportRect.left,
+            isFullyVisible: cellRect.left >= viewportRect.left && cellRect.right <= viewportRect.right
+          },
+          scrollDiagnostic: {
+            scrollLeft: currentScrollLeft,
+            cellAbsoluteLeft: cellRect.left,
+            cellAbsoluteRight: cellRect.right,
+            viewportAbsoluteLeft: viewportRect.left,
+            viewportAbsoluteRight: viewportRect.right,
+            cellRelativeToViewport: cellRect.left - viewportRect.left,
+            isCellOutsideViewport: cellRect.right < viewportRect.left || cellRect.left > viewportRect.right
           }
         });
 
