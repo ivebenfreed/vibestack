@@ -169,7 +169,7 @@ class ReactivePositionTracker {
         const oldPosition = currentPositions.get(cellKey);
 
         // Get viewport container for relative positioning
-        const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement;
+        const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement || container;
 
         if (viewportContainer) {
           // Use getBoundingClientRect to get viewport-relative coordinates
