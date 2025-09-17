@@ -49,8 +49,9 @@ class ReactivePositionTracker {
   private rafId: number | null = null;
   private isInitialized = false;
   private lastUpdateTime = 0;
-  private updateThrottle = 16; // ~60fps max
+  private updateThrottle = 32; // ~30fps max (reduced from 60fps to reduce blocking)
   private isUpdating = false;
+  private pendingUpdate = false;
 
   /**
    * Initialize tracking on a table container
@@ -107,14 +108,21 @@ class ReactivePositionTracker {
 
   /**
    * Schedule a position update (RAF throttled)
+   * PERFORMANCE OPTIMIZED: Better throttling and coalescing
    */
   private schedulePositionUpdate(): void {
-    if (this.rafId || this.isUpdating) return; // Already scheduled or updating
+    if (this.rafId || this.isUpdating || this.pendingUpdate) return; // Already scheduled or updating
 
     const now = Date.now();
     if (now - this.lastUpdateTime < this.updateThrottle) {
-      // Throttle updates to prevent infinite loops
-      setTimeout(() => this.schedulePositionUpdate(), this.updateThrottle);
+      // PERFORMANCE FIX: Use pendingUpdate flag to prevent multiple setTimeout calls
+      if (!this.pendingUpdate) {
+        this.pendingUpdate = true;
+        setTimeout(() => {
+          this.pendingUpdate = false;
+          this.schedulePositionUpdate();
+        }, this.updateThrottle - (now - this.lastUpdateTime));
+      }
       return;
     }
 
@@ -126,6 +134,7 @@ class ReactivePositionTracker {
 
   /**
    * Update positions for all pending cells
+   * PERFORMANCE OPTIMIZED: Batch DOM reads to minimize forced reflows
    */
   private updatePositions(): void {
     if (!tableContainer || this.isUpdating) return;
@@ -140,102 +149,94 @@ class ReactivePositionTracker {
     const currentPositions = domPositions$.cellPositions.get();
     const newPositions = new Map(currentPositions);
 
-    // Discover all cells in the DOM to ensure complete tracking
+    // PERFORMANCE FIX: Discover all cells in the DOM to ensure complete tracking
     const allCellsInDOM = container.querySelectorAll('[data-row-id][data-column-id]');
-    const allCellKeys = Array.from(allCellsInDOM).map(cell => {
-      const rowId = cell.getAttribute('data-row-id');
-      const columnId = cell.getAttribute('data-column-id');
-      return `${rowId}:${columnId}`;
-    });
+    const allCellElements = Array.from(allCellsInDOM) as HTMLElement[];
 
-    // Always update ALL cells in DOM for single source reliability
-    const cellsToUpdate = allCellKeys;
+    // Extract metadata in a single pass
+    const cellsToUpdate = allCellElements.map(cell => ({
+      element: cell,
+      rowId: cell.getAttribute('data-row-id')!,
+      columnId: cell.getAttribute('data-column-id')!,
+      cellKey: `${cell.getAttribute('data-row-id')}:${cell.getAttribute('data-column-id')}`
+    }));
 
-    fileLog.info('📐 Position update', {
+    fileLog.debug('📐 Position update', {
       cellsInDOM: allCellsInDOM.length,
       tracked: currentPositions.size,
       updating: cellsToUpdate.length
     });
 
-    cellsToUpdate.forEach(cellKey => {
-      const { rowId, columnId } = CoordinateUtils.parseCellKey(cellKey) || {};
-      if (!rowId || !columnId) return;
+    // PERFORMANCE FIX: Get viewport container once to avoid repeated queries
+    const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement || container;
 
-      const cell = container.querySelector(
-        `[data-row-id="${rowId}"][data-column-id="${columnId}"]`
-      ) as HTMLElement;
+    // CRITICAL PERFORMANCE FIX: Batch all layout reads together first, then writes
+    let viewportRect: DOMRect | null = null;
+    let scrollLeft = 0;
+    let scrollTop = 0;
 
-      if (cell) {
-        const oldPosition = currentPositions.get(cellKey);
+    // Single batch of layout reads
+    if (viewportContainer) {
+      viewportRect = viewportContainer.getBoundingClientRect();
+      scrollLeft = viewportContainer.scrollLeft || 0;
+      scrollTop = viewportContainer.scrollTop || 0;
+    }
 
-        // Get viewport container for relative positioning
-        const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement || container;
+    // PERFORMANCE FIX: Process all cells with pre-calculated viewport data
+    cellsToUpdate.forEach(({ element: cell, rowId, columnId, cellKey }) => {
+      if (!rowId || !columnId || !viewportRect) return;
 
-        if (viewportContainer) {
-          // Use getBoundingClientRect to get viewport-relative coordinates
-          const cellRect = cell.getBoundingClientRect();
-          const viewportRect = viewportContainer.getBoundingClientRect();
+      const oldPosition = currentPositions.get(cellKey);
 
-          // Calculate position relative to viewport container
-          const relativeX = cellRect.left - viewportRect.left;
-          const relativeY = cellRect.top - viewportRect.top;
+      // PERFORMANCE FIX: Single getBoundingClientRect call per cell
+      const cellRect = cell.getBoundingClientRect();
 
-          // CRITICAL FIX: Since the overlay container is inside the scrolling viewport,
-          // we need absolute positions within the scrollable area, not viewport-relative
-          const scrollLeft = viewportContainer.scrollLeft || 0;
-          const scrollTop = viewportContainer.scrollTop || 0;
+      // Calculate position relative to viewport container
+      const relativeX = cellRect.left - viewportRect.left;
+      const relativeY = cellRect.top - viewportRect.top;
 
-          // Add scroll offset to get absolute position within scrollable content
-          const absoluteX = relativeX + scrollLeft;
-          const absoluteY = relativeY + scrollTop;
+      // CRITICAL FIX: Since the overlay container is inside the scrolling viewport,
+      // we need absolute positions within the scrollable area, not viewport-relative
+      // Add scroll offset to get absolute position within scrollable content
+      const absoluteX = relativeX + scrollLeft;
+      const absoluteY = relativeY + scrollTop;
 
-          // Log detailed position calculation for debugging
-          if (columnId === 'satisfaction_rating') {
-            fileLog.info('🎯 SCROLL FIX: Position calculation for satisfaction_rating', {
-              cellKey,
-              cellRect: { left: cellRect.left, top: cellRect.top },
-              viewportRect: { left: viewportRect.left, top: viewportRect.top },
-              relativeX,
-              relativeY,
-              scrollLeft,
-              scrollTop,
-              absoluteX,
-              absoluteY,
-              viewportOverflow: getComputedStyle(viewportContainer).overflow,
-              containerIsViewport: container === viewportContainer
-            });
-          }
+      // Log detailed position calculation for debugging (reduced frequency)
+      if (columnId === 'satisfaction_rating' && Math.random() < 0.1) { // Only 10% of the time
+        fileLog.debug('🎯 SCROLL FIX: Position calculation for satisfaction_rating', {
+          cellKey,
+          cellRect: { left: cellRect.left, top: cellRect.top },
+          viewportRect: { left: viewportRect.left, top: viewportRect.top },
+          relativeX,
+          relativeY,
+          scrollLeft,
+          scrollTop,
+          absoluteX,
+          absoluteY
+        });
+      }
 
-          const newPosition: CellCoordinates = {
-            x: absoluteX,  // Use absolute position within scrollable content
-            y: absoluteY,  // Use absolute position within scrollable content
-            width: cellRect.width,
-            height: cellRect.height,
-            source: 'dom',
-            isVisible: cellRect.width > 0 && cellRect.height > 0,
-            timestamp
-          };
+      const newPosition: CellCoordinates = {
+        x: absoluteX,  // Use absolute position within scrollable content
+        y: absoluteY,  // Use absolute position within scrollable content
+        width: cellRect.width,
+        height: cellRect.height,
+        source: 'dom',
+        isVisible: cellRect.width > 0 && cellRect.height > 0,
+        timestamp
+      };
 
-          // Reduced logging to prevent spam
+      newPositions.set(cellKey, newPosition);
 
-          newPositions.set(cellKey, newPosition);
-
-          // Emit position change event
-          if (oldPosition && this.hasPositionChanged(oldPosition, newPosition)) {
-            this.emitPositionChange({
-              type: 'resize',
-              cellKey,
-              oldPosition,
-              newPosition,
-              timestamp
-            });
-          }
-        } else {
-          fileLog.warn('❌ No viewport container found for position calculation', { cellKey });
-        }
-      } else {
-        // Cell no longer exists in DOM
-        newPositions.delete(cellKey);
+      // Emit position change event
+      if (oldPosition && this.hasPositionChanged(oldPosition, newPosition)) {
+        this.emitPositionChange({
+          type: 'resize',
+          cellKey,
+          oldPosition,
+          newPosition,
+          timestamp
+        });
       }
     });
 

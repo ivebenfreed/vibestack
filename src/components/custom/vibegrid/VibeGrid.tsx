@@ -5,9 +5,11 @@ import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
 import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
 import type { Column } from './types';
 import { log } from '@/logger';
-import { visualOperations, visualState$, visualSyncStatus$ } from './stores/visual-state';
+import { createVibeGridVisualState } from './stores/visual-state';
 import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { observable } from '@legendapp/state';
+import { createHydrationManager, type VibeGridHydrationManager } from './stores/init-state';
+import { VibeGridLoadingOverlay, useVibeGridLoadingState } from './components/VibeGridLoadingOverlay';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -95,9 +97,22 @@ export function VibeGrid<T extends Record<string, any> = any>(
     tableViewport$: any;
   } | null>(null);
 
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isPersistenceLoaded, setIsPersistenceLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Create init manager instance
+  const initManagerRef = useRef<VibeGridHydrationManager | null>(null);
+  if (!initManagerRef.current) {
+    initManagerRef.current = createHydrationManager(tableId, entityType);
+  }
+  const initManager = initManagerRef.current;
+
+  // Create visual state instance (isolated per VibeGrid)
+  const visualStateRef = useRef<ReturnType<typeof createVibeGridVisualState> | null>(null);
+  if (!visualStateRef.current) {
+    visualStateRef.current = createVibeGridVisualState();
+  }
+  const visualState = visualStateRef.current;
+
+  // Use init manager hook for loading state
+  const { isLoading, isReady, hasErrors, retry } = useVibeGridLoadingState(initManager);
 
   // ====================================
   // INITIALIZATION
@@ -112,6 +127,11 @@ export function VibeGrid<T extends Record<string, any> = any>(
         entityType,
         columnCount: columns.length
       });
+
+      // Mark CSS and basic dependencies as ready immediately
+      initManager.markReady('cssStylesLoaded');
+      initManager.markReady('entityDataLoaded');
+      initManager.markReady('entityObservableReady');
 
       // Create the three-layer observables directly
       const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns);
@@ -143,19 +163,29 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       fileLog.debug('✅ Created pure observables', { entityType });
 
-      // Initialize centralized visual state
+      // Mark data state dependencies as ready
+      initManager.markReady('dataStateReady');
+      initManager.markReady('interactionStateReady');
+
+      // Mark persistence as loaded (Legend State handles this automatically)
+      initManager.markReady('dataPersistenceLoaded');
+      initManager.markReady('visualPersistenceLoaded');
+
+      // Initialize isolated visual state for this VibeGrid instance
       const orgId = universeOrgId$.get();
       const userId = universeUserId$.get();
       if (orgId && userId) {
-        visualOperations.initializeColumns(columns, entityType, orgId, userId);
-        fileLog.info('🎯 Visual state initialized, waiting for persistence', { entityType, orgId, userId });
+        visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
+        fileLog.info('🎯 Visual state initialized (isolated), waiting for persistence', { entityType, orgId, userId });
+        initManager.markReady('visualStateReady');
       } else {
         fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
+        initManager.markError('visualStateReady', 'Missing orgId or userId', true);
       }
 
       // Wait for container ref to be available for renderer initialization
       let retryCount = 0;
-      const maxRetries = 50; // Max 2.5 seconds (50ms * 50)
+      const maxRetries = 100; // Max 5 seconds (50ms * 100)
 
       const checkReadyToInitializeRenderer = () => {
         // First check if container ref is available
@@ -167,10 +197,29 @@ export function VibeGrid<T extends Record<string, any> = any>(
             return;
           } else {
             fileLog.error('❌ Container ref is null after max retries, giving up');
-            setError('Container element not available for VibeGrid initialization');
+            initManager.markError('containerReady', 'Container element not available for VibeGrid initialization', true);
             return;
           }
         }
+
+        // Additional check: ensure container is actually attached to DOM and has dimensions
+        const containerElement = containerRef.current;
+        const rect = containerElement.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            fileLog.debug(`🔄 Container has no dimensions (${rect.width}x${rect.height}), retrying in 50ms (attempt ${retryCount}/${maxRetries})`);
+            setTimeout(checkReadyToInitializeRenderer, 50);
+            return;
+          } else {
+            fileLog.error('❌ Container has no dimensions after max retries');
+            initManager.markError('containerReady', 'Container element has no dimensions', true);
+            return;
+          }
+        }
+
+        // Mark container as ready
+        initManager.markReady('containerReady');
 
         // Initialize renderer directly (persistence is automatic with Legend State)
         fileLog.info('✅ Container ready, initializing renderer', { entityType });
@@ -188,8 +237,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         });
 
         rendererRef.current = renderer;
-        setIsInitialized(true);
-        setError(null);
+        initManager.markReady('rendererInitialized');
 
         fileLog.info('✅ SimplePassiveRenderer initialized successfully');
 
@@ -233,17 +281,25 @@ export function VibeGrid<T extends Record<string, any> = any>(
         (renderer as any).resizeObserver = resizeObserver;
 
         // Initial viewport update
-        const rect = containerRef.current.getBoundingClientRect();
-        observables.tableViewport$.updateViewport(rect.width, rect.height);
+        const initialRect = containerRef.current.getBoundingClientRect();
+        observables.tableViewport$.updateViewport(initialRect.width, initialRect.height);
+
+        // Mark all remaining dependencies as ready
+        initManager.markReady('eventHandlersReady');
+        initManager.markReady('viewportReady');
+        initManager.markReady('overlaySystemReady');
+        initManager.markReady('positionTrackingReady');
+        initManager.markReady('mouseControllerReady');
+        initManager.markReady('scrollControllerReady');
       };
 
-      // Start checking for container readiness
-      checkReadyToInitializeRenderer();
+      // Start checking for container readiness after a small delay to allow React to render
+      setTimeout(checkReadyToInitializeRenderer, 100);
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       fileLog.error('❌ Failed to initialize VibeGrid', err);
-      setError(errorMsg);
+      initManager.markError('rendererInitialized', errorMsg, true);
     }
     };
 
@@ -271,32 +327,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
       }
 
       observablesRef.current = null;
-      setIsInitialized(false);
+      initManager.cleanup();
     };
-  }, [tableId, entityType]); // Only re-initialize if table identity changes
-
-  // Monitor persistence loading status
-  useEffect(() => {
-    if (!visualSyncStatus$?.isPersistenceDataLoaded) {
-      // No persistence system, proceed immediately
-      setIsPersistenceLoaded(true);
-      return;
-    }
-
-    const unsubscribe = visualSyncStatus$.isPersistenceDataLoaded.onChange((loaded) => {
-      if (loaded) {
-        fileLog.info('🎯 Persistence loaded, ready to render');
-        setIsPersistenceLoaded(true);
-      }
-    });
-
-    // Check if already loaded
-    if (visualSyncStatus$.isPersistenceDataLoaded.get()) {
-      setIsPersistenceLoaded(true);
-    }
-
-    return unsubscribe;
-  }, []);
+  }, [tableId, entityType, initManager]); // Only re-initialize if table identity changes
 
 
   // ====================================
@@ -304,7 +337,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // ====================================
 
   const api = useMemo(() => {
-    if (!observablesRef.current || !isInitialized) return null;
+    if (!observablesRef.current || !isReady) return null;
 
     const { tableCore$, tableInteraction$, tableViewport$ } = observablesRef.current;
 
@@ -356,7 +389,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         }
       },
     };
-  }, [isInitialized]);
+  }, [isReady]);
 
   // ====================================
   // RENDER
@@ -368,18 +401,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p>Loading table structure...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Wait for persistence to load before rendering the grid
-  if (!isPersistenceLoaded) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading user preferences...</p>
         </div>
       </div>
     );
@@ -399,21 +420,28 @@ export function VibeGrid<T extends Record<string, any> = any>(
         flexDirection: 'column'
       }}
     >
-      {/* Status indicator */}
-      {error && (
-        <div className="p-2 mb-2 bg-red-100 text-red-700 rounded text-sm">
-          Error: {error}
-        </div>
-      )}
-      
-      {isInitialized && !error && (
-        <div className="p-2 mb-2 bg-green-100 text-green-700 rounded text-sm">
-          ✅ Pure Observable VibeGrid initialized with automatic persistence ({entityType})
+      {/* Show loading overlay while initializing */}
+      {isLoading && (
+        <div className="absolute inset-0 z-10">
+          <VibeGridLoadingOverlay
+            initManager={initManager}
+            height={height}
+            width={width}
+            showDetailedProgress={false}
+          />
         </div>
       )}
 
+      {/* Status indicator */}
+      {!isLoading && hasErrors && (
+        <div className="p-2 mb-2 bg-red-100 text-red-700 rounded text-sm">
+          Initialization issues detected. <button onClick={retry} className="underline">Retry</button>
+        </div>
+      )}
+
+
       {/* Header with menu components */}
-      {isInitialized && !error && observablesRef.current && (
+      {isReady && !hasErrors && observablesRef.current && (
         <VibeGridXHeaderPure
           tableCore$={observablesRef.current.tableCore$}
           tableInteraction$={observablesRef.current.tableInteraction$}
@@ -421,14 +449,15 @@ export function VibeGrid<T extends Record<string, any> = any>(
         />
       )}
 
-      {/* Main table container */}
+      {/* Main table container - Always render for initialization */}
       <div className="flex-1" style={{ minHeight: 0 }}>
         <div
           ref={containerRef}
           className="vibegrid-pure-renderer h-full w-full"
           data-testid={`vibegrid-pure-renderer-${tableId}`}
-          style={{ 
-            width: '100%', 
+          data-vibegrid-container="true"
+          style={{
+            width: '100%',
             height: '100%',
             position: 'relative'
           }}
@@ -436,12 +465,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
       </div>
 
       {/* Debug info in development */}
-      {process.env.NODE_ENV === 'development' && isInitialized && (
+      {process.env.NODE_ENV === 'development' && isReady && (
         <div className="p-2 border-t bg-muted/50 text-xs space-y-1">
           <p><strong>Architecture:</strong> Pure Observables (Legend State)</p>
-          <p><strong>Renderer:</strong> PassiveTableRenderer with granular observers</p>
+          <p><strong>Renderer:</strong> SimplePassiveRenderer with init state management</p>
+          <p><strong>Init Manager:</strong> ✅ All dependencies initialized</p>
           <p><strong>Event Binding:</strong> Direct DOM → Observable methods</p>
-          <p><strong>XState:</strong> ❌ Removed (no state machines)</p>
         </div>
       )}
     </div>

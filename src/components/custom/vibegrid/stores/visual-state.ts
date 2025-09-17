@@ -88,11 +88,37 @@ export interface VisualState {
 }
 
 // ====================================
+// VISUAL STATE FACTORY - Creates isolated instance
+// ====================================
+
+/**
+ * Create a complete visual state system for a VibeGrid instance
+ * This replaces the singleton pattern with per-instance isolation
+ */
+export function createVibeGridVisualState() {
+  const visualInputs$ = createVisualInputs$();
+  const visualState$ = createVisualState$(visualInputs$);
+  const visibleColumns$ = createVisibleColumns$(visualInputs$);
+  const totalColumnsWidth$ = createTotalColumnsWidth$(visualInputs$, visibleColumns$);
+  const visualOperations = createVisualOperations(visualInputs$);
+
+  return {
+    visualInputs$,
+    visualState$,
+    visibleColumns$,
+    totalColumnsWidth$,
+    visualOperations,
+    visualSyncStatus$: null as any // Will be set during initialization
+  };
+}
+
+// ====================================
 // CORE OBSERVABLES (Input)
 // ====================================
 
-// Base input observables - these are the ONLY things that can be mutated
-export const visualInputs$ = observable({
+// Visual inputs factory function - creates isolated instance for each VibeGrid
+export function createVisualInputs$() {
+  return observable({
   // Column configuration
   columns: [] as Column[],
   columnWidths: {} as Record<string, number>,
@@ -120,20 +146,24 @@ export const visualInputs$ = observable({
   orgId: '',
   userId: '',
 
+  // Initialization flag to prevent saves during init
+  isInitializing: false,
+
   // Processed data rows (input for visual rows)
   processedRows: [] as any[]
-});
+  });
+}
 
 // ====================================
 // COMPUTED VISUAL STATE (Output)
 // ====================================
 
 /**
- * The SINGLE SOURCE OF TRUTH for all visual state
- * Everything reads from this computed observable
+ * Create visual state computed observable for a specific VibeGrid instance
  */
-export const visualState$ = computed((): VisualState => {
-  const inputs = visualInputs$.get();
+export function createVisualState$(visualInputs$: any) {
+  return computed((): VisualState => {
+    const inputs = visualInputs$.get();
 
   // Calculate column layouts with cumulative positioning
   let cumulativeX = 70; // Start after drag column (30px) + row header (40px)
@@ -226,7 +256,8 @@ export const visualState$ = computed((): VisualState => {
       userId: inputs.userId
     }
   };
-});
+  });
+}
 
 // ====================================
 // VISUAL ROWS COMPUTATION (merged from visual-rows-state)
@@ -328,7 +359,8 @@ export const visualRowsOperations = {
  */
 export function createVisualRows$(
   processedRows$: { get: () => any[] },
-  columns$: { get: () => any[] }
+  columns$: { get: () => any[] },
+  visualInputs$: any
 ) {
   return computed(() => {
     const processedRows = processedRows$.get();
@@ -354,12 +386,16 @@ export let visualSyncStatus$: any = null;
 // VISUAL STATE OPERATIONS
 // ====================================
 
-export const visualOperations = {
+/**
+ * Create visual operations for a specific VibeGrid instance
+ */
+export function createVisualOperations(visualInputs$: any) {
+  return {
 
-  /**
-   * Initialize visual state with columns and context
-   */
-  initialize(columns: Column[], entityType: string, orgId: string, userId: string) {
+    /**
+     * Initialize visual state with columns and context
+     */
+    initialize(columns: Column[], entityType: string, orgId: string, userId: string) {
     const defaultWidths = Object.fromEntries(
       columns.map(col => [col.id, col.width || 150])
     );
@@ -718,12 +754,19 @@ export const visualOperations = {
             return merged;
           },
           save: (value: any) => {
+            // Skip saving during initialization - don't persist the isInitializing flag
+            if (value.isInitializing) {
+              fileLog.debug('⏸️ Skipping save during initialization', { persistKey });
+              // Return false to prevent save according to Legend State docs
+              return false;
+            }
+
             // Ensure sortBy is valid before saving
             const validSortBy = Array.isArray(value.sortBy) ? value.sortBy.filter(item =>
               item && typeof item === 'object' && item.field && item.direction
             ) : [];
 
-            // Only persist configuration state, not transient data
+            // Only persist configuration state, not transient data (exclude isInitializing)
             const persistedState = {
               columnWidths: value.columnWidths || {},
               columnVisibility: value.columnVisibility || {},
@@ -751,8 +794,11 @@ export const visualOperations = {
       }
     });
 
+    // Set initialization flag to prevent saves during init
+    visualInputs$.isInitializing.set(true);
+
     // Initialize with default state (persistence will override if available)
-    visualInputs$.set({ ...visualInputs$.get(), ...defaultState });
+    visualInputs$.set({ ...visualInputs$.get(), ...defaultState, isInitializing: true });
 
     // Add persistence debugging as recommended by Legend State docs
     const syncStatus$ = syncState(visualInputs$);
@@ -770,6 +816,9 @@ export const visualOperations = {
     when(syncStatus$.isPersistLoaded).then(() => {
       // Give the load transform a chance to complete
       setTimeout(() => {
+        // Clear initialization flag to allow normal saves
+        visualInputs$.isInitializing.set(false);
+
         persistenceComplete$.set(true);
         fileLog.info('🎯 Columns observable persistence loaded', {
           entityType,
@@ -966,35 +1015,40 @@ export const visualOperations = {
     visualInputs$.columnVisibility.set(allHidden);
     fileLog.info('🫥 All columns hidden (except system)', { columnCount: columns.length });
   }
-};
+  };
+}
 
 // ====================================
 // COMPUTED VALUES FROM COLUMNS (merged from columns-observable)
 // ====================================
 
 /**
- * Get all visible columns in display order
+ * Create visible columns computed observable for a specific VibeGrid instance
  */
-export const visibleColumns$ = computed(() => {
-  const { columns, columnVisibility, columnOrder } = visualInputs$.get();
+export function createVisibleColumns$(visualInputs$: any) {
+  return computed(() => {
+    const { columns, columnVisibility, columnOrder } = visualInputs$.get();
 
-  return columnOrder
-    .map(id => columns.find(col => col.id === id))
-    .filter((col): col is Column => col !== undefined && columnVisibility[col.id] !== false);
-});
+    return columnOrder
+      .map(id => columns.find(col => col.id === id))
+      .filter((col): col is Column => col !== undefined && columnVisibility[col.id] !== false);
+  });
+}
 
 /**
- * Get total width of all visible columns (separate from visualState$ for performance)
+ * Create total columns width computed observable for a specific VibeGrid instance
  */
-export const totalColumnsWidth$ = computed(() => {
-  const visibleCols = visibleColumns$.get();
-  const columnWidths = visualInputs$.columnWidths.get();
+export function createTotalColumnsWidth$(visualInputs$: any, visibleColumns$: any) {
+  return computed(() => {
+    const visibleCols = visibleColumns$.get();
+    const columnWidths = visualInputs$.columnWidths.get();
 
-  return visibleCols.reduce((total, col) => {
-    const width = columnWidths[col.id] || col.width || 150;
-    return total + width;
-  }, 0);
-});
+    return visibleCols.reduce((total, col) => {
+      const width = columnWidths[col.id] || col.width || 150;
+      return total + width;
+    }, 0);
+  });
+}
 
 // ====================================
 // UTILITY FUNCTIONS (merged from columns-observable)

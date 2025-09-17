@@ -89,13 +89,27 @@ export class CanvasOverlayDOM {
     // CRITICAL FIX: The overlay container must be as wide as the scrollable content,
     // not just the viewport. Otherwise, overlays for cells outside the initial viewport
     // will be clipped. We need to match the full scrollable width of the table.
-    const scrollWidth = this.container.scrollWidth || 3000; // Use actual scroll width or fallback
+    //
+    // PERFORMANCE FIX: Defer scrollWidth calculation to avoid forced reflow during init
+    let scrollWidth = 3000; // Conservative fallback
+
+    // Use requestAnimationFrame to defer layout-dependent calculations
+    requestAnimationFrame(() => {
+      const actualScrollWidth = this.container?.scrollWidth;
+      if (actualScrollWidth && actualScrollWidth > scrollWidth && this.overlayContainer) {
+        this.overlayContainer.style.width = `${actualScrollWidth}px`;
+        fileLog.debug('📐 Updated overlay container width after layout', {
+          actualScrollWidth,
+          initialWidth: scrollWidth
+        });
+      }
+    });
 
     Object.assign(this.overlayContainer.style, {
       position: 'absolute',
       top: '0',
       left: '0',
-      width: `${scrollWidth}px`, // Full scrollable width, not viewport width
+      width: `${scrollWidth}px`, // Initial width, will be updated after layout
       bottom: '0',
       pointerEvents: 'none',
       zIndex: '1000',
@@ -135,13 +149,26 @@ export class CanvasOverlayDOM {
       });
 
       // CRITICAL: Selection container must also match full scrollable width
-      const scrollWidth = this.container?.scrollWidth || 3000;
+      // PERFORMANCE FIX: Use fallback initially, update after layout
+      let scrollWidth = 3000;
 
       selectionContainer.style.position = 'absolute';
       selectionContainer.style.top = '0';
       selectionContainer.style.left = '0';
-      selectionContainer.style.width = `${scrollWidth}px`; // Match full table width
+      selectionContainer.style.width = `${scrollWidth}px`; // Initial width
       selectionContainer.style.height = '100%';
+
+      // Update width after layout to avoid forced reflow during init
+      requestAnimationFrame(() => {
+        const actualScrollWidth = this.container?.scrollWidth;
+        if (actualScrollWidth && actualScrollWidth > scrollWidth) {
+          selectionContainer.style.width = `${actualScrollWidth}px`;
+          fileLog.debug('📐 Updated selection container width after layout', {
+            actualScrollWidth,
+            initialWidth: scrollWidth
+          });
+        }
+      });
 
       fileLog.info('✅ DIAGNOSTIC: Overlay container positioned to fill parent with scroll alignment');
 
