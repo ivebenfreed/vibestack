@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from '@tanstack/react-router'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import {
@@ -98,34 +98,16 @@ export const CommandMenu = observer(function CommandMenu() {
   const universeLoading = use$(universeLoading$)
 
   // Create global entity groups across ALL organizations (not filtered by current org)
-  const globalEntityGroups$ = useMemo(() => {
-    console.log('[CommandMenu] Creating GLOBAL entity groups across universe')
-    return createEntityGroups() // No orgId filter = show all entities from all orgs
-  }, [])
-
+  const globalEntityGroups$ = createEntityGroups() // No orgId filter = show all entities from all orgs
   const entityNavGroups = use$(globalEntityGroups$)
 
-  // Debug logging for entity groups
-  useEffect(() => {
-    console.log('[CommandMenu] Entity nav groups changed:', {
-      entityNavGroups,
-      groupCount: entityNavGroups?.length || 0,
-      currentOrgId,
-      hasOrgEntityGroups: !!globalEntityGroups$
-    })
-  }, [entityNavGroups, currentOrgId, globalEntityGroups$])
 
   // Generate dynamic navigation items based on universe context
-  const navigationItems = useMemo(() => {
+  const navigationItems = use$(() => {
     const items = [...getBaseNavigationItems(isAdmin, isSuperAdmin, currentOrgId)]
 
     // Add GLOBAL entity-based navigation items from ALL organizations
     if (entityNavGroups) {
-      console.log('[CommandMenu] Generating GLOBAL entity navigation items:', {
-        groupCount: entityNavGroups.length,
-        universeLoading
-      })
-
       // Add entity navigation items from ALL organizations
       entityNavGroups.forEach(group => {
         group.items?.forEach(item => {
@@ -136,14 +118,6 @@ export const CommandMenu = observer(function CommandMenu() {
             ? (userOrganizations || []).find(org => org.id === itemOrgId)
             : null
 
-          console.log('[CommandMenu] Adding GLOBAL entity navigation item:', {
-            title: item.title,
-            url: item.url,
-            icon: item.icon,
-            orgId: itemOrgId,
-            orgName: itemOrg?.name
-          })
-
           items.push({
             id: `entity-${itemOrgId}-${item.title}`,
             label: item.title,
@@ -153,17 +127,10 @@ export const CommandMenu = observer(function CommandMenu() {
           })
         })
       })
-    } else {
-      console.log('[CommandMenu] GLOBAL entity navigation not available:', {
-        hasEntityGroups: !!entityNavGroups,
-        groupCount: entityNavGroups?.length || 0,
-        universeLoading
-      })
     }
 
-    console.log('[CommandMenu] Total navigation items generated:', items.length)
     return items
-  }, [entityNavGroups, universeLoading, currentOrgId, isAdmin, isSuperAdmin, location.pathname, userOrganizations])
+  })
 
   const runCommand = (command: () => unknown) => {
     setOpen(false)

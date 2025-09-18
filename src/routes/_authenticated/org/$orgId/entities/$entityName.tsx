@@ -62,17 +62,11 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   // Call this unconditionally even if we don't have schema yet
   // Normalize entity name and check if entityName is already prefixed with orgId to avoid double-prefixing
   const actualEntityKey = React.useMemo(() => {
-    console.log('🔍 [actualEntityKey] Input:', { entityName, orgId })
     
     // Use centralized entity name utilities
     const normalizedEntityName = EntityNameUtils.fromUrlFormat(entityName)
     const result = EntityNameUtils.ensureOrgPrefix(normalizedEntityName, orgId)
     
-    console.log('🔍 [actualEntityKey] Normalized:', { 
-      input: entityName, 
-      normalized: normalizedEntityName, 
-      result 
-    })
     
     return result
   }, [entityName, orgId])
@@ -86,32 +80,9 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     
     // Use centralized entity name utilities for consistent normalization
     const normalizedEntityName = EntityNameUtils.fromUrlFormat(entityName)
-    console.log('🔍 [EntitySchema] Schema lookup debug:', {
-      entityName,
-      normalizedEntityName,
-      schemaExists: !!schema,
-      schemaEntities: schema?.entities ? Object.keys(schema.entities) : null,
-      foundSchema: !!schema.entities?.[normalizedEntityName],
-      actualSchema: schema.entities?.[normalizedEntityName]
-    })
     
     // More detailed debugging before final result
     const entityKeys = schema?.entities ? Object.keys(schema?.entities) : []
-    console.log('🔍 [EntitySchema] Detailed lookup:', {
-      schema: schema,
-      schemaExists: !!schema,
-      entities: schema?.entities,
-      entitiesExists: !!schema?.entities,
-      normalizedEntityName: normalizedEntityName,
-      directLookup: schema?.entities?.[normalizedEntityName],
-      allEntityKeys: entityKeys,
-      keyExists: schema?.entities ? Object.prototype.hasOwnProperty.call(schema.entities, normalizedEntityName) : false,
-      // Check if any keys contain our entity name
-      keysContainingEntity: entityKeys.filter(key => key.toLowerCase().includes(normalizedEntityName.toLowerCase()) || key.includes(normalizedEntityName)),
-      // Check for full entity keys (org-prefixed)
-      fullEntityKeyPattern: `${orgId}_${normalizedEntityName}`,
-      hasFullEntityKey: entityKeys.includes(`${orgId}_${normalizedEntityName}`)
-    })
     
     // Try multiple lookup strategies
     let result = null
@@ -138,19 +109,6 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
       }
     }
     
-    console.log('🔍 [EntitySchema] Lookup strategies result:', {
-      normalizedEntityName,
-      fullEntityKey: `${orgId}_${normalizedEntityName}`,
-      strategy1: !!schema?.entities?.[normalizedEntityName],
-      strategy2: !!schema?.entities?.[`${orgId}_${normalizedEntityName}`],
-      foundViaStrategy3: result ? 'found' : 'not found',
-      finalResult: !!result
-    })
-    console.log('🔍 [EntitySchema] Return result:', {
-      result,
-      hasResult: !!result,
-      resultType: typeof result
-    })
     
     return result
   }, [schema, entityName])
@@ -192,13 +150,6 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
   
-  // Debug entitySchema value
-  console.log('🔍 [EntitySchema] Final entity schema check:', {
-    entityName,
-    entitySchema: entitySchema,
-    hasEntitySchema: !!entitySchema,
-    schemaType: typeof entitySchema
-  })
   
   if (!entitySchema) {
     return (

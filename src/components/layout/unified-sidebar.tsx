@@ -11,9 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { observer } from '@legendapp/state/react'
+import { observer, use$ } from '@legendapp/state/react'
 import { createEntityGroups, getEntity$ } from '@/legend-state'
-import { use$ } from '@legendapp/state/react'
 import {
   Home,
   Settings,
@@ -514,16 +513,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
             const projectId = `${projectEntity.organizationId}-${projectEntity.originalEntityName || projectEntity.title}`
             const isExpanded = expandedProjects.has(projectId)
 
-            // Debug logging for entity name construction
-            console.log('[Sidebar] Project entity debug:', {
-              projectEntityTitle: projectEntity.title,
-              originalEntityName: projectEntity.originalEntityName,
-              fullEntityName: projectEntity.fullEntityName,
-              constructedFullEntityName: fullEntityName,
-              url: projectEntity.url,
-              organizationId: projectEntity.organizationId,
-              projectId
-            })
+            // Debug logging removed to prevent unnecessary console spam during navigation
 
             return (
               <ProjectEntitySection
@@ -600,39 +590,21 @@ const ProjectEntitySection = observer(({
   onToggle,
   location
 }: ProjectEntitySectionProps) => {
-  // Use the same pattern as dashboard - getEntity$ + use$
+  // Use Legend State's selective observation pattern
   const entityStore = getEntity$(fullEntityName)
-  const rawEntityData = use$(entityStore)
+
+  // Use shallow tracking to only react to structure changes, not individual record changes
+  const shallowData = entityStore ? entityStore.get(true) : undefined
+  const count = shallowData ? Object.keys(shallowData).length : 0
+  const loading = !entityStore
+
   const IconComponent = getIconComponent(projectEntity.icon)
 
-  // Process data to array format (same as dashboard pattern)
+  // Process data to array format - will only update when shallow structure changes
   const records = React.useMemo(() => {
-    if (!rawEntityData || typeof rawEntityData !== 'object') return []
-
-    // getEntity$ returns an object with IDs as keys, not an array
-    return Object.values(rawEntityData)
-  }, [rawEntityData])
-
-  const loading = rawEntityData === undefined
-  const count = rawEntityData && typeof rawEntityData === 'object' ? Object.keys(rawEntityData).length : 0
-
-  console.log('[ProjectEntitySection] Dashboard pattern - entity access:', {
-    fullEntityName,
-    projectEntityTitle: projectEntity.title,
-    projectEntityOriginalName: projectEntity.originalEntityName,
-    hasEntityStore: !!entityStore,
-    hasRawData: !!rawEntityData,
-    rawDataType: typeof rawEntityData,
-    count,
-    recordsLength: records?.length || 0,
-    loading,
-    firstRecords: records?.slice(0, 2), // Show first 2 records for debugging
-    comparison: {
-      'dashboard would use': projectEntity.fullEntityName,
-      'sidebar now uses': fullEntityName,
-      'matches': projectEntity.fullEntityName === fullEntityName
-    }
-  })
+    if (!shallowData || typeof shallowData !== 'object') return []
+    return Object.values(shallowData)
+  }, [shallowData]) // Depends on shallow data structure, not deep changes
 
   if (loading) {
     return (

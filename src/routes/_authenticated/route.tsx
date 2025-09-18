@@ -6,7 +6,6 @@ import { SearchProvider } from '@/context/search-context'
 import { PostAuthOrganizationSetup } from '@/features/auth/components/PostAuthOrganizationSetup'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { TrialExpiredGuard } from '@/components/guards/TrialExpiredGuard'
-import { useAuth } from '@/state-machines'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
@@ -23,7 +22,7 @@ export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
   beforeLoad: async ({ location }) => {
     // AUTH MACHINE REMOVED - Use Legend State auth directly
-    myLog.info('Checking Legend State authentication for route access')
+    myLog.info('Auth check triggered', { path: location.pathname })
     
     // Check Legend State auth - wait for loading to complete
     const legendStateLoading = auth$.loading.get()
@@ -32,7 +31,6 @@ export const Route = createFileRoute('/_authenticated')({
     
     // If Legend State is still loading, wait for it to complete
     if (legendStateLoading && !legendStateUser) {
-      myLog.info('Legend State auth still loading, waiting for completion...')
       
       await new Promise<void>((resolve) => {
         let resolved = false
@@ -65,14 +63,8 @@ export const Route = createFileRoute('/_authenticated')({
     const finalLegendStateUser = auth$.user.get()
     const finalIsLegendStateAuthenticated = !!finalLegendStateUser
     
-    myLog.info('Legend State auth check:', {
-      legendStateAuth: finalIsLegendStateAuthenticated,
-      legendStateUser: finalLegendStateUser?.email,
-      path: window.location.pathname
-    })
     
     if (!finalIsLegendStateAuthenticated) {
-      myLog.info('Redirecting to sign-in from:', window.location.pathname)
       throw redirect({
         to: '/sign-in',
         search: { redirect: location.pathname },
@@ -81,7 +73,6 @@ export const Route = createFileRoute('/_authenticated')({
     }
     
     // Components will handle their own loading states using UnifiedLoadingScreen
-    myLog.info('Route loading - components will handle Legend State initialization')
   },
   component: RouteComponent,
 })
@@ -95,40 +86,21 @@ function RouteComponent() {
 }
 
 const AuthenticatedContent = observer(function AuthenticatedContent() {
-  myLog.info('AuthenticatedContent Rendering at', Date.now());
   
   // Use unified auth system that combines XState and Legend State
   const unifiedAuth = useUnifiedAuth();
   
-  // Fallback to XState auth machine if available
-  const xstateAuth = useAuth();
   
-  // Determine auth state - prefer unified auth, fallback to XState
+  // Use unified auth state directly
   const authState = {
-    isCheckingAuth: unifiedAuth.loading || xstateAuth?.isCheckingAuth || false,
-    needsOrganizationSelection: unifiedAuth.needsOrganizationSelection || xstateAuth?.needsOrganizationSelection || false,
-    isLoadingOrganizations: unifiedAuth.isLoadingOrganizations || xstateAuth?.isLoadingOrganizations || false,
+    isCheckingAuth: unifiedAuth.loading,
+    needsOrganizationSelection: unifiedAuth.needsOrganizationSelection,
+    isLoadingOrganizations: unifiedAuth.isLoadingOrganizations,
     isAuthenticatedAndReady: unifiedAuth.isAuthenticatedAndReady,
-    organizationSetupComplete: unifiedAuth.organizationSetupComplete || xstateAuth?.organizationSetupComplete || true,
-    user: unifiedAuth.user || xstateAuth?.user
+    organizationSetupComplete: unifiedAuth.organizationSetupComplete,
+    user: unifiedAuth.user
   };
   
-  myLog.info('AuthenticatedContent Auth states:', {
-    unifiedAuthState: {
-      isAuthenticated: unifiedAuth.isAuthenticated,
-      isSystemReady: unifiedAuth.isSystemReady,
-      isLoading: unifiedAuth.isLoading,
-      hasUser: !!unifiedAuth.user,
-      userEmail: unifiedAuth.user?.email
-    },
-    xstateAuthState: {
-      available: !!xstateAuth,
-      isCheckingAuth: xstateAuth?.isCheckingAuth,
-      isAuthenticatedAndReady: xstateAuth?.isAuthenticatedAndReady,
-      hasUser: !!xstateAuth?.user
-    },
-    finalAuthState: authState
-  });
   
   const currentOrgId = authState.user?.currentOrganizationId;
   

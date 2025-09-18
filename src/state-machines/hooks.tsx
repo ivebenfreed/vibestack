@@ -12,7 +12,6 @@ const myLog = log('state-machines/hooks.tsx');
 export function useAuth() {
   const navigate = useNavigate();
   
-  myLog.info('[useAuth] 📝 Auth machine removed - use useUnifiedAuth instead');
   
   // Return stub implementation - auth machine no longer exists
   // Components should migrate to useUnifiedAuth for actual auth functionality
