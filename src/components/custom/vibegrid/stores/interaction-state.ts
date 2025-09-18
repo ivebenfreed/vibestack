@@ -423,13 +423,62 @@ export function createTableInteraction$(tableCore$?: any) {
       const { rows, columns, columnVisibility } = dataContext;
       const visibleColumns = columns.filter((col: any) => columnVisibility[col.id] !== false);
 
+      fileLog.debug('🎯 Range selection debug', {
+        startCellId,
+        endCellId,
+        startRowId,
+        startColId,
+        endRowId,
+        endColId,
+        rowsCount: rows.length,
+        columnsCount: columns.length,
+        visibleColumnsCount: visibleColumns.length,
+        firstRowId: rows[0]?.id,
+        firstColumnId: visibleColumns[0]?.id
+      });
+
       // Get row and column indices
       const startRowIndex = rows.findIndex((row: any) => row.id === startRowId);
       const endRowIndex = rows.findIndex((row: any) => row.id === endRowId);
       const startColIndex = visibleColumns.findIndex((col: any) => col.id === startColId);
       const endColIndex = visibleColumns.findIndex((col: any) => col.id === endColId);
 
+      fileLog.debug('🎯 Index lookup results', {
+        startRowIndex,
+        endRowIndex,
+        startColIndex,
+        endColIndex
+      });
+
       if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
+        fileLog.warn('⚠️ Range selection failed - could not find indices', {
+          startRowIndex,
+          endRowIndex,
+          startColIndex,
+          endColIndex,
+          startRowId,
+          endRowId,
+          startColId,
+          endColId,
+          rowIds: rows.slice(0, 3).map(r => r.id),
+          columnIds: visibleColumns.slice(0, 3).map(c => c.id)
+        });
+
+        // Fall back to simple selection of just the two end cells
+        const cellsToSelect = new Set<string>();
+        cellsToSelect.add(startCellId);
+        cellsToSelect.add(endCellId);
+
+        batch(() => {
+          tableInteraction$.selectedCells.set(cellsToSelect);
+          tableInteraction$.anchorCell.set(startCellId);
+        });
+
+        fileLog.info('🎯 Fallback range selection (index lookup failed)', {
+          count: cellsToSelect.size,
+          from: startCellId,
+          to: endCellId
+        });
         return;
       }
 
@@ -457,7 +506,9 @@ export function createTableInteraction$(tableCore$?: any) {
       fileLog.info('🎯 Full range selection with data context', {
         start: startCellId,
         end: endCellId,
-        totalCells: newSelection.size
+        totalCells: newSelection.size,
+        rowRange: `${minRowIndex}-${maxRowIndex}`,
+        colRange: `${minColIndex}-${maxColIndex}`
       });
     },
 

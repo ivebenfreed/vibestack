@@ -290,19 +290,39 @@ export class MouseController {
 
           // Get data context from visual state for proper range selection
           try {
+            // Try different data sources in order of preference
+            const rows = this.visualState.virtualizedData ||
+                        this.visualState.data ||
+                        this.visualState.processedRows$ ||
+                        [];
+            const columns = this.visualState.visualInputs$.columns.get() || [];
+            const columnVisibility = this.visualState.visualInputs$.columnVisibility.get() || {};
+
             const dataContext = {
-              rows: this.visualState.virtualizedData || this.visualState.data || [],
-              columns: this.visualState.visualInputs$.columns.get() || [],
-              columnVisibility: this.visualState.visualInputs$.columnVisibility.get() || {}
+              rows,
+              columns,
+              columnVisibility
             };
 
             fileLog.debug('🖱️ Drag selection data context', {
               rowsCount: dataContext.rows.length,
               columnsCount: dataContext.columns.length,
-              visibilityKeys: Object.keys(dataContext.columnVisibility).length
+              visibilityKeys: Object.keys(dataContext.columnVisibility).length,
+              firstRowId: dataContext.rows[0]?.id,
+              firstColumnId: dataContext.columns[0]?.id,
+              visibleColumns: dataContext.columns.filter(col => dataContext.columnVisibility[col.id] !== false).map(c => c.id).slice(0, 3)
             });
 
-            this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
+            // Only use data context if we have valid data
+            if (dataContext.rows.length > 0 && dataContext.columns.length > 0) {
+              this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
+            } else {
+              fileLog.warn('⚠️ Empty data context for drag selection, falling back to simple update', {
+                rowsCount: dataContext.rows.length,
+                columnsCount: dataContext.columns.length
+              });
+              this.tableInteraction$.updateDragSelection(currentCellId);
+            }
           } catch (error) {
             fileLog.warn('⚠️ Failed to get data context for drag selection, falling back to simple update', { error });
             this.tableInteraction$.updateDragSelection(currentCellId);
