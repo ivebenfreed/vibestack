@@ -19,8 +19,25 @@ import { log } from '@/logger';
 
 const fileLog = log('components/custom/vibegrid/stores/dom-position-state.ts');
 
+interface ViewportCache {
+  scrollLeft: number;
+  scrollTop: number;
+  clientWidth: number;
+  clientHeight: number;
+  containerRect: DOMRect | null;
+  lastViewportUpdate: number;
+}
+
+interface ColumnPositionCache {
+  columnPositions: Map<string, { offset: number; width: number }>;
+  totalWidth: number;
+  lastColumnUpdate: number;
+}
+
 interface DOMPositionState {
   cellPositions: CellPositionMap;
+  viewportCache: ViewportCache;
+  columnCache: ColumnPositionCache;
   lastUpdate: number;
   isTracking: boolean;
 }
@@ -28,6 +45,19 @@ interface DOMPositionState {
 // Central DOM position observable
 export const domPositions$ = observable<DOMPositionState>({
   cellPositions: new Map(),
+  viewportCache: {
+    scrollLeft: 0,
+    scrollTop: 0,
+    clientWidth: 0,
+    clientHeight: 0,
+    containerRect: null,
+    lastViewportUpdate: 0
+  },
+  columnCache: {
+    columnPositions: new Map(),
+    totalWidth: 0,
+    lastColumnUpdate: 0
+  },
   lastUpdate: 0,
   isTracking: false
 });
@@ -176,16 +206,55 @@ class ReactivePositionTracker {
     // PERFORMANCE FIX: Get viewport container once to avoid repeated queries
     const viewportContainer = container.querySelector('.vibegridx-viewport') as HTMLElement || container;
 
-    // CRITICAL PERFORMANCE FIX: Batch all layout reads together first, then writes
+    // VIEWPORT CACHE: Update viewport measurements once per batch
+    const currentViewportCache = domPositions$.viewportCache.get();
     let viewportRect: DOMRect | null = null;
     let scrollLeft = 0;
     let scrollTop = 0;
+    let clientWidth = 0;
+    let clientHeight = 0;
 
-    // Single batch of layout reads
-    if (viewportContainer) {
+    // Check if viewport measurements need updating (throttled to avoid excessive reads)
+    const viewportUpdateNeeded = !currentViewportCache.containerRect ||
+                                 (timestamp - currentViewportCache.lastViewportUpdate) > 50; // 20fps max for viewport updates
+
+    if (viewportContainer && viewportUpdateNeeded) {
+      // PERFORMANCE FIX: Single batch of layout reads for viewport
       viewportRect = viewportContainer.getBoundingClientRect();
       scrollLeft = viewportContainer.scrollLeft || 0;
       scrollTop = viewportContainer.scrollTop || 0;
+      clientWidth = viewportContainer.clientWidth || 0;
+      clientHeight = viewportContainer.clientHeight || 0;
+
+      // Cache the viewport measurements
+      domPositions$.viewportCache.set({
+        scrollLeft,
+        scrollTop,
+        clientWidth,
+        clientHeight,
+        containerRect: viewportRect,
+        lastViewportUpdate: timestamp
+      });
+
+      fileLog.debug('📊 VIEWPORT CACHE: Updated viewport measurements', {
+        scrollLeft, scrollTop, clientWidth, clientHeight,
+        viewportRect: { left: viewportRect.left, top: viewportRect.top, width: viewportRect.width, height: viewportRect.height }
+      });
+    } else {
+      // Use cached viewport measurements
+      const cached = currentViewportCache;
+      viewportRect = cached.containerRect;
+      scrollLeft = cached.scrollLeft;
+      scrollTop = cached.scrollTop;
+      clientWidth = cached.clientWidth;
+      clientHeight = cached.clientHeight;
+
+      if (viewportUpdateNeeded) {
+        fileLog.debug('📊 VIEWPORT CACHE: Using cached viewport measurements', {
+          scrollLeft, scrollTop, clientWidth, clientHeight,
+          cacheAge: timestamp - cached.lastViewportUpdate
+        });
+      }
     }
 
     // PERFORMANCE FIX: Process all cells with pre-calculated viewport data
@@ -411,5 +480,86 @@ export const PositionEvents = {
     return Array.from(positions.entries())
       .filter(([_, pos]) => pos.isVisible)
       .map(([key, _]) => key);
+  },
+
+  /**
+   * Get cached viewport measurements (avoids layout-forcing reads)
+   */
+  getViewportCache(): ViewportCache {
+    return domPositions$.viewportCache.get();
+  },
+
+  /**
+   * Get cached scroll position
+   */
+  getScrollPosition(): { scrollLeft: number; scrollTop: number } {
+    const cache = domPositions$.viewportCache.get();
+    return { scrollLeft: cache.scrollLeft, scrollTop: cache.scrollTop };
+  },
+
+  /**
+   * Get cached viewport dimensions
+   */
+  getViewportDimensions(): { clientWidth: number; clientHeight: number } {
+    const cache = domPositions$.viewportCache.get();
+    return { clientWidth: cache.clientWidth, clientHeight: cache.clientHeight };
+  },
+
+  /**
+   * Get cached container rect
+   */
+  getContainerRect(): DOMRect | null {
+    return domPositions$.viewportCache.get().containerRect;
+  },
+
+  /**
+   * Update column position cache from coordinate manager
+   */
+  updateColumnCache(columns: Array<{ columnId: string; offset: number; width: number }>): void {
+    const timestamp = Date.now();
+    const columnPositions = new Map();
+    let totalWidth = 0;
+
+    for (const column of columns) {
+      columnPositions.set(column.columnId, {
+        offset: column.offset,
+        width: column.width
+      });
+      totalWidth = Math.max(totalWidth, column.offset + column.width);
+    }
+
+    domPositions$.columnCache.set({
+      columnPositions,
+      totalWidth,
+      lastColumnUpdate: timestamp
+    });
+
+    fileLog.debug('📊 COLUMN CACHE: Updated column positions', {
+      columnCount: columns.length,
+      totalWidth,
+      columns: columns.map(c => ({ id: c.columnId, offset: c.offset, width: c.width }))
+    });
+  },
+
+  /**
+   * Get cached column position
+   */
+  getColumnPosition(columnId: string): { offset: number; width: number } | null {
+    const cache = domPositions$.columnCache.get();
+    return cache.columnPositions.get(columnId) || null;
+  },
+
+  /**
+   * Get cached total width
+   */
+  getTotalWidth(): number {
+    return domPositions$.columnCache.get().totalWidth;
+  },
+
+  /**
+   * Get all cached column positions
+   */
+  getAllColumnPositions(): Map<string, { offset: number; width: number }> {
+    return domPositions$.columnCache.get().columnPositions;
   }
 };

@@ -67,7 +67,6 @@ export class OverlayManager {
     this.getProcessedRows = options.getProcessedRows;
 
     this.initOverlays();
-    this.setupEditingObserver();
   }
   
   /**
@@ -125,98 +124,131 @@ export class OverlayManager {
   }
   
   /**
-   * Link to existing interactions observable instead of creating separate observer
-   * This directly uses the interaction state that's already being managed
+   * CONSOLIDATED: Single reactive observer for all overlay updates
+   * Replaces 3 separate observers to eliminate cascading reactive chain
    */
   private linkToInteractionsObservable(): void {
-    // Observe selection state changes and reactively update selection overlay
+    // State tracking for deduplication
+    let lastSelectionString = '';
+    let lastEditingCell: string | null = null;
+    let pendingUpdate: number | null = null;
+
+    // SINGLE OBSERVER: Watches all relevant state in one place
     observe(() => {
-      const selectedCells = this.tableInteraction$.selectedCells.get(true);
-      const focusedCell = this.tableInteraction$.focusedCell.get(true);
-      const hoveredCell = this.tableInteraction$.hoveredCell.get(true);
-
-      // IMPROVED DEDUPLICATION: Use string comparison for reliable equality check
-      const selectionString = Array.from(selectedCells).sort().join(',');
-
-      if (this.lastSelectionString === selectionString) {
-        fileLog.debug('🔍 REACTIVE: Selection unchanged, skipping update', {
-          selectedCells: Array.from(selectedCells)
-        });
+      // Safety check for observable availability
+      if (!this.tableInteraction$) {
         return;
       }
 
-      // Update cached selection string for deduplication
-      this.lastSelectionString = selectionString;
+      // READ ALL STATE: Read all state directly to trigger observer properly
+      let state;
+      try {
+        state = {
+          // Selection state - use get() to trigger observer properly
+          selectedCells: this.tableInteraction$.selectedCells.get(),
+          focusedCell: this.tableInteraction$.focusedCell.get(),
+          hoveredCell: this.tableInteraction$.hoveredCell.get(),
 
-      fileLog.debug('🔍 REACTIVE: Selection state changed', {
-        selectedCells: Array.from(selectedCells),
-        focusedCell,
-        hoveredCell
-      });
-
-      // BATCH: Use requestAnimationFrame for DOM updates to batch with browser paint
-      if (this.updateSelectionRAF !== null) {
-        cancelAnimationFrame(this.updateSelectionRAF);
+          // Editing state
+          editingCell: this.tableInteraction$.editingCell.get(),
+          editValue: this.tableInteraction$.editValue.get(),
+          isEditing: this.tableInteraction$.isEditing.get()
+        };
+      } catch (error) {
+        fileLog.debug('🔍 REACTIVE: Error reading state, likely during unmount', error);
+        return;
       }
 
-      this.updateSelectionRAF = requestAnimationFrame(() => {
-        this.updateSelectionRAF = null;
+      if (!state) {
+        return;
+      }
 
-        // Update selection overlay when selection changes
-        if (selectedCells.size > 0) {
-          this.performCanvasSelectionUpdate(selectedCells);
-        } else {
-          // Clear selection overlay when no cells selected
-          if (this.canvasOverlay) {
-            this.canvasOverlay.updateSelectionWithVisualPositions([]);
-            this.canvasOverlay.hideFillHandle();
+      fileLog.debug('🔍 REACTIVE: Observer triggered', {
+        selectedCount: state.selectedCells.size,
+        editingCell: state.editingCell,
+        isEditing: state.isEditing,
+        observerCallCount: Date.now()
+      });
+
+      // DEDUPLICATION: Skip if nothing meaningful changed
+      const selectionString = Array.from(state.selectedCells).sort().join(',');
+      const selectionChanged = lastSelectionString !== selectionString;
+      const editingChanged = lastEditingCell !== state.editingCell;
+
+      if (!selectionChanged && !editingChanged) {
+        fileLog.debug('🔍 REACTIVE: No meaningful changes, skipping update');
+        return;
+      }
+
+      // Update deduplication tracking
+      lastSelectionString = selectionString;
+      lastEditingCell = state.editingCell;
+
+      fileLog.debug('🔍 REACTIVE: Consolidated state changed', {
+        selectionChanged,
+        editingChanged,
+        selectedCount: state.selectedCells.size,
+        editingCell: state.editingCell,
+        isEditing: state.isEditing
+      });
+
+      // BATCH DOM UPDATES: Cancel any pending update and schedule new one
+      if (pendingUpdate !== null) {
+        cancelAnimationFrame(pendingUpdate);
+      }
+
+      pendingUpdate = requestAnimationFrame(() => {
+        pendingUpdate = null;
+
+        // BATCHED: All DOM updates happen together in a single frame
+        batch(() => {
+          // Handle selection updates
+          if (selectionChanged) {
+            if (state.selectedCells.size > 0) {
+              this.performCanvasSelectionUpdate(state.selectedCells);
+            } else {
+              // Clear selection overlay when no cells selected
+              if (this.canvasOverlay) {
+                this.canvasOverlay.updateSelectionWithVisualPositions([]);
+                this.canvasOverlay.hideFillHandle();
+              }
+            }
           }
-        }
+
+          // Handle editing overlay updates
+          if (editingChanged) {
+            if (state.isEditing && state.editingCell && this.editingOverlay) {
+              // Show editing overlay
+              const [rowId, columnId] = state.editingCell.split(':');
+              const columns = this.tableCore$.columns.peek(); // Use peek() to avoid triggering observers
+              const column = columns.find((c: any) => c.id === columnId);
+
+              if (column) {
+                const position = this.getCellPosition(rowId, columnId);
+                if (position) {
+                  const cell = { rowId, columnId };
+                  const actualValue = state.editValue !== undefined ? state.editValue : this.getCellValue(rowId, columnId);
+
+                  fileLog.info('🔍 REACTIVE: Showing editing overlay (consolidated)', {
+                    cellId: state.editingCell,
+                    position,
+                    value: actualValue
+                  });
+
+                  this.editingOverlay.showAt(position, cell, column, actualValue);
+                }
+              }
+            } else if (!state.isEditing && this.editingOverlay) {
+              // Hide editing overlay
+              fileLog.info('🔍 REACTIVE: Hiding editing overlay (consolidated)');
+              this.editingOverlay.hide();
+            }
+          }
+        });
       });
     });
 
-    // Observe editing state changes and reactively show/hide overlay
-    observe(() => {
-      const editingCell = this.tableInteraction$.editingCell.get(true);
-      const editValue = this.tableInteraction$.editValue.get(true);
-      const isEditing = this.tableInteraction$.isEditing.get(true);
-
-      fileLog.debug('🔍 REACTIVE: Linked to interactions observable', {
-        editingCell,
-        editValue,
-        isEditing,
-        hasOverlay: !!this.editingOverlay
-      });
-
-      if (isEditing && editingCell && this.editingOverlay) {
-        // Show editing overlay
-        const [rowId, columnId] = editingCell.split(':');
-        const columns = this.tableCore$.columns.get(true);
-        const column = columns.find((c: any) => c.id === columnId);
-
-        if (column) {
-          const position = this.getCellPosition(rowId, columnId);
-          if (position) {
-            const cell = { rowId, columnId };
-            const actualValue = editValue !== undefined ? editValue : this.getCellValue(rowId, columnId);
-
-            fileLog.info('🔍 REACTIVE: Showing editing overlay via interactions link', {
-              cellId: editingCell,
-              position,
-              value: actualValue
-            });
-
-            this.editingOverlay.showAt(position, cell, column, actualValue);
-          }
-        }
-      } else if (!isEditing && this.editingOverlay) {
-        // Hide editing overlay
-        fileLog.info('🔍 REACTIVE: Hiding editing overlay via interactions link');
-        this.editingOverlay.hide();
-      }
-    });
-
-    fileLog.info('✅ Linked to interactions observable for both selection and editing overlay positioning');
+    fileLog.info('✅ Consolidated reactive observer established - eliminated multiple observer chain');
   }
 
   
@@ -322,145 +354,6 @@ export class OverlayManager {
       if (!set2.has(item)) return false;
     }
     return true;
-  }
-  
-  /**
-   * REACTIVE: Setup editing overlay observer
-   */
-  private setupEditingObserver(): void {
-    let lastShownCell: string | null = null;
-    let observerCallCount = 0;
-    let pendingUpdate: number | null = null;
-
-    observe(() => {
-      // Safety check for observable availability
-      if (!this.tableInteraction$) {
-        return;
-      }
-
-      // Read all values in a single batch to minimize reactive triggers
-      let state;
-      try {
-        state = batch(() => ({
-          editingCell: this.tableInteraction$.editingCell.get(true),
-          editValue: this.tableInteraction$.editValue.get(true),
-          isEditing: this.tableInteraction$.isEditing.get(true)
-        }));
-      } catch (error) {
-        fileLog.debug('🔍 REACTIVE: Error reading state, likely during unmount', error);
-        return;
-      }
-
-      if (!state) {
-        return;
-      }
-
-      observerCallCount++;
-
-      // Cancel any pending update
-      if (pendingUpdate !== null) {
-        cancelAnimationFrame(pendingUpdate);
-        pendingUpdate = null;
-      }
-
-      fileLog.debug('🔍 REACTIVE: Editing observer triggered', {
-        editingCell: state.editingCell,
-        isEditing: state.isEditing,
-        editValue: state.editValue,
-        lastShownCell,
-        hasOverlay: !!this.editingOverlay,
-        callCount: observerCallCount
-      });
-
-      // Debounce updates using requestAnimationFrame to batch within same frame
-      // Capture state in closure for RAF callback
-      const capturedState = state;
-      const capturedOverlay = this.editingOverlay;
-
-      pendingUpdate = requestAnimationFrame(() => {
-        pendingUpdate = null;
-
-      // Safety check - RAF might execute after component unmount
-      if (!capturedState || !capturedOverlay) {
-        return;
-      }
-
-      if (capturedState.isEditing && capturedState.editingCell && capturedOverlay) {
-        // Only update overlay if the cell has actually changed
-        if (lastShownCell !== capturedState.editingCell) {
-          const [rowId, columnId] = capturedState.editingCell.split(':');
-          const columns = this.tableCore$.columns.get(true);
-          const column = columns.find((c: any) => c.id === columnId);
-
-          if (column) {
-            const position = this.getCellPosition(rowId, columnId);
-            if (position) {
-              const cell = { rowId, columnId };
-              // ALWAYS use the current cell value, ignore reactive editValue for initial display
-              const actualValue = this.getCellValue(rowId, columnId);
-
-              console.log('🔍 REACTIVE OBSERVER: About to call showAt', {
-                editingCell: capturedState.editingCell,
-                rowId,
-                columnId,
-                freshValue: actualValue,
-                ignoredReactiveValue: capturedState.editValue,
-                isLastShownCell: lastShownCell,
-                willCallShowAt: true
-              });
-
-              fileLog.debug('📝 REACTIVE: Getting fresh cell value', {
-                editingCell: capturedState.editingCell,
-                rowId,
-                columnId,
-                freshValue: actualValue,
-                ignoredReactiveValue: capturedState.editValue
-              });
-
-              // Hide previous overlay if different cell
-              if (lastShownCell && lastShownCell !== capturedState.editingCell) {
-                capturedOverlay.hide();
-                fileLog.debug('📝 REACTIVE: Hidden previous overlay for different cell', {
-                  from: lastShownCell,
-                  to: capturedState.editingCell
-                });
-              }
-
-              console.log('🔍 FINAL DEBUG: Calling showAt with exact values', {
-                cellId: `${rowId}:${columnId}`,
-                passedValue: actualValue,
-                valuePreview: typeof actualValue === 'string' ? actualValue.substring(0, 50) + '...' : actualValue
-              });
-
-              capturedOverlay.showAt(position, cell, column, actualValue);
-
-              fileLog.info('📝 REACTIVE: Editing overlay shown', {
-                editingCell: capturedState.editingCell,
-                editValue: actualValue,
-                isEditing: capturedState.isEditing,
-                transitionFrom: lastShownCell ? 'different-cell' : 'new-edit'
-              });
-
-              lastShownCell = capturedState.editingCell;
-            }
-          }
-        } else {
-          fileLog.debug('📝 REACTIVE: Skipping overlay update - same cell', { editingCell: capturedState.editingCell });
-        }
-      } else if (capturedOverlay) {
-        // Clear state when editing stops
-        if (lastShownCell !== null) {
-          capturedOverlay.hide();
-          lastShownCell = null;
-          fileLog.info('📝 REACTIVE: Editing overlay hidden', {
-            isEditing: capturedState.isEditing,
-            editingCell: capturedState.editingCell,
-            wasShowing: lastShownCell
-          });
-        }
-      }
-      });  // End of requestAnimationFrame callback
-    });
   }
 
   // NOTE: updateEditingOverlay method removed - editing overlays now handled reactively via interactions observable
@@ -575,32 +468,41 @@ export class OverlayManager {
   private getVisualCellPositions(selectedCells: Set<string>): VisualCellPosition[] {
     const visualPositions: VisualCellPosition[] = [];
 
-    // GET COMPREHENSIVE DIAGNOSTIC DATA
-    const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
-    const currentScrollLeft = scrollContainer.scrollLeft || 0;
-    const currentScrollTop = scrollContainer.scrollTop || 0;
-    const viewportWidth = scrollContainer.clientWidth || 0;
+    // PERFORMANCE FIX: Use cached viewport measurements instead of DOM reads
+    const cachedViewport = PositionEvents.getViewportCache();
+    const currentScrollLeft = cachedViewport.scrollLeft || 0;
+    const currentScrollTop = cachedViewport.scrollTop || 0;
+    const viewportWidth = cachedViewport.clientWidth || 0;
     const columns = this.tableCore$.columns.get(true);
 
-    fileLog.debug('🎨 DIAGNOSTIC: Getting visual cell positions with full context', {
-      selectedCount: selectedCells.size,
-      currentScrollLeft,
-      currentScrollTop,
-      viewportWidth,
-      totalColumns: columns.length,
-      scrollContainer: {
-        className: scrollContainer.className,
-        scrollWidth: scrollContainer.scrollWidth,
-        clientWidth: scrollContainer.clientWidth
-      }
-    });
+    // Keep scrollContainer reference for diagnostic logging only
+    const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
+
+    // PERFORMANCE: Sample diagnostic logging (10% of calls)
+    if (Math.random() < 0.1) {
+      fileLog.debug('🎨 DIAGNOSTIC: Getting visual cell positions with full context', {
+        selectedCount: selectedCells.size,
+        currentScrollLeft,
+        currentScrollTop,
+        viewportWidth,
+        totalColumns: columns.length,
+        scrollContainer: {
+          className: scrollContainer.className,
+          scrollWidth: scrollContainer.scrollWidth,
+          clientWidth: scrollContainer.clientWidth
+        }
+      });
+    }
 
     selectedCells.forEach(cellId => {
-      fileLog.debug('🔍 DIAGNOSTIC: Processing cellId in getVisualCellPositions', {
-        cellId,
-        cellIdType: typeof cellId,
-        cellIdValue: cellId
-      });
+      // PERFORMANCE: Sample per-cell diagnostic logging (reduce from 100% to 20% of cells)
+      if (Math.random() < 0.2) {
+        fileLog.debug('🔍 DIAGNOSTIC: Processing cellId in getVisualCellPositions', {
+          cellId,
+          cellIdType: typeof cellId,
+          cellIdValue: cellId
+        });
+      }
 
       const [rowId, columnId] = cellId.split(':');
 
@@ -608,20 +510,23 @@ export class OverlayManager {
       const column = columns.find((c: any) => c.id === columnId);
       const columnIndex = columns.findIndex((c: any) => c.id === columnId);
 
-      fileLog.debug('🔍 DIAGNOSTIC: Column analysis', {
-        rowId,
-        columnId,
-        rowIdType: typeof rowId,
-        columnIdType: typeof columnId,
-        columnIndex,
-        columnExists: !!column,
-        columnData: column ? {
-          id: column.id,
-          title: column.title,
-          width: column.width,
-          type: column.type
-        } : null
-      });
+      // PERFORMANCE: Sample column analysis logging (20% of calls)
+      if (Math.random() < 0.2) {
+        fileLog.debug('🔍 DIAGNOSTIC: Column analysis', {
+          rowId,
+          columnId,
+          rowIdType: typeof rowId,
+          columnIdType: typeof columnId,
+          columnIndex,
+          columnExists: !!column,
+          columnData: column ? {
+            id: column.id,
+            title: column.title,
+            width: column.width,
+            type: column.type
+          } : null
+        });
+      }
 
       // Calculate expected column X position based on column widths
       let expectedColumnX = 0;
@@ -717,8 +622,12 @@ export class OverlayManager {
    * Get cell position for editing overlay
    */
   private getCellPosition(rowId: string, columnId: string): { x: number; y: number; width: number; height: number } | null {
+    // PERFORMANCE FIX: Use cached scroll position instead of DOM read
+    const cachedViewport = PositionEvents.getViewportCache();
+    const currentScrollLeft = cachedViewport.scrollLeft || 0;
+
+    // Keep scrollContainer reference for diagnostic logging only
     const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
-    const currentScrollLeft = scrollContainer.scrollLeft || 0;
 
     fileLog.debug('🎯 DIAGNOSTIC: getCellPosition called with full context', {
       rowId,
@@ -881,10 +790,31 @@ export class OverlayManager {
    * Get viewport info
    */
   private getViewportInfo(): ViewportInfo {
-    // Use the body container if available, as that's where scrolling happens
+    // PERFORMANCE FIX: Use cached viewport measurements instead of DOM reads
+    const cachedViewport = PositionEvents.getViewportCache();
+
+    // If cache is fresh, use it directly
+    if (cachedViewport.containerRect && cachedViewport.lastViewportUpdate > 0) {
+      fileLog.debug('📊 VIEWPORT CACHE: Using cached viewport measurements for getViewportInfo', {
+        scrollLeft: cachedViewport.scrollLeft,
+        scrollTop: cachedViewport.scrollTop,
+        viewportWidth: cachedViewport.clientWidth,
+        viewportHeight: cachedViewport.clientHeight,
+        cacheAge: Date.now() - cachedViewport.lastViewportUpdate
+      });
+
+      return {
+        scrollTop: cachedViewport.scrollTop,
+        scrollLeft: cachedViewport.scrollLeft,
+        viewportWidth: cachedViewport.clientWidth,
+        viewportHeight: cachedViewport.clientHeight
+      };
+    }
+
+    // Fallback to DOM reads if cache is empty (should be rare)
+    fileLog.warn('📊 VIEWPORT CACHE: Cache miss, falling back to DOM reads');
     const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
 
-    // Defensive code to handle performance monitoring overrides
     let scrollTop = 0;
     let scrollLeft = 0;
     let viewportWidth = 0;
@@ -892,30 +822,11 @@ export class OverlayManager {
 
     try {
       scrollTop = scrollContainer.scrollTop || 0;
-    } catch (e) {
-      // Performance monitoring may override getter
-      fileLog.debug('Failed to get scrollTop, using 0', e);
-    }
-
-    try {
       scrollLeft = scrollContainer.scrollLeft || 0;
-    } catch (e) {
-      // Performance monitoring may override getter
-      fileLog.debug('Failed to get scrollLeft, using 0', e);
-    }
-
-    try {
       viewportWidth = scrollContainer.clientWidth || 0;
-    } catch (e) {
-      // Performance monitoring may override getter
-      fileLog.debug('Failed to get clientWidth, using 0', e);
-    }
-
-    try {
       viewportHeight = scrollContainer.clientHeight || 0;
     } catch (e) {
-      // Performance monitoring may override getter
-      fileLog.debug('Failed to get clientHeight, using 0', e);
+      fileLog.debug('Failed to get viewport measurements from DOM', e);
     }
 
     return {
