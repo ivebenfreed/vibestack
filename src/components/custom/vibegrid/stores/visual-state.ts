@@ -16,7 +16,7 @@ import { computed, observable, batch, when, syncState } from '@legendapp/state';
 import { syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { log } from '@/logger';
-import type { Column, GroupConfig, SortConfig, VirtualRow } from '../types';
+import type { Column, GroupConfig, SortConfig, FilterConfig, VirtualRow } from '../types';
 import { GroupProcessor } from '../processors/GroupProcessor';
 
 const fileLog = log('components/custom/vibegrid/stores/visual-state.ts');
@@ -34,6 +34,10 @@ export interface ColumnState {
   columnWidths: Record<string, number>;
   columnVisibility: Record<string, boolean>;
   columnOrder: string[];
+
+  // Data display preferences (moved from data-state)
+  sortBy: SortConfig[];
+  filters: FilterConfig[];
 
   // Metadata
   entityType: string;
@@ -142,6 +146,9 @@ export function createVisualInputs$() {
 
   // Sorting configuration
   sortBy: [] as SortConfig[],
+
+  // Filtering configuration
+  filters: [] as FilterConfig[],
 
   // Entity context
   entityType: '',
@@ -418,6 +425,8 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       rowCount: 0,
       rowHeight: 40,
       groupConfig: null,
+      sortBy: [],
+      filters: [],
       entityType,
       orgId,
       userId,
@@ -724,6 +733,12 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               item && typeof item === 'object' && item.field && item.direction
             );
 
+            // Ensure filters is valid array
+            const persistedFilters = Array.isArray(value.filters) ? value.filters : [];
+            const validFilters = persistedFilters.filter(item =>
+              item && typeof item === 'object' && item.field && item.operator && item.value !== undefined
+            );
+
             const merged = {
               ...currentInputs,
               ...value,
@@ -741,7 +756,9 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               // Include group configuration in persistence
               groupConfig: value.groupConfig || null,
               // Include sort configuration in persistence - validated
-              sortBy: validSortBy
+              sortBy: validSortBy,
+              // Include filter configuration in persistence - validated
+              filters: validFilters
             };
 
             fileLog.info('📁 Visual state loaded from persistence', {
@@ -779,6 +796,11 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               item && typeof item === 'object' && item.field && item.direction
             ) : [];
 
+            // Ensure filters is valid before saving
+            const validFilters = Array.isArray(value.filters) ? value.filters.filter(item =>
+              item && typeof item === 'object' && item.field && item.operator && item.value !== undefined
+            ) : [];
+
             // Only persist configuration state, not transient data (exclude isInitializing)
             const persistedState = {
               columnWidths: value.columnWidths || {},
@@ -786,6 +808,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               columnOrder: value.columnOrder || [],
               groupConfig: value.groupConfig || null,
               sortBy: validSortBy,
+              filters: validFilters,
               entityType: value.entityType,
               orgId: value.orgId,
               userId: value.userId,
@@ -888,6 +911,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       columnOrder: columns.map(col => col.id),
       groupConfig: null, // Include groupConfig in default state
       sortBy: [], // Include sortBy in default state
+      filters: [], // Include filters in default state
       entityType,
       orgId,
       userId
@@ -1027,6 +1051,90 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
 
     visualInputs$.columnVisibility.set(allHidden);
     fileLog.info('🫥 All columns hidden (except system)', { columnCount: columns.length });
+  },
+
+  /**
+   * Set filter for a field
+   */
+  setFilter(field: string, value: any, operator: string = 'equals') {
+    const currentFilters = visualInputs$.filters?.get() || [];
+    const existingIndex = currentFilters.findIndex(f => f.field === field);
+
+    const newFilter: FilterConfig = { field, value, operator };
+
+    if (existingIndex >= 0) {
+      // Update existing filter
+      const updatedFilters = [...currentFilters];
+      updatedFilters[existingIndex] = newFilter;
+      visualInputs$.filters?.set(updatedFilters);
+    } else {
+      // Add new filter
+      visualInputs$.filters?.set([...currentFilters, newFilter]);
+    }
+
+    fileLog.debug('🔍 Filter updated', { field, value, operator });
+  },
+
+  /**
+   * Remove filter for a field
+   */
+  removeFilter(field: string) {
+    const currentFilters = visualInputs$.filters?.get() || [];
+    const updatedFilters = currentFilters.filter(f => f.field !== field);
+    visualInputs$.filters?.set(updatedFilters);
+    fileLog.debug('🗑️ Filter removed', { field });
+  },
+
+  /**
+   * Clear all filters
+   */
+  clearFilters() {
+    visualInputs$.filters?.set([]);
+    fileLog.debug('🧹 All filters cleared');
+  },
+
+  /**
+   * Toggle sort for a field
+   */
+  toggleSort(field: string) {
+    const currentSortBy = visualInputs$.sortBy?.get() || [];
+    const existingIndex = currentSortBy.findIndex(s => s.field === field);
+
+    if (existingIndex >= 0) {
+      const currentSort = currentSortBy[existingIndex];
+      if (currentSort.direction === 'asc') {
+        // Switch to desc
+        const updatedSort = [...currentSortBy];
+        updatedSort[existingIndex] = { field, direction: 'desc' };
+        visualInputs$.sortBy?.set(updatedSort);
+      } else {
+        // Remove sort
+        const updatedSort = currentSortBy.filter(s => s.field !== field);
+        visualInputs$.sortBy?.set(updatedSort);
+      }
+    } else {
+      // Add new sort (asc)
+      const newSort: SortConfig = { field, direction: 'asc' };
+      visualInputs$.sortBy?.set([...currentSortBy, newSort]);
+    }
+
+    fileLog.debug('🔄 Sort toggled', { field, sortBy: visualInputs$.sortBy?.get() });
+  },
+
+  /**
+   * Set sort configuration
+   */
+  setSortBy(sortBy: SortConfig[]) {
+    visualInputs$.sortBy?.set(sortBy);
+    fileLog.debug('📊 Sort configuration set', { sortBy });
+  },
+
+  /**
+   * Clear all sorting
+   */
+  clearSort() {
+    visualInputs$.sortBy?.set([]);
+    fileLog.debug('🧹 All sorting cleared');
   }
   };
 }

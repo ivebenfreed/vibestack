@@ -35,15 +35,6 @@ export interface GroupRowOrderConfig {
  * Excludes transient UI state like selection, editing, hover, etc.
  */
 export interface PersistedTableState {
-  // Column configuration (persisted)
-  columnWidths: Record<string, number>;
-  columnVisibility: Record<string, boolean>;
-  columnOrder: string[];
-
-  // Data transformation configuration (persisted)
-  sortBy: SortConfig[];
-  filters: FilterConfig[];
-
   // Row ordering in grouped mode (persisted)
   groupRowOrders: Record<string, GroupRowOrderConfig>;
 
@@ -60,12 +51,7 @@ export interface PersistedTableState {
 
 export interface TableCoreState {
   entityType: string;
-  columns: Column[];
-  columnOrder: string[];
-  columnWidths: Record<string, number>;
-  columnVisibility: Record<string, boolean>;
-  sortBy: SortConfig[];
-  filters: FilterConfig[];
+  columns: Column[]; // Schema definition only
   groupRowOrders: Record<string, GroupRowOrderConfig>;
   flatRowOrder: string[]; // Row IDs in custom order for ungrouped mode
 }
@@ -309,11 +295,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     columns,
 
     // Persistent configuration state (will be synchronized with localStorage)
-    columnOrder: defaultState.columnOrder,
-    columnWidths: defaultState.columnWidths,
-    columnVisibility: defaultState.columnVisibility,
-    sortBy: defaultState.sortBy,
-    filters: defaultState.filters,
+    // NOTE: Column concerns moved to visual-state (columnOrder, columnWidths, columnVisibility, sortBy, filters)
     groupRowOrders: defaultState.groupRowOrders,
     flatRowOrder: defaultState.flatRowOrder,
 
@@ -335,8 +317,11 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 
       // Get entity observable directly like atomic bridge does
       const entityObs = getEntity$(entityType);
-      const sortBy = tableCore$.sortBy.get();
-      const filters = tableCore$.filters.get();
+
+      // TODO: These should be provided by visual state integration
+      // For now, use empty arrays as fallback until visual state integration is complete
+      const sortBy: SortConfig[] = [];
+      const filters: FilterConfig[] = [];
 
       // Get the data from the entity observable
       let data = {};
@@ -414,77 +399,205 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       return rows;
     },
 
-    // Direct manipulation methods with automatic persistence
-    toggleSort(field: string, isMultiSort: boolean = false) {
-      const current = tableCore$.sortBy.get();
-      const index = current.findIndex(s => s.field === field);
+    // NOTE: Column manipulation methods moved to visual-state
+    // (toggleSort, setFilter, clearFilter, setColumnWidth)
 
-      fileLog.debug('toggleSort called', {
-        field,
-        isMultiSort,
-        currentSort: current,
-        fieldIndex: index,
-        beforeSort: JSON.stringify(current)
-      });
+    setGroupConfig(config: GroupConfig | null) {
+      // Delegate to visual operations which handles the actual grouping state
+      tableCore$.groupConfig.set(config);
+      fileLog.info('🎯 Group config delegated to visual state', { config });
+    },
 
-      batch(() => {
-        if (index === -1) {
-          // Add new sort - either replace all or add to existing based on multi-sort mode
-          if (isMultiSort) {
-            const newSort = [...current, { field, direction: 'asc' }];
-            fileLog.debug('Adding new sort field to multi-sort', { newSort });
-            tableCore$.sortBy.set(newSort);
-          } else {
-            const newSort = [{ field, direction: 'asc' }];
-            fileLog.debug('Setting single sort field', { newSort });
-            tableCore$.sortBy.set(newSort);
-          }
-        } else if (current[index].direction === 'asc') {
-          // Change to desc
-          const newSort = [...current];
-          newSort[index] = { ...current[index], direction: 'desc' };
-          fileLog.debug('Changing sort direction to desc', { field, newSort });
-          tableCore$.sortBy.set(newSort);
-        } else {
-          // Third click: remove this sort field entirely (allow unsorted state)
-          const newSort = current.filter((_, i) => i !== index);
-          fileLog.debug('Removing sort field', { field, newSort });
-          tableCore$.sortBy.set(newSort);
+    // Drag and drop row ordering methods for grouped mode
+    setGroupRowOrder(groupId: string, rowIds: string[]) {
+      const orders = tableCore$.groupRowOrders.get();
+      tableCore$.groupRowOrders.set({
+        ...orders,
+        [groupId]: {
+          groupId,
+          rowIds,
+          lastModified: new Date().toISOString()
         }
-
-        // Save to localStorage using Legend State syncObservable
-        // The persistence should happen automatically through syncObservable
       });
 
-      const finalSort = tableCore$.sortBy.get();
-      fileLog.info('Sort toggled - checking persistence', {
-        field,
-        isMultiSort,
-        finalSort,
-        afterSort: JSON.stringify(finalSort),
-        storageKey: `vibestack-table-${entityType}`
+      fileLog.info('🔄 Group row order set (auto-persistent)', {
+        groupId,
+        rowCount: rowIds.length
+      });
+    },
+
+    moveRowInGroupByIndex(groupId: string, fromIndex: number, toIndex: number) {
+      const orders = tableCore$.groupRowOrders.get();
+      const groupOrder = orders[groupId];
+
+      if (!groupOrder) {
+        fileLog.warn('⚠️ No group order found for drag operation', { groupId });
+        return false;
+      }
+
+      const newRowIds = [...groupOrder.rowIds];
+      const [movedRowId] = newRowIds.splice(fromIndex, 1);
+      newRowIds.splice(toIndex, 0, movedRowId);
+
+      tableCore$.groupRowOrders.set({
+        ...orders,
+        [groupId]: {
+          ...groupOrder,
+          rowIds: newRowIds,
+          lastModified: new Date().toISOString()
+        }
       });
 
-      // Check what's actually in localStorage
-      try {
-        const stored = localStorage.getItem(`vibestack-table-${entityType}`);
-        fileLog.debug('Current localStorage content after sort change', {
-          storageKey: `vibestack-table-${entityType}`,
-          storedValue: stored,
-          parsedValue: stored ? JSON.parse(stored) : null
+      fileLog.info('🔄 Row moved within group (auto-persistent)', {
+        groupId,
+        fromIndex,
+        toIndex,
+        movedRowId
+      });
+
+      return true;
+    },
+
+    getGroupRowOrder(groupId: string): string[] | null {
+      const orders = tableCore$.groupRowOrders.get();
+      return orders[groupId]?.rowIds || null;
+    },
+
+    clearGroupRowOrders() {
+      tableCore$.groupRowOrders.set({});
+      fileLog.info('🗑️ All group row orders cleared (auto-persistent)');
+    },
+
+    // Higher-level method for drag and drop that handles row movement by ID
+    async moveRowInGroup(sourceGroupId: string, targetGroupId: string, draggedRowId: string, newIndex: number): Promise<boolean> {
+      // Handle cross-group moves
+      if (sourceGroupId !== targetGroupId) {
+        return await this.moveRowBetweenGroups(sourceGroupId, targetGroupId, draggedRowId, newIndex);
+      }
+
+      const orders = tableCore$.groupRowOrders.get();
+      let groupOrder = orders[sourceGroupId];
+
+      // If no order exists yet, create one from current group data
+      if (!groupOrder) {
+        const processedRows = tableCore$.processedRows.get();
+        const groupRows = processedRows.filter(row =>
+          row.type === 'data' && (row.groupId === sourceGroupId || row.parentGroupId === sourceGroupId)
+        );
+        const initialOrder = groupRows.map(row => row.id).filter(Boolean);
+
+        groupOrder = {
+          groupId: sourceGroupId,
+          rowIds: initialOrder,
+          lastModified: new Date().toISOString()
+        };
+
+        tableCore$.groupRowOrders.set({
+          ...orders,
+          [sourceGroupId]: groupOrder
         });
-      } catch (e) {
-        fileLog.error('Failed to read localStorage after sort change', { error: e.message });
+
+        fileLog.info('🆕 Created initial group row order', {
+          sourceGroupId,
+          rowCount: initialOrder.length
+        });
+      }
+
+      // Find current position of the dragged row
+      const currentIndex = groupOrder.rowIds.indexOf(draggedRowId);
+      if (currentIndex === -1) {
+        fileLog.warn('⚠️ Dragged row not found in group order', {
+          draggedRowId,
+          sourceGroupId,
+          currentOrder: groupOrder.rowIds
+        });
+        return false;
+      }
+
+      // If trying to move to the same position, no change needed
+      if (currentIndex === newIndex) {
+        return true;
+      }
+
+      // Move the row
+      const newRowIds = [...groupOrder.rowIds];
+      const [movedRowId] = newRowIds.splice(currentIndex, 1);
+      newRowIds.splice(newIndex, 0, movedRowId);
+
+      tableCore$.groupRowOrders.set({
+        ...orders,
+        [sourceGroupId]: {
+          ...groupOrder,
+          rowIds: newRowIds,
+          lastModified: new Date().toISOString()
+        }
+      });
+
+      fileLog.info('🔄 Row moved within group by ID (auto-persistent)', {
+        sourceGroupId,
+        draggedRowId,
+        from: currentIndex,
+        to: newIndex,
+        newOrderLength: newRowIds.length
+      });
+
+      return true;
+    },
+
+    // Drag and drop row ordering methods for flat/ungrouped mode
+    setFlatRowOrder(rowIds: string[]) {
+      tableCore$.flatRowOrder.set([...rowIds]);
+      fileLog.info('🔄 Flat row order set (auto-persistent)', {
+        rowCount: rowIds.length
+      });
+    },
+
+    // Move row between different groups - purely reactive approach
+    async moveRowBetweenGroups(sourceGroupId: string, targetGroupId: string, draggedRowId: string, newIndex: number): Promise<boolean> {
+      // Extract the status value from group IDs (e.g., "group_status_done" -> "done")
+      const extractStatusFromGroupId = (groupId: string): string => {
+        return groupId.replace('group_status_', '');
+      };
+
+      const newStatus = extractStatusFromGroupId(targetGroupId);
+      const entityType = tableCore$.entityType.get();
+
+      // Update the actual row data using the proper entity update system
+      // The reactive system will automatically handle visual repositioning
+      try {
+        // Import the update helper and entity operations
+        const { getUpdateFunction } = await import('../utils/entity-update-helpers');
+
+        // Use the full org-prefixed entity type for entity operations
+        const fullEntityType = entityType;
+
+        // Get the update function and update the row's status
+        const updateEntity = getUpdateFunction(fullEntityType as any);
+        await updateEntity(draggedRowId, { status: newStatus });
+
+        fileLog.info('🔄 Cross-group move completed via reactive status update', {
+          draggedRowId,
+          oldStatus: extractStatusFromGroupId(sourceGroupId),
+          newStatus,
+          sourceGroupId,
+          targetGroupId,
+          note: 'Row will appear in new group automatically via reactive system'
+        });
+
+        return true;
+      } catch (error) {
+        fileLog.error('❌ Failed to update row status for cross-group move', {
+          draggedRowId,
+          newStatus,
+          entityType,
+          fullEntityType: entityType,
+          error: error.message
+        });
+        return false;
       }
     },
 
-    setFilter(field: string, value: any, operator: string = 'contains') {
-      batch(() => {
-        const filters = tableCore$.filters.get();
-        const existingIndex = filters.findIndex(f => f.field === field);
-
-        if (existingIndex !== -1) {
-          filters[existingIndex] = { field, value, operator };
+    moveRowInFlat(fromIndex: number, toIndex: number): boolean {
         } else {
           filters.push({ field, value, operator });
         }
