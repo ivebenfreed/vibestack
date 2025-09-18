@@ -12,9 +12,7 @@
  * All renderers, managers, and components should read from this computed state ONLY.
  */
 
-import { computed, observable, batch, when, syncState } from '@legendapp/state';
-import { syncObservable } from '@legendapp/state/sync';
-import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
+import { computed, observable, batch, when } from '@legendapp/state';
 import { log } from '@/logger';
 import type { Column, GroupConfig, SortConfig, FilterConfig, VirtualRow } from '../types';
 import { GroupProcessor } from '../processors/GroupProcessor';
@@ -232,10 +230,6 @@ export function createVisualInputs$() {
   orgId: '',
   userId: '',
 
-  // Initialization flag to prevent saves during init
-  isInitializing: false,
-  // Timestamp when persistence was set up (for grace period)
-  persistenceSetupTime: undefined as number | undefined,
 
   // Processed data rows (input for visual rows)
   processedRows: [] as any[]
@@ -800,243 +794,6 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
   // COLUMN OPERATIONS (merged from columns-observable)
   // ====================================
 
-  /**
-   * Set up persistence for the visual state (called once during initialization)
-   */
-  setupPersistence(entityType: string) {
-    const persistKey = `vibegrid-visual-${entityType}`;
-
-    // Set persistence setup timestamp IMMEDIATELY to start grace period
-    visualInputs$.persistenceSetupTime.set(Date.now());
-
-    const syncObservableInstance = syncObservable(visualInputs$, {
-      persist: {
-        plugin: ObservablePersistLocalStorage,
-        name: persistKey,
-        debounceSet: 1000, // Debounce saves by 1 second to prevent excessive localStorage writes
-        transform: {
-          load: (value: any) => {
-            fileLog.debug('🔍 Loading visual state from persistence', { value, persistKey });
-
-            // Handle missing or invalid data
-            if (!value || typeof value !== 'object') {
-              // This is normal - no persisted state exists initially
-              const currentInputs = visualInputs$.get();
-              // IMPORTANT: Preserve initialization state and set timestamp even when no persisted state
-              // Set the timestamp NOW to start the grace period immediately
-              return {
-                ...currentInputs,
-                isInitializing: currentInputs.isInitializing, // Preserve current initialization state
-                initializationCompleteTime: Date.now() // Always set timestamp to start grace period
-              };
-            }
-
-            // Merge with current state (in case schema changed)
-            const currentInputs = visualInputs$.get();
-
-            // Ensure sortBy is valid array
-            const persistedSortBy = Array.isArray(value.sortBy) ? value.sortBy : [];
-            const validSortBy = persistedSortBy.filter(item =>
-              item && typeof item === 'object' && item.field && item.direction
-            );
-
-            // Ensure filters is valid array
-            const persistedFilters = Array.isArray(value.filters) ? value.filters : [];
-            const validFilters = persistedFilters.filter(item =>
-              item && typeof item === 'object' && item.field && item.operator && item.value !== undefined
-            );
-
-            const merged = {
-              ...currentInputs,
-              ...value,
-              columns: currentInputs.columns, // Always use fresh columns from current state
-              // Preserve user preferences but add defaults for new columns
-              columnWidths: {
-                ...currentInputs.columnWidths,
-                ...value.columnWidths
-              },
-              columnVisibility: {
-                ...currentInputs.columnVisibility,
-                ...value.columnVisibility
-              },
-              columnOrder: value.columnOrder?.length ? value.columnOrder : currentInputs.columnOrder,
-              // Include group configuration in persistence
-              groupConfig: value.groupConfig || null,
-              // Include sort configuration in persistence - validated
-              sortBy: validSortBy,
-              // Include filter configuration in persistence - validated
-              filters: validFilters,
-              // IMPORTANT: Preserve initialization state from current state, not persisted state
-              isInitializing: currentInputs.isInitializing,
-              // Set initialization complete timestamp when loading persistence
-              initializationCompleteTime: currentInputs.isInitializing ? undefined : Date.now()
-            };
-
-            fileLog.info('📁 Visual state loaded from persistence', {
-              persistKey,
-              columnsCount: merged.columns.length,
-              persistedWidths: Object.keys(merged.columnWidths).length,
-              visibleColumns: Object.values(merged.columnVisibility).filter(Boolean).length,
-              hasGroupConfig: !!merged.groupConfig,
-              groupFields: merged.groupConfig?.fields?.length || 0
-            });
-
-            return merged;
-          },
-          save: (value: any) => {
-            // Skip saving during initialization
-            if (value.isInitializing) {
-              fileLog.info('⏸️ SAVE BLOCKED: Skipping save during initialization', {
-                persistKey,
-                entityType: value.entityType,
-                stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
-              });
-              return false;
-            }
-
-            // Add grace period after persistence setup to prevent rapid saves
-            const now = Date.now();
-            const gracePeriod = 1000; // 1 second grace period
-            const persistenceSetupTime = visualInputs$.persistenceSetupTime.get() || 0;
-            const timeSincePersistenceSetup = now - persistenceSetupTime;
-
-            if (persistenceSetupTime && timeSincePersistenceSetup < gracePeriod) {
-              fileLog.info('⏸️ SAVE DEFERRED: Grace period active after persistence setup', {
-                persistKey,
-                entityType: value.entityType,
-                timeSincePersistenceSetup,
-                gracePeriod,
-                deferredMs: gracePeriod - timeSincePersistenceSetup
-              });
-              return false;
-            }
-
-            // Log what triggered this save
-            fileLog.info('💾 SAVE TRIGGERED: Visual state save', {
-              persistKey,
-              entityType: value.entityType,
-              triggerStack: new Error().stack?.split('\n').slice(1, 6).join('\n')
-            });
-
-            // FIX: Get current state from observable instead of relying on stale `value` parameter
-            // This ensures we always save the most up-to-date state, especially for sort changes
-            const currentState = visualInputs$.get();
-
-            // DEBUG: Log the complete value object being saved
-            console.log('💾 SAVE DEBUG - INPUT VALUE OBJECT:', {
-              keys: Object.keys(value),
-              sortBy: value.sortBy,
-              sortByExists: !!value.sortBy,
-              sortByLength: Array.isArray(value.sortBy) ? value.sortBy.length : 'not-array',
-              columnWidths: value.columnWidths,
-              fullObject: value
-            });
-
-            console.log('💾 SAVE DEBUG - CURRENT STATE OBJECT:', {
-              keys: Object.keys(currentState),
-              sortBy: currentState.sortBy,
-              sortByExists: !!currentState.sortBy,
-              sortByLength: Array.isArray(currentState.sortBy) ? currentState.sortBy.length : 'not-array',
-              columnWidths: currentState.columnWidths,
-              fullObject: currentState
-            });
-
-            fileLog.info('💾 SAVE DEBUG: Complete value object', {
-              persistKey,
-              hasColumnWidths: !!value.columnWidths,
-              hasColumnVisibility: !!value.columnVisibility,
-              hasColumnOrder: !!value.columnOrder,
-              hasGroupConfig: !!value.groupConfig,
-              hasSortBy: !!value.sortBy,
-              sortByType: typeof value.sortBy,
-              sortByLength: Array.isArray(value.sortBy) ? value.sortBy.length : 'not-array',
-              sortByValue: value.sortBy,
-              hasFilters: !!value.filters,
-              filtersType: typeof value.filters,
-              valueKeys: Object.keys(value),
-              fullValueObject: value
-            });
-
-            // Simple sort validation - just ensure it's an array
-            const validSortBy = Array.isArray(currentState.sortBy) ? currentState.sortBy : [];
-
-            console.log('💾 SIMPLE SORT DEBUG:', {
-              originalSortBy: value.sortBy,
-              currentStateSortBy: currentState.sortBy,
-              validSortBy,
-              validSortByCount: validSortBy.length
-            });
-
-            // Ensure filters is valid before saving
-            const validFilters = Array.isArray(value.filters) ? value.filters.filter(item =>
-              item && typeof item === 'object' && item.field && item.operator && item.value !== undefined
-            ) : [];
-
-            // Only persist configuration state, not transient data
-            const persistedState = {
-              columnWidths: value.columnWidths || {},
-              columnVisibility: value.columnVisibility || {},
-              columnOrder: value.columnOrder || [],
-              groupConfig: value.groupConfig || null,
-              sortBy: validSortBy,
-              filters: validFilters,
-              entityType: value.entityType,
-              orgId: value.orgId,
-              userId: value.userId,
-              version: '1.0',
-              lastUpdated: new Date().toISOString()
-            };
-
-            fileLog.info('💾 Saving visual state to persistence', {
-              persistKey,
-              hasGroupConfig: !!persistedState.groupConfig,
-              groupFields: persistedState.groupConfig?.fields?.length || 0,
-              columnCount: Object.keys(persistedState.columnWidths).length,
-              columnOrder: persistedState.columnOrder,
-              sortByCount: persistedState.sortBy.length,
-              sortBy: persistedState.sortBy,
-              originalSortBy: value.sortBy,
-              validSortByFiltered: validSortBy
-            });
-
-            // DEBUG: Log the final object being persisted
-            fileLog.info('💾 FINAL PERSISTED OBJECT', {
-              persistKey,
-              finalObject: persistedState,
-              finalObjectKeys: Object.keys(persistedState),
-              jsonStringified: JSON.stringify(persistedState)
-            });
-
-            return persistedState;
-          }
-        }
-      }
-    });
-
-    // Add persistence debugging
-    const syncStatus$ = syncState(visualInputs$);
-    const persistenceComplete$ = observable(false);
-
-    // Export sync status for VibeGrid to check
-    visualSyncStatus$ = {
-      ...syncStatus$,
-      isPersistenceDataLoaded: persistenceComplete$
-    };
-
-    // Note: Initialization flags are managed by VibeGrid.tsx coordinating with init-state
-    // We don't set isInitializing:false here to avoid race conditions
-
-    // localStorage is synchronous, so persistence should be loaded immediately
-    fileLog.info('🎯 Visual state persistence configured and loaded', {
-      entityType,
-      persistKey,
-      isPersistLoaded: syncStatus$.isPersistLoaded.get(),
-      isPersistEnabled: syncStatus$.isPersistEnabled.get(),
-      currentState: visualInputs$.get().entityType
-    });
-
-    return syncObservableInstance;
-  },
 
   /**
    * Initialize columns with data and user/org context
@@ -1052,8 +809,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     // Initialize with default state
     visualInputs$.set({
       ...visualInputs$.get(),
-      ...defaultState,
-      isInitializing: true // Keep initialization flag
+      ...defaultState
     });
 
     fileLog.info('🎯 Columns initialized', {

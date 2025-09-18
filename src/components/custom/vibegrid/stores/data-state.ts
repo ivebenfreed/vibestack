@@ -2,13 +2,12 @@
  * Data State - tableCore$ and tableCoreSync$ observables
  * Extracted from pure-observables.ts lines 484-869
  *
- * This module handles data loading, persistence, and transformation
+ * This module handles data loading and transformation
  * including sorting, filtering, and grouping operations.
+ * No persistence - uses simple data-only state management.
  */
 
 import { observable, computed, batch } from '@legendapp/state';
-import { syncObservable } from '@legendapp/state/sync';
-import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$, universeContext$ } from '@/legend-state/observables';
 import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
@@ -147,139 +146,11 @@ function applyFlatRowOrdering(rows: any[], flatRowOrder: string[]): any[] {
 }
 
 // ====================================
-// PERSISTENCE HELPERS
-// ====================================
-
-/**
- * Generate simple storage key using entity name directly
- * EntityType already contains org prefix: "01920000-1000-7000-8000-000000000001_TaskV2"
- */
-function generateTableStateKey(entityType: string): string {
-  const storageKey = `vibegrid-${entityType}`;
-  fileLog.debug('🔧 Generated simple storage key', { storageKey, entityType });
-  return storageKey;
-}
-
-/**
- * Create default table state from columns
- */
-function createDefaultTableState(entityType: string, columns: Column[]): Partial<PersistedTableState> {
-  const orgId = universeOrgId$.peek();
-  const userId = universeUserId$.peek();
-
-  return {
-    groupRowOrders: {},
-    flatRowOrder: [],
-    version: '1.0',
-    lastUpdated: new Date().toISOString(),
-    entityType,
-    orgId: orgId || 'unknown',
-    userId: userId || 'unknown'
-  };
-}
-
-/**
- * Transform function to handle data migration between versions
- */
-function transformTableState(loaded: any, defaultState: Partial<PersistedTableState>): PersistedTableState {
-  if (!loaded || typeof loaded !== 'object') {
-    fileLog.info('🔧 No saved state found, using defaults');
-    return defaultState as PersistedTableState;
-  }
-
-  // Handle version migrations
-  if (loaded.version !== '1.0') {
-    fileLog.info('🔧 Migrating table state from version', loaded.version, 'to 1.0');
-    // Add migration logic here for future versions
-  }
-
-  // Merge loaded state with defaults to handle missing fields
-  const merged = {
-    ...defaultState,
-    ...loaded,
-    version: '1.0',
-    lastUpdated: new Date().toISOString()
-  };
-
-  fileLog.info('🔧 Restored table state with', {
-    groupRowOrders: Object.keys(merged.groupRowOrders || {}).length,
-    flatRowOrderLength: merged.flatRowOrder?.length || 0
-  });
-
-  return merged as PersistedTableState;
-}
-
-/**
- * Load display state from localStorage using VibeGrid compatible key format
- * Uses vibegridx_display_{entityName} format for compatibility
- */
-function loadDisplayState(entityType: string): Partial<PersistedTableState> | null {
-  try {
-    // Extract entity name from org-prefixed entityType (e.g., "01920000-1000-7000-8000-000000000001_TaskV2" -> "TaskV2")
-    const entityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
-    const storageKey = `vibegridx_display_${entityName}`;
-
-    fileLog.debug('🔧 Loading display state', { entityType, entityName, storageKey });
-
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) {
-      fileLog.debug('🔧 No stored display state found', { storageKey });
-      return null;
-    }
-
-    const parsed = JSON.parse(stored);
-    fileLog.info('🔧 Loaded display state from localStorage', { storageKey, state: parsed });
-    return parsed;
-
-  } catch (error) {
-    fileLog.error('L Error loading display state', { entityType, error: error.message });
-    return null;
-  }
-}
-
-/**
- * Save display state to localStorage using VibeGrid compatible key format
- * Uses vibegridx_display_{entityName} format for compatibility
- */
-function saveDisplayState(entityType: string, tableState: any): void {
-  try {
-    // Extract entity name from org-prefixed entityType (e.g., "01920000-1000-7000-8000-000000000001_TaskV2" -> "TaskV2")
-    const entityName = entityType.includes('_') ? entityType.split('_').pop() : entityType;
-    const storageKey = `vibegridx_display_${entityName}`;
-
-    // Create state object matching VibeGrid format
-    const displayState = {
-      columnOrder: tableState.columnOrder,
-      columnWidths: tableState.columnWidths,
-      columnVisibility: tableState.columnVisibility,
-      sortBy: tableState.sortBy,
-      filters: tableState.filters,
-      version: '1.0',
-      lastUpdated: new Date().toISOString()
-    };
-
-    localStorage.setItem(storageKey, JSON.stringify(displayState));
-    fileLog.info('<� TableCore: Saved persistent display state', { storageKey, displayState });
-
-  } catch (error) {
-    fileLog.error('L Error saving display state', { entityType, error: error.message });
-  }
-}
-
-// ====================================
 // DATA STATE CORE OBSERVABLE FACTORY
 // ====================================
 
 export function createTableCore$(entityType: string, columns: Column[], visualInputs$?: any) {
-  fileLog.info('<� Creating tableCore$ observable with Legend State localStorage persistence', { entityType, columnCount: columns.length });
-
-  // Create default state structure (without requiring orgId/userId yet)
-  const defaultState = createDefaultTableState(entityType, columns);
-  fileLog.info('<� Default state created', { entityType, defaultSortBy: defaultState.sortBy });
-
-  // Generate simple storage key using entity name
-  const storageKey = generateTableStateKey(entityType);
-  let tableCoreSync$: any = null;
+  fileLog.info('🎯 Creating tableCore$ observable (no persistence)', { entityType, columnCount: columns.length });
 
   // Create the core observable with default values
   const tableCore$ = observable({
@@ -287,15 +158,9 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
     entityType,
     columns,
 
-    // Initialization flag to prevent saves during init
-    isInitializing: true,
-    // Timestamp when persistence was set up (for grace period)
-    persistenceSetupTime: undefined as number | undefined,
-
-    // Persistent configuration state (will be synchronized with localStorage)
-    // NOTE: Column concerns moved to visual-state (columnOrder, columnWidths, columnVisibility, sortBy, filters)
-    groupRowOrders: defaultState.groupRowOrders,
-    flatRowOrder: defaultState.flatRowOrder,
+    // Row ordering state (no persistence)
+    groupRowOrders: {} as Record<string, GroupRowOrderConfig>,
+    flatRowOrder: [] as string[],
 
     // Computed groupConfig - will be provided by external visual state
     get groupConfig() {
@@ -420,7 +285,7 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         }
       });
 
-      fileLog.info('🔄 Group row order set (auto-persistent)', {
+      fileLog.info('🔄 Group row order set (no persistence)', {
         groupId,
         rowCount: rowIds.length
       });
@@ -448,7 +313,7 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         }
       });
 
-      fileLog.info('🔄 Row moved within group (auto-persistent)', {
+      fileLog.info('🔄 Row moved within group (no persistence)', {
         groupId,
         fromIndex,
         toIndex,
@@ -465,7 +330,7 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
 
     clearGroupRowOrders() {
       tableCore$.groupRowOrders.set({});
-      fileLog.info('🗑️ All group row orders cleared (auto-persistent)');
+      fileLog.info('🗑️ All group row orders cleared (no persistence)');
     },
 
     // Higher-level method for drag and drop that handles row movement by ID
@@ -533,7 +398,7 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         }
       });
 
-      fileLog.info('🔄 Row moved within group by ID (auto-persistent)', {
+      fileLog.info('🔄 Row moved within group by ID (no persistence)', {
         sourceGroupId,
         draggedRowId,
         from: currentIndex,
@@ -547,7 +412,7 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
     // Drag and drop row ordering methods for flat/ungrouped mode
     setFlatRowOrder(rowIds: string[]) {
       tableCore$.flatRowOrder.set([...rowIds]);
-      fileLog.info('🔄 Flat row order set (auto-persistent)', {
+      fileLog.info('🔄 Flat row order set (no persistence)', {
         rowCount: rowIds.length
       });
     },
@@ -599,19 +464,28 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
 
     moveRowInFlat(fromIndex: number, toIndex: number): boolean {
       try {
-        const flatData = tableCore$.flatData.peek();
-        if (fromIndex < 0 || fromIndex >= flatData.length || toIndex < 0 || toIndex >= flatData.length) {
+        const processedRows = tableCore$.processedRows.get();
+        if (fromIndex < 0 || fromIndex >= processedRows.length || toIndex < 0 || toIndex >= processedRows.length) {
           return false;
         }
 
-        const newFlatData = [...flatData];
-        const [movedItem] = newFlatData.splice(fromIndex, 1);
-        newFlatData.splice(toIndex, 0, movedItem);
+        // Get the row IDs from processed rows
+        const rowIds = processedRows.map(row => row.id || row.data?.id).filter(Boolean);
 
-        tableCore$.flatData.set(newFlatData);
+        if (fromIndex >= rowIds.length || toIndex >= rowIds.length) {
+          return false;
+        }
+
+        // Create new order by moving the row
+        const newRowIds = [...rowIds];
+        const [movedRowId] = newRowIds.splice(fromIndex, 1);
+        newRowIds.splice(toIndex, 0, movedRowId);
+
+        // Update the flat row order
+        tableCore$.flatRowOrder.set(newRowIds);
         return true;
       } catch (error) {
-        console.error('Error moving row in flat data:', error);
+        fileLog.error('Error moving row in flat data:', error);
         return false;
       }
     },
@@ -622,118 +496,10 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
 
     clearFlatRowOrder() {
       tableCore$.flatRowOrder.set([]);
-      fileLog.info('🗑️ Flat row order cleared (auto-persistent)');
+      fileLog.info('🗑️ Flat row order cleared (no persistence)');
     }
   });
 
-  // Load existing display state if available (only row ordering state for data-state)
-  const existingState = loadDisplayState(entityType);
-  if (existingState) {
-    fileLog.info('🔧 Applying existing row ordering state', { entityType });
-
-    // Apply only row ordering state (columns handled by visual state)
-    if (existingState.groupRowOrders) {
-      tableCore$.groupRowOrders.set(existingState.groupRowOrders);
-    }
-    if (existingState.flatRowOrder) {
-      tableCore$.flatRowOrder.set(existingState.flatRowOrder);
-    }
-  }
-
-  // Create persistent sync observable for table state
-
-  // Configure Legend State persistence (always available with simplified storage key)
-  try {
-    // Set persistence setup timestamp IMMEDIATELY to start grace period
-    tableCore$.persistenceSetupTime.set(Date.now());
-
-    // Configure syncObservable for Legend State persistence
-    tableCoreSync$ = syncObservable(tableCore$, {
-      persist: {
-        name: storageKey,
-        plugin: ObservablePersistLocalStorage,
-        // Only persist configuration, not computed data
-        transform: {
-          load: (value: any) => {
-            if (!value) {
-              // IMPORTANT: Preserve initialization state and set timestamp even when no persisted state
-              const isCurrentlyInitializing = tableCore$.isInitializing.get();
-              return {
-                isInitializing: isCurrentlyInitializing, // Preserve current initialization state
-                initializationCompleteTime: Date.now() // Always set timestamp to start grace period
-              };
-            }
-            // Transform loaded data and preserve initialization state
-            const transformed = transformTableState(value, defaultState);
-
-            // IMPORTANT: Always preserve initialization state from current observable state
-            // The transformed state might have isInitializing: false from persisted data
-            return {
-              ...transformed,
-              isInitializing: tableCore$.isInitializing.get(), // Preserve current initialization state
-              initializationCompleteTime: tableCore$.isInitializing.get() ? undefined : Date.now()
-            };
-          },
-          save: (value: any) => {
-            // Skip saving during initialization - check for the isInitializing flag
-            if (value.isInitializing) {
-              fileLog.info('⏸️ SAVE BLOCKED: Skipping data state save during initialization', {
-                storageKey,
-                entityType: value.entityType,
-                stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
-              });
-              // Return false to prevent save according to Legend State docs
-              return false;
-            }
-
-            // Add grace period after persistence setup to prevent rapid saves
-            const now = Date.now();
-            const gracePeriod = 1000; // 1 second grace period
-            const persistenceSetupTime = tableCore$.persistenceSetupTime.get() || 0;
-            const timeSincePersistenceSetup = now - persistenceSetupTime;
-
-            if (persistenceSetupTime && timeSincePersistenceSetup < gracePeriod) {
-              fileLog.info('⏸️ SAVE DEFERRED: Grace period active after persistence setup', {
-                storageKey,
-                entityType: value.entityType,
-                timeSincePersistenceSetup,
-                gracePeriod,
-                deferredMs: gracePeriod - timeSincePersistenceSetup
-              });
-              return false;
-            }
-
-            // Save only row ordering fields (columns handled by visual state)
-            const persistedData = {
-              groupRowOrders: value.groupRowOrders,
-              flatRowOrder: value.flatRowOrder,
-              version: '1.0',
-              lastUpdated: new Date().toISOString(),
-              entityType: value.entityType
-            };
-
-            fileLog.info('💾 Saving data state to persistence', {
-              storageKey,
-              entityType: value.entityType,
-              groupRowOrderCount: Object.keys(persistedData.groupRowOrders || {}).length,
-              flatRowOrderLength: persistedData.flatRowOrder?.length || 0
-            });
-
-            return persistedData;
-          }
-        }
-      }
-    });
-
-    fileLog.info(' Legend State persistence configured successfully', {
-      entityType,
-      storageKey,
-      hasPersistence: !!tableCoreSync$
-    });
-
-  } catch (error) {
-    fileLog.error('❌ Failed to configure Legend State persistence', { entityType, error: error.message });
-  }
 
   // Initialize columns observable with current state
   const orgId = universeOrgId$.get();
@@ -746,10 +512,13 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
     fileLog.warn('� Cannot initialize columns observable - missing orgId or userId', { orgId, userId });
   }
 
-  // Return the observable with sync state
+  // No persistence - simple data-only state
+  fileLog.info('✅ TableCore$ created without persistence', { entityType });
+
+  // Return the observable without sync
   return {
     tableCore$,
-    tableCoreSync$ // syncObservable returns the sync state observable
+    tableCoreSync$: tableCore$ // No sync, just return the same observable for compatibility
   };
 }
 

@@ -111,36 +111,3 @@ export function exampleUsage() {
   return vibeGridPersistence;
 }
 
-// Helper to migrate from complex to simple persistence (if needed)
-export function migrateFromComplexPersistence(entityType: string, complexPrefs: any) {
-  integrationLog.info('🔄 Migrating from complex to simple persistence', { entityType });
-
-  const { operations } = createVibeGridPreferences(entityType);
-
-  // Extract the essential data from complex preferences
-  if (complexPrefs.columnWidths) {
-    Object.entries(complexPrefs.columnWidths).forEach(([columnId, width]) => {
-      operations.setColumnWidth(columnId, width as number);
-    });
-  }
-
-  if (complexPrefs.columnOrder) {
-    operations.setColumnOrder(complexPrefs.columnOrder);
-  }
-
-  if (complexPrefs.columnVisibility) {
-    Object.entries(complexPrefs.columnVisibility).forEach(([columnId, visible]) => {
-      operations.setColumnVisibility(columnId, visible as boolean);
-    });
-  }
-
-  if (complexPrefs.sortBy) {
-    operations.setSortBy(complexPrefs.sortBy);
-  }
-
-  if (complexPrefs.filters) {
-    operations.setFilters(complexPrefs.filters);
-  }
-
-  integrationLog.info('✅ Migration completed', { entityType });
-}

@@ -183,6 +183,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const orgId = universeOrgId$.get();
       const userId = universeUserId$.get();
       if (orgId && userId) {
+
         // Initialize simple persistence with columns first
         simplePersistence.operations.initializeColumns(columns);
 
@@ -222,43 +223,32 @@ export function VibeGrid<T extends Record<string, any> = any>(
         // Set up reactive sync from visual state to simple persistence
         // Watch for changes and save them automatically
         visualState.visualInputs$.columnWidths.onChange((newWidths) => {
-          if (!visualState.visualInputs$.isInitializing.get()) {
-            simplePersistence.operations.setColumnWidth('batch', 0); // Trigger save
-            Object.entries(newWidths).forEach(([columnId, width]) => {
-              simplePersistence.operations.setColumnWidth(columnId, width);
-            });
-            fileLog.debug('💾 Saved column widths to simple persistence', { newWidths });
-          }
+          Object.entries(newWidths).forEach(([columnId, width]) => {
+            simplePersistence.operations.setColumnWidth(columnId, width);
+          });
+          fileLog.debug('💾 Saved column widths to simple persistence', { newWidths });
         });
 
         visualState.visualInputs$.columnOrder.onChange((newOrder) => {
-          if (!visualState.visualInputs$.isInitializing.get()) {
-            simplePersistence.operations.setColumnOrder(newOrder);
-            fileLog.debug('💾 Saved column order to simple persistence', { newOrder });
-          }
+          simplePersistence.operations.setColumnOrder(newOrder);
+          fileLog.debug('💾 Saved column order to simple persistence', { newOrder });
         });
 
         visualState.visualInputs$.columnVisibility.onChange((newVisibility) => {
-          if (!visualState.visualInputs$.isInitializing.get()) {
-            Object.entries(newVisibility).forEach(([columnId, visible]) => {
-              simplePersistence.operations.setColumnVisibility(columnId, visible);
-            });
-            fileLog.debug('💾 Saved column visibility to simple persistence', { newVisibility });
-          }
+          Object.entries(newVisibility).forEach(([columnId, visible]) => {
+            simplePersistence.operations.setColumnVisibility(columnId, visible);
+          });
+          fileLog.debug('💾 Saved column visibility to simple persistence', { newVisibility });
         });
 
         visualState.visualInputs$.sortBy.onChange((newSortBy) => {
-          if (!visualState.visualInputs$.isInitializing.get()) {
-            simplePersistence.operations.setSortBy(newSortBy);
-            fileLog.debug('💾 Saved sort configuration to simple persistence', { newSortBy });
-          }
+          simplePersistence.operations.setSortBy(newSortBy);
+          fileLog.debug('💾 Saved sort configuration to simple persistence', { newSortBy });
         });
 
         visualState.visualInputs$.filters.onChange((newFilters) => {
-          if (!visualState.visualInputs$.isInitializing.get()) {
-            simplePersistence.operations.setFilters(newFilters);
-            fileLog.debug('💾 Saved filters to simple persistence', { newFilters });
-          }
+          simplePersistence.operations.setFilters(newFilters);
+          fileLog.debug('💾 Saved filters to simple persistence', { newFilters });
         });
 
         fileLog.info('🎯 Visual state initialized with simple persistence', {
@@ -372,14 +362,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
         // This prevents premature initialization signals
 
         // Coordinate state initialization with overall VibeGrid initialization
-        // Clear all isInitializing flags only when entire grid is fully ready
         initManager.isFullyHydrated$.onChange((isFullyInitialized) => {
           if (isFullyInitialized) {
-            // Clear visual state initialization flag
-            visualState.visualInputs$.isInitializing.set(false);
-            // Clear data state initialization flag
-            observables.tableCore$.isInitializing.set(false);
-            fileLog.info('🎯 All state initialization flags cleared - VibeGrid fully ready', {
+            fileLog.info('🎯 VibeGrid fully ready', {
               entityType,
               tableId
             });

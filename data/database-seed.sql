@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bsMTEWslze5RYC0LW3ov7lik67J20G5bRIJsNY9Iw3PdbFWX7Ed2xNO1YpwfAkz
+\restrict zqUMN8WUVuofSlYpt8HE1qkFkSzS8iCVonfZcuMrOjLfCZaVlHSa2jwTkbFGCJA
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -903,10 +903,10 @@ eb6d8755-c903-4d03-9e67-0abc07fcca89	01920000-1000-7000-8000-000000000001	2025-0
 a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-13 16:38:49.773	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-02-28 22:00:00	documentation	32	35	4	t	\N	\N	f
 3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-15 00:46:13.035	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
 e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-15 18:04:58.211	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	done	2025-04-01 04:00:00	development	40	\N	4	t	\N	\N	t
-2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-15 18:06:04.708	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	done	2025-03-15 21:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
 c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-17 20:04:42.881	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	high	done	2025-03-20 08:00:00	design	45	\N	3	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-12 01:54:48.69	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	not_started	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
+2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-18 21:22:19.161	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	group_priority_high	2025-03-16 01:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
 \.
 
 
@@ -1279,5 +1279,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bsMTEWslze5RYC0LW3ov7lik67J20G5bRIJsNY9Iw3PdbFWX7Ed2xNO1YpwfAkz
+\unrestrict zqUMN8WUVuofSlYpt8HE1qkFkSzS8iCVonfZcuMrOjLfCZaVlHSa2jwTkbFGCJA
 

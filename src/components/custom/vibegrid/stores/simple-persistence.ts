@@ -9,6 +9,8 @@ import { observable } from '@legendapp/state';
 import { configureSynced, syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { log } from '@/logger';
+import type { GroupConfig, SortConfig, FilterConfig } from '../types';
+import type { GroupRowOrderConfig } from './data-state';
 
 const persistLog = log('vibegrid/simple-persistence');
 
@@ -19,7 +21,7 @@ const persistOptions = configureSynced({
   }
 });
 
-// Simple interface for essential VibeGrid preferences
+// Complete interface for all VibeGrid visual state persistence
 export interface VibeGridPreferences {
   // Column layout
   columnWidths: Record<string, number>;
@@ -27,8 +29,21 @@ export interface VibeGridPreferences {
   columnVisibility: Record<string, boolean>;
 
   // Data display
-  sortBy: Array<{ field: string; direction: 'asc' | 'desc' }>;
-  filters: Array<{ field: string; operator: string; value: any }>;
+  sortBy: SortConfig[];
+  filters: FilterConfig[];
+
+  // Grouping configuration
+  groupConfig: GroupConfig | null;
+
+  // Row ordering state
+  groupRowOrders: Record<string, GroupRowOrderConfig>;
+  flatRowOrder: string[];
+
+  // Viewport state (optional - may not want to persist scroll position)
+  scrollPosition?: { top: number; left: number };
+
+  // Selection state (transient - usually not persisted)
+  selectedCells?: string[];
 
   // Metadata
   entityType: string;
@@ -46,6 +61,11 @@ export function createVibeGridPreferences(entityType: string) {
     columnVisibility: {},
     sortBy: [],
     filters: [],
+    groupConfig: null,
+    groupRowOrders: {},
+    flatRowOrder: [],
+    scrollPosition: { top: 0, left: 0 },
+    selectedCells: [],
     entityType,
     lastUpdated: new Date().toISOString()
   });
@@ -97,17 +117,67 @@ export function createVibeGridPreferences(entityType: string) {
       },
 
       // Update sort configuration
-      setSortBy(sortBy: Array<{ field: string; direction: 'asc' | 'desc' }>) {
+      setSortBy(sortBy: SortConfig[]) {
         preferences$.sortBy.set(sortBy);
         preferences$.lastUpdated.set(new Date().toISOString());
         persistLog.debug('📊 Sort configuration saved', { sortBy });
       },
 
       // Update filters
-      setFilters(filters: Array<{ field: string; operator: string; value: any }>) {
+      setFilters(filters: FilterConfig[]) {
         preferences$.filters.set(filters);
         preferences$.lastUpdated.set(new Date().toISOString());
         persistLog.debug('🔍 Filters saved', { filters });
+      },
+
+      // Update group configuration
+      setGroupConfig(groupConfig: GroupConfig | null) {
+        preferences$.groupConfig.set(groupConfig);
+        preferences$.lastUpdated.set(new Date().toISOString());
+        persistLog.debug('👥 Group configuration saved', {
+          hasConfig: !!groupConfig,
+          fields: groupConfig?.fields?.length || 0
+        });
+      },
+
+      // Update scroll position (optional - usually not persisted for UX reasons)
+      setScrollPosition(position: { top: number; left: number }) {
+        preferences$.scrollPosition.set(position);
+        preferences$.lastUpdated.set(new Date().toISOString());
+        persistLog.debug('📜 Scroll position saved', { position });
+      },
+
+      // Update selected cells (transient - usually not persisted)
+      setSelectedCells(cells: string[]) {
+        preferences$.selectedCells.set(cells);
+        preferences$.lastUpdated.set(new Date().toISOString());
+        persistLog.debug('🎯 Selected cells saved', { count: cells.length });
+      },
+
+      // Update group row orders for a specific group
+      setGroupRowOrder(groupId: string, rowOrder: GroupRowOrderConfig) {
+        const current = preferences$.groupRowOrders.get();
+        preferences$.groupRowOrders.set({
+          ...current,
+          [groupId]: rowOrder
+        });
+        preferences$.lastUpdated.set(new Date().toISOString());
+        persistLog.debug('📋 Group row order saved', { groupId, rowCount: rowOrder.rowIds.length });
+      },
+
+      // Update flat row order (ungrouped mode)
+      setFlatRowOrder(rowOrder: string[]) {
+        preferences$.flatRowOrder.set(rowOrder);
+        preferences$.lastUpdated.set(new Date().toISOString());
+        persistLog.debug('📋 Flat row order saved', { rowCount: rowOrder.length });
+      },
+
+      // Clear all row ordering (useful when switching modes)
+      clearRowOrdering() {
+        preferences$.groupRowOrders.set({});
+        preferences$.flatRowOrder.set([]);
+        preferences$.lastUpdated.set(new Date().toISOString());
+        persistLog.debug('🗑️ All row ordering cleared');
       },
 
       // Initialize with column defaults
@@ -159,6 +229,11 @@ export function createVibeGridPreferences(entityType: string) {
           columnVisibility: defaultVisibility,
           sortBy: [],
           filters: [],
+          groupConfig: null,
+          groupRowOrders: {},
+          flatRowOrder: [],
+          scrollPosition: { top: 0, left: 0 },
+          selectedCells: [],
           lastUpdated: new Date().toISOString()
         });
 
@@ -200,7 +275,12 @@ export function inspectVibeGridPersistence(entityType: string) {
       hasColumnWidths: !!parsed.columnWidths && Object.keys(parsed.columnWidths).length > 0,
       hasColumnOrder: !!parsed.columnOrder && parsed.columnOrder.length > 0,
       hasSortBy: !!parsed.sortBy && parsed.sortBy.length > 0,
-      hasFilters: !!parsed.filters && parsed.filters.length > 0
+      hasFilters: !!parsed.filters && parsed.filters.length > 0,
+      hasGroupConfig: !!parsed.groupConfig,
+      hasGroupRowOrders: !!parsed.groupRowOrders && Object.keys(parsed.groupRowOrders).length > 0,
+      hasFlatRowOrder: !!parsed.flatRowOrder && parsed.flatRowOrder.length > 0,
+      hasScrollPosition: !!parsed.scrollPosition,
+      hasSelectedCells: !!parsed.selectedCells && parsed.selectedCells.length > 0
     });
     return parsed;
   } catch (error) {
