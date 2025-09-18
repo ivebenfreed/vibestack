@@ -124,6 +124,7 @@ export class SimplePassiveRenderer {
   private interactionObserverDisposer: (() => void) | null = null;
   private scrollObserverDisposer: (() => void) | null = null;
   private dragSelectionObserverDisposer: (() => void) | null = null;
+  private pendingRAF: number | null = null; // Track pending RAF to prevent cascades
   private domFactory: DOMElementFactory | null = null;
   private headerRenderer: HeaderRenderer | null = null;
   
@@ -442,7 +443,13 @@ export class SimplePassiveRenderer {
 
       // Defer virtual range checking to avoid reading computed state in observer
       // Use RAF to break out of the reactive context
-      requestAnimationFrame(() => {
+      // CRITICAL FIX: Prevent RAF cascade by cancelling previous RAF
+      if (this.pendingRAF !== null) {
+        cancelAnimationFrame(this.pendingRAF);
+      }
+
+      this.pendingRAF = requestAnimationFrame(() => {
+        this.pendingRAF = null; // Clear the pending RAF
         this.checkVirtualRangeChange();
       });
     });
@@ -1009,8 +1016,11 @@ export class SimplePassiveRenderer {
       this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
     }
 
-    // Force DOM position tracker to update after cells are rendered
-    positionTracker.forceUpdate();
+    // Schedule DOM position tracker update in next frame to avoid forced reflow
+    // This prevents measuring DOM immediately after modifying it
+    requestAnimationFrame(() => {
+      positionTracker.forceUpdate();
+    });
 
     fileLog.info('✅ Body rendered with Phase 2 managers');
   }
@@ -1253,7 +1263,13 @@ export class SimplePassiveRenderer {
    */
   destroy(): void {
     fileLog.info('🧹 Destroying SimplePassiveRenderer with Phase 2 managers');
-    
+
+    // Cancel any pending RAF
+    if (this.pendingRAF !== null) {
+      cancelAnimationFrame(this.pendingRAF);
+      this.pendingRAF = null;
+    }
+
     // Clean up focused observers
     if (this.dataObserverDisposer) {
       this.dataObserverDisposer();

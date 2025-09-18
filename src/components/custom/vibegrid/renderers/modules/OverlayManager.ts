@@ -835,12 +835,46 @@ export class OverlayManager {
   private getViewportInfo(): ViewportInfo {
     // Use the body container if available, as that's where scrolling happens
     const scrollContainer = this.bodyContainer || this.container.querySelector('.vibegridx-body-container') as HTMLElement || this.container;
-    
+
+    // Defensive code to handle performance monitoring overrides
+    let scrollTop = 0;
+    let scrollLeft = 0;
+    let viewportWidth = 0;
+    let viewportHeight = 0;
+
+    try {
+      scrollTop = scrollContainer.scrollTop || 0;
+    } catch (e) {
+      // Performance monitoring may override getter
+      fileLog.debug('Failed to get scrollTop, using 0', e);
+    }
+
+    try {
+      scrollLeft = scrollContainer.scrollLeft || 0;
+    } catch (e) {
+      // Performance monitoring may override getter
+      fileLog.debug('Failed to get scrollLeft, using 0', e);
+    }
+
+    try {
+      viewportWidth = scrollContainer.clientWidth || 0;
+    } catch (e) {
+      // Performance monitoring may override getter
+      fileLog.debug('Failed to get clientWidth, using 0', e);
+    }
+
+    try {
+      viewportHeight = scrollContainer.clientHeight || 0;
+    } catch (e) {
+      // Performance monitoring may override getter
+      fileLog.debug('Failed to get clientHeight, using 0', e);
+    }
+
     return {
-      scrollTop: scrollContainer.scrollTop || 0,
-      scrollLeft: scrollContainer.scrollLeft || 0,
-      viewportWidth: scrollContainer.clientWidth || 0,
-      viewportHeight: scrollContainer.clientHeight || 0
+      scrollTop,
+      scrollLeft,
+      viewportWidth,
+      viewportHeight
     };
   }
   

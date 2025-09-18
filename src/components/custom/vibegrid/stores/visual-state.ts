@@ -714,6 +714,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       persist: {
         plugin: ObservablePersistLocalStorage,
         name: persistKey,
+        debounceSet: 1000, // Debounce saves by 1 second to prevent excessive localStorage writes
         transform: {
           load: (value: any) => {
             fileLog.debug('🔍 Loading visual state from persistence', { value, persistKey });
