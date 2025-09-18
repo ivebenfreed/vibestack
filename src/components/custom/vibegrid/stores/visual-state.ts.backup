@@ -1181,12 +1181,6 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     try {
       fileLog.info('🔄 toggleSort ENTRY', { field, isMultiSort, timestamp: Date.now() });
 
-      fileLog.debug("🔍 DEBUGGING visualInputs$ in toggleSort", { 
-        visualInputsType: typeof visualInputs$, 
-        visualInputsExists: !!visualInputs$, 
-        visualInputsValue: visualInputs$, 
-        hasClosureAccess: "visualInputs$" in this || typeof visualInputs$ !== "undefined" 
-      });
       const currentSortBy = visualInputs$.sortBy?.get() || [];
       const existingIndex = currentSortBy.findIndex(s => s.field === field);
 

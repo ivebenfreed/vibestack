@@ -183,6 +183,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
         // Keep visual state synchronized with tableCore$ observables
         visualState.visualInputs$.columns.set(columns);
 
+        // sortedProcessedRows$ is now created internally by the renderer (self-contained architecture)
+
         fileLog.info('🎯 Visual state initialized and synchronized', {
           entityType, orgId, userId,
           columnsCount: columns.length
@@ -237,7 +239,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
           enableSelectionColumn,
           bufferSize,
           onEntityUpdate,
-          onBatchEntityUpdate
+          onBatchEntityUpdate,
+          // sortedProcessedRows$ now created internally by renderer
         });
 
         rendererRef.current = renderer;

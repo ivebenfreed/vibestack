@@ -233,7 +233,7 @@ export class HeaderRenderer {
     this.setupResizeHandler(resizeHandle, column);
     headerCell.appendChild(resizeHandle);
     
-    // Add click handler for sorting and column selection
+    // Set up passive interaction attributes for MouseController
     this.setupHeaderClickHandler(headerCell, column);
 
     // Add drag handling for column reordering - MOVED TO MOUSECONTROLLER
@@ -241,9 +241,6 @@ export class HeaderRenderer {
 
     // Disable HTML5 drag on header cells - MouseController will handle all dragging
     headerCell.draggable = false;
-
-    // Add data attribute for MouseController to identify column
-    headerCell.setAttribute('data-column-id', column.id);
 
     return headerCell;
   }
@@ -458,43 +455,19 @@ export class HeaderRenderer {
 
 
   /**
-   * Set up header click handler for sorting and column selection
+   * Set up header for passive interaction (data attributes only)
    */
   private setupHeaderClickHandler(headerCell: HTMLElement, column: any): void {
     headerCell.style.cursor = 'pointer';
-    headerCell.addEventListener('click', (e) => {
-      // Don't sort if clicking on resize handle
-      if ((e.target as HTMLElement).classList.contains('vibegridx-resize-handle')) {
-        return;
-      }
-      
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      const isShiftKey = e.shiftKey;
-      
-      if (isCtrlKey && !isShiftKey) {
-        // Ctrl+Click on header - select entire column
-        e.preventDefault();
-        if (this.selectionController) {
-          this.selectionController.selectColumn(column.id);
-        }
-        fileLog.info('🎯 Column selected', { columnId: column.id });
-      } else {
-        // Regular click or Shift+click - toggle sort
-        // Shift+click enables multi-column sorting
-        const isMultiSort = isShiftKey;
-        
-        fileLog.info('🔄 Column header clicked for sort', { 
-          columnId: column.id, 
-          field: column.field,
-          usingField: column.field || column.id,
-          isMultiSort,
-          isShiftKey
-        });
-        
-        // Use column.field for sorting (data field), not column.id (display identifier)
-        // Pass isMultiSort parameter to enable/disable multi-column sorting
-        this.tableCore$.toggleSort(column.field || column.id, isMultiSort);
-      }
+
+    // HeaderRenderer should be passive - just add data attributes for MouseController
+    headerCell.setAttribute('data-column-id', column.id);
+    headerCell.setAttribute('data-field', column.field || column.id);
+    headerCell.setAttribute('data-interaction-type', 'column-header');
+
+    fileLog.debug('🎯 Header cell setup for passive interaction', {
+      columnId: column.id,
+      field: column.field || column.id
     });
   }
 

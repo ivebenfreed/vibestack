@@ -429,6 +429,16 @@ export class MouseController {
     const target = e.target as HTMLElement;
     const isWithinContainer = this.container.contains(e.target as Node);
 
+    fileLog.info('🔍 onClick entry', {
+      targetTag: target.tagName,
+      targetClass: target.className,
+      targetId: target.id,
+      isWithinContainer,
+      targetHasDataColumnId: target.hasAttribute('data-column-id'),
+      targetHasDataInteractionType: target.hasAttribute('data-interaction-type'),
+      targetDataInteractionType: target.getAttribute('data-interaction-type')
+    });
+
     if (isWithinContainer) {
       // Handle clicks within the container
       const cellElement = target.closest('[data-row-id][data-column-id]');
@@ -464,13 +474,125 @@ export class MouseController {
             this.selectionController.selectRow(rowId);
           }
         }
-      } else if (!cellElement) {
+      } else {
+        // Check for column header clicks
+        const columnHeaderElement = target.closest('[data-interaction-type="column-header"]');
+
+        fileLog.debug('🔍 Click target analysis', {
+          targetTag: target.tagName,
+          targetClass: target.className,
+          targetId: target.id,
+          hasDataInteractionType: target.hasAttribute('data-interaction-type'),
+          targetDataInteractionType: target.getAttribute('data-interaction-type'),
+          columnHeaderElement: !!columnHeaderElement,
+          columnHeaderTag: columnHeaderElement?.tagName,
+          columnHeaderClass: columnHeaderElement?.className
+        });
+
+        if (columnHeaderElement) {
+          // Don't sort if clicking on resize handle
+          if ((e.target as HTMLElement).classList.contains('vibegridx-resize-handle')) {
+            return;
+          }
+
+          const columnId = columnHeaderElement.getAttribute('data-column-id');
+          const field = columnHeaderElement.getAttribute('data-field');
+
+          if (columnId && field) {
+            const isCtrlKey = e.ctrlKey || e.metaKey;
+            const isShiftKey = e.shiftKey;
+
+            fileLog.info('🖱️ Column header click detected', {
+              columnId,
+              field,
+              isShiftKey,
+              isCtrlKey
+            });
+
+            if (isCtrlKey && !isShiftKey && this.selectionController) {
+              // Ctrl+Click on header - select entire column
+              e.preventDefault();
+              this.selectionController.selectColumn(columnId);
+              fileLog.info('🎯 Column selected', { columnId });
+            } else {
+              // Regular click or Shift+click - toggle sort
+              // Shift+click enables multi-column sorting
+              const isMultiSort = isShiftKey;
+
+              fileLog.info('🔄 Column header clicked for sort', {
+                columnId,
+                field,
+                isMultiSort,
+                isShiftKey
+              });
+
+              // Use visual state operations for sorting
+              fileLog.info('🔄 About to call toggleSort', {
+                hasVisualState: !!this.visualState,
+                hasVisualOperations: !!this.visualState?.visualOperations,
+                hasToggleSort: !!this.visualState?.visualOperations?.toggleSort,
+                field,
+                isMultiSort
+              });
+              this.visualState.visualOperations.toggleSort(field, isMultiSort);
+              fileLog.info('🔄 toggleSort call completed');
+            }
+          }
+        } else if (!cellElement) {
+        // Check if this was actually a column header click that didn't get detected
+        const columnHeaderElement = target.closest('[data-interaction-type="column-header"]');
+
+        if (columnHeaderElement) {
+          // This is a column header click that was missed in the earlier check
+          const columnId = columnHeaderElement.getAttribute('data-column-id');
+          const field = columnHeaderElement.getAttribute('data-field');
+
+          fileLog.info('🔍 FOUND MISSED COLUMN HEADER in fallback check', {
+            columnId,
+            field,
+            targetTag: target.tagName,
+            targetClass: target.className
+          });
+
+          if (columnId && field) {
+            const isCtrlKey = e.ctrlKey || e.metaKey;
+            const isShiftKey = e.shiftKey;
+
+            if (isCtrlKey && !isShiftKey && this.selectionController) {
+              // Ctrl+Click on header - select entire column
+              e.preventDefault();
+              this.selectionController.selectColumn(columnId);
+              fileLog.info('🎯 Column selected via fallback', { columnId });
+            } else {
+              // Regular click or Shift+click - toggle sort
+              const isMultiSort = isShiftKey;
+              fileLog.info('🔄 Column header clicked for sort via fallback', {
+                columnId,
+                field,
+                isMultiSort,
+                isShiftKey
+              });
+              this.visualState.visualOperations.toggleSort(field, isMultiSort);
+            }
+            return; // Important: exit early to prevent "container click" message
+          }
+        }
+
         // Click within container but not on a cell or row header - this should NOT clear selection
         // Only clicks outside the entire container should clear selection
-        fileLog.info('🖱️ Container click (non-cell) detected - preserving selection');
+        fileLog.info('🖱️ Container click (non-cell) detected - preserving selection', {
+          targetTag: target.tagName,
+          targetClass: target.className,
+          targetId: target.id,
+          targetHasDataColumnId: target.hasAttribute('data-column-id'),
+          targetHasDataInteractionType: target.hasAttribute('data-interaction-type'),
+          targetDataInteractionType: target.getAttribute('data-interaction-type'),
+          closestColumnHeader: !!target.closest('[data-interaction-type="column-header"]'),
+          closestWithDataColumnId: !!target.closest('[data-column-id]')
+        });
         // Do nothing - preserve current selection
+        }
       }
-      // Note: Cell clicks are handled by mouse down for immediate selection
     } else {
       // Click outside the container - this is a true outside click for blur
       fileLog.info('🖱️ Outside container click detected - delegating to ScrollController for blur');

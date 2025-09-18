@@ -76,6 +76,7 @@ export class SimplePassiveRenderer {
   private tableInteraction$: TableInteraction$;
   private tableViewport$: TableViewport$;
   private initManager: VibeGridHydrationManager;
+  private sortedProcessedRows$?: any; // Computed that provides sorted processedRows
   
   // Basic row management
   private activeRows: Map<string, HTMLElement> = new Map();
@@ -148,6 +149,14 @@ export class SimplePassiveRenderer {
 
     // Use visual state passed from parent VibeGrid component
     this.visualState = options.visualState;
+
+    // Create sorted processed rows computed observable internally (self-contained)
+    this.sortedProcessedRows$ = this.visualState.createSortedProcessedRows$(this.tableCore$);
+
+    fileLog.info('✅ Renderer self-contained: created sortedProcessedRows$ internally', {
+      timestamp: Date.now(),
+      hasSortedRows: !!this.sortedProcessedRows$
+    });
     
     this.initDOM();
     this.initControllers();
@@ -155,7 +164,9 @@ export class SimplePassiveRenderer {
     this.initPhase2Managers();
     this.initOverlayManager();
     this.initHeaderRenderer();
+    fileLog.debug('🎯 About to call initFocusedObservers - this should appear during construction');
     this.initFocusedObservers();
+    fileLog.debug('🎯 initFocusedObservers completed - observers should be created');
     this.postInitialization();
   }
   
@@ -295,25 +306,62 @@ export class SimplePassiveRenderer {
   private initFocusedObservers(): void {
     fileLog.info('🎯 Initializing focused observers');
 
-    // DATA OBSERVER: Only watches data changes (rows, sorting, filtering)
-    // Track data changes to avoid unnecessary renders
-    let lastDataSignature = '';
-    this.dataObserverDisposer = observe(() => {
+    // VISUAL STATE OBSERVER: Direct subscription to visual state changes
+    // This will trigger whenever visual state changes (sorting, filtering, etc.)
+    fileLog.debug('🎯 Creating visual state observer - direct subscription to sortBy changes');
+    this.dataObserverDisposer = this.visualState.visualInputs$.sortBy.onChange(() => {
+      fileLog.debug('🔍 VISUAL STATE CHANGE DETECTED', {
+        observersEnabled: this.observersEnabled,
+        timestamp: Date.now()
+      });
+
       // GUARD: Skip if observers are not enabled yet
       if (!this.observersEnabled) {
-        fileLog.debug('⏸️ DATA: Observers not enabled yet');
+        fileLog.debug('⏸️ VISUAL: Observers not enabled yet');
         return;
       }
 
       // GUARD: Only render if grid is fully initialized
       const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
       if (!isFullyInitialized) {
-        fileLog.debug('⏸️ DATA: Skipping render during initialization');
+        fileLog.debug('⏸️ VISUAL: Skipping render during initialization');
         return;
       }
 
-      const processedRows = this.tableCore$.processedRows.get(true);
-      const sortBy = this.visualState.visualInputs$.sortBy.get(true);
+      // ALWAYS use visual state for processed rows - never bypass to data state
+      if (!this.sortedProcessedRows$) {
+        fileLog.error('❌ DATA FLOW ERROR: sortedProcessedRows$ not available - renderer should ALWAYS observe visual state');
+        return;
+      }
+
+      // Get the current sort configuration and trigger recomputation
+      const sortBy = this.visualState.visualOperations.visualInputs$.sortBy.get();
+
+      // Force recalculation by accessing the computed - this should trigger applySorting
+      const processedRows = this.sortedProcessedRows$.get();
+
+      fileLog.debug('🔍 VISUAL STATE OBSERVER: Dependencies accessed', {
+        processedRowsCount: processedRows.length,
+        sortByCount: sortBy.length,
+        sortByFirst: sortBy[0]?.field,
+        sortByDirection: sortBy[0]?.direction
+      });
+
+      // CRITICAL: Trigger DOM re-render with the new sorted data
+      this.renderTable(processedRows);
+
+      fileLog.debug('🔄 DOM re-rendered with sorted data', {
+        processedRowsCount: processedRows.length
+      });
+
+      fileLog.debug('🔍 DATA FLOW CHECK', {
+        hasSortedProcessedRows: !!this.sortedProcessedRows$,
+        processedRowsCount: processedRows.length,
+        sortByCount: sortBy.length,
+        sortBy: sortBy.map(s => `${s.field}:${s.direction}`),
+        usingDataState: !this.sortedProcessedRows$,
+        firstRowTitle: processedRows[0]?.title
+      });
 
       // Create a signature of actual data changes
       const dataSignature = `${processedRows.length}-${sortBy.map(s => `${s.field}:${s.direction}`).join(',')}`;
