@@ -492,6 +492,9 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     );
     const defaultOrder = columns.map(col => col.id);
 
+    // Get current state to preserve any loaded persistence values
+    const currentState = visualInputs$.get();
+
     visualInputs$.set({
       columns,
       columnWidths: defaultWidths,
@@ -504,8 +507,9 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       rowCount: 0,
       rowHeight: 40,
       groupConfig: null,
-      sortBy: [],
-      filters: [],
+      // Preserve existing sortBy and filters from persistence
+      sortBy: currentState.sortBy || [],
+      filters: currentState.filters || [],
       entityType,
       orgId,
       userId,
@@ -893,15 +897,51 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               triggerStack: new Error().stack?.split('\n').slice(1, 6).join('\n')
             });
 
-            // Ensure sortBy is valid before saving
-            const validSortBy = Array.isArray(value.sortBy) ? value.sortBy.filter(item =>
-              item && typeof item === 'object' && item.field && item.direction
-            ) : [];
+            // FIX: Get current state from observable instead of relying on stale `value` parameter
+            // This ensures we always save the most up-to-date state, especially for sort changes
+            const currentState = visualInputs$.get();
 
-            fileLog.info('💾 SORT DEBUG: Pre-persistence validation', {
+            // DEBUG: Log the complete value object being saved
+            console.log('💾 SAVE DEBUG - INPUT VALUE OBJECT:', {
+              keys: Object.keys(value),
+              sortBy: value.sortBy,
+              sortByExists: !!value.sortBy,
+              sortByLength: Array.isArray(value.sortBy) ? value.sortBy.length : 'not-array',
+              columnWidths: value.columnWidths,
+              fullObject: value
+            });
+
+            console.log('💾 SAVE DEBUG - CURRENT STATE OBJECT:', {
+              keys: Object.keys(currentState),
+              sortBy: currentState.sortBy,
+              sortByExists: !!currentState.sortBy,
+              sortByLength: Array.isArray(currentState.sortBy) ? currentState.sortBy.length : 'not-array',
+              columnWidths: currentState.columnWidths,
+              fullObject: currentState
+            });
+
+            fileLog.info('💾 SAVE DEBUG: Complete value object', {
+              persistKey,
+              hasColumnWidths: !!value.columnWidths,
+              hasColumnVisibility: !!value.columnVisibility,
+              hasColumnOrder: !!value.columnOrder,
+              hasGroupConfig: !!value.groupConfig,
+              hasSortBy: !!value.sortBy,
+              sortByType: typeof value.sortBy,
+              sortByLength: Array.isArray(value.sortBy) ? value.sortBy.length : 'not-array',
+              sortByValue: value.sortBy,
+              hasFilters: !!value.filters,
+              filtersType: typeof value.filters,
+              valueKeys: Object.keys(value),
+              fullValueObject: value
+            });
+
+            // Simple sort validation - just ensure it's an array
+            const validSortBy = Array.isArray(currentState.sortBy) ? currentState.sortBy : [];
+
+            console.log('💾 SIMPLE SORT DEBUG:', {
               originalSortBy: value.sortBy,
-              originalSortByType: typeof value.sortBy,
-              originalSortByIsArray: Array.isArray(value.sortBy),
+              currentStateSortBy: currentState.sortBy,
               validSortBy,
               validSortByCount: validSortBy.length
             });
@@ -936,6 +976,14 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               sortBy: persistedState.sortBy,
               originalSortBy: value.sortBy,
               validSortByFiltered: validSortBy
+            });
+
+            // DEBUG: Log the final object being persisted
+            fileLog.info('💾 FINAL PERSISTED OBJECT', {
+              persistKey,
+              finalObject: persistedState,
+              finalObjectKeys: Object.keys(persistedState),
+              jsonStringified: JSON.stringify(persistedState)
             });
 
             return persistedState;
@@ -1010,8 +1058,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       columnVisibility: Object.fromEntries(columns.map(col => [col.id, true])),
       columnOrder: columns.map(col => col.id),
       groupConfig: null, // Include groupConfig in default state
-      sortBy: [], // Include sortBy in default state
-      filters: [], // Include filters in default state
+      // Note: sortBy and filters are preserved from persistence/current state in initializeColumns
       entityType,
       orgId,
       userId
@@ -1243,7 +1290,15 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
         }
       }
 
-      fileLog.debug('🔄 Sort toggled', { field, isMultiSort, sortBy: visualInputs$.sortBy?.get() });
+      // DEBUG: Enhanced logging after sort toggle
+      const currentSortAfterToggle = visualInputs$.sortBy?.get();
+      fileLog.info('🔄 Sort toggled - ENHANCED DEBUG', {
+        field,
+        isMultiSort,
+        sortBy: currentSortAfterToggle,
+        sortByLength: Array.isArray(currentSortAfterToggle) ? currentSortAfterToggle.length : 'not-array',
+        entireVisualInputs: visualInputs$.get()
+      });
     } catch (error) {
       fileLog.error('🔄 toggleSort ERROR', { field, error });
       throw error;
