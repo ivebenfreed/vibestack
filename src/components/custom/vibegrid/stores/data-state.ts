@@ -345,19 +345,13 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
 
-      // Get grouping configuration from visual state (if available) or fallback to data state
-      const visualGroupConfig = visualInputs$?.groupConfig?.get();
-      const dataGroupConfig = tableCore$.groupConfig.get();
-      const groupConfig = visualGroupConfig || dataGroupConfig;
+      // Get grouping configuration from visual state only (pure architecture)
+      const groupConfig = visualInputs$?.groupConfig?.get();
 
-      fileLog.info('📊 Group config sources', {
+      fileLog.info('📊 Group config from visual state', {
         hasVisualInputs: !!visualInputs$,
-        hasVisualGroupConfig: !!visualGroupConfig,
-        hasDataGroupConfig: !!dataGroupConfig,
-        usingVisualConfig: !!visualGroupConfig,
-        expandedGroupsFromVisual: visualGroupConfig?.expandedGroups ? Array.from(visualGroupConfig.expandedGroups) : 'none',
-        expandedGroupsFromData: dataGroupConfig?.expandedGroups ? Array.from(dataGroupConfig.expandedGroups) : 'none',
-        finalExpandedGroups: groupConfig?.expandedGroups ? Array.from(groupConfig.expandedGroups) : 'none'
+        hasGroupConfig: !!groupConfig,
+        expandedGroups: groupConfig?.expandedGroups ? Array.from(groupConfig.expandedGroups) : 'none'
       });
 
       // Apply grouping if configured
@@ -412,11 +406,7 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
     // NOTE: Column manipulation methods moved to visual-state
     // (toggleSort, setFilter, clearFilter, setColumnWidth)
 
-    setGroupConfig(config: GroupConfig | null) {
-      // Delegate to visual operations which handles the actual grouping state
-      tableCore$.groupConfig.set(config);
-      fileLog.info('🎯 Group config delegated to visual state', { config });
-    },
+    // NOTE: setGroupConfig removed - grouping now handled purely in visual state
 
     // Drag and drop row ordering methods for grouped mode
     setGroupRowOrder(groupId: string, rowIds: string[]) {
