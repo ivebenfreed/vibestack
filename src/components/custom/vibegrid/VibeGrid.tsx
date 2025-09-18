@@ -175,6 +175,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const orgId = universeOrgId$.get();
       const userId = universeUserId$.get();
       if (orgId && userId) {
+        // Set up persistence first (once per entity)
+        visualState.visualOperations.setupPersistence(entityType);
+        // Then initialize columns
         visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
 
         // Keep visual state synchronized with tableCore$ observables
@@ -293,12 +296,15 @@ export function VibeGrid<T extends Record<string, any> = any>(
         initManager.markReady('mouseControllerReady');
         initManager.markReady('scrollControllerReady');
 
-        // Coordinate visual state initialization with overall VibeGrid initialization
-        // Clear visual state's isInitializing flag only when entire grid is fully ready
+        // Coordinate state initialization with overall VibeGrid initialization
+        // Clear all isInitializing flags only when entire grid is fully ready
         initManager.isFullyHydrated$.onChange((isFullyInitialized) => {
           if (isFullyInitialized) {
+            // Clear visual state initialization flag
             visualState.visualInputs$.isInitializing.set(false);
-            fileLog.info('🎯 Visual state initialization flag cleared - VibeGrid fully ready', {
+            // Clear data state initialization flag
+            observables.tableCore$.isInitializing.set(false);
+            fileLog.info('🎯 All state initialization flags cleared - VibeGrid fully ready', {
               entityType,
               tableId
             });

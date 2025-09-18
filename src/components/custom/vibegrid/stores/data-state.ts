@@ -287,6 +287,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     entityType,
     columns,
 
+    // Initialization flag to prevent saves during init
+    isInitializing: true,
+
     // Persistent configuration state (will be synchronized with localStorage)
     // NOTE: Column concerns moved to visual-state (columnOrder, columnWidths, columnVisibility, sortBy, filters)
     groupRowOrders: defaultState.groupRowOrders,
@@ -650,6 +653,17 @@ export function createTableCore$(entityType: string, columns: Column[]) {
             return transformTableState(value, defaultState);
           },
           save: (value: any) => {
+            // Skip saving during initialization - check for the isInitializing flag
+            if (value.isInitializing) {
+              fileLog.info('⏸️ SAVE BLOCKED: Skipping data state save during initialization', {
+                storageKey,
+                entityType: value.entityType,
+                stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
+              });
+              // Return false to prevent save according to Legend State docs
+              return false;
+            }
+
             // Save only row ordering fields (columns handled by visual state)
             const persistedData = {
               groupRowOrders: value.groupRowOrders,

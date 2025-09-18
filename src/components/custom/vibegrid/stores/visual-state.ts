@@ -697,17 +697,9 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
   // ====================================
 
   /**
-   * Initialize columns with data and user/org context with persistence
+   * Set up persistence for the visual state (called once during initialization)
    */
-  initializeColumns(
-    columns: Column[],
-    entityType: string,
-    orgId: string,
-    userId: string
-  ) {
-    const defaultState = this.createDefaultColumnState(columns, entityType, orgId, userId);
-
-    // Set up persistence with simplified storage key using entity name
+  setupPersistence(entityType: string) {
     const persistKey = `vibegrid-visual-${entityType}`;
 
     const syncObservableInstance = syncObservable(visualInputs$, {
@@ -722,7 +714,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
             // Handle missing or invalid data
             if (!value || typeof value !== 'object') {
               fileLog.warn('⚠️ No valid persisted state found, using defaults');
-              return { ...visualInputs$.get(), ...defaultState };
+              return visualInputs$.get(); // Return current state if no persistence data
             }
 
             // Merge with current state (in case schema changed)
@@ -743,17 +735,17 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
             const merged = {
               ...currentInputs,
               ...value,
-              columns: defaultState.columns, // Always use fresh columns from schema
+              columns: currentInputs.columns, // Always use fresh columns from current state
               // Preserve user preferences but add defaults for new columns
               columnWidths: {
-                ...defaultState.columnWidths,
+                ...currentInputs.columnWidths,
                 ...value.columnWidths
               },
               columnVisibility: {
-                ...defaultState.columnVisibility,
+                ...currentInputs.columnVisibility,
                 ...value.columnVisibility
               },
-              columnOrder: value.columnOrder?.length ? value.columnOrder : defaultState.columnOrder,
+              columnOrder: value.columnOrder?.length ? value.columnOrder : currentInputs.columnOrder,
               // Include group configuration in persistence
               groupConfig: value.groupConfig || null,
               // Include sort configuration in persistence - validated
@@ -774,18 +766,17 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
             return merged;
           },
           save: (value: any) => {
-            // Skip saving during initialization - don't persist the isInitializing flag
+            // Skip saving during initialization
             if (value.isInitializing) {
               fileLog.info('⏸️ SAVE BLOCKED: Skipping save during initialization', {
                 persistKey,
                 entityType: value.entityType,
                 stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
               });
-              // Return false to prevent save according to Legend State docs
               return false;
             }
 
-            // Log what triggered this save to debug cross-entity contamination
+            // Log what triggered this save
             fileLog.info('💾 SAVE TRIGGERED: Visual state save', {
               persistKey,
               entityType: value.entityType,
@@ -802,7 +793,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               item && typeof item === 'object' && item.field && item.operator && item.value !== undefined
             ) : [];
 
-            // Only persist configuration state, not transient data (exclude isInitializing)
+            // Only persist configuration state, not transient data
             const persistedState = {
               columnWidths: value.columnWidths || {},
               columnVisibility: value.columnVisibility || {},
@@ -831,68 +822,55 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       }
     });
 
-    // Set initialization flag to prevent saves during init
-    visualInputs$.isInitializing.set(true);
-
-    // Initialize with default state (persistence will override if available)
-    visualInputs$.set({ ...visualInputs$.get(), ...defaultState, isInitializing: true });
-
-    // Add persistence debugging as recommended by Legend State docs
+    // Add persistence debugging
     const syncStatus$ = syncState(visualInputs$);
-
-    // Create a custom persistence loaded tracker that waits for actual data loading
     const persistenceComplete$ = observable(false);
 
-    // Export both sync status and our custom completion tracker for persistence checking in VibeGrid
+    // Export sync status for VibeGrid to check
     visualSyncStatus$ = {
       ...syncStatus$,
       isPersistenceDataLoaded: persistenceComplete$
     };
 
-    // Wait for persistence to load, then log status and mark as complete
+    // Wait for persistence to load
     when(syncStatus$.isPersistLoaded).then(() => {
-      // Give the load transform a chance to complete AND prevent rapid saves during initialization
       setTimeout(() => {
-        // NOTE: isInitializing flag is now controlled by VibeGrid initManager
-        // Don't clear it here - let the overall initialization coordination handle it
-
         persistenceComplete$.set(true);
-        fileLog.info('🎯 Columns observable persistence loaded', {
+        fileLog.info('🎯 Visual state persistence loaded', {
           entityType,
-          orgId,
-        userId,
-        columnsCount: columns.length,
-        persistKey,
-        isPersistLoaded: syncStatus$.isPersistLoaded.get(),
-        isPersistEnabled: syncStatus$.isPersistEnabled.get(),
-        currentSortBy: visualInputs$.sortBy.get(),
-        error: syncStatus$.error.get()
-      });
-
-      // Debug localStorage content
-      try {
-        const stored = localStorage.getItem(persistKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          fileLog.debug('📦 Persistence content check', {
-            persistKey,
-            hasSortBy: !!parsed.sortBy,
-            sortByLength: Array.isArray(parsed.sortBy) ? parsed.sortBy.length : 0,
-            sortBy: parsed.sortBy
-          });
-        }
-      } catch (e) {
-        fileLog.error('❌ Failed to check persistence content', e);
-      }
-      }, 2000); // Increase delay to 2 seconds to prevent rapid saves during grid initialization
+          persistKey,
+          isPersistLoaded: syncStatus$.isPersistLoaded.get(),
+          isPersistEnabled: syncStatus$.isPersistEnabled.get()
+        });
+      }, 100); // Short delay to ensure data is loaded
     });
 
-    fileLog.info('🎯 Columns observable initialized', {
+    return syncObservableInstance;
+  },
+
+  /**
+   * Initialize columns with data and user/org context
+   */
+  initializeColumns(
+    columns: Column[],
+    entityType: string,
+    orgId: string,
+    userId: string
+  ) {
+    const defaultState = this.createDefaultColumnState(columns, entityType, orgId, userId);
+
+    // Initialize with default state
+    visualInputs$.set({
+      ...visualInputs$.get(),
+      ...defaultState,
+      isInitializing: true // Keep initialization flag
+    });
+
+    fileLog.info('🎯 Columns initialized', {
       entityType,
       orgId,
       userId,
-      columnsCount: columns.length,
-      persistKey
+      columnsCount: columns.length
     });
   },
 
