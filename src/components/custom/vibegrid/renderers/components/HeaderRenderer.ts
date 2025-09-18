@@ -57,10 +57,12 @@ export class HeaderRenderer {
     visibleRangeEnd: number;
     columnOrderString: string; // Track column order for drag operations
   } | null = null;
-  private updateCoordinateMapping: (mapping: CoordinateMapping) => void;
-  
+
   // Header state
   private selectAllCheckbox: HTMLInputElement | null = null;
+
+  // Reactive sort indicator observer
+  private sortIndicatorObserver?: () => void;
 
   constructor(options: HeaderRendererOptions) {
     this.headerContainer = options.headerContainer;
@@ -73,6 +75,8 @@ export class HeaderRenderer {
     this.enableSelectionColumn = options.enableSelectionColumn ?? false;
     this.updateCoordinateMapping = options.updateCoordinateMapping;
     this.visualState = options.visualState;
+
+    this.initializeReactiveSortIndicators();
   }
 
   /**
@@ -486,20 +490,29 @@ export class HeaderRenderer {
   }
 
   /**
-   * Update all sort indicators
+   * Update all sort indicators (legacy method - now uses reactive pattern)
    */
   updateSortIndicators(): void {
-    const headerCells = this.headerContainer.querySelectorAll('.vibegridx-header-cell');
-    const columns = this.tableCore$.columns.get();
-    
-    headerCells.forEach((headerCell, index) => {
-      const fieldId = headerCell.getAttribute('data-field');
-      const column = columns.find(c => c.id === fieldId);
-      
-      if (column) {
-        this.updateSortIndicator(headerCell as HTMLElement, column);
-      }
-    });
+    // Get current sort state and trigger reactive update
+    try {
+      const sortState = this.visualState.visualInputs$.sortBy.get();
+      this.updateSortIndicatorsReactive(sortState);
+    } catch (error) {
+      // Fallback to manual update if reactive state is not available
+      fileLog.warn('⚠️ Falling back to manual sort indicator update', { error });
+
+      const headerCells = this.headerContainer.querySelectorAll('.vibegridx-header-cell');
+      const columns = this.tableCore$.columns.get();
+
+      headerCells.forEach((headerCell, index) => {
+        const fieldId = headerCell.getAttribute('data-field');
+        const column = columns.find(c => c.id === fieldId);
+
+        if (column) {
+          this.updateSortIndicator(headerCell as HTMLElement, column);
+        }
+      });
+    }
   }
 
   /**
@@ -602,6 +615,73 @@ export class HeaderRenderer {
       // If visual operations aren't available, fallback to direct check
       const tableCore = this.tableCore$.get();
       return tableCore.grouping && tableCore.grouping.fields && tableCore.grouping.fields.length > 0;
+    }
+  }
+
+  /**
+   * Initialize reactive sort indicators that automatically update when sort state changes
+   */
+  private initializeReactiveSortIndicators(): void {
+    if (!this.visualState?.visualInputs$?.sortBy) {
+      fileLog.error('🚨 Visual state not available for reactive sort indicators');
+      return;
+    }
+
+    // Create reactive observer for sort state changes
+    this.sortIndicatorObserver = observe(() => {
+      try {
+        const sortState = this.visualState.visualInputs$.sortBy.get();
+
+        fileLog.debug('🔄 Reactive sort indicator update triggered', {
+          sortByCount: sortState?.length || 0,
+          firstSort: sortState?.[0]?.field,
+          firstDirection: sortState?.[0]?.direction
+        });
+
+        // Update all sort indicators immediately
+        this.updateSortIndicatorsReactive(sortState);
+
+      } catch (error) {
+        fileLog.error('🚨 Error in reactive sort indicator update', { error });
+      }
+    });
+
+    fileLog.info('✅ Reactive sort indicators initialized');
+  }
+
+  /**
+   * Reactive sort indicator update - optimized for Legend State observables
+   */
+  private updateSortIndicatorsReactive(sortState: any[]): void {
+    if (!this.headerContainer) return;
+
+    const headerCells = this.headerContainer.querySelectorAll('.vibegridx-header-cell');
+
+    headerCells.forEach((headerCell) => {
+      const fieldId = headerCell.getAttribute('data-field');
+      if (!fieldId) return;
+
+      const columnSort = sortState?.find((s: any) => s.field === fieldId);
+      const direction = columnSort?.direction || null;
+
+      // Update the sort icon using DOM factory method
+      this.domFactory.updateSortIcon(headerCell as HTMLElement, direction);
+    });
+
+    fileLog.debug('🎯 Reactive sort indicators updated', {
+      updatedCells: headerCells.length,
+      activeSorts: sortState?.length || 0
+    });
+  }
+
+  /**
+   * Cleanup method for disposing reactive observers
+   */
+  dispose(): void {
+    if (this.sortIndicatorObserver) {
+      this.sortIndicatorObserver();
+      this.sortIndicatorObserver = undefined;
+      fileLog.info('🧹 Reactive sort indicator observer disposed');
     }
   }
 }

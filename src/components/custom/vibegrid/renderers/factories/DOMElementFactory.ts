@@ -267,23 +267,49 @@ export class DOMElementFactory {
    */
   createHeaderTextGroup(column: any): HTMLElement {
     const textGroup = this.createElement('div', 'vibegridx-header-text-group');
-    textGroup.style.cssText = 'display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;';
-    
+    textGroup.style.cssText = 'display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;';
+
     // Header text
     const headerText = this.createElement('span', 'vibegridx-header-text');
     headerText.style.cssText = 'flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
     headerText.textContent = column.label || column.name || column.id;
-    
+
     textGroup.appendChild(headerText);
 
     // Sort icon (if column is sortable)
     if (column.sortable !== false) {
       const sortIcon = this.createElement('span', 'vibegridx-sort-icon');
-      sortIcon.style.cssText = 'flex-shrink: 0; min-width: 16px; margin-left: 4px;';
+      sortIcon.style.cssText = `
+        flex-shrink: 0;
+        min-width: 20px;
+        width: 20px;
+        height: 20px;
+        margin-left: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.4;
+        transition: opacity 0.2s ease, transform 0.1s ease;
+        cursor: pointer;
+        border-radius: 3px;
+      `;
       sortIcon.innerHTML = this.createSortIconSVG(null); // No sort initially
+
+      // Enhanced hover effects
+      sortIcon.addEventListener('mouseenter', () => {
+        sortIcon.style.opacity = '0.8';
+        sortIcon.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+      });
+
+      sortIcon.addEventListener('mouseleave', () => {
+        const isActive = sortIcon.classList.contains('active');
+        sortIcon.style.opacity = isActive ? '1' : '0.4';
+        sortIcon.style.backgroundColor = 'transparent';
+      });
+
       textGroup.appendChild(sortIcon);
     }
-    
+
     return textGroup;
   }
 
@@ -308,27 +334,39 @@ export class DOMElementFactory {
   }
 
   /**
-   * Create sort icon SVG
+   * Create sort icon SVG - Enhanced with better visibility and size
    */
   private createSortIconSVG(direction: 'asc' | 'desc' | null): string {
     const activeColor = '#3b82f6';
     const inactiveColor = '#9ca3af';
-    
+    const hoverColor = '#6366f1';
+
     return `
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M8 3L11 7H5L8 3Z" fill="${direction === 'asc' ? activeColor : inactiveColor}" />
-        <path d="M8 13L5 9H11L8 13Z" fill="${direction === 'desc' ? activeColor : inactiveColor}" />
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" class="vibegridx-sort-svg">
+        <path d="M10 4L14 9H6L10 4Z" fill="${direction === 'asc' ? activeColor : inactiveColor}" stroke="${direction === 'asc' ? activeColor : 'transparent'}" stroke-width="0.5" />
+        <path d="M10 16L6 11H14L10 16Z" fill="${direction === 'desc' ? activeColor : inactiveColor}" stroke="${direction === 'desc' ? activeColor : 'transparent'}" stroke-width="0.5" />
       </svg>
     `;
   }
 
   /**
-   * Update sort icon for a column
+   * Update sort icon for a column with enhanced visual feedback
    */
   updateSortIcon(headerElement: HTMLElement, direction: 'asc' | 'desc' | null): void {
     const sortIcon = headerElement.querySelector('.vibegridx-sort-icon');
     if (sortIcon) {
       sortIcon.innerHTML = this.createSortIconSVG(direction);
+
+      // Update visual state
+      if (direction) {
+        sortIcon.classList.add('active');
+        (sortIcon as HTMLElement).style.opacity = '1';
+        (sortIcon as HTMLElement).style.color = '#3b82f6';
+      } else {
+        sortIcon.classList.remove('active');
+        (sortIcon as HTMLElement).style.opacity = '0.4';
+        (sortIcon as HTMLElement).style.color = '#9ca3af';
+      }
     }
   }
 }

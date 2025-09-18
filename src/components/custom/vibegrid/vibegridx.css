@@ -147,35 +147,46 @@
   line-height: 1;
 }
 
-/* Sort dropdown icon */
+/* Sort dropdown icon - Enhanced sizing and visibility */
 .vibegridx-sort-icon {
-  margin-left: 4px;
-  /* opacity: 0; -- Removed, handled by inline styles based on sort state */
-  transition: opacity 0.2s;
+  margin-left: 6px;
+  transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.1s ease;
   color: hsl(var(--muted-foreground));
-  font-size: 16px;
+  font-size: 20px;
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-direction: column;
   gap: 0;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 2px;
   border-radius: 4px;
   flex-shrink: 0;
-  min-width: 16px; /* Ensure sort icon always has space */
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  opacity: 0.4;
 }
 
 .vibegridx-header-cell:hover .vibegridx-sort-icon {
-  opacity: 0.5;
+  opacity: 0.8;
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 .vibegridx-sort-icon:hover {
-  opacity: 0.8 !important;
-  color: hsl(var(--foreground));
-  background-color: hsl(var(--accent));
+  opacity: 1 !important;
+  color: hsl(var(--primary));
+  background-color: rgba(59, 130, 246, 0.15);
+  transform: scale(1.05);
 }
 
-/* Active sort states */
+/* Active sort states - Enhanced visibility */
+.vibegridx-sort-icon.active {
+  opacity: 1 !important;
+  color: hsl(var(--primary));
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
 .vibegridx-header-cell.sort-asc .vibegridx-sort-icon,
 .vibegridx-header-cell.sort-desc .vibegridx-sort-icon {
   opacity: 1;
@@ -183,8 +194,21 @@
 }
 
 .vibegridx-sort-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+}
+
+/* Enhanced sort icon animations */
+.vibegridx-sort-svg {
+  transition: all 0.2s ease;
+}
+
+.vibegridx-sort-icon:hover .vibegridx-sort-svg {
+  filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.3));
+}
+
+.vibegridx-sort-icon.active .vibegridx-sort-svg {
+  filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
 }
 
 /* Hide the old sort indicator */

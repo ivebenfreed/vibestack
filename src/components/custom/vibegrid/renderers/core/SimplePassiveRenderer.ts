@@ -1451,6 +1451,12 @@ export class SimplePassiveRenderer {
       this.groupRenderer = null;
     }
 
+    // Clean up HeaderRenderer reactive observers
+    if (this.headerRenderer) {
+      this.headerRenderer.dispose();
+      this.headerRenderer = null;
+    }
+
     // RowRenderer and CellRenderer don't need explicit cleanup
     this.bodyRenderer = null;
     
