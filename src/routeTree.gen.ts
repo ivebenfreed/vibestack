@@ -54,6 +54,7 @@ import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_au
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
+import { Route as AuthenticatedDebugLocalStorageSyncRouteImport } from './routes/_authenticated/debug/local-storage-sync'
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
 import { Route as AuthenticatedOrgOrgIdTestPassiveRendererRouteImport } from './routes/_authenticated/org/$orgId/test-passive-renderer'
@@ -320,6 +321,12 @@ const AuthenticatedDebugStateMachineTestRoute =
     path: '/state-machine-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugLocalStorageSyncRoute =
+  AuthenticatedDebugLocalStorageSyncRouteImport.update({
+    id: '/local-storage-sync',
+    path: '/local-storage-sync',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugLegendStateTestRoute =
   AuthenticatedDebugLegendStateTestRouteImport.update({
     id: '/legend-state-test',
@@ -372,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
+  '/debug/local-storage-sync': typeof AuthenticatedDebugLocalStorageSyncRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -421,6 +429,7 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
+  '/debug/local-storage-sync': typeof AuthenticatedDebugLocalStorageSyncRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -474,6 +483,7 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/legend-state-test': typeof AuthenticatedDebugLegendStateTestRoute
+  '/_authenticated/debug/local-storage-sync': typeof AuthenticatedDebugLocalStorageSyncRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -527,6 +537,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/debug/legend-state-test'
+    | '/debug/local-storage-sync'
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
@@ -576,6 +587,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/debug/legend-state-test'
+    | '/debug/local-storage-sync'
     | '/debug/state-machine-test'
     | '/debug/system-options'
     | '/debug/vibegrid-legend-state'
@@ -628,6 +640,7 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/_authenticated/debug/legend-state-test'
+    | '/_authenticated/debug/local-storage-sync'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
     | '/_authenticated/debug/vibegrid-legend-state'
@@ -996,6 +1009,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugStateMachineTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/local-storage-sync': {
+      id: '/_authenticated/debug/local-storage-sync'
+      path: '/local-storage-sync'
+      fullPath: '/debug/local-storage-sync'
+      preLoaderRoute: typeof AuthenticatedDebugLocalStorageSyncRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/legend-state-test': {
       id: '/_authenticated/debug/legend-state-test'
       path: '/legend-state-test'
@@ -1036,6 +1056,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugLegendStateTestRoute: typeof AuthenticatedDebugLegendStateTestRoute
+  AuthenticatedDebugLocalStorageSyncRoute: typeof AuthenticatedDebugLocalStorageSyncRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
   AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
@@ -1048,6 +1069,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
   {
     AuthenticatedDebugLegendStateTestRoute:
       AuthenticatedDebugLegendStateTestRoute,
+    AuthenticatedDebugLocalStorageSyncRoute:
+      AuthenticatedDebugLocalStorageSyncRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,

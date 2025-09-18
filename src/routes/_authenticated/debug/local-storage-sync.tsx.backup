@@ -1,0 +1,313 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
+import { observable } from '@legendapp/state'
+import { synced } from '@legendapp/state/sync'
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+import { configureSynced, syncObservable } from '@legendapp/state/sync'
+import { observer } from '@legendapp/state/react'
+
+// Component will be defined below after all observables are created
+
+export const Route = createFileRoute('/_authenticated/debug/local-storage-sync')({
+  component: LocalStorageSyncDebugPageComponent
+})
+
+// Simple test data interface
+interface TestData {
+  message: string
+  counter: number
+  timestamp: number
+}
+
+// Method 1: Using synced() with initial data and persistence
+const testStore1$ = observable(synced({
+  initial: {
+    message: 'Hello from Method 1',
+    counter: 0,
+    timestamp: Date.now()
+  } as TestData,
+  persist: {
+    name: 'vibestack-test-store-1'
+    // Local storage plugin will be configured globally
+  }
+}))
+
+// Method 2: Create observable then sync with syncObservable
+const testStore2$ = observable<TestData>({
+  message: 'Hello from Method 2',
+  counter: 0,
+  timestamp: Date.now()
+})
+
+// Method 3: Observable with more complex structure
+const complexStore$ = observable(synced({
+  initial: {
+    user: {
+      name: 'Test User',
+      preferences: {
+        theme: 'dark',
+        notifications: true
+      }
+    },
+    settings: {
+      autoSave: true,
+      debugMode: false
+    },
+    history: [] as string[]
+  },
+  persist: {
+    name: 'vibestack-complex-store'
+  }
+}))
+
+// Initialize local storage persistence
+let isInitialized = false
+
+function initializePersistence() {
+  if (isInitialized) return
+
+  try {
+    // Configure local storage as the default persistence plugin
+    const persistOptions = configureSynced({
+      persist: {
+        plugin: ObservablePersistLocalStorage
+      }
+    })
+
+    // Apply sync to method 2 observable
+    syncObservable(testStore2$, persistOptions({
+      persist: {
+        name: 'vibestack-test-store-2'
+      }
+    }))
+
+    console.log('✅ Local storage persistence initialized successfully')
+    isInitialized = true
+  } catch (error) {
+    console.error('❌ Failed to initialize local storage persistence:', error)
+  }
+}
+
+const LocalStorageSyncDebugPageComponent = observer(() => {
+  const [isReady, setIsReady] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string>('')
+
+  useEffect(() => {
+    // Initialize persistence on component mount
+    initializePersistence()
+    setIsReady(true)
+  }, [])
+
+  const updateStore1 = () => {
+    const currentCounter = testStore1$.counter.get()
+    testStore1$.assign({
+      message: `Updated at ${new Date().toLocaleTimeString()}`,
+      counter: currentCounter + 1,
+      timestamp: Date.now()
+    })
+  }
+
+  const updateStore2 = () => {
+    const currentCounter = testStore2$.counter.get()
+    testStore2$.assign({
+      message: `Method 2 updated at ${new Date().toLocaleTimeString()}`,
+      counter: currentCounter + 1,
+      timestamp: Date.now()
+    })
+  }
+
+  const updateComplexStore = () => {
+    const currentHistory = complexStore$.history.get()
+    complexStore$.assign({
+      user: {
+        name: `User ${Date.now()}`,
+        preferences: {
+          theme: complexStore$.user.preferences.theme.get() === 'dark' ? 'light' : 'dark',
+          notifications: !complexStore$.user.preferences.notifications.get()
+        }
+      },
+      settings: {
+        autoSave: !complexStore$.settings.autoSave.get(),
+        debugMode: !complexStore$.settings.debugMode.get()
+      },
+      history: [...currentHistory, `Action at ${new Date().toLocaleTimeString()}`]
+    })
+  }
+
+  const clearAllStores = () => {
+    // Reset to initial values
+    testStore1$.assign({
+      message: 'Cleared Method 1',
+      counter: 0,
+      timestamp: Date.now()
+    })
+
+    testStore2$.assign({
+      message: 'Cleared Method 2',
+      counter: 0,
+      timestamp: Date.now()
+    })
+
+    complexStore$.assign({
+      user: {
+        name: 'Reset User',
+        preferences: {
+          theme: 'dark',
+          notifications: true
+        }
+      },
+      settings: {
+        autoSave: true,
+        debugMode: false
+      },
+      history: ['Reset at ' + new Date().toLocaleTimeString()]
+    })
+  }
+
+  const inspectLocalStorage = () => {
+    const keys = Object.keys(localStorage).filter(key => key.includes('vibestack'))
+    const storage = keys.reduce((acc, key) => {
+      try {
+        acc[key] = JSON.parse(localStorage.getItem(key) || 'null')
+      } catch {
+        acc[key] = localStorage.getItem(key)
+      }
+      return acc
+    }, {} as Record<string, any>)
+
+    setDebugInfo(JSON.stringify(storage, null, 2))
+  }
+
+  const clearLocalStorage = () => {
+    const keys = Object.keys(localStorage).filter(key => key.includes('vibestack'))
+    keys.forEach(key => localStorage.removeItem(key))
+    setDebugInfo('Local storage cleared')
+
+    // Trigger a page refresh to reload from empty storage
+    setTimeout(() => window.location.reload(), 1000)
+  }
+
+  if (!isReady) {
+    return <div className="p-6">Initializing local storage persistence...</div>
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">Legend State Local Storage Sync Debug</h1>
+
+      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
+        <h2 className="text-lg font-semibold mb-2">Instructions</h2>
+        <ol className="list-decimal list-inside space-y-1 text-sm">
+          <li>Click the update buttons to modify the observables</li>
+          <li>Refresh the page to verify data persists</li>
+          <li>Use "Inspect Local Storage" to see the stored data</li>
+          <li>Use "Clear Storage" to reset and test fresh loading</li>
+        </ol>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {/* Method 1: synced() with initial data */}
+        <div className="p-4 border rounded">
+          <h3 className="font-semibold mb-3">Method 1: synced() with initial</h3>
+          <div className="space-y-2 text-sm mb-4">
+            <div><strong>Message:</strong> {testStore1$.message.get()}</div>
+            <div><strong>Counter:</strong> {testStore1$.counter.get()}</div>
+            <div><strong>Timestamp:</strong> {new Date(testStore1$.timestamp.get()).toLocaleString()}</div>
+          </div>
+          <button
+            onClick={updateStore1}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Update Store 1
+          </button>
+        </div>
+
+        {/* Method 2: syncObservable */}
+        <div className="p-4 border rounded">
+          <h3 className="font-semibold mb-3">Method 2: syncObservable()</h3>
+          <div className="space-y-2 text-sm mb-4">
+            <div><strong>Message:</strong> {testStore2$.message.get()}</div>
+            <div><strong>Counter:</strong> {testStore2$.counter.get()}</div>
+            <div><strong>Timestamp:</strong> {new Date(testStore2$.timestamp.get()).toLocaleString()}</div>
+          </div>
+          <button
+            onClick={updateStore2}
+            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Update Store 2
+          </button>
+        </div>
+
+        {/* Method 3: Complex nested structure */}
+        <div className="p-4 border rounded">
+          <h3 className="font-semibold mb-3">Method 3: Complex Structure</h3>
+          <div className="space-y-2 text-sm mb-4">
+            <div><strong>User:</strong> {complexStore$.user.name.get()}</div>
+            <div><strong>Theme:</strong> {complexStore$.user.preferences.theme.get()}</div>
+            <div><strong>Notifications:</strong> {complexStore$.user.preferences.notifications.get() ? 'On' : 'Off'}</div>
+            <div><strong>Auto Save:</strong> {complexStore$.settings.autoSave.get() ? 'On' : 'Off'}</div>
+            <div><strong>History:</strong> {complexStore$.history.get().length} items</div>
+          </div>
+          <button
+            onClick={updateComplexStore}
+            className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            Update Complex
+          </button>
+        </div>
+      </div>
+
+      {/* Control buttons */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <button
+          onClick={clearAllStores}
+          className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+        >
+          Clear All Stores
+        </button>
+        <button
+          onClick={inspectLocalStorage}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        >
+          Inspect Local Storage
+        </button>
+        <button
+          onClick={clearLocalStorage}
+          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+        >
+          Clear Storage & Reload
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+        >
+          Refresh Page
+        </button>
+      </div>
+
+      {/* Debug output */}
+      {debugInfo && (
+        <div className="p-4 bg-gray-100 border rounded">
+          <h3 className="font-semibold mb-2">Local Storage Debug Info:</h3>
+          <pre className="text-xs overflow-auto whitespace-pre-wrap">
+            {debugInfo}
+          </pre>
+        </div>
+      )}
+
+      {/* Technical details */}
+      <div className="mt-6 p-4 bg-gray-50 border rounded">
+        <h3 className="font-semibold mb-2">Implementation Details:</h3>
+        <ul className="text-sm space-y-1">
+          <li><strong>Method 1:</strong> Uses <code>synced()</code> with initial data and persistence name</li>
+          <li><strong>Method 2:</strong> Creates observable then applies <code>syncObservable()</code> with <code>configureSynced()</code></li>
+          <li><strong>Method 3:</strong> Complex nested structure demonstrating deep property persistence</li>
+          <li><strong>Plugin:</strong> <code>ObservablePersistLocalStorage</code> for browser localStorage</li>
+          <li><strong>Keys:</strong> Data is stored with prefixed keys (vibestack-test-store-1, etc.)</li>
+        </ul>
+      </div>
+    </div>
+  )
+})
+
+export default LocalStorageSyncDebugPageComponent

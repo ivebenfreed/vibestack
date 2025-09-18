@@ -35,6 +35,13 @@ function DebugIndexPage() {
       path: '/debug/system-options',
       color: 'border-emerald-500/20 hover:border-emerald-500/30 bg-emerald-500/5 dark:border-emerald-400/20 dark:hover:border-emerald-400/30 dark:bg-emerald-400/5',
       badge: 'SYSTEM OPTIONS'
+    },
+    {
+      title: '💾 Local Storage Sync',
+      description: 'Test Legend State local storage persistence patterns. Demonstrates synced observables, persistence configuration, and refresh behavior.',
+      path: '/debug/local-storage-sync',
+      color: 'border-orange-500/20 hover:border-orange-500/30 bg-orange-500/5 dark:border-orange-400/20 dark:hover:border-orange-400/30 dark:bg-orange-400/5',
+      badge: 'PERSISTENCE'
     }
   ]
 
@@ -60,6 +67,8 @@ function DebugIndexPage() {
                   ? 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300 border border-cyan-500/20'
                   : page.badge === 'SYSTEM OPTIONS'
                   ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 border border-emerald-500/20'
+                  : page.badge === 'PERSISTENCE'
+                  ? 'bg-orange-500/10 text-orange-700 dark:bg-orange-400/10 dark:text-orange-300 border border-orange-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -74,10 +83,11 @@ function DebugIndexPage() {
               </p>
               <Link to={page.path}>
                 <Button variant="outline" className="w-full">
-                  {page.badge === 'SYNC DEBUG' ? '🚀 Open Sync Panel' 
+                  {page.badge === 'SYNC DEBUG' ? '🚀 Open Sync Panel'
                    : page.badge === 'OBSERVABLES' ? '⚡ Open Entity Operations'
                    : page.badge === 'LEGEND STATE' ? '🌟 Open Legend State Test'
                    : page.badge === 'SYSTEM OPTIONS' ? '🏷️ Open System Options Test'
+                   : page.badge === 'PERSISTENCE' ? '💾 Open Storage Test'
                    : 'Open Tool'}
                 </Button>
               </Link>

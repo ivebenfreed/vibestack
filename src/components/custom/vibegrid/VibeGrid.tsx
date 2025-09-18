@@ -10,6 +10,7 @@ import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
 import { observable } from '@legendapp/state';
 import { createHydrationManager, type VibeGridHydrationManager } from './stores/init-state';
 import { VibeGridLoadingOverlay, useVibeGridLoadingState } from './components/VibeGridLoadingOverlay';
+import { createVibeGridPreferences } from './stores/simple-persistence';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -111,6 +112,13 @@ export function VibeGrid<T extends Record<string, any> = any>(
   }
   const visualState = visualStateRef.current;
 
+  // Create simple persistence instance (isolated per VibeGrid)
+  const simplePersistenceRef = useRef<ReturnType<typeof createVibeGridPreferences> | null>(null);
+  if (!simplePersistenceRef.current) {
+    simplePersistenceRef.current = createVibeGridPreferences(entityType);
+  }
+  const simplePersistence = simplePersistenceRef.current;
+
   // Use init manager hook for loading state
   const { isLoading, isReady, hasErrors, retry } = useVibeGridLoadingState(initManager);
 
@@ -175,19 +183,88 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const orgId = universeOrgId$.get();
       const userId = universeUserId$.get();
       if (orgId && userId) {
-        // Set up persistence first (once per entity)
-        visualState.visualOperations.setupPersistence(entityType);
-        // Then initialize columns
+        // Initialize simple persistence with columns first
+        simplePersistence.operations.initializeColumns(columns);
+
+        // Initialize visual state columns
         visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
 
         // Keep visual state synchronized with tableCore$ observables
         visualState.visualInputs$.columns.set(columns);
 
-        // sortedProcessedRows$ is now created internally by the renderer (self-contained architecture)
+        // Load saved preferences from simple persistence and apply to visual state
+        const savedPrefs = simplePersistence.preferences$.get();
+        if (savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0) {
+          visualState.visualInputs$.columnWidths.set(savedPrefs.columnWidths);
+          fileLog.info('✅ Loaded column widths from simple persistence', { columnWidths: savedPrefs.columnWidths });
+        }
+        if (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0) {
+          visualState.visualInputs$.columnOrder.set(savedPrefs.columnOrder);
+          fileLog.info('✅ Loaded column order from simple persistence', { columnOrder: savedPrefs.columnOrder });
+        }
+        if (savedPrefs.columnVisibility && Object.keys(savedPrefs.columnVisibility).length > 0) {
+          visualState.visualInputs$.columnVisibility.set(savedPrefs.columnVisibility);
+          fileLog.info('✅ Loaded column visibility from simple persistence', { columnVisibility: savedPrefs.columnVisibility });
+        }
+        if (savedPrefs.sortBy) {
+          // Handle both direct array and Legend State wrapped format
+          const sortByArray = savedPrefs.sortBy.value || savedPrefs.sortBy;
+          if (Array.isArray(sortByArray) && sortByArray.length > 0) {
+            visualState.visualInputs$.sortBy.set(sortByArray);
+            fileLog.info('✅ Loaded sort configuration from simple persistence', { sortBy: sortByArray });
+          }
+        }
+        if (savedPrefs.filters && savedPrefs.filters.length > 0) {
+          visualState.visualInputs$.filters.set(savedPrefs.filters);
+          fileLog.info('✅ Loaded filters from simple persistence', { filters: savedPrefs.filters });
+        }
 
-        fileLog.info('🎯 Visual state initialized and synchronized', {
+        // Set up reactive sync from visual state to simple persistence
+        // Watch for changes and save them automatically
+        visualState.visualInputs$.columnWidths.onChange((newWidths) => {
+          if (!visualState.visualInputs$.isInitializing.get()) {
+            simplePersistence.operations.setColumnWidth('batch', 0); // Trigger save
+            Object.entries(newWidths).forEach(([columnId, width]) => {
+              simplePersistence.operations.setColumnWidth(columnId, width);
+            });
+            fileLog.debug('💾 Saved column widths to simple persistence', { newWidths });
+          }
+        });
+
+        visualState.visualInputs$.columnOrder.onChange((newOrder) => {
+          if (!visualState.visualInputs$.isInitializing.get()) {
+            simplePersistence.operations.setColumnOrder(newOrder);
+            fileLog.debug('💾 Saved column order to simple persistence', { newOrder });
+          }
+        });
+
+        visualState.visualInputs$.columnVisibility.onChange((newVisibility) => {
+          if (!visualState.visualInputs$.isInitializing.get()) {
+            Object.entries(newVisibility).forEach(([columnId, visible]) => {
+              simplePersistence.operations.setColumnVisibility(columnId, visible);
+            });
+            fileLog.debug('💾 Saved column visibility to simple persistence', { newVisibility });
+          }
+        });
+
+        visualState.visualInputs$.sortBy.onChange((newSortBy) => {
+          if (!visualState.visualInputs$.isInitializing.get()) {
+            simplePersistence.operations.setSortBy(newSortBy);
+            fileLog.debug('💾 Saved sort configuration to simple persistence', { newSortBy });
+          }
+        });
+
+        visualState.visualInputs$.filters.onChange((newFilters) => {
+          if (!visualState.visualInputs$.isInitializing.get()) {
+            simplePersistence.operations.setFilters(newFilters);
+            fileLog.debug('💾 Saved filters to simple persistence', { newFilters });
+          }
+        });
+
+        fileLog.info('🎯 Visual state initialized with simple persistence', {
           entityType, orgId, userId,
-          columnsCount: columns.length
+          columnsCount: columns.length,
+          hasPersistedState: !!(savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0)
         });
         initManager.markReady('visualStateReady');
       } else {

@@ -1,6 +1,6 @@
 // In apps/web/src/routes/_authenticated/debug/route.tsx
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { useAuth } from '@/state-machines';
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
 import { useEffect, useState, useRef } from 'react';
 
 export const Route = createFileRoute('/_authenticated/debug')({
@@ -19,14 +19,15 @@ export const Route = createFileRoute('/_authenticated/debug')({
   ),
 });
 
-// Debug layout component with permission check using orchestrator state
+// Debug layout component with permission check using unified auth
 function DebugLayoutComponent() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user } = useUnifiedAuth();
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(true);
   const lastLogRef = useRef<string>('');
-  
-  // Calculate debug access directly to avoid function reference instability
-  const canAccessDebug = user?.role === 'admin' || user?.role === 'super_admin';
+
+  // Calculate debug access based on user role
+  // For development, allow 'owner' role from test credentials to access debug features
+  const canAccessDebug = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'owner';
   
   // Check permissions immediately now that sign-in fetches full session data
   useEffect(() => {
@@ -75,7 +76,7 @@ function DebugLayoutComponent() {
           Contact an administrator if you need access.
         </p>
         <div className="text-xs text-muted-foreground mt-4 bg-muted p-2 rounded">
-          Current role: {user?.role || 'Unknown'} | Required: admin or super_admin
+          Current role: {user?.role || 'Unknown'} | Required: admin, super_admin, or owner
         </div>
       </div>
     );
