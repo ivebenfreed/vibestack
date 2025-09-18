@@ -15,7 +15,7 @@ import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatt
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
-import { visualState$, getColumnWidth, visualOperations } from '../../stores/visual-state';
+import type { createVibeGridVisualState } from '../../stores/visual-state';
 import { GRID_DIMENSIONS } from '../../constants/grid-dimensions';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
@@ -41,6 +41,7 @@ export interface BodyRendererOptions {
   keyboardNavController?: KeyboardNavigationController;
   enableSelectionColumn?: boolean;
   container: HTMLElement;
+  visualState: ReturnType<typeof createVibeGridVisualState>;
 
   // DOM utility functions
   createElement: (tag: string, className?: string) => HTMLElement;
@@ -64,6 +65,7 @@ export class BodyRenderer {
   private container: HTMLElement;
   private createElement: (tag: string, className?: string) => HTMLElement;
   private onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+  private visualState: ReturnType<typeof createVibeGridVisualState>;
 
   // Row state
   private activeRows: Map<string, HTMLElement> = new Map();
@@ -84,6 +86,7 @@ export class BodyRenderer {
     this.container = options.container;
     this.createElement = options.createElement;
     this.onEntityUpdate = options.onEntityUpdate;
+    this.visualState = options.visualState;
 
     // Initialize drag and drop manager with container
     this.initializeDragDrop();
@@ -146,8 +149,8 @@ export class BodyRenderer {
     });
 
     // Use UNIFIED visual state's totalWidth - no duplicate calculation
-    const visualState = visualState$.get();
-    const totalRowWidth = visualState.geometry.totalWidth;
+    const visualStateData = this.visualState.visualState$.get();
+    const totalRowWidth = visualStateData.geometry.totalWidth;
     rowElement.style.width = `${totalRowWidth}px`;
     rowElement.style.minWidth = `${totalRowWidth}px`;
 
@@ -268,8 +271,8 @@ export class BodyRenderer {
     checkbox.dataset.rowId = row.id;
 
     // Check if this row is currently selected (use ALL visible columns from visual state)
-    const visualState = visualState$.get();
-    const allVisibleColumns = visualState.visibleColumns;
+    const visualStateData = this.visualState.visualState$.get();
+    const allVisibleColumns = visualStateData.visibleColumns;
 
     const selectedCells = this.tableInteraction$.selectedCells.get();
     const isRowSelected = allVisibleColumns.every(col =>
@@ -477,7 +480,7 @@ export class BodyRenderer {
     const isSelected = this.tableInteraction$.selectedCells.get().has(cellId);
 
     // Use centralized visual state for column width
-    const actualWidth = getColumnWidth(column.id);
+    const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
 
     // Use absolute positioning if xPosition is provided
     if (xPosition !== undefined) {
@@ -778,8 +781,8 @@ export class BodyRenderer {
   updateAllRowCheckboxes(): void {
     const selectedCells = this.tableInteraction$.selectedCells.get();
     // Use UNIFIED visual state's visible columns - no duplicate filtering
-    const visualState = visualState$.get();
-    const allVisibleColumns = visualState.visibleColumns;
+    const visualStateData = this.visualState.visualState$.get();
+    const allVisibleColumns = visualStateData.visibleColumns;
 
     this.activeRows.forEach((rowElement, rowId) => {
       const checkbox = rowElement.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -894,7 +897,7 @@ export class BodyRenderer {
   private updateGroupedModeStatus(): void {
     try {
       // Get grouping configuration from visual operations
-      const groupConfig = visualOperations.getGroupConfig();
+      const groupConfig = this.visualState.visualOperations.getGroupConfig();
       this.isGroupedMode = !!(groupConfig && groupConfig.fields && groupConfig.fields.length > 0);
     } catch (error) {
       // Fallback: assume not grouped if unable to get config

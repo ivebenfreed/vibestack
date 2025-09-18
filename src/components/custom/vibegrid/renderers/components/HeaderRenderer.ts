@@ -5,7 +5,7 @@
 
 import { log } from '@/logger';
 import { observe } from '@legendapp/state';
-import { visualState$, visualOperations, getColumnWidth, getColumnXOffset, getVisibleColumns } from '../../stores/visual-state';
+// Note: This file needs to be updated to receive visual state instance from parent
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
@@ -28,7 +28,10 @@ export interface HeaderRendererOptions {
   selectionController?: SelectionController;
   coordinateMapping: CoordinateMapping;
   enableSelectionColumn?: boolean;
-  
+
+  // Visual state instance
+  visualState: any;
+
   // Callbacks for coordinate updates
   updateCoordinateMapping: (mapping: CoordinateMapping) => void;
 }
@@ -42,6 +45,8 @@ export class HeaderRenderer {
   private selectionController?: SelectionController;
   private coordinateMapping: CoordinateMapping;
   private enableSelectionColumn: boolean;
+  private visualState: any;
+  private updateCoordinateMapping: (mapping: CoordinateMapping) => void;
 
   // Legend State performance optimization: track last render state to prevent redundant renders
   private lastRenderState: {
@@ -67,6 +72,7 @@ export class HeaderRenderer {
     this.coordinateMapping = options.coordinateMapping;
     this.enableSelectionColumn = options.enableSelectionColumn ?? false;
     this.updateCoordinateMapping = options.updateCoordinateMapping;
+    this.visualState = options.visualState;
   }
 
   /**
@@ -76,7 +82,7 @@ export class HeaderRenderer {
     if (!this.headerContainer) return;
 
     // Get visual state early for debugging
-    const visualState = visualState$.get();
+    const visualStateData = this.visualState.visualState$.get();
 
     const columns = this.tableCore$.columns.get();
     const columnVisibility = this.tableCore$.columnVisibility.get();
@@ -84,11 +90,11 @@ export class HeaderRenderer {
     // Legend State change detection pattern: check if render is actually needed
     const currentRenderState = {
       columnCount: columns.length,
-      scrollLeft: visualState.geometry.scrollLeft,
-      visibleColumnsLength: visualState.visibleColumns.length,
-      visibleRangeStart: visualState.geometry.visibleColumnRange.start,
-      visibleRangeEnd: visualState.geometry.visibleColumnRange.end,
-      columnOrderString: (visualState.columnState.columnOrder || []).join(',') // Track column order for drag operations
+      scrollLeft: visualStateData.geometry.scrollLeft,
+      visibleColumnsLength: visualStateData.visibleColumns.length,
+      visibleRangeStart: visualStateData.geometry.visibleColumnRange.start,
+      visibleRangeEnd: visualStateData.geometry.visibleColumnRange.end,
+      columnOrderString: (visualStateData.columnState.columnOrder || []).join(',') // Track column order for drag operations
     };
 
     // Skip render if nothing actually changed (Legend State optimization pattern)
@@ -109,10 +115,10 @@ export class HeaderRenderer {
 
     fileLog.info('🔄 HEADER RENDER TRIGGERED', {
       columnCount: columns.length,
-      scrollLeft: visualState.geometry.scrollLeft,
-      visibleRange: `${visualState.geometry.visibleColumnRange.start}-${visualState.geometry.visibleColumnRange.end}`,
-      totalColumns: visualState.visibleColumns.length,
-      virtualRangeCount: visualState.geometry.visibleColumnRange.end - visualState.geometry.visibleColumnRange.start
+      scrollLeft: visualStateData.geometry.scrollLeft,
+      visibleRange: `${visualStateData.geometry.visibleColumnRange.start}-${visualStateData.geometry.visibleColumnRange.end}`,
+      totalColumns: visualStateData.visibleColumns.length,
+      virtualRangeCount: visualStateData.geometry.visibleColumnRange.end - visualStateData.geometry.visibleColumnRange.start
     });
     
     this.headerContainer.innerHTML = '';
@@ -150,7 +156,7 @@ export class HeaderRenderer {
     
     // Get visible columns from unified visual state (same as DOM rendering)
     // This ensures coordinate mapping matches exactly what's rendered in DOM
-    const allColumnLayouts = visualState.visibleColumns;
+    const allColumnLayouts = visualStateData.visibleColumns;
     const allVisibleColumns = allColumnLayouts.map(layout =>
       columns.find(col => col.id === layout.id)
     ).filter(Boolean);
@@ -158,12 +164,12 @@ export class HeaderRenderer {
     fileLog.info('🎨 Header rendering ALL columns (no virtualization)', {
       totalColumns: columns.length,
       visibleColumns: allColumnLayouts.length,
-      scrollLeft: visualState.geometry.scrollLeft,
+      scrollLeft: visualStateData.geometry.scrollLeft,
       columnIds: allColumnLayouts.slice(0, 5).map(col => col.id)
     });
 
     // Update column coordinate mapping only if columns have changed
-    // Now uses the SAME column source as DOM rendering (visualState.visibleColumns)
+    // Now uses the SAME column source as DOM rendering (visualStateData.visibleColumns)
     const needsCoordinateUpdate = this.updateColumnCoordinateMapping(allVisibleColumns);
 
     // Render ALL columns at their absolute positions
@@ -188,7 +194,7 @@ export class HeaderRenderer {
 
     // Set total width for proper overflow handling (include end drop zone)
     // Use UNIFIED visual state's totalWidth - no duplicate calculation
-    const totalHeaderWidth = visualState.geometry.totalWidth;
+    const totalHeaderWidth = visualStateData.geometry.totalWidth;
     headerRow.style.width = `${totalHeaderWidth}px`;
     headerRow.style.minWidth = `${totalHeaderWidth}px`;
 
@@ -212,7 +218,7 @@ export class HeaderRenderer {
    */
   private createColumnHeader(column: any, actualIndex: number, xOffset: number): HTMLElement {
     // Use single source of truth for column width
-    const actualWidth = getColumnWidth(column.id);
+    const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
     const headerCell = this.domFactory.createHeaderCell(column, actualWidth);
     
     // Create header content with text and sort icon
@@ -320,7 +326,7 @@ export class HeaderRenderer {
     const columnWidths = this.tableCore$.columnWidths.get();
 
     allVisibleColumns.forEach((column, index) => {
-      const actualWidth = getColumnWidth(column.id);
+      const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
       newColumns.push({
         columnId: column.id,
         x: xOffset,
@@ -403,7 +409,7 @@ export class HeaderRenderer {
     let isResizing = false;
     let startX = 0;
     // Get actual width from centralized visual state
-    let startWidth = getColumnWidth(column.id);
+    let startWidth = this.visualState.visualOperations.getColumnWidth(column.id);
 
     resizeHandle.addEventListener('mousedown', (e) => {
       e.stopPropagation();
@@ -458,7 +464,7 @@ export class HeaderRenderer {
         const resizeState = this.tableInteraction$.columnResize.get();
         if (resizeState && resizeState.newWidth) {
           // Apply the new width
-          visualOperations.setColumnWidth(column.id, resizeState.newWidth);
+          this.visualState.visualOperations.setColumnWidth(column.id, resizeState.newWidth);
         }
         
         // Clear resize state
@@ -641,7 +647,7 @@ export class HeaderRenderer {
    */
   private isGroupedMode(): boolean {
     try {
-      const groupConfig = visualOperations.getGroupConfig();
+      const groupConfig = this.visualState.visualOperations.getGroupConfig();
       return groupConfig && groupConfig.fields && groupConfig.fields.length > 0;
     } catch (error) {
       // If visual operations aren't available, fallback to direct check

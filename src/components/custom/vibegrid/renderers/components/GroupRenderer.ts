@@ -4,7 +4,7 @@
  */
 
 import { log } from '@/logger';
-import { visualOperations } from '../../stores/visual-state';
+import type { createVibeGridVisualState } from '../../stores/visual-state';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/GroupRenderer.ts');
@@ -14,15 +14,18 @@ const ROW_HEIGHT = 40;
 export interface GroupRendererOptions {
   domFactory: DOMElementFactory;
   createElement: (tag: string, className: string) => HTMLElement;
+  visualState: ReturnType<typeof createVibeGridVisualState>;
 }
 
 export class GroupRenderer {
   private domFactory: DOMElementFactory;
   private createElement: (tag: string, className: string) => HTMLElement;
+  private visualState: ReturnType<typeof createVibeGridVisualState>;
 
   constructor(options: GroupRendererOptions) {
     this.domFactory = options.domFactory;
     this.createElement = options.createElement;
+    this.visualState = options.visualState;
 
     fileLog.info('🏗️ GroupRenderer initialized');
   }
@@ -108,7 +111,7 @@ export class GroupRenderer {
 
     // Click handler for expand/collapse
     const handleToggle = () => {
-      visualOperations.toggleGroupExpansion(groupRow.id);
+      this.visualState.visualOperations.toggleGroupExpansion(groupRow.id);
       fileLog.info('🔄 Group toggled', {
         groupId: groupRow.id,
         wasExpanded: isExpanded,

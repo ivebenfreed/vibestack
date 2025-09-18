@@ -161,7 +161,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       };
       observablesRef.current = observables;
 
-      fileLog.debug('✅ Created pure observables', { entityType });
+      fileLog.debug('✅ Created pure observables', { entityType, columnCount: columns.length });
 
       // Mark data state dependencies as ready
       initManager.markReady('dataStateReady');
@@ -176,7 +176,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
       const userId = universeUserId$.get();
       if (orgId && userId) {
         visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
-        fileLog.info('🎯 Visual state initialized (isolated), waiting for persistence', { entityType, orgId, userId });
+
+        // Keep visual state synchronized with tableCore$ observables
+        visualState.visualInputs$.columns.set(columns);
+        visualState.visualInputs$.columnVisibility.set(tableCore$.columnVisibility.get());
+        visualState.visualInputs$.columnOrder.set(tableCore$.columnOrder.get());
+
+        fileLog.info('🎯 Visual state initialized and synchronized', {
+          entityType, orgId, userId,
+          columnsCount: columns.length,
+          columnVisibilityCount: Object.keys(tableCore$.columnVisibility.get()).length,
+          columnOrderCount: tableCore$.columnOrder.get().length
+        });
         initManager.markReady('visualStateReady');
       } else {
         fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
@@ -222,6 +233,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           tableCore$: observables.tableCore$,
           tableInteraction$: observables.tableInteraction$,
           tableViewport$: observables.tableViewport$,
+          visualState,
           enableSelectionColumn,
           bufferSize,
           onEntityUpdate,
@@ -439,6 +451,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           tableCore$={observablesRef.current.tableCore$}
           tableInteraction$={observablesRef.current.tableInteraction$}
           enableGrouping={enableGrouping}
+          visualState={visualState}
         />
       )}
 

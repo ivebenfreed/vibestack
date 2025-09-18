@@ -16,23 +16,25 @@ import { Input } from '@/components/ui/input';
 import type { Column } from '../types';
 import type { TableCore$ } from '../stores/data-state';
 import type { TableInteraction$ } from '../stores/interaction-state';
-import { visualOperations, visualInputs$ } from '../stores/visual-state';
+import type { createVibeGridVisualState } from '../stores/visual-state';
 import { formatFieldName } from '../column-defaults';
 
 interface VibeGridXColumnVisibilityPureProps {
   tableCore$: TableCore$;
   tableInteraction$: TableInteraction$;
+  visualState: ReturnType<typeof createVibeGridVisualState>;
   className?: string;
 }
 
 export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVisibilityPure({
   tableCore$,
   tableInteraction$,
+  visualState,
   className = ''
 }: VibeGridXColumnVisibilityPureProps) {
   // Get reactive data from observables
-  const columns = visualInputs$.columns.get();
-  const columnVisibility = visualInputs$.columnVisibility.get();
+  const columns = visualState.visualInputs$.columns.get();
+  const columnVisibility = visualState.visualInputs$.columnVisibility.get();
   const isOpen = tableInteraction$.columnVisibilityMenuState.isOpen.get();
   const searchValue = tableInteraction$.columnVisibilityMenuState.searchValue.get();
 
@@ -51,18 +53,18 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
   }, [tableInteraction$]);
 
   const handleToggleColumn = React.useCallback((columnId: string) => {
-    visualOperations.toggleColumnVisibility(columnId);
-  }, []);
+    visualState.visualOperations.toggleColumnVisibility(columnId);
+  }, [visualState]);
 
   const handleShowAll = React.useCallback(() => {
-    visualOperations.showAllColumns();
+    visualState.visualOperations.showAllColumns();
     tableInteraction$.setColumnVisibilitySearch('');
-  }, [tableInteraction$]);
+  }, [visualState, tableInteraction$]);
 
   const handleHideAll = React.useCallback(() => {
-    visualOperations.hideAllColumns();
+    visualState.visualOperations.hideAllColumns();
     tableInteraction$.setColumnVisibilitySearch('');
-  }, [tableInteraction$]);
+  }, [visualState, tableInteraction$]);
 
   const handleSearchChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     tableInteraction$.setColumnVisibilitySearch(e.target.value);

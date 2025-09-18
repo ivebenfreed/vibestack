@@ -5,7 +5,6 @@
 
 import { log } from '@/logger';
 import type { TableInteraction$ } from '../../stores/interaction-state';
-import { visualOperations } from '../../stores/visual-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/factories/DOMElementFactory.ts');
 
@@ -18,6 +17,7 @@ export interface DOMElementFactoryOptions {
   selectionController?: any; // SelectionController instance
   enableSelectionColumn?: boolean;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+  visualOperations?: any; // Visual operations instance
 }
 
 export class DOMElementFactory {
@@ -26,6 +26,7 @@ export class DOMElementFactory {
   private selectionController?: any;
   private enableSelectionColumn: boolean;
   private onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+  private visualOperations?: any;
 
   constructor(options: DOMElementFactoryOptions) {
     this.tableInteraction$ = options.tableInteraction$;
@@ -33,6 +34,7 @@ export class DOMElementFactory {
     this.selectionController = options.selectionController;
     this.enableSelectionColumn = options.enableSelectionColumn ?? false;
     this.onEntityUpdate = options.onEntityUpdate;
+    this.visualOperations = options.visualOperations;
   }
 
   /**
@@ -103,7 +105,7 @@ export class DOMElementFactory {
 
     // Click handler for expand/collapse
     expandButton.addEventListener('click', () => {
-      visualOperations.toggleGroupExpansion(groupRow.id);
+      this.visualOperations?.toggleGroupExpansion(groupRow.id);
     });
 
     rowElement.appendChild(expandButton);

@@ -1,6 +1,8 @@
 /**
  * Visual State - Central Computed Place for All Table Visual State
  *
+ * Factory Pattern Implementation - Each grid instance creates isolated state
+ *
  * This is the SINGLE SOURCE OF TRUTH for all visual aspects of the table:
  * - Column dimensions (widths, positions, visibility)
  * - Scroll state and viewport calculations
@@ -1060,6 +1062,7 @@ export function createTotalColumnsWidth$(visualInputs$: any, visibleColumns$: an
     }, 0);
   });
 }
+
 
 
 // ====================================

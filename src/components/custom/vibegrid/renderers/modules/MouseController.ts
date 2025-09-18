@@ -6,7 +6,7 @@
  */
 
 import { log } from '@/logger';
-import { visualOperations } from '../../stores/visual-state';
+import type { createVibeGridVisualState } from '../../stores/visual-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/modules/MouseController.ts');
 
@@ -15,6 +15,7 @@ export interface MouseControllerOptions {
   bodyRenderer?: any; // Will delegate cell clicks here
   scrollController?: any; // Will delegate outside clicks here
   tableInteraction$: any; // For reactive state updates
+  visualState: ReturnType<typeof createVibeGridVisualState>;
 }
 
 export class MouseController {
@@ -22,6 +23,7 @@ export class MouseController {
   private bodyRenderer?: any;
   private scrollController?: any;
   private tableInteraction$: any;
+  private visualState: ReturnType<typeof createVibeGridVisualState>;
 
   // Mouse state tracking
   private isDragging = false;
@@ -47,6 +49,7 @@ export class MouseController {
     this.bodyRenderer = options.bodyRenderer;
     this.scrollController = options.scrollController;
     this.tableInteraction$ = options.tableInteraction$;
+    this.visualState = options.visualState;
 
     // Prevent text selection during drag operations
     this.container.style.userSelect = 'none';
@@ -307,7 +310,7 @@ export class MouseController {
             insertBefore,
             mouseX: e.clientX
           });
-          visualOperations.reorderColumns(this.dragColumnId, targetColumnId, insertBefore);
+          this.visualState.visualOperations.reorderColumns(this.dragColumnId, targetColumnId, insertBefore);
         }
 
         // Reset column drag state

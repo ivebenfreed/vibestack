@@ -4,6 +4,7 @@ import { VibeGridXColumnVisibilityPure } from './VibeGridXColumnVisibilityPure';
 import { GroupConfigDropdownPure } from './GroupConfigDropdownPure';
 import type { TableCore$ } from '../stores/data-state';
 import type { TableInteraction$ } from '../stores/interaction-state';
+import { createVibeGridVisualState } from '../stores/visual-state';
 
 interface VibeGridXHeaderPureProps {
   tableCore$: TableCore$;
@@ -11,14 +12,18 @@ interface VibeGridXHeaderPureProps {
   // Group by functionality (optional)
   enableGrouping?: boolean;
   className?: string;
+  visualState: ReturnType<typeof createVibeGridVisualState>;
 }
 
 export const VibeGridXHeaderPure = observer(function VibeGridXHeaderPure({
   tableCore$,
   tableInteraction$,
   enableGrouping = false,
-  className = ''
+  className = '',
+  visualState
 }: VibeGridXHeaderPureProps) {
+  // Visual state is passed from parent VibeGrid component
+
   // Get reactive data from observables
   const columns = tableCore$.columns.get();
   const hiddenColumnCount = tableCore$.hiddenColumnCount.get();
@@ -44,6 +49,7 @@ export const VibeGridXHeaderPure = observer(function VibeGridXHeaderPure({
         <VibeGridXColumnVisibilityPure
           tableCore$={tableCore$}
           tableInteraction$={tableInteraction$}
+          visualState={visualState}
         />
       </div>
     </div>

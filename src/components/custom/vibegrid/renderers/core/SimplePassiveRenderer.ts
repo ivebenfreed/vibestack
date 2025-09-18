@@ -7,7 +7,7 @@
 
 import { observe, batch } from '@legendapp/state';
 import { log } from '@/logger';
-import { visualOperations, visualState$, visualInputs$ } from '../../stores/visual-state';
+import { createVibeGridVisualState } from '../../stores/visual-state';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
@@ -53,6 +53,7 @@ export interface SimplePassiveRendererOptions {
   tableCore$: TableCore$;
   tableInteraction$: TableInteraction$;
   tableViewport$: TableViewport$;
+  visualState: ReturnType<typeof createVibeGridVisualState>;
   enableSelectionColumn?: boolean;
   bufferSize?: number;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
@@ -127,14 +128,20 @@ export class SimplePassiveRenderer {
   private bodyRenderer: BodyRenderer | null = null;
   // ViewportManager consolidated into visual-state
   private eventManager: EventManager | null = null;
+
+  // Visual state instance
+  private visualState: any = null;
   
   constructor(private options: SimplePassiveRendererOptions) {
     fileLog.info('🎯 SimplePassiveRenderer: Initializing');
-    
+
     this.container = options.container;
     this.tableCore$ = options.tableCore$;
     this.tableInteraction$ = options.tableInteraction$;
     this.tableViewport$ = options.tableViewport$;
+
+    // Use visual state passed from parent VibeGrid component
+    this.visualState = options.visualState;
     
     this.initDOM();
     this.initControllers();
@@ -157,7 +164,8 @@ export class SimplePassiveRenderer {
       tableCore$: this.tableCore$,
       selectionController: this.selectionController,
       enableSelectionColumn: this.options.enableSelectionColumn,
-      onEntityUpdate: this.options.onEntityUpdate
+      onEntityUpdate: this.options.onEntityUpdate,
+      visualOperations: this.visualState.visualOperations
     });
     
     fileLog.info('✅ DOM Element Factory initialized');
@@ -212,7 +220,8 @@ export class SimplePassiveRenderer {
     // Initialize GroupRenderer first (needed by BodyRenderer)
     this.groupRenderer = new GroupRenderer({
       domFactory: this.domFactory!,
-      createElement: this.createElement.bind(this)
+      createElement: this.createElement.bind(this),
+      visualState: this.visualState
     });
 
     // Initialize BodyRenderer (consolidated cell and row rendering)
@@ -225,6 +234,7 @@ export class SimplePassiveRenderer {
       keyboardNavController: this.keyboardNavController,
       enableSelectionColumn: this.options.enableSelectionColumn,
       container: this.container,
+      visualState: this.visualState,
       createElement: this.createElement.bind(this),
       onEntityUpdate: this.options.onEntityUpdate
     });
@@ -302,7 +312,7 @@ export class SimplePassiveRenderer {
     // Track non-scroll visual changes to avoid duplicate renders with scroll observer
     let lastVisualLayout = '';
     this.visualObserverDisposer = observe(() => {
-      const visualState = visualState$.get(true);
+      const visualState = this.visualState.visualState$.get(true);
 
       // Create a signature of layout-only changes (exclude scroll position)
       // Include column order in signature to detect reordering
@@ -397,8 +407,8 @@ export class SimplePassiveRenderer {
 
     // SCROLL OBSERVER: Watches scroll position and triggers re-render when virtual range changes
     this.scrollObserverDisposer = observe(() => {
-      const scrollLeft = visualInputs$.scrollLeft.get(true);
-      const scrollTop = visualInputs$.scrollTop.get(true);
+      const scrollLeft = this.visualState.visualInputs$.scrollLeft.get(true);
+      const scrollTop = this.visualState.visualInputs$.scrollTop.get(true);
 
       // Always update CSS transforms immediately (lightweight)
       if (this.headerViewport) {
@@ -467,6 +477,7 @@ export class SimplePassiveRenderer {
       selectionController: this.selectionController,
       coordinateMapping: this.coordinateMapping,
       enableSelectionColumn: this.options.enableSelectionColumn,
+      visualState: this.visualState,
       updateCoordinateMapping: (mapping: CoordinateMapping) => {
         this.coordinateMapping = mapping;
         // CRITICAL: OverlayManager still needs coordinate mapping for positioning overlays
@@ -491,7 +502,7 @@ export class SimplePassiveRenderer {
     // Initialize viewport dimensions
     // Initialize viewport dimensions using visual operations
     const bounds = this.container.getBoundingClientRect();
-    visualOperations.updateViewportDimensions(bounds.width, bounds.height);
+    this.visualState.visualOperations.updateViewportDimensions(bounds.width, bounds.height);
 
     // Initialize hybrid coordinate system position tracking
     this.initializePositionTracking();
@@ -507,10 +518,10 @@ export class SimplePassiveRenderer {
       },
       onScroll: (scrollLeft: number, scrollTop: number) => {
         // Use the UNIFIED visual operations instead of legacy tableViewport$
-        visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');
+        this.visualState.visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');
 
         // DEBUGGING: Log detailed width calculations during scroll
-        const visualState = visualState$.get(true);
+        const visualState = this.visualState.visualState$.get(true);
         const viewport = this.viewport;
         const headerViewport = this.headerViewport;
 
@@ -626,7 +637,7 @@ export class SimplePassiveRenderer {
    */
   private checkVirtualRangeChange(): void {
     // Get current visual state outside of observer context
-    const visualState = visualState$.get(true);
+    const visualState = this.visualState.visualState$.get(true);
     const currentColumnRange = visualState.geometry.visibleColumnRange;
     const currentRowRange = visualState.geometry.visibleRowRange;
 
@@ -850,13 +861,13 @@ export class SimplePassiveRenderer {
     
     // Update content dimensions in visual state
     const totalHeight = rows.length * 40; // ROW_HEIGHT
-    visualOperations.setRowCount(rows.length);
+    this.visualState.visualOperations.setRowCount(rows.length);
 
     // Update row coordinate mapping
     this.coordinateMapping.rows = [];
 
     // Virtual scrolling: Only render visible rows - use visual observables
-    const visualState = visualState$.get(true);
+    const visualState = this.visualState.visualState$.get(true);
 
     // CRITICAL FIX: Set body container width to enable proper horizontal scrolling
     // The body container must be wide enough to accommodate all content
@@ -1181,7 +1192,7 @@ export class SimplePassiveRenderer {
    */
   private isGroupedMode(): boolean {
     try {
-      const groupConfig = visualOperations.getGroupConfig();
+      const groupConfig = this.visualState.visualOperations.getGroupConfig();
       return groupConfig && groupConfig.fields && groupConfig.fields.length > 0;
     } catch (error) {
       // If visual operations aren't available, fallback to direct check
