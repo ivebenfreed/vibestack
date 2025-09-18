@@ -14,22 +14,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  Layers, 
-  ChevronDown, 
-  ChevronUp, 
-  X, 
+import {
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  X,
   Settings,
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import type { Column } from '../types';
+import type { Column, GroupConfig } from '../types';
 import { cn } from '@/lib/utils';
 
 interface GroupingControlsProps {
   columns: Column[];
-  groupBy: string[];
-  onGroupByChange: (groupBy: string[]) => void;
+  groupConfig: GroupConfig | null;
+  onGroupConfigChange: (config: GroupConfig | null) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
   onClearGrouping: () => void;
@@ -38,27 +38,36 @@ interface GroupingControlsProps {
 
 export function GroupingControls({
   columns,
-  groupBy,
-  onGroupByChange,
+  groupConfig,
+  onGroupConfigChange,
   onExpandAll,
   onCollapseAll,
   onClearGrouping,
   className
 }: GroupingControlsProps) {
   // Filter columns to only show single relationship columns
-  const groupableColumns = columns.filter(col => 
-    col.cellType === 'relationship-single' && 
+  const groupableColumns = columns.filter(col =>
+    col.cellType === 'relationship-single' &&
     col.id !== '__selection'
   );
-  
-  const currentGroupColumn = groupBy[0] || '';
-  const isGrouped = groupBy.length > 0;
-  
+
+  const currentGroupColumn = groupConfig?.fields?.[0]?.field || '';
+  const isGrouped = groupConfig !== null && groupConfig.fields.length > 0;
+
   const handleGroupByChange = (columnId: string) => {
     if (columnId === 'none') {
-      onGroupByChange([]);
+      onGroupConfigChange(null);
     } else {
-      onGroupByChange([columnId]);
+      // Create new GroupConfig with single field
+      const newConfig: GroupConfig = {
+        fields: [{ field: columnId, name: columns.find(c => c.id === columnId)?.name || columnId }],
+        sortBy: 'name',
+        sortDirection: 'asc',
+        aggregations: [],
+        expandedGroups: new Set(),
+        colorScheme: 'auto'
+      };
+      onGroupConfigChange(newConfig);
     }
   };
   
@@ -131,21 +140,37 @@ export function GroupingControls({
 // Compact version for toolbar integration
 export function GroupingControlsCompact({
   columns,
-  groupBy,
-  onGroupByChange,
+  groupConfig,
+  onGroupConfigChange,
   className
-}: Pick<GroupingControlsProps, 'columns' | 'groupBy' | 'onGroupByChange' | 'className'>) {
-  const groupableColumns = columns.filter(col => 
-    col.cellType === 'relationship-single' && 
+}: Pick<GroupingControlsProps, 'columns' | 'groupConfig' | 'onGroupConfigChange' | 'className'>) {
+  const groupableColumns = columns.filter(col =>
+    col.cellType === 'relationship-single' &&
     col.id !== '__selection'
   );
-  
-  const currentGroupColumn = groupBy[0] || '';
-  
+
+  const currentGroupColumn = groupConfig?.fields?.[0]?.field || '';
+
+  const handleValueChange = (value: string) => {
+    if (value === 'none') {
+      onGroupConfigChange(null);
+    } else {
+      const newConfig: GroupConfig = {
+        fields: [{ field: value, name: columns.find(c => c.id === value)?.name || value }],
+        sortBy: 'name',
+        sortDirection: 'asc',
+        aggregations: [],
+        expandedGroups: new Set(),
+        colorScheme: 'auto'
+      };
+      onGroupConfigChange(newConfig);
+    }
+  };
+
   return (
     <Select
       value={currentGroupColumn || 'none'}
-      onValueChange={(value) => onGroupByChange(value === 'none' ? [] : [value])}
+      onValueChange={handleValueChange}
     >
       <SelectTrigger className={cn("w-[140px] h-7 text-xs", className)}>
         <Layers className="h-3 w-3 mr-1" />
@@ -170,3 +195,47 @@ export function GroupingControlsCompact({
 const SelectMenuSeparator = () => (
   <div className="h-px bg-border my-1 -mx-1" />
 );
+
+// Reactive version that connects to visual state operations
+interface GroupingControlsReactiveProps {
+  columns: Column[];
+  visualOperations: any; // Visual operations object
+  className?: string;
+}
+
+export function GroupingControlsReactive({
+  columns,
+  visualOperations,
+  className
+}: GroupingControlsReactiveProps) {
+  // Get current group config from visual state
+  const groupConfig = visualOperations.getGroupConfig();
+
+  const handleGroupConfigChange = React.useCallback((config: GroupConfig | null) => {
+    visualOperations.setGroupConfig(config);
+  }, [visualOperations]);
+
+  const handleExpandAll = React.useCallback(() => {
+    visualOperations.expandAllGroups();
+  }, [visualOperations]);
+
+  const handleCollapseAll = React.useCallback(() => {
+    visualOperations.collapseAllGroups();
+  }, [visualOperations]);
+
+  const handleClearGrouping = React.useCallback(() => {
+    visualOperations.setGroupConfig(null);
+  }, [visualOperations]);
+
+  return (
+    <GroupingControls
+      columns={columns}
+      groupConfig={groupConfig}
+      onGroupConfigChange={handleGroupConfigChange}
+      onExpandAll={handleExpandAll}
+      onCollapseAll={handleCollapseAll}
+      onClearGrouping={handleClearGrouping}
+      className={className}
+    />
+  );
+}

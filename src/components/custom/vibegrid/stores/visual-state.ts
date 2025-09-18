@@ -717,22 +717,43 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
    */
   toggleGroupExpansion(groupId: string) {
     const groupConfig = visualInputs$.groupConfig.get();
-    if (!groupConfig) return;
+    fileLog.info('🔍 toggleGroupExpansion called', {
+      groupId,
+      hasGroupConfig: !!groupConfig,
+      currentExpandedGroups: groupConfig?.expandedGroups ? Array.from(groupConfig.expandedGroups) : 'none'
+    });
 
-    const expandedGroups = new Set(groupConfig.expandedGroups);
-
-    if (expandedGroups.has(groupId)) {
-      expandedGroups.delete(groupId);
-      fileLog.info('🎯 Group collapsed', { groupId });
-    } else {
-      expandedGroups.add(groupId);
-      fileLog.info('🎯 Group expanded', { groupId });
+    if (!groupConfig) {
+      fileLog.warn('⚠️ No groupConfig found, cannot toggle expansion');
+      return;
     }
 
-    visualInputs$.groupConfig.set({
+    const expandedGroups = new Set(groupConfig.expandedGroups);
+    const wasExpanded = expandedGroups.has(groupId);
+
+    if (wasExpanded) {
+      expandedGroups.delete(groupId);
+      fileLog.info('🎯 Group collapsed', { groupId, newExpandedGroups: Array.from(expandedGroups) });
+    } else {
+      expandedGroups.add(groupId);
+      fileLog.info('🎯 Group expanded', { groupId, newExpandedGroups: Array.from(expandedGroups) });
+    }
+
+    const newGroupConfig = {
       ...groupConfig,
       expandedGroups
-    } as GroupConfig);
+    } as GroupConfig;
+
+    visualInputs$.groupConfig.set(newGroupConfig);
+
+    // Verify the state was updated
+    const updatedConfig = visualInputs$.groupConfig.get();
+    fileLog.info('✅ Group config updated', {
+      groupId,
+      wasExpanded,
+      nowExpanded: updatedConfig?.expandedGroups?.has(groupId),
+      finalExpandedGroups: updatedConfig?.expandedGroups ? Array.from(updatedConfig.expandedGroups) : 'none'
+    });
   },
 
   /**

@@ -270,7 +270,7 @@ function saveDisplayState(entityType: string, tableState: any): void {
 // DATA STATE CORE OBSERVABLE FACTORY
 // ====================================
 
-export function createTableCore$(entityType: string, columns: Column[]) {
+export function createTableCore$(entityType: string, columns: Column[], visualInputs$?: any) {
   fileLog.info('<� Creating tableCore$ observable with Legend State localStorage persistence', { entityType, columnCount: columns.length });
 
   // Create default state structure (without requiring orgId/userId yet)
@@ -345,8 +345,20 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
 
-      // Get grouping configuration from table core state
-      const groupConfig = tableCore$.groupConfig.get();
+      // Get grouping configuration from visual state (if available) or fallback to data state
+      const visualGroupConfig = visualInputs$?.groupConfig?.get();
+      const dataGroupConfig = tableCore$.groupConfig.get();
+      const groupConfig = visualGroupConfig || dataGroupConfig;
+
+      fileLog.info('📊 Group config sources', {
+        hasVisualInputs: !!visualInputs$,
+        hasVisualGroupConfig: !!visualGroupConfig,
+        hasDataGroupConfig: !!dataGroupConfig,
+        usingVisualConfig: !!visualGroupConfig,
+        expandedGroupsFromVisual: visualGroupConfig?.expandedGroups ? Array.from(visualGroupConfig.expandedGroups) : 'none',
+        expandedGroupsFromData: dataGroupConfig?.expandedGroups ? Array.from(dataGroupConfig.expandedGroups) : 'none',
+        finalExpandedGroups: groupConfig?.expandedGroups ? Array.from(groupConfig.expandedGroups) : 'none'
+      });
 
       // Apply grouping if configured
       if (groupConfig && groupConfig.fields && groupConfig.fields.length > 0) {

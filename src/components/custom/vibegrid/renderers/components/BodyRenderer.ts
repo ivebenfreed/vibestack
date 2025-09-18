@@ -337,8 +337,8 @@ export class BodyRenderer {
     const groupLabel = this.createGroupLabel(groupData);
     rowElement.appendChild(groupLabel);
 
-    // Add click handler for expand/collapse
-    this.setupGroupHeaderHandler(rowElement, groupRow, isExpanded);
+    // Add data attribute for MouseController to detect group clicks
+    rowElement.setAttribute('data-group-id', groupRow.id);
 
     return rowElement;
   }

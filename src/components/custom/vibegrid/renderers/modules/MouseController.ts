@@ -495,6 +495,35 @@ export class MouseController {
           }
         }
       } else {
+        // Check for group expansion clicks (triangle-icon)
+        const triangleElement = target.closest('.triangle-icon');
+        const groupRowElement = triangleElement?.closest('[data-group-id]');
+
+        if (triangleElement && groupRowElement) {
+          const groupId = groupRowElement.getAttribute('data-group-id');
+
+          if (groupId) {
+            fileLog.info('🎯 Group expansion triangle clicked', {
+              groupId,
+              targetTag: target.tagName,
+              targetClass: target.className
+            });
+
+            // Use visual state operations for group expansion (same pattern as sorting)
+            if (this.visualState?.visualOperations?.toggleGroupExpansion) {
+              this.visualState.visualOperations.toggleGroupExpansion(groupId);
+              fileLog.info('🔄 toggleGroupExpansion call completed', { groupId });
+            } else {
+              fileLog.warn('⚠️ Visual operations not available for group expansion', {
+                hasVisualState: !!this.visualState,
+                hasVisualOperations: !!this.visualState?.visualOperations,
+                hasToggleGroupExpansion: !!this.visualState?.visualOperations?.toggleGroupExpansion
+              });
+            }
+            return; // Important: exit early to prevent further processing
+          }
+        }
+
         // Check for column header clicks
         const columnHeaderElement = target.closest('[data-interaction-type="column-header"]');
 
