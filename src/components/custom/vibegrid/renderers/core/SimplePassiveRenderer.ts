@@ -426,6 +426,12 @@ export class SimplePassiveRenderer {
 
     // SCROLL OBSERVER: Watches scroll position and triggers re-render when virtual range changes
     this.scrollObserverDisposer = observe(() => {
+      // Skip during initialization to prevent unnecessary renders
+      // Check rendererInitialized to ensure we're completely done initializing
+      if (!this.initManager.hydrationState$.rendererInitialized.get(true)) {
+        return;
+      }
+
       const scrollLeft = this.visualState.visualInputs$.scrollLeft.get(true);
       const scrollTop = this.visualState.visualInputs$.scrollTop.get(true);
 
@@ -448,10 +454,13 @@ export class SimplePassiveRenderer {
         cancelAnimationFrame(this.pendingRAF);
       }
 
-      this.pendingRAF = requestAnimationFrame(() => {
-        this.pendingRAF = null; // Clear the pending RAF
-        this.checkVirtualRangeChange();
-      });
+      // Only schedule RAF if we're fully initialized
+      if (this.initManager.hydrationState$.rendererInitialized.get(true)) {
+        this.pendingRAF = requestAnimationFrame(() => {
+          this.pendingRAF = null; // Clear the pending RAF
+          this.checkVirtualRangeChange();
+        });
+      }
     });
 
     // DRAG SELECTION OBSERVER: Watches drag selection state and mouse coordinates
@@ -625,12 +634,31 @@ export class SimplePassiveRenderer {
       this.eventManager.setupEventHandling();
     }
 
+    // Mark dependencies as ready before initial render
+    this.initManager.markReady('viewportReady');
+    this.initManager.markReady('overlaySystemReady');
+    this.initManager.markReady('positionTrackingReady');
+    this.initManager.markReady('eventHandlersReady');
+    this.initManager.markReady('mouseControllerReady');
+    this.initManager.markReady('scrollControllerReady');
+
     // Apply Legend State batching for initial render to prevent multiple layout calculations
     batch(() => {
       // Initial render
       this.renderHeader();
       this.renderBody();
     });
+
+    // Defer marking renderer as initialized to next tick to ensure all observers have run
+    // This prevents the virtual range observer from triggering during init
+    setTimeout(() => {
+      this.initManager.markReady('rendererInitialized');
+      fileLog.info('✅ Renderer marked as initialized after initial render');
+
+      // Now that we're fully initialized, update virtual ranges if needed
+      this.lastVisibleColumns = this.visualState.visualState$.geometry.visibleColumnRange.get();
+      this.lastVisibleRows = this.visualState.visualState$.geometry.visibleRowRange.get();
+    }, 0);
 
     fileLog.info('✅ Post-initialization complete');
   }
@@ -676,6 +704,12 @@ export class SimplePassiveRenderer {
    * This runs outside the reactive context to avoid observer cascades
    */
   private checkVirtualRangeChange(): void {
+    // Skip during initialization to prevent multiple renders
+    // Check rendererInitialized specifically to ensure we're completely done
+    if (!this.initManager.hydrationState$.rendererInitialized.get(true)) {
+      return;
+    }
+
     // Get current visual state outside of observer context
     const visualState = this.visualState.visualState$.get(true);
     const currentColumnRange = visualState.geometry.visibleColumnRange;
@@ -1018,9 +1052,12 @@ export class SimplePassiveRenderer {
 
     // Schedule DOM position tracker update in next frame to avoid forced reflow
     // This prevents measuring DOM immediately after modifying it
-    requestAnimationFrame(() => {
-      positionTracker.forceUpdate();
-    });
+    // Only force update if initialization is complete
+    if (this.initManager.isFullyHydrated$.get(true)) {
+      requestAnimationFrame(() => {
+        positionTracker.forceUpdate();
+      });
+    }
 
     fileLog.info('✅ Body rendered with Phase 2 managers');
   }

@@ -241,9 +241,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
         });
 
         rendererRef.current = renderer;
-        initManager.markReady('rendererInitialized');
+        // Don't mark as ready yet - renderer will do this after postInitialize
 
-        fileLog.info('✅ SimplePassiveRenderer initialized successfully');
+        fileLog.info('✅ SimplePassiveRenderer created successfully');
 
         // Set up event handlers after renderer is created
         if (onSelectionChange) {
@@ -288,13 +288,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
         const initialRect = containerRef.current.getBoundingClientRect();
         observables.tableViewport$.updateViewport(initialRect.width, initialRect.height);
 
-        // Mark all remaining dependencies as ready
-        initManager.markReady('eventHandlersReady');
-        initManager.markReady('viewportReady');
-        initManager.markReady('overlaySystemReady');
-        initManager.markReady('positionTrackingReady');
-        initManager.markReady('mouseControllerReady');
-        initManager.markReady('scrollControllerReady');
+        // Don't mark dependencies here - renderer will mark them when ready
+        // This prevents premature initialization signals
 
         // Coordinate state initialization with overall VibeGrid initialization
         // Clear all isInitializing flags only when entire grid is fully ready
