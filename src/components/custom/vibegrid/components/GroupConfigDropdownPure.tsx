@@ -33,10 +33,12 @@ import {
 import type { Column, GroupConfig, GroupField } from '../types';
 import type { TableCore$ } from '../stores/data-state';
 import type { TableInteraction$ } from '../stores/interaction-state';
+import { createVibeGridVisualState } from '../stores/visual-state';
 
 interface GroupConfigDropdownPureProps {
   tableCore$: TableCore$;
   tableInteraction$: TableInteraction$;
+  visualState: ReturnType<typeof createVibeGridVisualState>;
   className?: string;
 }
 
@@ -102,6 +104,7 @@ const SortableGroupField = ({ field, index, onRemove }: SortableGroupFieldProps)
 export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure({
   tableCore$,
   tableInteraction$,
+  visualState,
   className = ''
 }: GroupConfigDropdownPureProps) {
   // Get reactive data from observables
@@ -143,10 +146,10 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
           fields: reorderedFields
         };
 
-        tableCore$.setGroupConfig(newConfig);
+        visualState.visualOperations.setGroupConfig(newConfig);
       }
     }
-  }, [groupConfig, tableCore$]);
+  }, [groupConfig, visualState]);
 
   // Available columns for grouping (only select/enum fields suitable for grouping)
   const availableColumns = React.useMemo(() => {
@@ -184,9 +187,9 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
       colorScheme: 'auto'
     };
 
-    tableCore$.setGroupConfig(newConfig);
+    visualState.visualOperations.setGroupConfig(newConfig);
     tableInteraction$.closeGroupConfigMenu();
-  }, [availableColumns, groupConfig, tableCore$, tableInteraction$]);
+  }, [availableColumns, groupConfig, visualState, tableInteraction$]);
 
   const handleRemoveGroupField = React.useCallback((index: number) => {
     if (!groupConfig) return;
@@ -194,19 +197,19 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
     const newFields = groupConfig.fields.filter((_, i) => i !== index);
     
     if (newFields.length === 0) {
-      tableCore$.setGroupConfig(null);
+      visualState.visualOperations.setGroupConfig(null);
     } else {
-      tableCore$.setGroupConfig({
+      visualState.visualOperations.setGroupConfig({
         ...groupConfig,
         fields: newFields
       });
     }
-  }, [groupConfig, tableCore$]);
+  }, [groupConfig, visualState]);
 
   const handleClearGrouping = React.useCallback(() => {
-    tableCore$.setGroupConfig(null);
+    visualState.visualOperations.setGroupConfig(null);
     tableInteraction$.closeGroupConfigMenu();
-  }, [tableCore$, tableInteraction$]);
+  }, [visualState, tableInteraction$]);
 
   // Get available columns that aren't already used for grouping
   const availableForGrouping = React.useMemo(() => {

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rUI0XvVeYUsITlPEKdL9rckzBWixgXWct4vfHYjYdjcd7PEolmi34cETbYwW01U
+\restrict bsMTEWslze5RYC0LW3ov7lik67J20G5bRIJsNY9Iw3PdbFWX7Ed2xNO1YpwfAkz
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -892,12 +892,12 @@ e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-0
 a880b054-1c80-443a-a613-e60c33ba8ccb	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.866	2025-09-12 01:53:37.866	Security Audit and Compliance Review	Comprehensive security assessment and compliance verification for new systems	high	not_started	2025-04-01 00:00:00	testing	45	\N	4	t	\N	\N	f
 26b282d1-820a-497c-b8dc-d7675d12ff9c	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:59.898	2025-09-12 01:53:59.898	Real-time Analytics Dashboard	Build interactive dashboard for healthcare analytics with real-time patient monitoring and reporting	high	not_started	2025-04-15 00:00:00	development	65	\N	4	t	\N	\N	t
 85566e0d-4fd8-44e5-97a1-aa71e5024750	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.082	2025-09-12 01:54:00.082	API Security Testing	Comprehensive security testing of healthcare APIs including penetration testing and vulnerability assessment	critical	not_started	2025-05-01 00:00:00	testing	40	\N	3	t	\N	\N	f
-7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-12 01:54:00.275	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	active	2025-03-15 00:00:00	deployment	35	\N	3	t	\N	\N	f
 f98ab62c-724c-4b91-95ef-92ec6c19a0f3	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.45	2025-09-12 01:54:00.45	Integration with EHR Systems	Develop integrations with major Electronic Health Record systems for seamless data exchange	medium	not_started	2025-06-01 00:00:00	development	55	\N	4	t	\N	\N	t
 b814d501-69ad-40ee-a7b5-6c99a399f9d6	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.592	2025-09-12 01:54:22.592	Inventory Management System	Develop real-time inventory tracking system with automated reorder points and supplier integration	high	not_started	2025-04-30 00:00:00	development	60	\N	4	t	\N	\N	t
 6a731430-a1bc-4db1-b7fb-0e6cafe897e5	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.728	2025-09-12 01:54:22.728	Customer Analytics Dashboard	Build comprehensive analytics dashboard for customer behavior, sales trends, and business intelligence	medium	not_started	2025-06-15 00:00:00	development	50	\N	3	t	\N	\N	t
 eb6d8755-c903-4d03-9e67-0abc07fcca89	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.001	2025-09-12 01:54:23.001	Search and Recommendation Engine	Implement AI-powered search functionality with personalized product recommendations	medium	not_started	2025-07-01 00:00:00	development	55	\N	5	t	\N	\N	t
 394e27f2-0fc1-469f-ba73-bdb02d868817	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.121	2025-09-12 01:54:23.121	Multi-Platform Testing	Comprehensive testing across web, mobile, and tablet platforms with automated test suites	high	not_started	2025-08-15 00:00:00	testing	42	\N	3	t	\N	\N	f
+7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-18 20:29:37.154	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	done	2025-03-15 04:00:00	deployment	35	\N	3	t	\N	\N	f
 1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-13 14:23:53.086	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-20 22:00:00	deployment	12	14	3	t	\N	\N	f
 01d55ead-3b1d-478e-a379-22322f32dc0f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.423	2025-09-15 00:46:23.947	Process Automation Framework Design	Design automation framework for business processes using RPA and workflow tools	high	done	2025-02-01 05:00:00	development	60	\N	5	t	\N	\N	f
 a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-13 16:38:49.773	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-02-28 22:00:00	documentation	32	35	4	t	\N	\N	f
@@ -1279,5 +1279,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rUI0XvVeYUsITlPEKdL9rckzBWixgXWct4vfHYjYdjcd7PEolmi34cETbYwW01U
+\unrestrict bsMTEWslze5RYC0LW3ov7lik67J20G5bRIJsNY9Iw3PdbFWX7Ed2xNO1YpwfAkz
 

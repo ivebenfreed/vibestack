@@ -95,13 +95,31 @@ export class DragDropManager {
     rowType: 'data' | 'group' | 'summary',
     groupId?: string
   ): void {
+    fileLog.info('🎯 setupRowDragHandlers called', {
+      rowId,
+      rowType,
+      groupId,
+      hasRowElement: !!rowElement,
+      dataGroupId: rowElement?.dataset?.groupId
+    });
+
     // Only data rows are draggable
-    if (rowType !== 'data') return;
+    if (rowType !== 'data') {
+      fileLog.debug('⏭️ Skipping non-data row', { rowId, rowType });
+      return;
+    }
 
     const isGroupMode = this.callbacks.isGroupMode?.() ?? true;
+    fileLog.info('🔍 Group mode check', { isGroupMode, groupId, hasGroupId: !!groupId });
 
     if (isGroupMode && !groupId) {
-      fileLog.error('❌ Cannot setup drag handlers: no group ID provided for grouped mode', { rowId });
+      fileLog.error('❌ Cannot setup drag handlers: no group ID provided for grouped mode', {
+        rowId,
+        isGroupMode,
+        groupId,
+        dataGroupId: rowElement?.dataset?.groupId,
+        allDataAttributes: Object.assign({}, rowElement?.dataset)
+      });
       return;
     }
 
@@ -262,26 +280,6 @@ export class DragDropManager {
     return dataRows.indexOf(rowElement);
   }
 
-  /**
-   * Set container for drag operations (compatibility method)
-   */
-  setContainer(container: HTMLElement): void {
-    // No-op in simplified implementation - container is handled per-row
-    fileLog.debug('🔧 Container set for drag operations');
-  }
-
-  /**
-   * Setup row for drag and drop (compatibility method)
-   */
-  setupRowForDragDrop(rowElement: HTMLElement, row: any): void {
-    // Delegate to the main setup method
-    this.setupRowDragHandlers(
-      rowElement,
-      row.id,
-      row.type || 'data',
-      row.groupId
-    );
-  }
 
   /**
    * Create a clean drag preview showing all visible row content

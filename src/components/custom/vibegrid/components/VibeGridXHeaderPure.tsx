@@ -44,6 +44,7 @@ export const VibeGridXHeaderPure = observer(function VibeGridXHeaderPure({
           <GroupConfigDropdownPure
             tableCore$={tableCore$}
             tableInteraction$={tableInteraction$}
+            visualState={visualState}
           />
         )}
         <VibeGridXColumnVisibilityPure
