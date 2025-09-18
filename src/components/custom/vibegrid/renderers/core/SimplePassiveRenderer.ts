@@ -125,6 +125,7 @@ export class SimplePassiveRenderer {
   private scrollObserverDisposer: (() => void) | null = null;
   private dragSelectionObserverDisposer: (() => void) | null = null;
   private pendingRAF: number | null = null; // Track pending RAF to prevent cascades
+  private observersEnabled: boolean = false; // Prevent observers from running during initialization
   private domFactory: DOMElementFactory | null = null;
   private headerRenderer: HeaderRenderer | null = null;
   
@@ -292,6 +293,12 @@ export class SimplePassiveRenderer {
     // Track data changes to avoid unnecessary renders
     let lastDataSignature = '';
     this.dataObserverDisposer = observe(() => {
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ DATA: Observers not enabled yet');
+        return;
+      }
+
       // GUARD: Only render if grid is fully initialized
       const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
       if (!isFullyInitialized) {
@@ -324,6 +331,12 @@ export class SimplePassiveRenderer {
     // Track non-scroll visual changes to avoid duplicate renders with scroll observer
     let lastVisualLayout = '';
     this.visualObserverDisposer = observe(() => {
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ VISUAL: Observers not enabled yet');
+        return;
+      }
+
       // GUARD: Only render if grid is fully initialized
       const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
       if (!isFullyInitialized) {
@@ -370,6 +383,11 @@ export class SimplePassiveRenderer {
 
     // INTERACTION OBSERVER: Only watches interaction changes (selection, editing, drag)
     this.interactionObserverDisposer = observe(() => {
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ INTERACTION: Observers not enabled yet');
+        return;
+      }
       const selectedCells = this.tableInteraction$.selectedCells.get(true);
       const editingCell = this.tableInteraction$.editingCell.get(true);
       const editValue = this.tableInteraction$.editValue.get(true);
@@ -426,6 +444,12 @@ export class SimplePassiveRenderer {
 
     // SCROLL OBSERVER: Watches scroll position and triggers re-render when virtual range changes
     this.scrollObserverDisposer = observe(() => {
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ SCROLL: Observers not enabled yet');
+        return;
+      }
+
       // Skip during initialization to prevent unnecessary renders
       // Check rendererInitialized to ensure we're completely done initializing
       if (!this.initManager.hydrationState$.rendererInitialized.get(true)) {
@@ -467,6 +491,12 @@ export class SimplePassiveRenderer {
 
     // DRAG SELECTION OBSERVER: Watches drag selection state and mouse coordinates
     this.dragSelectionObserverDisposer = observe(() => {
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ DRAG: Observers not enabled yet');
+        return;
+      }
+
       const isDragSelecting = this.tableInteraction$.isDragSelecting.get(true);
       const mouseX = this.tableInteraction$.mouseX.get(true);
       const mouseY = this.tableInteraction$.mouseY.get(true);
@@ -672,6 +702,11 @@ export class SimplePassiveRenderer {
             this.initManager.markReady('rendererInitialized');
 
             fileLog.info('✅ Renderer marked as initialized after initial render');
+
+            // Enable observers after initialization is complete
+            this.observersEnabled = true;
+            fileLog.info('🔄 Observers enabled after initialization');
+
             fileLog.info('✅ Post-initialization complete');
           });
         });
@@ -925,9 +960,12 @@ export class SimplePassiveRenderer {
   private renderBody(): void {
     if (!this.bodyContainer || !this.bodyRenderer) return;
 
-    // GUARD: Only render if grid is fully initialized
+    // GUARD: Only render if grid is fully initialized OR if this is the initial render call
     const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
-    if (!isFullyInitialized) {
+    const rendererInitialized = this.initManager.hydrationState$.rendererInitialized.get(true);
+
+    // Allow initial render before renderer is marked as initialized
+    if (!isFullyInitialized && rendererInitialized) {
       fileLog.debug('⏸️ RENDER_BODY: Skipping render during initialization');
       return;
     }
