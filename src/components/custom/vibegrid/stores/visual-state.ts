@@ -852,8 +852,8 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     when(syncStatus$.isPersistLoaded).then(() => {
       // Give the load transform a chance to complete AND prevent rapid saves during initialization
       setTimeout(() => {
-        // Clear initialization flag to allow normal saves
-        visualInputs$.isInitializing.set(false);
+        // NOTE: isInitializing flag is now controlled by VibeGrid initManager
+        // Don't clear it here - let the overall initialization coordination handle it
 
         persistenceComplete$.set(true);
         fileLog.info('🎯 Columns observable persistence loaded', {

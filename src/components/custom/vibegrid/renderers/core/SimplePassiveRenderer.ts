@@ -41,6 +41,7 @@ import type { ViewportInfo, TableRow } from '../../types';
 import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
 import { createDataLoadingStage$, createStageCallbacks } from '../../stores/data-loading-stages';
+import type { VibeGridHydrationManager } from '../../stores/init-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
@@ -54,6 +55,7 @@ export interface SimplePassiveRendererOptions {
   tableInteraction$: TableInteraction$;
   tableViewport$: TableViewport$;
   visualState: ReturnType<typeof createVibeGridVisualState>;
+  initManager: VibeGridHydrationManager;
   enableSelectionColumn?: boolean;
   bufferSize?: number;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
@@ -73,6 +75,7 @@ export class SimplePassiveRenderer {
   private tableCore$: TableCore$;
   private tableInteraction$: TableInteraction$;
   private tableViewport$: TableViewport$;
+  private initManager: VibeGridHydrationManager;
   
   // Basic row management
   private activeRows: Map<string, HTMLElement> = new Map();
@@ -139,6 +142,7 @@ export class SimplePassiveRenderer {
     this.tableCore$ = options.tableCore$;
     this.tableInteraction$ = options.tableInteraction$;
     this.tableViewport$ = options.tableViewport$;
+    this.initManager = options.initManager;
 
     // Use visual state passed from parent VibeGrid component
     this.visualState = options.visualState;
@@ -287,6 +291,13 @@ export class SimplePassiveRenderer {
     // Track data changes to avoid unnecessary renders
     let lastDataSignature = '';
     this.dataObserverDisposer = observe(() => {
+      // GUARD: Only render if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('⏸️ DATA: Skipping render during initialization');
+        return;
+      }
+
       const processedRows = this.tableCore$.processedRows.get(true);
       const sortBy = this.visualState.visualInputs$.sortBy.get(true);
 
@@ -312,6 +323,13 @@ export class SimplePassiveRenderer {
     // Track non-scroll visual changes to avoid duplicate renders with scroll observer
     let lastVisualLayout = '';
     this.visualObserverDisposer = observe(() => {
+      // GUARD: Only render if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('⏸️ VISUAL: Skipping render during initialization');
+        return;
+      }
+
       const visualState = this.visualState.visualState$.get(true);
 
       // Create a signature of layout-only changes (exclude scroll position)
@@ -415,6 +433,13 @@ export class SimplePassiveRenderer {
         this.headerViewport.style.transform = `translateX(-${scrollLeft}px)`;
       }
 
+      // GUARD: Only trigger virtual range check if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('⏸️ SCROLL: Skipping virtual range check during initialization');
+        return;
+      }
+
       // Defer virtual range checking to avoid reading computed state in observer
       // Use RAF to break out of the reactive context
       requestAnimationFrame(() => {
@@ -480,6 +505,14 @@ export class SimplePassiveRenderer {
       visualState: this.visualState,
       updateCoordinateMapping: (mapping: CoordinateMapping) => {
         this.coordinateMapping = mapping;
+
+        // GUARD: Only update coordinate mapping if grid is fully initialized
+        const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+        if (!isFullyInitialized) {
+          fileLog.debug('⏸️ COORDINATE: Skipping coordinate mapping update during initialization');
+          return;
+        }
+
         // CRITICAL: OverlayManager still needs coordinate mapping for positioning overlays
         this.overlayManager?.updateCoordinateMapping(mapping);
         fileLog.debug('🔄 Coordinate mapping updated for overlays', {
@@ -835,6 +868,13 @@ export class SimplePassiveRenderer {
   private renderBody(): void {
     if (!this.bodyContainer || !this.bodyRenderer) return;
 
+    // GUARD: Only render if grid is fully initialized
+    const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+    if (!isFullyInitialized) {
+      fileLog.debug('⏸️ RENDER_BODY: Skipping render during initialization');
+      return;
+    }
+
     const rows = this.tableCore$.processedRows.get(true);
     const columns = this.tableCore$.columns.get(true);
     const columnVisibility = this.visualState.visualInputs$.columnVisibility.get(true);
@@ -957,6 +997,13 @@ export class SimplePassiveRenderer {
         mappingVersion: this.coordinateMapping.version,
         sampleRows: newRows.slice(0, 3).map(r => ({ id: r.rowId, y: r.y }))
       });
+
+      // GUARD: Only update coordinate mapping if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('⏸️ COORDINATE: Skipping coordinate mapping update during initialization (renderBody)');
+        return;
+      }
 
       // CRITICAL: OverlayManager still needs coordinate mapping for positioning overlays
       this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);

@@ -230,6 +230,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
           tableInteraction$: observables.tableInteraction$,
           tableViewport$: observables.tableViewport$,
           visualState,
+          initManager: initManager,
           enableSelectionColumn,
           bufferSize,
           onEntityUpdate,
@@ -291,6 +292,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
         initManager.markReady('positionTrackingReady');
         initManager.markReady('mouseControllerReady');
         initManager.markReady('scrollControllerReady');
+
+        // Coordinate visual state initialization with overall VibeGrid initialization
+        // Clear visual state's isInitializing flag only when entire grid is fully ready
+        initManager.isFullyHydrated$.onChange((isFullyInitialized) => {
+          if (isFullyInitialized) {
+            visualState.visualInputs$.isInitializing.set(false);
+            fileLog.info('🎯 Visual state initialization flag cleared - VibeGrid fully ready', {
+              entityType,
+              tableId
+            });
+          }
+        });
       };
 
       // Start checking for container readiness after a small delay to allow React to render
