@@ -55,7 +55,7 @@ export class CanvasOverlayDOM {
   constructor(config: OverlayConfig, eventCallback?: CanvasEventCallback) {
     this.config = config;
     this.eventCallback = eventCallback || null;
-    fileLog.info('CanvasOverlayDOM: Created with config', config);
+    fileLog.debug('CanvasOverlayDOM: Created with config', config);
   }
   
   /**
@@ -74,7 +74,7 @@ export class CanvasOverlayDOM {
       return;
     }
     
-    fileLog.info('CanvasOverlayDOM: Initializing in container', {
+    fileLog.debug('CanvasOverlayDOM: Initializing in container', {
       className: container.className,
       tagName: container.tagName,
       scrollWidth: container.scrollWidth,
@@ -119,28 +119,54 @@ export class CanvasOverlayDOM {
     // Add to container
     this.container.appendChild(this.overlayContainer);
     
-    fileLog.info('CanvasOverlayDOM: Overlay container created');
+    fileLog.debug('CanvasOverlayDOM: Overlay container created');
+
+    // PRE-INITIALIZE overlays to avoid lazy loading delays during interactions
+    this.preInitializeOverlays();
   }
   
+  /**
+   * Pre-initialize all overlays to avoid lazy loading delays during interactions
+   */
+  private preInitializeOverlays(): void {
+    if (!this.overlayContainer) {
+      return;
+    }
+
+    fileLog.debug('CanvasOverlayDOM: Pre-initializing all overlays');
+
+    // Pre-create all overlays to avoid delays on first interaction
+    try {
+      this.getSelectionOverlay();
+      this.getFillHandleLayer();
+      // Skip other overlays for now as they're less commonly used
+      // Can add more if needed: getClipboardOverlay(), getDragPreviewOverlay(), etc.
+
+      fileLog.debug('CanvasOverlayDOM: All critical overlays pre-initialized');
+    } catch (error) {
+      fileLog.error('CanvasOverlayDOM: Failed to pre-initialize overlays', error);
+    }
+  }
+
   /**
    * Get or create the selection overlay
    */
   private getSelectionOverlay(): SelectionOverlayDOM {
     if (!this.selectionOverlay && this.overlayContainer) {
-      fileLog.info('CanvasOverlayDOM: Lazily creating SelectionOverlayDOM');
+      fileLog.debug('CanvasOverlayDOM: Creating SelectionOverlayDOM');
 
       // Create selection container positioned to match the actual viewport
       const selectionContainer = document.createElement('div');
       selectionContainer.className = 'vibegridx-selection-container';
 
       // CRITICAL FIX: Ensure overlay container coordinate system matches the table body
-      fileLog.info('🎯 DIAGNOSTIC: Setting up overlay container positioning with scroll context alignment');
+      fileLog.debug('🎯 DIAGNOSTIC: Setting up overlay container positioning with scroll context alignment');
 
       // Find the scrollable table body container to ensure coordinate alignment
       const tableBodyContainer = this.container?.querySelector('.vibegridx-body-container') as HTMLElement;
       const scrollContext = tableBodyContainer || this.container;
 
-      fileLog.info('🎯 DIAGNOSTIC: Overlay positioning context analysis', {
+      fileLog.debug('🎯 DIAGNOSTIC: Overlay positioning context analysis', {
         hasTableBodyContainer: !!tableBodyContainer,
         scrollContextClass: scrollContext?.className,
         containerClass: this.container?.className,
@@ -170,7 +196,7 @@ export class CanvasOverlayDOM {
         }
       });
 
-      fileLog.info('✅ DIAGNOSTIC: Overlay container positioned to fill parent with scroll alignment');
+      fileLog.debug('✅ DIAGNOSTIC: Overlay container positioned to fill parent with scroll alignment');
 
       selectionContainer.style.pointerEvents = 'none';
       selectionContainer.style.overflow = 'hidden';
