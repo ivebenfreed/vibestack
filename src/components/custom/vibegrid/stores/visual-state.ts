@@ -178,10 +178,11 @@ export function createVibeGridVisualState() {
       const rawProcessedRows = tableCore$.processedRows.get();
       // Use the correct visualInputs$ reference from the visual state instance
       const sortBy = visualInputs$.sortBy.get();
-      fileLog.debug('🔄 createSortedProcessedRows$ computed triggered', {
+      fileLog.info('🔄 createSortedProcessedRows$ computed triggered', {
         rawRowsCount: rawProcessedRows.length,
         sortByCount: sortBy.length,
-        sortByFirst: sortBy[0]?.field
+        sortByFirst: sortBy[0]?.field,
+        sortByDirection: sortBy[0]?.direction
       });
       return applySorting(rawProcessedRows, sortBy);
     })

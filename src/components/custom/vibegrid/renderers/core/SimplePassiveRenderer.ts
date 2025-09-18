@@ -306,79 +306,56 @@ export class SimplePassiveRenderer {
   private initFocusedObservers(): void {
     fileLog.info('🎯 Initializing focused observers');
 
-    // VISUAL STATE OBSERVER: Direct subscription to visual state changes
-    // This will trigger whenever visual state changes (sorting, filtering, etc.)
-    fileLog.debug('🎯 Creating visual state observer - direct subscription to sortBy changes');
+    // SORTED DATA OBSERVER: Direct subscription to computed sorted rows changes
+    // This will trigger whenever the computed sorted data changes (due to sorting, filtering, or raw data changes)
+    fileLog.debug('🎯 Creating sorted data observer - direct subscription to sortedProcessedRows$ changes');
+
+    if (!this.sortedProcessedRows$) {
+      fileLog.error('❌ DATA FLOW ERROR: sortedProcessedRows$ not available - cannot set up observer');
+      return;
+    }
+
     this.dataObserverDisposer = this.visualState.visualInputs$.sortBy.onChange(() => {
-      fileLog.debug('🔍 VISUAL STATE CHANGE DETECTED', {
+      fileLog.info('🔍 SORT CHANGE DETECTED - Legend State onChange', {
         observersEnabled: this.observersEnabled,
         timestamp: Date.now()
       });
 
+      // Get the latest sorted data after sort change
+      const processedRows = this.sortedProcessedRows$.get();
+      const sortBy = this.visualState.visualInputs$.sortBy.get();
+
+      fileLog.info('🔍 SORTED DATA AFTER CHANGE', {
+        processedRowsCount: processedRows.length,
+        sortByCount: sortBy.length,
+        sortByFirst: sortBy[0]?.field,
+        sortByDirection: sortBy[0]?.direction,
+        firstRowTitle: processedRows[0]?.title
+      });
+
       // GUARD: Skip if observers are not enabled yet
       if (!this.observersEnabled) {
-        fileLog.debug('⏸️ VISUAL: Observers not enabled yet');
+        fileLog.debug('⏸️ SORTED DATA: Observers not enabled yet');
         return;
       }
 
       // GUARD: Only render if grid is fully initialized
       const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
       if (!isFullyInitialized) {
-        fileLog.debug('⏸️ VISUAL: Skipping render during initialization');
+        fileLog.debug('⏸️ SORTED DATA: Skipping render during initialization');
         return;
       }
 
-      // ALWAYS use visual state for processed rows - never bypass to data state
-      if (!this.sortedProcessedRows$) {
-        fileLog.error('❌ DATA FLOW ERROR: sortedProcessedRows$ not available - renderer should ALWAYS observe visual state');
-        return;
-      }
+      // Legend State automatically handles change detection - just re-render
+      this.renderBody();
 
-      // Get the current sort configuration and trigger recomputation
-      const sortBy = this.visualState.visualOperations.visualInputs$.sortBy.get();
-
-      // Force recalculation by accessing the computed - this should trigger applySorting
-      const processedRows = this.sortedProcessedRows$.get();
-
-      fileLog.debug('🔍 VISUAL STATE OBSERVER: Dependencies accessed', {
+      fileLog.debug('🔄 Legend State reactive render - sorted data applied', {
         processedRowsCount: processedRows.length,
         sortByCount: sortBy.length,
         sortByFirst: sortBy[0]?.field,
-        sortByDirection: sortBy[0]?.direction
-      });
-
-      // CRITICAL: Trigger DOM re-render with the new sorted data
-      this.renderTable(processedRows);
-
-      fileLog.debug('🔄 DOM re-rendered with sorted data', {
-        processedRowsCount: processedRows.length
-      });
-
-      fileLog.debug('🔍 DATA FLOW CHECK', {
-        hasSortedProcessedRows: !!this.sortedProcessedRows$,
-        processedRowsCount: processedRows.length,
-        sortByCount: sortBy.length,
-        sortBy: sortBy.map(s => `${s.field}:${s.direction}`),
-        usingDataState: !this.sortedProcessedRows$,
+        sortByDirection: sortBy[0]?.direction,
         firstRowTitle: processedRows[0]?.title
       });
-
-      // Create a signature of actual data changes
-      const dataSignature = `${processedRows.length}-${sortBy.map(s => `${s.field}:${s.direction}`).join(',')}`;
-
-      // Only render if actual data changed
-      if (dataSignature !== lastDataSignature) {
-        lastDataSignature = dataSignature;
-
-        fileLog.debug('📊 Data changed - rendering body only', {
-          rowCount: processedRows.length,
-          sortFields: sortBy.length
-        });
-
-        // Only render body for data changes, no layout recalc
-        this.renderBody();
-        this.updateSortIndicators();
-      }
     });
 
     // VISUAL OBSERVER: Only watches layout changes (columns, viewport dimensions)
@@ -1026,7 +1003,8 @@ export class SimplePassiveRenderer {
       return;
     }
 
-    const rows = this.tableCore$.processedRows.get(true);
+    // CRITICAL FIX: Use sorted processed rows from visual state, not raw unsorted data
+    const rows = this.sortedProcessedRows$ ? this.sortedProcessedRows$.get(true) : this.tableCore$.processedRows.get(true);
     const columns = this.tableCore$.columns.get(true);
     const columnVisibility = this.visualState.visualInputs$.columnVisibility.get(true);
 
@@ -1042,6 +1020,8 @@ export class SimplePassiveRenderer {
       columnCount: columns.length,
       groupRows: groupRows.length,
       dataRows: dataRows.length,
+      usingSortedData: !!this.sortedProcessedRows$,
+      firstRowTitle: rows[0]?.title,
       callStack: stack
     });
 
