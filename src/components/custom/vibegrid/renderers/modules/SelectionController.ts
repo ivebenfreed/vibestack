@@ -285,33 +285,31 @@ export class SelectionController {
   }
 
   /**
-   * Update select all checkbox state
+   * Update select all checkbox state (reactive)
    */
   getSelectAllState(): { checked: boolean; indeterminate: boolean } {
     const processedRows = this.getProcessedRows();
     const visibleColumns = this.getVisibleColumns();
-    const selectedCells = this.tableInteraction$.selectedCells.get();
-    
+
     if (processedRows.length === 0 || visibleColumns.length === 0) {
       return { checked: false, indeterminate: false };
     }
-    
-    let totalCells = 0;
-    let selectedCount = 0;
-    
+
+    // Use reactive checkbox states from interaction state
+    const checkboxStates = this.tableInteraction$.getRowCheckboxStates(processedRows, visibleColumns);
+
+    let totalRows = processedRows.length;
+    let selectedRowCount = 0;
+
     for (const row of processedRows) {
-      for (const column of visibleColumns) {
-        if (column.id === 'selection') continue;
-        totalCells++;
-        if (selectedCells.has(`${row.id}:${column.id}`)) {
-          selectedCount++;
-        }
+      if (checkboxStates.get(row.id)) {
+        selectedRowCount++;
       }
     }
-    
-    if (selectedCount === 0) {
+
+    if (selectedRowCount === 0) {
       return { checked: false, indeterminate: false };
-    } else if (selectedCount === totalCells) {
+    } else if (selectedRowCount === totalRows) {
       return { checked: true, indeterminate: false };
     } else {
       return { checked: false, indeterminate: true };

@@ -123,6 +123,25 @@ export function createTableInteraction$(tableCore$?: any) {
       }
     }),
 
+    // Row checkbox states (computed method - called by renderer with data context)
+    getRowCheckboxStates(rows: any[], visibleColumns: any[]): Map<string, boolean> {
+      const selectedCells = tableInteraction$.selectedCells.get();
+      const rowStates = new Map<string, boolean>();
+
+      // Filter out selection column to match toggleRowCells behavior
+      const dataColumns = visibleColumns.filter(col => col.id !== 'selection');
+
+      for (const row of rows) {
+        const isRowSelected = dataColumns.every(col =>
+          selectedCells.has(`${row.id}:${col.id}`)
+        ) && dataColumns.length > 0;
+
+        rowStates.set(row.id, isRowSelected);
+      }
+
+      return rowStates;
+    },
+
     // Editing state
     editingCell: null as string | null,
     editValue: null as any,

@@ -738,21 +738,21 @@ export class BodyRenderer {
   }
 
   /**
-   * Update all row checkboxes based on current selection
+   * Update all row checkboxes based on current selection (reactive)
    */
   updateAllRowCheckboxes(): void {
-    const selectedCells = this.tableInteraction$.selectedCells.get();
     // Use UNIFIED visual state's visible columns - no duplicate filtering
     const visualStateData = this.visualState.visualState$.get();
     const allVisibleColumns = visualStateData.visibleColumns;
+    const processedRows = this.tableCore$.processedRows.get();
+
+    // Get reactive checkbox states from interaction state
+    const checkboxStates = this.tableInteraction$.getRowCheckboxStates(processedRows, allVisibleColumns);
 
     this.activeRows.forEach((rowElement, rowId) => {
       const checkbox = rowElement.querySelector('input[type="checkbox"]') as HTMLInputElement;
       if (checkbox) {
-        const isRowSelected = allVisibleColumns.every(col =>
-          selectedCells.has(`${rowId}:${col.id}`)
-        ) && allVisibleColumns.length > 0;
-
+        const isRowSelected = checkboxStates.get(rowId) || false;
         checkbox.checked = isRowSelected;
       }
     });

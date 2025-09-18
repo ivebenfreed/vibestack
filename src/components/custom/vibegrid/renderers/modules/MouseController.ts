@@ -490,8 +490,8 @@ export class MouseController {
             // Ctrl+click: Toggle row (add/remove from existing selection)
             this.selectionController.toggleRowSelection(rowId);
           } else {
-            // Regular click: Replace selection with this row
-            this.selectionController.selectRow(rowId);
+            // Regular checkbox click: Toggle row selection (checkboxes should always toggle)
+            this.selectionController.toggleRowSelection(rowId);
           }
         }
       } else {
