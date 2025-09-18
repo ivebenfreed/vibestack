@@ -454,8 +454,10 @@ export class SimplePassiveRenderer {
         cancelAnimationFrame(this.pendingRAF);
       }
 
-      // Only schedule RAF if we're fully initialized
-      if (this.initManager.hydrationState$.rendererInitialized.get(true)) {
+      // Only schedule RAF if we're fully initialized AND have previous ranges to compare
+      // This prevents double-render during initialization
+      if (this.initManager.hydrationState$.rendererInitialized.get(true) &&
+          this.lastVisibleColumns && this.lastVisibleRows) {
         this.pendingRAF = requestAnimationFrame(() => {
           this.pendingRAF = null; // Clear the pending RAF
           this.checkVirtualRangeChange();
@@ -548,119 +550,133 @@ export class SimplePassiveRenderer {
   private postInitialization(): void {
     fileLog.info('🚀 Starting post-initialization');
 
-    // Initialize viewport dimensions
-    // Initialize viewport dimensions using visual operations
-    const bounds = this.container.getBoundingClientRect();
-    this.visualState.visualOperations.updateViewportDimensions(bounds.width, bounds.height);
-
-    // Initialize hybrid coordinate system position tracking
+    // Phase 1: Quick synchronous operations that don't cause reflows
+    // Initialize hybrid coordinate system position tracking (mostly calculations)
     this.initializePositionTracking();
 
-    // Initialize enhanced ScrollController with comprehensive event handling
-    this.scrollController = new ScrollController({
-      viewport: this.viewport!,
-      headerViewport: this.headerViewport,
-      container: this.container,
-      onClickOutside: () => {
-        // Delegate to interaction state with proper editing logic
-        this.tableInteraction$.handleOutsideClick();
-      },
-      onScroll: (scrollLeft: number, scrollTop: number) => {
-        // Use the UNIFIED visual operations instead of legacy tableViewport$
-        this.visualState.visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');
+    // Phase 2: Defer DOM measurements and controller initialization
+    requestAnimationFrame(() => {
+      // Now safe to measure DOM
+      const bounds = this.container.getBoundingClientRect();
+      this.visualState.visualOperations.updateViewportDimensions(bounds.width, bounds.height);
 
-        // DEBUGGING: Log detailed width calculations during scroll
-        const visualState = this.visualState.visualState$.get(true);
-        const viewport = this.viewport;
-        const headerViewport = this.headerViewport;
+      // Initialize enhanced ScrollController with comprehensive event handling
+      this.scrollController = new ScrollController({
+        viewport: this.viewport!,
+        headerViewport: this.headerViewport,
+        container: this.container,
+        onClickOutside: () => {
+          // Delegate to interaction state with proper editing logic
+          this.tableInteraction$.handleOutsideClick();
+        },
+        onScroll: (scrollLeft: number, scrollTop: number) => {
+          // Use the UNIFIED visual operations instead of legacy tableViewport$
+          this.visualState.visualOperations.handleViewportScroll(scrollLeft, scrollTop, 'body');
 
-        fileLog.info('📜 SCROLL DEBUG - Width Calculations', {
-          scrollLeft,
-          scrollTop,
-          // Visual state geometry
-          visualStateTotalWidth: visualState.geometry.totalWidth,
-          visualStateViewportWidth: visualState.geometry.viewportWidth,
-          // Visible columns analysis
-          visibleColumnsCount: visualState.visibleColumns.length,
-          columnLayouts: visualState.visibleColumns.map(col => ({
-            id: col.id,
-            width: col.width,
-            xOffset: col.xOffset,
-            visible: col.visible
-          })),
-          // DOM dimensions
-          viewportClientWidth: viewport?.clientWidth,
-          viewportScrollWidth: viewport?.scrollWidth,
-          headerViewportClientWidth: headerViewport?.clientWidth,
-          headerViewportScrollWidth: headerViewport?.scrollWidth,
-          // Transform states
-          headerTransform: headerViewport?.style.transform,
-          // Scroll edge analysis
-          scrollRightEdge: scrollLeft + (viewport?.clientWidth || 0),
-          totalScrollableWidth: (viewport?.scrollWidth || 0) - (viewport?.clientWidth || 0),
-          scrollProgress: viewport?.scrollWidth ? (scrollLeft / ((viewport.scrollWidth - viewport.clientWidth) || 1) * 100).toFixed(1) + '%' : '0%'
-        });
-      },
-      keyboardNavController: this.keyboardNavController,
-      selectionController: this.selectionController,
-      tableInteraction$: this.tableInteraction$
-    });
+          // DEBUGGING: Log detailed width calculations during scroll
+          const visualState = this.visualState.visualState$.get(true);
+          const viewport = this.viewport;
+          const headerViewport = this.headerViewport;
 
-    // Initialize MouseController for centralized mouse event handling
-    this.mouseController = new MouseController({
-      container: this.container,
-      bodyRenderer: this.bodyRenderer,
-      scrollController: this.scrollController,
-      tableInteraction$: this.tableInteraction$
-    });
-
-    // Configure ColumnWidthManager with DOM containers
-    if (this.columnWidthManager) {
-      this.columnWidthManager.setContainers({
-        headerContainer: this.headerContainer,
-        bodyContainer: this.bodyContainer,
-        headerViewport: this.headerViewport
+          fileLog.info('📜 SCROLL DEBUG - Width Calculations', {
+            scrollLeft,
+            scrollTop,
+            // Visual state geometry
+            visualStateTotalWidth: visualState.geometry.totalWidth,
+            visualStateViewportWidth: visualState.geometry.viewportWidth,
+            // Visible columns analysis
+            visibleColumnsCount: visualState.visibleColumns.length,
+            columnLayouts: visualState.visibleColumns.map(col => ({
+              id: col.id,
+              width: col.width,
+              xOffset: col.xOffset,
+              visible: col.visible
+            })),
+            // DOM dimensions
+            viewportClientWidth: viewport?.clientWidth,
+            viewportScrollWidth: viewport?.scrollWidth,
+            headerViewportClientWidth: headerViewport?.clientWidth,
+            headerViewportScrollWidth: headerViewport?.scrollWidth,
+            // Transform states
+            headerTransform: headerViewport?.style.transform,
+            // Scroll edge analysis
+            scrollRightEdge: scrollLeft + (viewport?.clientWidth || 0),
+            totalScrollableWidth: (viewport?.scrollWidth || 0) - (viewport?.clientWidth || 0),
+            scrollProgress: viewport?.scrollWidth ? (scrollLeft / ((viewport.scrollWidth - viewport.clientWidth) || 1) * 100).toFixed(1) + '%' : '0%'
+          });
+        },
+        keyboardNavController: this.keyboardNavController,
+        selectionController: this.selectionController,
+        tableInteraction$: this.tableInteraction$
       });
-    }
 
-    // Initialize overlay now that DOM is ready
-    if (this.overlayManager) {
-      this.overlayManager.initializeOverlay();
-    }
+      // Initialize MouseController for centralized mouse event handling
+      this.mouseController = new MouseController({
+        container: this.container,
+        bodyRenderer: this.bodyRenderer,
+        scrollController: this.scrollController,
+        tableInteraction$: this.tableInteraction$
+      });
 
-    // Setup event handling via EventManager
-    if (this.eventManager) {
-      this.eventManager.setOverlayManager(this.overlayManager!);
-      this.eventManager.setupEventHandling();
-    }
+      // Configure ColumnWidthManager with DOM containers
+      if (this.columnWidthManager) {
+        this.columnWidthManager.setContainers({
+          headerContainer: this.headerContainer,
+          bodyContainer: this.bodyContainer,
+          headerViewport: this.headerViewport
+        });
+      }
 
-    // Mark dependencies as ready before initial render
-    this.initManager.markReady('viewportReady');
-    this.initManager.markReady('overlaySystemReady');
-    this.initManager.markReady('positionTrackingReady');
-    this.initManager.markReady('eventHandlersReady');
-    this.initManager.markReady('mouseControllerReady');
-    this.initManager.markReady('scrollControllerReady');
+      // Mark controller dependencies as ready
+      this.initManager.markReady('mouseControllerReady');
+      this.initManager.markReady('scrollControllerReady');
+      this.initManager.markReady('viewportReady');
+      this.initManager.markReady('positionTrackingReady');
 
-    // Apply Legend State batching for initial render to prevent multiple layout calculations
-    batch(() => {
-      // Initial render
-      this.renderHeader();
-      this.renderBody();
+      // Phase 3: Defer overlay and event setup
+      requestAnimationFrame(() => {
+        // Initialize overlay now that DOM is ready
+        if (this.overlayManager) {
+          this.overlayManager.initializeOverlay();
+        }
+
+        // Setup event handling via EventManager
+        if (this.eventManager) {
+          this.eventManager.setOverlayManager(this.overlayManager!);
+          this.eventManager.setupEventHandling();
+        }
+
+        // Mark remaining dependencies as ready
+        this.initManager.markReady('overlaySystemReady');
+        this.initManager.markReady('eventHandlersReady');
+
+        // Phase 4: Defer header render
+        requestAnimationFrame(() => {
+          // Render header first (lighter operation)
+          batch(() => {
+            this.renderHeader();
+          });
+
+          // Phase 5: Defer body render to next frame
+          requestAnimationFrame(() => {
+            // Render body and capture ranges in batch
+            batch(() => {
+              this.renderBody();
+
+              // Capture initial visible ranges after body render
+              this.lastVisibleColumns = this.visualState.visualState$.geometry.visibleColumnRange.get();
+              this.lastVisibleRows = this.visualState.visualState$.geometry.visibleRowRange.get();
+            });
+
+            // Mark renderer as initialized after body render completes
+            this.initManager.markReady('rendererInitialized');
+
+            fileLog.info('✅ Renderer marked as initialized after initial render');
+            fileLog.info('✅ Post-initialization complete');
+          });
+        });
+      });
     });
-
-    // Defer marking renderer as initialized to next tick to ensure all observers have run
-    // This prevents the virtual range observer from triggering during init
-    setTimeout(() => {
-      this.initManager.markReady('rendererInitialized');
-      fileLog.info('✅ Renderer marked as initialized after initial render');
-
-      // Now that we're fully initialized, update virtual ranges if needed
-      this.lastVisibleColumns = this.visualState.visualState$.geometry.visibleColumnRange.get();
-      this.lastVisibleRows = this.visualState.visualState$.geometry.visibleRowRange.get();
-    }, 0);
-
-    fileLog.info('✅ Post-initialization complete');
   }
 
   /**
