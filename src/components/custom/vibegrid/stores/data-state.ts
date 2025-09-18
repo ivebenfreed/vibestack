@@ -289,6 +289,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 
     // Initialization flag to prevent saves during init
     isInitializing: true,
+    // Timestamp when persistence was set up (for grace period)
+    persistenceSetupTime: undefined as number | undefined,
 
     // Persistent configuration state (will be synchronized with localStorage)
     // NOTE: Column concerns moved to visual-state (columnOrder, columnWidths, columnVisibility, sortBy, filters)
@@ -640,6 +642,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 
   // Configure Legend State persistence (always available with simplified storage key)
   try {
+    // Set persistence setup timestamp IMMEDIATELY to start grace period
+    tableCore$.persistenceSetupTime.set(Date.now());
+
     // Configure syncObservable for Legend State persistence
     tableCoreSync$ = syncObservable(tableCore$, {
       persist: {
@@ -648,9 +653,24 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         // Only persist configuration, not computed data
         transform: {
           load: (value: any) => {
-            if (!value) return {};
-            // Transform loaded data if needed
-            return transformTableState(value, defaultState);
+            if (!value) {
+              // IMPORTANT: Preserve initialization state and set timestamp even when no persisted state
+              const isCurrentlyInitializing = tableCore$.isInitializing.get();
+              return {
+                isInitializing: isCurrentlyInitializing, // Preserve current initialization state
+                initializationCompleteTime: Date.now() // Always set timestamp to start grace period
+              };
+            }
+            // Transform loaded data and preserve initialization state
+            const transformed = transformTableState(value, defaultState);
+
+            // IMPORTANT: Always preserve initialization state from current observable state
+            // The transformed state might have isInitializing: false from persisted data
+            return {
+              ...transformed,
+              isInitializing: tableCore$.isInitializing.get(), // Preserve current initialization state
+              initializationCompleteTime: tableCore$.isInitializing.get() ? undefined : Date.now()
+            };
           },
           save: (value: any) => {
             // Skip saving during initialization - check for the isInitializing flag
@@ -661,6 +681,23 @@ export function createTableCore$(entityType: string, columns: Column[]) {
                 stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
               });
               // Return false to prevent save according to Legend State docs
+              return false;
+            }
+
+            // Add grace period after persistence setup to prevent rapid saves
+            const now = Date.now();
+            const gracePeriod = 1000; // 1 second grace period
+            const persistenceSetupTime = tableCore$.persistenceSetupTime.get() || 0;
+            const timeSincePersistenceSetup = now - persistenceSetupTime;
+
+            if (persistenceSetupTime && timeSincePersistenceSetup < gracePeriod) {
+              fileLog.info('⏸️ SAVE DEFERRED: Grace period active after persistence setup', {
+                storageKey,
+                entityType: value.entityType,
+                timeSincePersistenceSetup,
+                gracePeriod,
+                deferredMs: gracePeriod - timeSincePersistenceSetup
+              });
               return false;
             }
 

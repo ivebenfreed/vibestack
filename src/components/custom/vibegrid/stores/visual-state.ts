@@ -157,6 +157,8 @@ export function createVisualInputs$() {
 
   // Initialization flag to prevent saves during init
   isInitializing: false,
+  // Timestamp when persistence was set up (for grace period)
+  persistenceSetupTime: undefined as number | undefined,
 
   // Processed data rows (input for visual rows)
   processedRows: [] as any[]
@@ -702,6 +704,9 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
   setupPersistence(entityType: string) {
     const persistKey = `vibegrid-visual-${entityType}`;
 
+    // Set persistence setup timestamp IMMEDIATELY to start grace period
+    visualInputs$.persistenceSetupTime.set(Date.now());
+
     const syncObservableInstance = syncObservable(visualInputs$, {
       persist: {
         plugin: ObservablePersistLocalStorage,
@@ -713,8 +718,15 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
 
             // Handle missing or invalid data
             if (!value || typeof value !== 'object') {
-              fileLog.warn('⚠️ No valid persisted state found, using defaults');
-              return visualInputs$.get(); // Return current state if no persistence data
+              // This is normal - no persisted state exists initially
+              const currentInputs = visualInputs$.get();
+              // IMPORTANT: Preserve initialization state and set timestamp even when no persisted state
+              // Set the timestamp NOW to start the grace period immediately
+              return {
+                ...currentInputs,
+                isInitializing: currentInputs.isInitializing, // Preserve current initialization state
+                initializationCompleteTime: Date.now() // Always set timestamp to start grace period
+              };
             }
 
             // Merge with current state (in case schema changed)
@@ -751,7 +763,11 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               // Include sort configuration in persistence - validated
               sortBy: validSortBy,
               // Include filter configuration in persistence - validated
-              filters: validFilters
+              filters: validFilters,
+              // IMPORTANT: Preserve initialization state from current state, not persisted state
+              isInitializing: currentInputs.isInitializing,
+              // Set initialization complete timestamp when loading persistence
+              initializationCompleteTime: currentInputs.isInitializing ? undefined : Date.now()
             };
 
             fileLog.info('📁 Visual state loaded from persistence', {
@@ -772,6 +788,23 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
                 persistKey,
                 entityType: value.entityType,
                 stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
+              });
+              return false;
+            }
+
+            // Add grace period after persistence setup to prevent rapid saves
+            const now = Date.now();
+            const gracePeriod = 1000; // 1 second grace period
+            const persistenceSetupTime = visualInputs$.persistenceSetupTime.get() || 0;
+            const timeSincePersistenceSetup = now - persistenceSetupTime;
+
+            if (persistenceSetupTime && timeSincePersistenceSetup < gracePeriod) {
+              fileLog.info('⏸️ SAVE DEFERRED: Grace period active after persistence setup', {
+                persistKey,
+                entityType: value.entityType,
+                timeSincePersistenceSetup,
+                gracePeriod,
+                deferredMs: gracePeriod - timeSincePersistenceSetup
               });
               return false;
             }
@@ -832,17 +865,16 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       isPersistenceDataLoaded: persistenceComplete$
     };
 
-    // Wait for persistence to load
-    when(syncStatus$.isPersistLoaded).then(() => {
-      setTimeout(() => {
-        persistenceComplete$.set(true);
-        fileLog.info('🎯 Visual state persistence loaded', {
-          entityType,
-          persistKey,
-          isPersistLoaded: syncStatus$.isPersistLoaded.get(),
-          isPersistEnabled: syncStatus$.isPersistEnabled.get()
-        });
-      }, 100); // Short delay to ensure data is loaded
+    // Note: Initialization flags are managed by VibeGrid.tsx coordinating with init-state
+    // We don't set isInitializing:false here to avoid race conditions
+
+    // localStorage is synchronous, so persistence should be loaded immediately
+    fileLog.info('🎯 Visual state persistence configured and loaded', {
+      entityType,
+      persistKey,
+      isPersistLoaded: syncStatus$.isPersistLoaded.get(),
+      isPersistEnabled: syncStatus$.isPersistEnabled.get(),
+      currentState: visualInputs$.get().entityType
     });
 
     return syncObservableInstance;
