@@ -368,37 +368,13 @@ export class HeaderRenderer {
    * Set up select all checkbox handler
    */
   private setupSelectAllHandler(): void {
-    if (!this.selectAllCheckbox) return;
-    
+    if (!this.selectAllCheckbox || !this.selectionController) return;
+
     this.selectAllCheckbox.addEventListener('click', (e) => {
       e.stopPropagation();
-      
-      // Check current selection state to determine action
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      const processedRows = this.tableCore$.processedRows.get();
-      const columns = this.tableCore$.columns.get();
-      const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
-      const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
-      
-      fileLog.info('🎯 Select all checkbox clicked', {
-        currentSelection: selectedCells.size,
-        totalRows: processedRows.length,
-        totalColumns: visibleColumns.length
-      });
-      
-      if (selectedCells.size === 0) {
-        // REACTIVE: No selection - select all directly via state
-        this.tableInteraction$.selectAll({
-          rows: processedRows,
-          columns: visibleColumns,
-          columnVisibility
-        });
-        fileLog.info('✅ Select all triggered reactively');
-      } else {
-        // REACTIVE: Has selection - clear all directly via state
-        this.tableInteraction$.clearSelection();
-        fileLog.info('✅ Clear selection triggered reactively');
-      }
+
+      // Delegate to SelectionController for consistent architecture
+      this.selectionController!.handleSelectAllToggle();
     });
   }
 

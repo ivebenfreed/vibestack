@@ -4,6 +4,7 @@
  */
 
 import { log } from '@/logger';
+import { batch } from '@legendapp/state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 
 const fileLog = log('components/custom/vibegrid/renderers/modules/SelectionController.ts');
@@ -12,18 +13,21 @@ export interface SelectionControllerOptions {
   tableInteraction$: TableInteraction$;
   getProcessedRows: () => any[];
   getVisibleColumns: () => any[];
+  bodyRenderer?: any; // For updating checkbox visual state
 }
 
 export class SelectionController {
   private tableInteraction$: TableInteraction$;
   private getProcessedRows: () => any[];
   private getVisibleColumns: () => any[];
+  public bodyRenderer?: any; // Public to allow SimplePassiveRenderer to set it
   private lastSelectedRowId: string | null = null;
 
   constructor(options: SelectionControllerOptions) {
     this.tableInteraction$ = options.tableInteraction$;
     this.getProcessedRows = options.getProcessedRows;
     this.getVisibleColumns = options.getVisibleColumns;
+    this.bodyRenderer = options.bodyRenderer;
   }
 
   /**
@@ -50,18 +54,13 @@ export class SelectionController {
    */
   selectColumn(columnId: string): void {
     const processedRows = this.getProcessedRows();
-    const selectedCells = new Set<string>();
 
-    for (const row of processedRows) {
-      selectedCells.add(`${row.id}:${columnId}`);
-    }
+    // Use interaction-state method to ensure proper state management
+    this.tableInteraction$.selectColumnCells(columnId, processedRows);
 
-    this.tableInteraction$.selectedCells.set(selectedCells);
-    this.tableInteraction$.anchorCell.set(`${processedRows[0]?.id}:${columnId}`);
-    
-    fileLog.info('Column selected', {
+    fileLog.info('Column selected via interaction-state', {
       columnId,
-      cellCount: selectedCells.size
+      rowCount: processedRows.length
     });
   }
 
@@ -70,20 +69,20 @@ export class SelectionController {
    */
   selectRow(rowId: string): void {
     const visibleColumns = this.getVisibleColumns();
-    const selectedCells = new Set<string>();
 
-    for (const column of visibleColumns) {
-      if (column.id === 'selection') continue;
-      selectedCells.add(`${rowId}:${column.id}`);
+    // Use interaction-state method to ensure proper state management
+    this.tableInteraction$.selectRowCells(rowId, visibleColumns);
+
+    this.lastSelectedRowId = rowId;
+
+    // Update checkbox visual state
+    if (this.bodyRenderer?.updateAllRowCheckboxes) {
+      this.bodyRenderer.updateAllRowCheckboxes();
     }
 
-    this.tableInteraction$.selectedCells.set(selectedCells);
-    this.tableInteraction$.anchorCell.set(`${rowId}:${visibleColumns[0]?.id}`);
-    this.lastSelectedRowId = rowId;
-    
-    fileLog.info('Row selected', {
+    fileLog.info('Row selected via interaction-state', {
       rowId,
-      cellCount: selectedCells.size
+      columnCount: visibleColumns.length
     });
   }
 
@@ -92,33 +91,18 @@ export class SelectionController {
    */
   toggleRowSelection(rowId: string): void {
     const visibleColumns = this.getVisibleColumns();
-    const currentSelection = this.tableInteraction$.selectedCells.get();
-    const newSelection = new Set(currentSelection);
-    
-    const rowCells: string[] = [];
-    for (const column of visibleColumns) {
-      if (column.id === 'selection') continue;
-      rowCells.push(`${rowId}:${column.id}`);
-    }
-    
-    const isRowSelected = rowCells.every(cellId => currentSelection.has(cellId));
-    
-    if (isRowSelected) {
-      // Deselect row
-      for (const cellId of rowCells) {
-        newSelection.delete(cellId);
-      }
-      fileLog.info('Row deselected', { rowId });
-    } else {
-      // Select row
-      for (const cellId of rowCells) {
-        newSelection.add(cellId);
-      }
-      fileLog.info('Row selected', { rowId });
-    }
-    
-    this.tableInteraction$.selectedCells.set(newSelection);
+
+    // Use interaction-state method to ensure proper state management
+    this.tableInteraction$.toggleRowCells(rowId, visibleColumns);
+
     this.lastSelectedRowId = rowId;
+
+    // Update checkbox visual state
+    if (this.bodyRenderer?.updateAllRowCheckboxes) {
+      this.bodyRenderer.updateAllRowCheckboxes();
+    }
+
+    fileLog.info('Row selection toggled via interaction-state', { rowId });
   }
 
   /**
@@ -156,7 +140,12 @@ export class SelectionController {
     
     this.tableInteraction$.selectedCells.set(selectedCells);
     this.tableInteraction$.anchorCell.set(`${startRowId}:${visibleColumns[0]?.id}`);
-    
+
+    // Update checkbox visual state
+    if (this.bodyRenderer?.updateAllRowCheckboxes) {
+      this.bodyRenderer.updateAllRowCheckboxes();
+    }
+
     fileLog.info('Row range selected', {
       startRowId,
       endRowId,
@@ -214,10 +203,58 @@ export class SelectionController {
    * Clear all selections
    */
   clearSelection(): void {
-    this.tableInteraction$.selectedCells.set(new Set());
-    this.tableInteraction$.anchorCell.set(null);
+    // Use interaction-state method to ensure proper state management
+    this.tableInteraction$.clearSelection();
     this.lastSelectedRowId = null;
-    fileLog.info('Selection cleared');
+    fileLog.info('Selection cleared via interaction-state');
+  }
+
+  /**
+   * Select all cells in the table (for select all checkbox)
+   */
+  handleSelectAllToggle(): void {
+    const selectedCells = this.tableInteraction$.selectedCells.get();
+    const processedRows = this.getProcessedRows();
+    const visibleColumns = this.getVisibleColumns();
+
+    fileLog.info('🎯 Select all checkbox toggled', {
+      currentSelection: selectedCells.size,
+      totalRows: processedRows.length,
+      totalColumns: visibleColumns.length
+    });
+
+    if (selectedCells.size === 0) {
+      // No selection - select all cells via interaction-state
+      this.tableInteraction$.selectAll({
+        rows: processedRows,
+        columns: visibleColumns,
+        columnVisibility: this.getColumnVisibility()
+      });
+      fileLog.info('✅ Select all triggered via SelectionController');
+    } else {
+      // Has selection - clear all via interaction-state
+      this.tableInteraction$.clearSelection();
+      fileLog.info('✅ Clear selection triggered via SelectionController');
+    }
+
+    // Update checkbox visual state
+    if (this.bodyRenderer?.updateAllRowCheckboxes) {
+      this.bodyRenderer.updateAllRowCheckboxes();
+    }
+  }
+
+  /**
+   * Get column visibility for interaction state
+   */
+  private getColumnVisibility(): Record<string, boolean> {
+    const visibleColumns = this.getVisibleColumns();
+    const columnVisibility: Record<string, boolean> = {};
+
+    visibleColumns.forEach(col => {
+      columnVisibility[col.id] = true;
+    });
+
+    return columnVisibility;
   }
 
   /**

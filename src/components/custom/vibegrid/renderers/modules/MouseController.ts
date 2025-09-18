@@ -14,6 +14,7 @@ export interface MouseControllerOptions {
   container: HTMLElement;
   bodyRenderer?: any; // Will delegate cell clicks here
   scrollController?: any; // Will delegate outside clicks here
+  selectionController?: any; // For row/column selection operations
   tableInteraction$: any; // For reactive state updates
   visualState: ReturnType<typeof createVibeGridVisualState>;
 }
@@ -22,6 +23,7 @@ export class MouseController {
   private container: HTMLElement;
   private bodyRenderer?: any;
   private scrollController?: any;
+  private selectionController?: any;
   private tableInteraction$: any;
   private visualState: ReturnType<typeof createVibeGridVisualState>;
 
@@ -30,6 +32,7 @@ export class MouseController {
   private isTracking = false; // Flag to track if we're monitoring for drag
   private dragThreshold = 8; // pixels (increased to be less sensitive)
   private startPosition: { x: number; y: number } = { x: 0, y: 0 };
+  private justEndedDrag = false; // Flag to prevent click events immediately after drag
 
   // Column drag state
   private isColumnDrag = false;
@@ -48,6 +51,7 @@ export class MouseController {
     this.container = options.container;
     this.bodyRenderer = options.bodyRenderer;
     this.scrollController = options.scrollController;
+    this.selectionController = options.selectionController;
     this.tableInteraction$ = options.tableInteraction$;
     this.visualState = options.visualState;
 
@@ -266,6 +270,47 @@ export class MouseController {
       }
     }
 
+    // Handle cell drag selection updates
+    if (this.isDragging && !this.isColumnDrag && this.tableInteraction$.isDragSelecting.get()) {
+      const target = e.target as HTMLElement;
+      const cellElement = target.closest('[data-row-id][data-column-id]');
+
+      if (cellElement) {
+        const rowId = cellElement.getAttribute('data-row-id');
+        const columnId = cellElement.getAttribute('data-column-id');
+        const currentCellId = `${rowId}:${columnId}`;
+
+        // Update drag selection if we're over a different cell
+        const currentDragCell = this.tableInteraction$.dragSelectCurrent.get();
+        if (currentCellId !== currentDragCell) {
+          fileLog.info('🖱️ Drag selection updated to new cell', {
+            previousCell: currentDragCell,
+            currentCell: currentCellId
+          });
+
+          // Get data context from visual state for proper range selection
+          try {
+            const dataContext = {
+              rows: this.visualState.virtualizedData || this.visualState.data || [],
+              columns: this.visualState.visualInputs$.columns.get() || [],
+              columnVisibility: this.visualState.visualInputs$.columnVisibility.get() || {}
+            };
+
+            fileLog.debug('🖱️ Drag selection data context', {
+              rowsCount: dataContext.rows.length,
+              columnsCount: dataContext.columns.length,
+              visibilityKeys: Object.keys(dataContext.columnVisibility).length
+            });
+
+            this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
+          } catch (error) {
+            fileLog.warn('⚠️ Failed to get data context for drag selection, falling back to simple update', { error });
+            this.tableInteraction$.updateDragSelection(currentCellId);
+          }
+        }
+      }
+    }
+
     // PURE: Always update mouse coordinates (computed observables react to changes)
     this.tableInteraction$.setMousePosition(e.clientX, e.clientY);
 
@@ -333,6 +378,9 @@ export class MouseController {
       e.preventDefault();
       e.stopPropagation();
 
+      // Set flag to prevent click events immediately after drag
+      this.justEndedDrag = true;
+
       // Reset drag state immediately - no delay needed
       this.isDragging = false;
       this.isTracking = false;
@@ -344,6 +392,12 @@ export class MouseController {
         isTracking: this.isTracking,
         isColumnDrag: this.isColumnDrag
       });
+
+      // Clear the flag after a brief delay to allow normal clicks again
+      setTimeout(() => {
+        this.justEndedDrag = false;
+        fileLog.debug('🖱️ Post-drag click blocking cleared');
+      }, 100);
     } else {
       // No drag was happening, reset immediately
       this.isDragging = false;
@@ -378,16 +432,43 @@ export class MouseController {
     if (isWithinContainer) {
       // Handle clicks within the container
       const cellElement = target.closest('[data-row-id][data-column-id]');
+      const rowHeaderElement = target.closest('[data-interaction-type="row-header"]');
 
-      if (!cellElement) {
-        // Click within container but outside cells - delegate to ScrollController
-        fileLog.info('🖱️ Container click (non-cell) detected - delegating to ScrollController');
+      if (rowHeaderElement && this.selectionController) {
+        // Handle row header clicks
+        const rowId = rowHeaderElement.getAttribute('data-row-id');
+        if (rowId) {
+          fileLog.info('🖱️ Row header click detected', {
+            rowId,
+            isShiftKey: e.shiftKey,
+            isCtrlKey: e.ctrlKey
+          });
 
-        if (this.scrollController?.handleOutsideClick) {
-          this.scrollController.handleOutsideClick(e);
-        } else {
-          fileLog.warn('⚠️ ScrollController handleOutsideClick method not available');
+          // Handle different click types properly:
+          // Regular click (no modifiers) -> replace selection
+          // Ctrl+click -> toggle row (add/remove from existing selection)
+          // Shift+click -> range selection
+          if (e.shiftKey) {
+            // Shift+click: Range selection
+            const lastRowId = this.selectionController.getLastSelectedRowId();
+            if (lastRowId) {
+              this.selectionController.selectRowRange(lastRowId, rowId);
+            } else {
+              this.selectionController.selectRow(rowId);
+            }
+          } else if (e.ctrlKey || e.metaKey) {
+            // Ctrl+click: Toggle row (add/remove from existing selection)
+            this.selectionController.toggleRowSelection(rowId);
+          } else {
+            // Regular click: Replace selection with this row
+            this.selectionController.selectRow(rowId);
+          }
         }
+      } else if (!cellElement) {
+        // Click within container but not on a cell or row header - this should NOT clear selection
+        // Only clicks outside the entire container should clear selection
+        fileLog.info('🖱️ Container click (non-cell) detected - preserving selection');
+        // Do nothing - preserve current selection
       }
       // Note: Cell clicks are handled by mouse down for immediate selection
     } else {
@@ -452,6 +533,11 @@ export class MouseController {
   setScrollController(scrollController: any): void {
     this.scrollController = scrollController;
     fileLog.info('🖱️ ScrollController reference updated');
+  }
+
+  setSelectionController(selectionController: any): void {
+    this.selectionController = selectionController;
+    fileLog.info('🖱️ SelectionController reference updated');
   }
 
   /**

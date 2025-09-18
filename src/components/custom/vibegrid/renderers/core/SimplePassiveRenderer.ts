@@ -191,7 +191,8 @@ export class SimplePassiveRenderer {
         const columns = this.tableCore$.columns.get();
         const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
         return columns.filter(col => columnVisibility[col.id] !== false);
-      }
+      },
+      bodyRenderer: null // Will be set after bodyRenderer is initialized
     });
     
     // Initialize keyboard navigation controller
@@ -244,6 +245,11 @@ export class SimplePassiveRenderer {
       createElement: this.createElement.bind(this),
       onEntityUpdate: this.options.onEntityUpdate
     });
+
+    // Update SelectionController with bodyRenderer reference for checkbox updates
+    if (this.selectionController) {
+      this.selectionController.bodyRenderer = this.bodyRenderer;
+    }
     
     // ViewportManager functionality now consolidated in visual-state.ts
     // Viewport operations are handled through visualOperations
@@ -645,7 +651,9 @@ export class SimplePassiveRenderer {
         container: this.container,
         bodyRenderer: this.bodyRenderer,
         scrollController: this.scrollController,
-        tableInteraction$: this.tableInteraction$
+        selectionController: this.selectionController,
+        tableInteraction$: this.tableInteraction$,
+        visualState: this.visualState
       });
 
       // Configure ColumnWidthManager with DOM containers

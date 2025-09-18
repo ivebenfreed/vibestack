@@ -288,51 +288,13 @@ export class BodyRenderer {
    * Set up row header click handling
    */
   private setupRowHeaderHandler(rowHeader: HTMLElement, row: any): void {
-    rowHeader.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      const isCtrlKey = e.ctrlKey || e.metaKey;
+    // BodyRenderer should NOT handle selection logic - just render and emit events
+    // MouseController will handle all interactions via event delegation
+    fileLog.debug('🎯 Row header setup for rendering only', { rowId: row.id });
 
-      // If click is directly on checkbox, let it handle the event
-      if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
-        const checkbox = target as HTMLInputElement;
-        const isShiftKey = e.shiftKey;
-
-        fileLog.debug('🔘 Checkbox click detected', {
-          rowId: row.id,
-          isShiftKey,
-          checkboxChecked: checkbox.checked
-        });
-
-        if (isShiftKey) {
-          // Shift+Click for row range selection
-          fileLog.debug('🎯 Shift+Click detected - calling selectRowRange');
-          const lastSelectedRowId = this.selectionController?.getLastSelectedRowId();
-          if (lastSelectedRowId) {
-            this.selectionController?.selectRowRange(lastSelectedRowId, row.id);
-          }
-        } else {
-          // Use toggleRowSelection for proper multi-row behavior
-          fileLog.debug('🔘 Regular click - calling toggleRowSelection', {
-            rowId: row.id
-          });
-          this.selectionController?.toggleRowSelection(row.id);
-          this.selectionController?.setLastSelectedRowId(row.id);
-        }
-        return;
-      }
-
-      // Click on row header area (but not checkbox) - still select row
-      if (isCtrlKey) {
-        // Ctrl+Click on row header - add to selection
-        e.preventDefault();
-        this.selectionController?.selectRow(row.id);
-      } else {
-        // Regular click - select entire row
-        this.selectionController?.selectRow(row.id);
-      }
-
-      fileLog.info('🎯 Row header clicked', { rowId: row.id, isCtrlKey });
-    });
+    // Just add data attributes that MouseController can use
+    rowHeader.setAttribute('data-row-id', row.id);
+    rowHeader.setAttribute('data-interaction-type', 'row-header');
   }
 
   /**

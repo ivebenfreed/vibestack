@@ -100,6 +100,7 @@ export function createTableInteraction$(tableCore$?: any) {
     anchorCell: null as string | null,
     selectionMode: 'cell' as 'cell' | 'row' | 'range' | 'multi',
     isSelecting: false,
+    lastBulkSelectionTime: 0,
 
     // Select all checkbox state (computed)
     // Note: This is now a simple state-based computation without data coupling
@@ -248,6 +249,18 @@ export function createTableInteraction$(tableCore$?: any) {
 
     // Pure cell click handler - minimal logic, reactive approach
     handleCellClick(cellId: string, isEditable: boolean, ctrlKey: boolean, shiftKey: boolean) {
+      // CONFLICT PREVENTION: Skip if row/column selection just happened
+      // This prevents MouseController from overriding SelectionController
+      const now = Date.now();
+      const lastBulkSelection = tableInteraction$.lastBulkSelectionTime?.get() || 0;
+      if (now - lastBulkSelection < 50) { // Within 50ms of bulk selection
+        fileLog.info('🚫 Skipping cell click - recent bulk selection detected', {
+          cellId,
+          timeSinceLastBulk: now - lastBulkSelection
+        });
+        return;
+      }
+
       batch(() => {
         // 1. Always set focus
         this.setFocusedCell(cellId);
@@ -446,6 +459,89 @@ export function createTableInteraction$(tableCore$?: any) {
         end: endCellId,
         totalCells: newSelection.size
       });
+    },
+
+    /**
+     * Select entire row as cells (for SelectionController)
+     */
+    selectRowCells(rowId: string, visibleColumns: any[]) {
+      batch(() => {
+        // CLEAR PREVIOUS SELECTIONS: Row selection replaces all
+        tableInteraction$.selectedRows.set(new Set());
+        tableInteraction$.selectedCells.set(new Set());
+
+        const selectedCells = new Set<string>();
+        for (const column of visibleColumns) {
+          if (column.id === 'selection') continue;
+          selectedCells.add(`${rowId}:${column.id}`);
+        }
+
+        tableInteraction$.selectedCells.set(selectedCells);
+        tableInteraction$.anchorCell.set(`${rowId}:${visibleColumns[0]?.id}`);
+        tableInteraction$.lastBulkSelectionTime.set(Date.now());
+
+        fileLog.info('📋 Row cells selected', {
+          rowId,
+          cellCount: selectedCells.size
+        });
+      });
+    },
+
+    /**
+     * Select entire column as cells (for SelectionController)
+     */
+    selectColumnCells(columnId: string, processedRows: any[]) {
+      batch(() => {
+        // CLEAR PREVIOUS SELECTIONS: Column selection replaces all
+        tableInteraction$.selectedRows.set(new Set());
+        tableInteraction$.selectedCells.set(new Set());
+
+        const selectedCells = new Set<string>();
+        for (const row of processedRows) {
+          selectedCells.add(`${row.id}:${columnId}`);
+        }
+
+        tableInteraction$.selectedCells.set(selectedCells);
+        tableInteraction$.anchorCell.set(`${processedRows[0]?.id}:${columnId}`);
+        tableInteraction$.lastBulkSelectionTime.set(Date.now());
+
+        fileLog.info('📋 Column cells selected', {
+          columnId,
+          cellCount: selectedCells.size
+        });
+      });
+    },
+
+    /**
+     * Toggle row selection as cells (for SelectionController)
+     */
+    toggleRowCells(rowId: string, visibleColumns: any[]) {
+      const currentSelection = tableInteraction$.selectedCells.get();
+      const newSelection = new Set(currentSelection);
+
+      const rowCells: string[] = [];
+      for (const column of visibleColumns) {
+        if (column.id === 'selection') continue;
+        rowCells.push(`${rowId}:${column.id}`);
+      }
+
+      const isRowSelected = rowCells.every(cellId => currentSelection.has(cellId));
+
+      if (isRowSelected) {
+        // Deselect row
+        for (const cellId of rowCells) {
+          newSelection.delete(cellId);
+        }
+        fileLog.info('📋 Row cells deselected', { rowId });
+      } else {
+        // Select row
+        for (const cellId of rowCells) {
+          newSelection.add(cellId);
+        }
+        fileLog.info('📋 Row cells selected', { rowId });
+      }
+
+      tableInteraction$.selectedCells.set(newSelection);
     },
 
     toggleCellSelection(rowId: string, columnId: string, isCtrlKey: boolean = false, isShiftKey: boolean = false) {
