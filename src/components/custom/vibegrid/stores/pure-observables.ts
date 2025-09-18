@@ -12,7 +12,7 @@
 // Re-export from the new consolidated files
 export { createTableCore$, createTableCoreSync$ } from './data-state';
 export { createTableInteraction$ } from './interaction-state';
-export { visualInputs$, visualState$, visualOperations } from './visual-state';
+export { createVibeGridVisualState } from './visual-state';
 
 // Types
 export type {
@@ -27,15 +27,16 @@ export function createPureObservables(config: any) {
   const tableCore$ = createTableCore$(config);
   const tableCoreSync$ = createTableCoreSync$(config);
   const tableInteraction$ = createTableInteraction$(config);
+  const visualState = createVibeGridVisualState();
 
   return {
     tableCore$,
     tableCoreSync$,
     tableInteraction$,
-    // Visual state is now consolidated in visual-state.ts
-    visualInputs$,
-    visualState$,
-    visualOperations
+    // Visual state is now consolidated in visual-state.ts using factory pattern
+    visualInputs$: visualState.visualInputs$,
+    visualState$: visualState.visualState$,
+    visualOperations: visualState.visualOperations
   };
 }
 

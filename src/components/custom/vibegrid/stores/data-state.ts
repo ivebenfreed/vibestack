@@ -14,7 +14,6 @@ import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
 import { GroupProcessor } from '../processors/GroupProcessor';
-import { visualOperations } from './visual-state';
 
 const fileLog = log('components/custom/vibegrid/stores/data-state.ts');
 
@@ -318,9 +317,9 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     groupRowOrders: defaultState.groupRowOrders,
     flatRowOrder: defaultState.flatRowOrder,
 
-    // Computed groupConfig from visual state (for dropdown component)
+    // Computed groupConfig - will be provided by external visual state
     get groupConfig() {
-      return visualOperations.getGroupConfig ? visualOperations.getGroupConfig() : null;
+      return null; // Default - will be overridden by visual state integration
     },
 
     // Computed processed data (lazy)
@@ -363,8 +362,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
       rows = applyFilters(rows, filters);
       rows = applySorting(rows, sortBy);
 
-      // Get grouping configuration from visual state
-      const groupConfig = visualOperations.getGroupConfig ? visualOperations.getGroupConfig() : null;
+      // Get grouping configuration from table core state
+      const groupConfig = tableCore$.groupConfig.get();
 
       // Apply grouping if configured
       if (groupConfig && groupConfig.fields && groupConfig.fields.length > 0) {
@@ -382,8 +381,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
           hasGrouping: true
         });
 
-        // Update visual state with the processed row count
-        visualOperations.setRowCount(groupResult.virtualRows.length);
+        // Note: Row count will be handled by visual state integration
 
         // Return virtual rows (mix of group headers and data rows)
         return groupResult.virtualRows;
@@ -411,8 +409,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
         }
       }
 
-      // Update visual state with the current row count
-      visualOperations.setRowCount(rows.length);
+      // Note: Row count will be handled by visual state integration
 
       return rows;
     },
@@ -520,7 +517,7 @@ export function createTableCore$(entityType: string, columns: Column[]) {
 
     setGroupConfig(config: GroupConfig | null) {
       // Delegate to visual operations which handles the actual grouping state
-      visualOperations.setGroupConfig(config);
+      tableCore$.groupConfig.set(config);
       fileLog.info('<� Group config delegated to visual state', { config });
     },
 

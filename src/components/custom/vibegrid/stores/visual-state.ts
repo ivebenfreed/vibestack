@@ -100,7 +100,7 @@ export function createVibeGridVisualState() {
   const visualState$ = createVisualState$(visualInputs$);
   const visibleColumns$ = createVisibleColumns$(visualInputs$);
   const totalColumnsWidth$ = createTotalColumnsWidth$(visualInputs$, visibleColumns$);
-  const visualOperations = createVisualOperations(visualInputs$);
+  const visualOperations = createVisualOperations(visualInputs$, visualState$);
 
   return {
     visualInputs$,
@@ -389,7 +389,7 @@ export let visualSyncStatus$: any = null;
 /**
  * Create visual operations for a specific VibeGrid instance
  */
-export function createVisualOperations(visualInputs$: any) {
+export function createVisualOperations(visualInputs$: any, visualState$: any) {
   return {
 
     /**
@@ -1061,69 +1061,6 @@ export function createTotalColumnsWidth$(visualInputs$: any, visibleColumns$: an
   });
 }
 
-// ====================================
-// UTILITY FUNCTIONS (merged from columns-observable)
-// ====================================
-
-/**
- * Get column widths for a list of columns (bulk operation)
- */
-export const getColumnWidths = (columnIds: string[]): Record<string, number> => {
-  return Object.fromEntries(
-    columnIds.map(id => [id, visualOperations.getColumnWidth(id)])
-  );
-};
-
-/**
- * Check if a column is visible
- */
-export const isColumnVisible = (columnId: string): boolean => {
-  return visualInputs$.columnVisibility.get()[columnId] !== false;
-};
-
-/**
- * Get visible column count
- */
-export const getVisibleColumnCount = (): number => {
-  const visibility = visualInputs$.columnVisibility.get();
-  return Object.values(visibility).filter(Boolean).length;
-};
-
-// ====================================
-// CONVENIENCE GETTERS
-// ====================================
-
-/**
- * Get effective width for a column - reads from computed state
- */
-export const getColumnWidth = (columnId: string): number => {
-  const state = visualState$.get();
-  const layout = state.columnLayouts.find(col => col.id === columnId);
-  return layout?.width || 150;
-};
-
-/**
- * Get column x-offset position - reads from computed state
- */
-export const getColumnXOffset = (columnId: string): number => {
-  const state = visualState$.get();
-  const layout = state.columnLayouts.find(col => col.id === columnId);
-  return layout?.xOffset || 0;
-};
-
-/**
- * Get visible columns in display order - reads from computed state
- */
-export const getVisibleColumns = (): ColumnLayout[] => {
-  return visualState$.get().visibleColumns;
-};
-
-/**
- * Get current viewport geometry - reads from computed state
- */
-export const getViewportGeometry = (): ViewportGeometry => {
-  return visualState$.get().geometry;
-};
 
 // ====================================
 // COMPLETE GRID STATE OBSERVABLE
@@ -1348,25 +1285,4 @@ export function createCompleteGridState$(
   });
 }
 
-// ====================================
-// SINGLETON INSTANCE FOR EXISTING CODE
-// ====================================
-
-// Create and export a singleton instance for the existing codebase
-const {
-  visualInputs$,
-  visualState$,
-  visibleColumns$,
-  totalColumnsWidth$,
-  visualOperations
-} = createVibeGridVisualState();
-
-// Export the singleton instances
-export {
-  visualInputs$,
-  visualState$,
-  visibleColumns$,
-  totalColumnsWidth$,
-  visualOperations
-};
 
