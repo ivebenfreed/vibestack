@@ -174,18 +174,24 @@ export function createVibeGridVisualState() {
     visualOperations,
     visualSyncStatus$: null as any, // Will be set during initialization
     // Add computed that provides sorted processedRows by combining data state + visual state
-    createSortedProcessedRows$: (tableCore$: any) => computed(() => {
-      const rawProcessedRows = tableCore$.processedRows.get();
-      // Use the correct visualInputs$ reference from the visual state instance
-      const sortBy = visualInputs$.sortBy.get();
-      fileLog.info('🔄 createSortedProcessedRows$ computed triggered', {
-        rawRowsCount: rawProcessedRows.length,
-        sortByCount: sortBy.length,
-        sortByFirst: sortBy[0]?.field,
-        sortByDirection: sortBy[0]?.direction
+    createSortedProcessedRows$: (tableCore$: any) => {
+      // Create computed observable that uses the correct visualInputs$ instance from this scope
+      const thisVisualInputs$ = visualInputs$; // Capture the correct reference
+      return computed(() => {
+        const rawProcessedRows = tableCore$.processedRows.get();
+        // Access sortBy from the captured visual inputs instance
+        const sortBy = thisVisualInputs$.sortBy.get();
+        fileLog.info('🔄 createSortedProcessedRows$ computed triggered', {
+          rawRowsCount: rawProcessedRows.length,
+          sortByCount: sortBy.length,
+          sortByFirst: sortBy[0]?.field,
+          sortByDirection: sortBy[0]?.direction,
+          visualInputsExists: !!thisVisualInputs$,
+          sortByExists: !!thisVisualInputs$.sortBy
+        });
+        return applySorting(rawProcessedRows, sortBy);
       });
-      return applySorting(rawProcessedRows, sortBy);
-    })
+    }
   };
 }
 
@@ -892,6 +898,14 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               item && typeof item === 'object' && item.field && item.direction
             ) : [];
 
+            fileLog.info('💾 SORT DEBUG: Pre-persistence validation', {
+              originalSortBy: value.sortBy,
+              originalSortByType: typeof value.sortBy,
+              originalSortByIsArray: Array.isArray(value.sortBy),
+              validSortBy,
+              validSortByCount: validSortBy.length
+            });
+
             // Ensure filters is valid before saving
             const validFilters = Array.isArray(value.filters) ? value.filters.filter(item =>
               item && typeof item === 'object' && item.field && item.operator && item.value !== undefined
@@ -917,7 +931,11 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
               hasGroupConfig: !!persistedState.groupConfig,
               groupFields: persistedState.groupConfig?.fields?.length || 0,
               columnCount: Object.keys(persistedState.columnWidths).length,
-              columnOrder: persistedState.columnOrder
+              columnOrder: persistedState.columnOrder,
+              sortByCount: persistedState.sortBy.length,
+              sortBy: persistedState.sortBy,
+              originalSortBy: value.sortBy,
+              validSortByFiltered: validSortBy
             });
 
             return persistedState;

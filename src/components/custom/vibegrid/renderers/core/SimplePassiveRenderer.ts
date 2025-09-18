@@ -315,13 +315,13 @@ export class SimplePassiveRenderer {
       return;
     }
 
-    this.dataObserverDisposer = this.visualState.visualInputs$.sortBy.onChange(() => {
-      fileLog.info('🔍 SORT CHANGE DETECTED - Legend State onChange', {
+    this.dataObserverDisposer = this.sortedProcessedRows$.onChange(() => {
+      fileLog.info('🔍 SORTED DATA CHANGE DETECTED - Legend State computed observable onChange', {
         observersEnabled: this.observersEnabled,
         timestamp: Date.now()
       });
 
-      // Get the latest sorted data after sort change
+      // Get the latest sorted data after the computed observable change
       const processedRows = this.sortedProcessedRows$.get();
       const sortBy = this.visualState.visualInputs$.sortBy.get();
 
