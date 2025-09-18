@@ -1267,7 +1267,7 @@ export class CellFormatter {
         const dataContext = {
           rows: this.tableCore$.processedRows.get(),
           columns: this.tableCore$.columns.get(),
-          columnVisibility: this.tableCore$.columnVisibility.get()
+          columnVisibility: this.visualState.visualInputs$.columnVisibility.get()
         };
         this.tableInteraction$.updateDragSelection(currentCellId, dataContext);
       }

@@ -168,11 +168,6 @@ function createDefaultTableState(entityType: string, columns: Column[]): Partial
   const userId = universeUserId$.peek();
 
   return {
-    columnOrder: columns.map(col => col.id),
-    columnWidths: Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
-    columnVisibility: Object.fromEntries(columns.map(col => [col.id, true])),
-    sortBy: [],
-    filters: [],
     groupRowOrders: {},
     flatRowOrder: [],
     version: '1.0',
@@ -207,10 +202,8 @@ function transformTableState(loaded: any, defaultState: Partial<PersistedTableSt
   };
 
   fileLog.info('🔧 Restored table state with', {
-    columns: Object.keys(merged.columnWidths || {}).length,
-    sorts: merged.sortBy.length,
-    filters: merged.filters.length,
-    hasGrouping: !!merged.groupConfig
+    groupRowOrders: Object.keys(merged.groupRowOrders || {}).length,
+    flatRowOrderLength: merged.flatRowOrder?.length || 0
   });
 
   return merged as PersistedTableState;
@@ -598,262 +591,22 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     },
 
     moveRowInFlat(fromIndex: number, toIndex: number): boolean {
-        } else {
-          filters.push({ field, value, operator });
-        }
-
-        tableCore$.filters.set([...filters]);
-        // persistObservable will automatically persist changes
-      });
-
-      fileLog.info('<� Filter set (auto-persistent)', { field, value, operator });
-    },
-
-    clearFilter(field: string) {
-      const filters = tableCore$.filters.get();
-      tableCore$.filters.set(filters.filter(f => f.field !== field));
-      // persistObservable automatically persists changes
-      fileLog.info('<� Filter cleared (auto-persistent)', { field });
-    },
-
-
-    setColumnWidth(columnId: string, width: number) {
-      const widths = tableCore$.columnWidths.get();
-      tableCore$.columnWidths.set({
-        ...widths,
-        [columnId]: width
-      });
-      // persistObservable automatically persists changes
-
-      fileLog.info('<� Column width set (auto-persistent)', { columnId, width });
-    },
-
-    setGroupConfig(config: GroupConfig | null) {
-      // Delegate to visual operations which handles the actual grouping state
-      tableCore$.groupConfig.set(config);
-      fileLog.info('<� Group config delegated to visual state', { config });
-    },
-
-    // Drag and drop row ordering methods for grouped mode
-    setGroupRowOrder(groupId: string, rowIds: string[]) {
-      const orders = tableCore$.groupRowOrders.get();
-      tableCore$.groupRowOrders.set({
-        ...orders,
-        [groupId]: {
-          groupId,
-          rowIds,
-          lastModified: new Date().toISOString()
-        }
-      });
-
-      fileLog.info('🔄 Group row order set (auto-persistent)', {
-        groupId,
-        rowCount: rowIds.length
-      });
-    },
-
-    moveRowInGroupByIndex(groupId: string, fromIndex: number, toIndex: number) {
-      const orders = tableCore$.groupRowOrders.get();
-      const groupOrder = orders[groupId];
-
-      if (!groupOrder) {
-        fileLog.warn('⚠️ No group order found for drag operation', { groupId });
-        return false;
-      }
-
-      const newRowIds = [...groupOrder.rowIds];
-      const [movedRowId] = newRowIds.splice(fromIndex, 1);
-      newRowIds.splice(toIndex, 0, movedRowId);
-
-      tableCore$.groupRowOrders.set({
-        ...orders,
-        [groupId]: {
-          ...groupOrder,
-          rowIds: newRowIds,
-          lastModified: new Date().toISOString()
-        }
-      });
-
-      fileLog.info('🔄 Row moved within group (auto-persistent)', {
-        groupId,
-        fromIndex,
-        toIndex,
-        movedRowId
-      });
-
-      return true;
-    },
-
-    getGroupRowOrder(groupId: string): string[] | null {
-      const orders = tableCore$.groupRowOrders.get();
-      return orders[groupId]?.rowIds || null;
-    },
-
-    clearGroupRowOrders() {
-      tableCore$.groupRowOrders.set({});
-      fileLog.info('🗑️ All group row orders cleared (auto-persistent)');
-    },
-
-    // Higher-level method for drag and drop that handles row movement by ID
-    async moveRowInGroup(sourceGroupId: string, targetGroupId: string, draggedRowId: string, newIndex: number): Promise<boolean> {
-      // Handle cross-group moves
-      if (sourceGroupId !== targetGroupId) {
-        return await this.moveRowBetweenGroups(sourceGroupId, targetGroupId, draggedRowId, newIndex);
-      }
-
-      const orders = tableCore$.groupRowOrders.get();
-      let groupOrder = orders[sourceGroupId];
-
-      // If no order exists yet, create one from current group data
-      if (!groupOrder) {
-        const processedRows = tableCore$.processedRows.get();
-        const groupRows = processedRows.filter(row =>
-          row.type === 'data' && (row.groupId === sourceGroupId || row.parentGroupId === sourceGroupId)
-        );
-        const initialOrder = groupRows.map(row => row.id).filter(Boolean);
-
-        groupOrder = {
-          groupId: sourceGroupId,
-          rowIds: initialOrder,
-          lastModified: new Date().toISOString()
-        };
-
-        tableCore$.groupRowOrders.set({
-          ...orders,
-          [sourceGroupId]: groupOrder
-        });
-
-        fileLog.info('🆕 Created initial group row order', {
-          sourceGroupId,
-          rowCount: initialOrder.length
-        });
-      }
-
-      // Find current position of the dragged row
-      const currentIndex = groupOrder.rowIds.indexOf(draggedRowId);
-      if (currentIndex === -1) {
-        fileLog.warn('⚠️ Dragged row not found in group order', {
-          draggedRowId,
-          sourceGroupId,
-          currentOrder: groupOrder.rowIds
-        });
-        return false;
-      }
-
-      // If trying to move to the same position, no change needed
-      if (currentIndex === newIndex) {
-        return true;
-      }
-
-      // Move the row
-      const newRowIds = [...groupOrder.rowIds];
-      const [movedRowId] = newRowIds.splice(currentIndex, 1);
-      newRowIds.splice(newIndex, 0, movedRowId);
-
-      tableCore$.groupRowOrders.set({
-        ...orders,
-        [sourceGroupId]: {
-          ...groupOrder,
-          rowIds: newRowIds,
-          lastModified: new Date().toISOString()
-        }
-      });
-
-      fileLog.info('🔄 Row moved within group by ID (auto-persistent)', {
-        sourceGroupId,
-        draggedRowId,
-        from: currentIndex,
-        to: newIndex,
-        newOrderLength: newRowIds.length
-      });
-
-      return true;
-    },
-
-    // Drag and drop row ordering methods for flat/ungrouped mode
-    setFlatRowOrder(rowIds: string[]) {
-      tableCore$.flatRowOrder.set([...rowIds]);
-      fileLog.info('🔄 Flat row order set (auto-persistent)', {
-        rowCount: rowIds.length
-      });
-    },
-
-    // Move row between different groups - purely reactive approach
-    async moveRowBetweenGroups(sourceGroupId: string, targetGroupId: string, draggedRowId: string, newIndex: number): Promise<boolean> {
-      // Extract the status value from group IDs (e.g., "group_status_done" -> "done")
-      const extractStatusFromGroupId = (groupId: string): string => {
-        return groupId.replace('group_status_', '');
-      };
-
-      const newStatus = extractStatusFromGroupId(targetGroupId);
-      const entityType = tableCore$.entityType.get();
-
-      // Update the actual row data using the proper entity update system
-      // The reactive system will automatically handle visual repositioning
       try {
-        // Import the update helper and entity operations
-        const { getUpdateFunction } = await import('../utils/entity-update-helpers');
+        const flatData = tableCore$.flatData.peek();
+        if (fromIndex < 0 || fromIndex >= flatData.length || toIndex < 0 || toIndex >= flatData.length) {
+          return false;
+        }
 
-        // Use the full org-prefixed entity type for entity operations
-        const fullEntityType = entityType;
+        const newFlatData = [...flatData];
+        const [movedItem] = newFlatData.splice(fromIndex, 1);
+        newFlatData.splice(toIndex, 0, movedItem);
 
-        // Get the update function and update the row's status
-        const updateEntity = getUpdateFunction(fullEntityType as any);
-        await updateEntity(draggedRowId, { status: newStatus });
-
-        fileLog.info('🔄 Cross-group move completed via reactive status update', {
-          draggedRowId,
-          oldStatus: extractStatusFromGroupId(sourceGroupId),
-          newStatus,
-          sourceGroupId,
-          targetGroupId,
-          note: 'Row will appear in new group automatically via reactive system'
-        });
-
+        tableCore$.flatData.set(newFlatData);
         return true;
       } catch (error) {
-        fileLog.error('❌ Failed to update row status for cross-group move', {
-          draggedRowId,
-          newStatus,
-          entityType,
-          fullEntityType: entityType,
-          error: error.message
-        });
+        console.error('Error moving row in flat data:', error);
         return false;
       }
-    },
-
-    moveRowInFlat(fromIndex: number, toIndex: number): boolean {
-      const currentOrder = tableCore$.flatRowOrder.get();
-
-      // If no flat order exists yet, create one from current row data
-      if (!currentOrder || currentOrder.length === 0) {
-        const processedRows = tableCore$.processedRows.get();
-        const initialOrder = processedRows.map(row => row.id || row.data?.id).filter(Boolean);
-        tableCore$.flatRowOrder.set(initialOrder);
-        fileLog.info('🆕 Created initial flat row order', { rowCount: initialOrder.length });
-        return false; // Let caller retry the operation
-      }
-
-      if (fromIndex < 0 || toIndex < 0 || fromIndex >= currentOrder.length || toIndex >= currentOrder.length) {
-        fileLog.warn('⚠️ Invalid indices for flat row move', { fromIndex, toIndex, orderLength: currentOrder.length });
-        return false;
-      }
-
-      const newOrder = [...currentOrder];
-      const [movedRowId] = newOrder.splice(fromIndex, 1);
-      newOrder.splice(toIndex, 0, movedRowId);
-
-      tableCore$.flatRowOrder.set(newOrder);
-
-      fileLog.info('🔄 Row moved in flat mode (auto-persistent)', {
-        fromIndex,
-        toIndex,
-        movedRowId,
-        newOrderLength: newOrder.length
-      });
-
-      return true;
     },
 
     getFlatRowOrder(): string[] {
@@ -866,27 +619,12 @@ export function createTableCore$(entityType: string, columns: Column[]) {
     }
   });
 
-  // Load existing display state if available
+  // Load existing display state if available (only row ordering state for data-state)
   const existingState = loadDisplayState(entityType);
   if (existingState) {
-    fileLog.info('🔧 Applying existing display state', { entityType });
+    fileLog.info('🔧 Applying existing row ordering state', { entityType });
 
-    // Apply loaded state
-    if (existingState.columnOrder) {
-      tableCore$.columnOrder.set(existingState.columnOrder);
-    }
-    if (existingState.columnWidths) {
-      tableCore$.columnWidths.set(existingState.columnWidths);
-    }
-    if (existingState.columnVisibility) {
-      tableCore$.columnVisibility.set(existingState.columnVisibility);
-    }
-    if (existingState.sortBy) {
-      tableCore$.sortBy.set(existingState.sortBy);
-    }
-    if (existingState.filters) {
-      tableCore$.filters.set(existingState.filters);
-    }
+    // Apply only row ordering state (columns handled by visual state)
     if (existingState.groupRowOrders) {
       tableCore$.groupRowOrders.set(existingState.groupRowOrders);
     }
@@ -912,13 +650,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
             return transformTableState(value, defaultState);
           },
           save: (value: any) => {
-            // Save only persistent fields
+            // Save only row ordering fields (columns handled by visual state)
             const persistedData = {
-              columnOrder: value.columnOrder,
-              columnWidths: value.columnWidths,
-              columnVisibility: value.columnVisibility,
-              sortBy: value.sortBy,
-              filters: value.filters,
               groupRowOrders: value.groupRowOrders,
               flatRowOrder: value.flatRowOrder,
               version: '1.0',
@@ -929,9 +662,8 @@ export function createTableCore$(entityType: string, columns: Column[]) {
             fileLog.info('💾 Saving data state to persistence', {
               storageKey,
               entityType: value.entityType,
-              columnOrder: persistedData.columnOrder,
-              sortBy: persistedData.sortBy,
-              filters: persistedData.filters
+              groupRowOrderCount: Object.keys(persistedData.groupRowOrders || {}).length,
+              flatRowOrderLength: persistedData.flatRowOrder?.length || 0
             });
 
             return persistedData;

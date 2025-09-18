@@ -179,14 +179,10 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         // Keep visual state synchronized with tableCore$ observables
         visualState.visualInputs$.columns.set(columns);
-        visualState.visualInputs$.columnVisibility.set(tableCore$.columnVisibility.get());
-        visualState.visualInputs$.columnOrder.set(tableCore$.columnOrder.get());
 
         fileLog.info('🎯 Visual state initialized and synchronized', {
           entityType, orgId, userId,
-          columnsCount: columns.length,
-          columnVisibilityCount: Object.keys(tableCore$.columnVisibility.get()).length,
-          columnOrderCount: tableCore$.columnOrder.get().length
+          columnsCount: columns.length
         });
         initManager.markReady('visualStateReady');
       } else {

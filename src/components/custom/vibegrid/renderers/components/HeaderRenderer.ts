@@ -85,7 +85,7 @@ export class HeaderRenderer {
     const visualStateData = this.visualState.visualState$.get();
 
     const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
 
     // Legend State change detection pattern: check if render is actually needed
     const currentRenderState = {
@@ -323,7 +323,7 @@ export class HeaderRenderer {
 
     // Build new coordinate mapping for all visible columns
     // Get reactive column widths
-    const columnWidths = this.tableCore$.columnWidths.get();
+    const columnWidths = this.visualState.visualInputs$.columnWidths.get();
 
     allVisibleColumns.forEach((column, index) => {
       const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
@@ -377,7 +377,7 @@ export class HeaderRenderer {
       const selectedCells = this.tableInteraction$.selectedCells.get();
       const processedRows = this.tableCore$.processedRows.get();
       const columns = this.tableCore$.columns.get();
-      const columnVisibility = this.tableCore$.columnVisibility.get();
+      const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
       const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
       
       fileLog.info('🎯 Select all checkbox clicked', {
@@ -416,7 +416,7 @@ export class HeaderRenderer {
       isResizing = true;
       startX = e.pageX;
       // Update startWidth from current reactive state
-      const currentColumnWidths = this.tableCore$.columnWidths.get();
+      const currentColumnWidths = this.visualState.visualInputs$.columnWidths.get();
       startWidth = currentColumnWidths[column.id] || column.width || 150;
       
       // Update interaction state
@@ -526,7 +526,7 @@ export class HeaderRenderer {
    * Update sort indicator for a column
    */
   private updateSortIndicator(headerCell: HTMLElement, column: any): void {
-    const sortState = this.tableCore$.sortBy.get();
+    const sortState = this.visualState.visualInputs$.sortBy.get();
     const columnSort = sortState.find((s: any) => s.field === (column.field || column.id));
     
     if (columnSort) {

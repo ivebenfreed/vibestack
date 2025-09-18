@@ -1248,7 +1248,7 @@ export function createCompleteGridState$(
       const dragSource = tableInteraction$.dragSource.get();
       const dragTarget = tableInteraction$.dragTarget.get();
       const processedRows = tableCore$.processedRows.get(true); // shallow for performance
-      const sortBy = tableCore$.sortBy.get(true); // shallow for performance
+      const sortBy = visualState$.sortBy.get(true); // shallow for performance
       const columnResize = tableInteraction$.columnResize.get();
 
     // Smart change detection - compare with previous state

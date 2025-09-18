@@ -183,7 +183,7 @@ export class SimplePassiveRenderer {
       getProcessedRows: () => this.tableCore$.processedRows.get(),
       getVisibleColumns: () => {
         const columns = this.tableCore$.columns.get();
-        const columnVisibility = this.tableCore$.columnVisibility.get();
+        const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
         return columns.filter(col => columnVisibility[col.id] !== false);
       }
     });
@@ -195,7 +195,7 @@ export class SimplePassiveRenderer {
       getProcessedRows: () => this.tableCore$.processedRows.get(),
       getVisibleColumns: () => {
         const columns = this.tableCore$.columns.get();
-        const columnVisibility = this.tableCore$.columnVisibility.get();
+        const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
         return columns.filter(col => columnVisibility[col.id] !== false);
       },
       container: this.container
@@ -288,7 +288,7 @@ export class SimplePassiveRenderer {
     let lastDataSignature = '';
     this.dataObserverDisposer = observe(() => {
       const processedRows = this.tableCore$.processedRows.get(true);
-      const sortBy = this.tableCore$.sortBy.get(true);
+      const sortBy = this.visualState.visualInputs$.sortBy.get(true);
 
       // Create a signature of actual data changes
       const dataSignature = `${processedRows.length}-${sortBy.map(s => `${s.field}:${s.direction}`).join(',')}`;
@@ -837,7 +837,7 @@ export class SimplePassiveRenderer {
 
     const rows = this.tableCore$.processedRows.get(true);
     const columns = this.tableCore$.columns.get(true);
-    const columnVisibility = this.tableCore$.columnVisibility.get(true);
+    const columnVisibility = this.visualState.visualInputs$.columnVisibility.get(true);
 
     // Debug: Check if we have group rows (Legend State rows don't have type property)
     const groupRows = rows.filter((row: any) => row.type === 'group');
@@ -1133,7 +1133,7 @@ export class SimplePassiveRenderer {
     // Get current data and columns for range calculation
     const processedRows = this.tableCore$.processedRows.get();
     const columns = this.tableCore$.columns.get();
-    const columnVisibility = this.tableCore$.columnVisibility.get();
+    const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
     const visibleColumns = columns.filter(col => columnVisibility[col.id] !== false);
 
     // Find row and column indices
