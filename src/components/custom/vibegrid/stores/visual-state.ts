@@ -157,12 +157,13 @@ export interface VisualState {
  * Create a complete visual state system for a VibeGrid instance
  * This replaces the singleton pattern with per-instance isolation
  */
-export function createVibeGridVisualState() {
+export function createVibeGridVisualState(entityType?: string) {
   const visualInputs$ = createVisualInputs$();
   const visualState$ = createVisualState$(visualInputs$);
   const visibleColumns$ = createVisibleColumns$(visualInputs$);
   const totalColumnsWidth$ = createTotalColumnsWidth$(visualInputs$, visibleColumns$);
   const visualOperations = createVisualOperations(visualInputs$, visualState$);
+
 
   return {
     visualInputs$,
@@ -346,18 +347,29 @@ export function createVisualState$(visualInputs$: any) {
 // ====================================
 
 /**
- * Compute visual rows with grouping applied
+ * Compute visual rows - data-state handles grouping, but ensure proper VirtualRow format
  */
 function computeVisualRows(inputs: any): VirtualRow[] {
-  const { processedRows, columns, groupConfig } = inputs;
+  const { processedRows, groupConfig } = inputs;
 
-  // If no grouping, return processedRows as-is
+  fileLog.debug('🎨 Visual rows computation', {
+    processedRowsCount: processedRows.length,
+    hasGroupConfig: !!groupConfig,
+    firstRowType: processedRows[0]?.type || 'undefined'
+  });
+
+  // If processedRows are already VirtualRow objects (from grouping), pass them through
+  if (processedRows.length > 0 && processedRows[0]?.type) {
+    fileLog.debug('🎨 ProcessedRows already in VirtualRow format, passing through');
+    return processedRows;
+  }
+
+  // If no grouping, convert raw data rows to VirtualRow format for consistency
   if (!groupConfig || !groupConfig.fields || groupConfig.fields.length === 0) {
-    fileLog.debug('No grouping configured, returning raw rows', {
+    fileLog.debug('🎨 Converting raw rows to VirtualRow format (no grouping)', {
       rowCount: processedRows.length
     });
 
-    // Convert to virtual rows format for consistency
     return processedRows.map((row: any, index: number) => ({
       type: 'data' as const,
       id: row.id,
@@ -367,27 +379,9 @@ function computeVisualRows(inputs: any): VirtualRow[] {
     }));
   }
 
-  // Apply grouping using GroupProcessor
-  fileLog.info('🎯 Applying grouping with GroupProcessor', {
-    rowCount: processedRows.length,
-    groupFields: groupConfig.fields.map((f: any) => f.field),
-    expandedGroups: Array.from(groupConfig.expandedGroups)
-  });
-
-  const groupResult = GroupProcessor.processData(
-    processedRows,
-    columns,
-    groupConfig
-  );
-
-  fileLog.info('✅ Grouping applied', {
-    originalRows: processedRows.length,
-    virtualRows: groupResult.virtualRows.length,
-    groupCount: groupResult.groupCount,
-    totalHeight: groupResult.totalHeight
-  });
-
-  return groupResult.virtualRows;
+  // This should not happen anymore since data-state handles grouping
+  fileLog.warn('⚠️ Unexpected state: grouping configured but processedRows not in VirtualRow format');
+  return processedRows;
 }
 
 // ====================================
@@ -695,6 +689,12 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
    * Set grouping configuration
    */
   setGroupConfig(config: GroupConfig | null) {
+    fileLog.info('🎯 Setting group config in visual state', {
+      config,
+      hasFields: !!config?.fields,
+      fieldsLength: config?.fields?.length,
+      fields: config?.fields
+    });
     visualInputs$.groupConfig.set(config);
     fileLog.info('🎯 Group config updated', { config });
   },
@@ -767,10 +767,16 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       }
     });
 
-    visualInputs$.groupConfig.set({
-      ...groupConfig,
-      expandedGroups: allGroupIds
-    });
+    // Explicitly create a new GroupConfig to ensure all properties are preserved
+    const newConfig: GroupConfig = {
+      fields: groupConfig.fields,
+      sortBy: groupConfig.sortBy,
+      sortDirection: groupConfig.sortDirection,
+      aggregations: groupConfig.aggregations,
+      expandedGroups: allGroupIds,
+      colorScheme: groupConfig.colorScheme
+    };
+    visualInputs$.groupConfig.set(newConfig);
 
     fileLog.info('🎯 All groups expanded', { count: allGroupIds.size });
   },
@@ -782,10 +788,16 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     const groupConfig = visualInputs$.groupConfig.get();
     if (!groupConfig) return;
 
-    visualInputs$.groupConfig.set({
-      ...groupConfig,
-      expandedGroups: new Set()
-    } as GroupConfig);
+    // Explicitly create a new GroupConfig to ensure all properties are preserved
+    const newConfig: GroupConfig = {
+      fields: groupConfig.fields,
+      sortBy: groupConfig.sortBy,
+      sortDirection: groupConfig.sortDirection,
+      aggregations: groupConfig.aggregations,
+      expandedGroups: new Set(),
+      colorScheme: groupConfig.colorScheme
+    };
+    visualInputs$.groupConfig.set(newConfig);
 
     fileLog.info('🎯 All groups collapsed');
   },

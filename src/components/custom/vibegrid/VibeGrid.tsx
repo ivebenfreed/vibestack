@@ -3,7 +3,7 @@ import { createTableCore$, createTableCoreSync$ } from './stores/data-state';
 import { createTableInteraction$ } from './stores/interaction-state';
 import { SimplePassiveRenderer } from './renderers/core/SimplePassiveRenderer';
 import { VibeGridXHeaderPure } from './components/VibeGridXHeaderPure';
-import type { Column } from './types';
+import type { Column, GroupConfig } from './types';
 import { log } from '@/logger';
 import { createVibeGridVisualState } from './stores/visual-state';
 import { universeOrgId$, universeUserId$ } from '@/legend-state/observables';
@@ -108,7 +108,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // Create visual state instance (isolated per VibeGrid)
   const visualStateRef = useRef<ReturnType<typeof createVibeGridVisualState> | null>(null);
   if (!visualStateRef.current) {
-    visualStateRef.current = createVibeGridVisualState();
+    visualStateRef.current = createVibeGridVisualState(entityType);
   }
   const visualState = visualStateRef.current;
 
@@ -219,6 +219,54 @@ export function VibeGrid<T extends Record<string, any> = any>(
           visualState.visualInputs$.filters.set(savedPrefs.filters);
           fileLog.info('✅ Loaded filters from simple persistence', { filters: savedPrefs.filters });
         }
+        // Group configuration - Debug what we have
+        fileLog.info('🔍 Group config debugging', {
+          hasGroupConfig: !!savedPrefs.groupConfig,
+          groupConfig: savedPrefs.groupConfig,
+          hasFields: !!savedPrefs.groupConfig?.fields,
+          fieldsIsArray: Array.isArray(savedPrefs.groupConfig?.fields),
+          fieldsLength: savedPrefs.groupConfig?.fields?.length,
+          validationPasses: !!(savedPrefs.groupConfig && savedPrefs.groupConfig.fields && Array.isArray(savedPrefs.groupConfig.fields) && savedPrefs.groupConfig.fields.length > 0)
+        });
+
+        if (savedPrefs.groupConfig && savedPrefs.groupConfig.fields && Array.isArray(savedPrefs.groupConfig.fields) && savedPrefs.groupConfig.fields.length > 0) {
+          try {
+            // Convert serializable GroupConfig (with Array) back to runtime GroupConfig (with Set)
+            const runtimeGroupConfig: GroupConfig = {
+              fields: savedPrefs.groupConfig.fields,
+              sortBy: savedPrefs.groupConfig.sortBy || 'name',
+              sortDirection: savedPrefs.groupConfig.sortDirection || 'asc',
+              aggregations: savedPrefs.groupConfig.aggregations || [],
+              expandedGroups: new Set(savedPrefs.groupConfig.expandedGroups || []), // Convert Array back to Set
+              colorScheme: savedPrefs.groupConfig.colorScheme || 'auto'
+            };
+            visualState.visualInputs$.groupConfig.set(runtimeGroupConfig);
+            fileLog.info('✅ Loaded group configuration from simple persistence', {
+              groupConfig: runtimeGroupConfig,
+              fieldsCount: runtimeGroupConfig.fields.length,
+              expandedGroupsCount: runtimeGroupConfig.expandedGroups.size
+            });
+          } catch (error) {
+            fileLog.error('❌ Failed to load group configuration from persistence', { error, savedGroupConfig: savedPrefs.groupConfig });
+          }
+        }
+
+        // Load row ordering from persistence
+        if (savedPrefs.flatRowOrder && savedPrefs.flatRowOrder.length > 0) {
+          tableCore$.flatRowOrder.set(savedPrefs.flatRowOrder);
+          fileLog.info('✅ Loaded flat row order from simple persistence', {
+            rowCount: savedPrefs.flatRowOrder.length,
+            firstFew: savedPrefs.flatRowOrder.slice(0, 3)
+          });
+        }
+
+        if (savedPrefs.groupRowOrders && Object.keys(savedPrefs.groupRowOrders).length > 0) {
+          tableCore$.groupRowOrders.set(savedPrefs.groupRowOrders);
+          fileLog.info('✅ Loaded group row orders from simple persistence', {
+            groupCount: Object.keys(savedPrefs.groupRowOrders).length,
+            groups: Object.keys(savedPrefs.groupRowOrders)
+          });
+        }
 
         // Set up reactive sync from visual state to simple persistence
         // Watch for changes and save them automatically
@@ -246,10 +294,83 @@ export function VibeGrid<T extends Record<string, any> = any>(
           fileLog.debug('💾 Saved sort configuration to simple persistence', { newSortBy });
         });
 
+        // Use a debounced approach to prevent partial saves from rapid updates
+        let groupConfigSaveTimeout: NodeJS.Timeout | null = null;
+
+        visualState.visualInputs$.groupConfig.onChange((newGroupConfig) => {
+          fileLog.info('🔍 Group config onChange triggered', {
+            newGroupConfig,
+            hasFields: !!newGroupConfig?.fields,
+            fieldsLength: newGroupConfig?.fields?.length,
+            fields: newGroupConfig?.fields,
+            sortBy: newGroupConfig?.sortBy,
+            sortDirection: newGroupConfig?.sortDirection,
+            expandedGroups: newGroupConfig?.expandedGroups
+          });
+
+          // Clear any pending save
+          if (groupConfigSaveTimeout) {
+            clearTimeout(groupConfigSaveTimeout);
+          }
+
+          // Debounce the save to prevent partial updates from interfering
+          groupConfigSaveTimeout = setTimeout(() => {
+            const currentConfig = visualState.visualInputs$.groupConfig.get();
+
+            // Only save if we have a complete group config or null (to clear)
+            if (currentConfig === null || (currentConfig && currentConfig.fields && currentConfig.fields.length > 0)) {
+              simplePersistence.operations.setGroupConfig(currentConfig);
+              fileLog.debug('💾 Saved group configuration to simple persistence', { currentConfig });
+            } else {
+              fileLog.warn('⚠️ Skipping incomplete group config save', {
+                currentConfig,
+                hasFields: !!currentConfig?.fields,
+                fieldsLength: currentConfig?.fields?.length
+              });
+            }
+          }, 100); // Small delay to let any rapid updates settle
+        });
+
         visualState.visualInputs$.filters.onChange((newFilters) => {
           simplePersistence.operations.setFilters(newFilters);
           fileLog.debug('💾 Saved filters to simple persistence', { newFilters });
         });
+
+        // Row order persistence - flat mode (ungrouped)
+        tableCore$.flatRowOrder.onChange((newFlatRowOrder) => {
+          simplePersistence.operations.setFlatRowOrder(newFlatRowOrder);
+          fileLog.debug('📋 Saved flat row order to simple persistence', {
+            rowCount: newFlatRowOrder.length,
+            firstFew: newFlatRowOrder.slice(0, 3)
+          });
+        });
+
+        // Row order persistence - grouped mode
+        tableCore$.groupRowOrders.onChange((newGroupRowOrders) => {
+          fileLog.debug('🔍 DEBUG: groupRowOrders.onChange fired', {
+            newGroupRowOrders,
+            type: typeof newGroupRowOrders,
+            keys: Object.keys(newGroupRowOrders || {}),
+            entries: Object.entries(newGroupRowOrders || {})
+          });
+
+          // Save each group row order separately
+          Object.entries(newGroupRowOrders).forEach(([groupId, rowOrder]) => {
+            fileLog.debug('🔍 DEBUG: Processing group row order entry', {
+              groupId,
+              rowOrder,
+              groupIdType: typeof groupId,
+              rowOrderType: typeof rowOrder
+            });
+            simplePersistence.operations.setGroupRowOrder(groupId, rowOrder);
+          });
+          fileLog.debug('📋 Saved group row orders to simple persistence', {
+            groupCount: Object.keys(newGroupRowOrders).length,
+            groups: Object.keys(newGroupRowOrders)
+          });
+        });
+
+        // Group config persistence is now handled by reactive persistence wrapper
 
         fileLog.info('🎯 Visual state initialized with simple persistence', {
           entityType, orgId, userId,

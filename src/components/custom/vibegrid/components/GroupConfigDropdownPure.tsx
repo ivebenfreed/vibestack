@@ -141,9 +141,14 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
       if (activeIndex !== -1 && overIndex !== -1) {
         const reorderedFields = arrayMove(groupConfig.fields, activeIndex, overIndex);
 
+        // Explicitly create a new GroupConfig to ensure Set is properly cloned
         const newConfig: GroupConfig = {
-          ...groupConfig,
-          fields: reorderedFields
+          fields: reorderedFields,
+          sortBy: groupConfig.sortBy,
+          sortDirection: groupConfig.sortDirection,
+          aggregations: groupConfig.aggregations,
+          expandedGroups: new Set(groupConfig.expandedGroups), // Explicitly clone the Set
+          colorScheme: groupConfig.colorScheme
         };
 
         visualState.visualOperations.setGroupConfig(newConfig);
@@ -195,14 +200,20 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
     if (!groupConfig) return;
 
     const newFields = groupConfig.fields.filter((_, i) => i !== index);
-    
+
     if (newFields.length === 0) {
       visualState.visualOperations.setGroupConfig(null);
     } else {
-      visualState.visualOperations.setGroupConfig({
-        ...groupConfig,
-        fields: newFields
-      });
+      // Explicitly create a new GroupConfig to ensure Set is properly cloned
+      const newConfig: GroupConfig = {
+        fields: newFields,
+        sortBy: groupConfig.sortBy,
+        sortDirection: groupConfig.sortDirection,
+        aggregations: groupConfig.aggregations,
+        expandedGroups: new Set(groupConfig.expandedGroups), // Explicitly clone the Set
+        colorScheme: groupConfig.colorScheme
+      };
+      visualState.visualOperations.setGroupConfig(newConfig);
     }
   }, [groupConfig, visualState]);
 

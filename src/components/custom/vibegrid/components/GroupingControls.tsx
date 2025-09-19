@@ -60,7 +60,7 @@ export function GroupingControls({
     } else {
       // Create new GroupConfig with single field
       const newConfig: GroupConfig = {
-        fields: [{ field: columnId, name: columns.find(c => c.id === columnId)?.name || columnId }],
+        fields: [{ field: columnId, displayName: columns.find(c => c.id === columnId)?.name || columnId }],
         sortBy: 'name',
         sortDirection: 'asc',
         aggregations: [],

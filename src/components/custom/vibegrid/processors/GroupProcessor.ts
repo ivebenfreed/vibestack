@@ -124,10 +124,40 @@ export class GroupProcessor {
   ): GroupNode[] {
     const groupField = config.fields[0];
     const fieldName = groupField.field;
-    
+
+    // Find the column definition for this field to get possible options
+    const column = columns.find(col => col.id === fieldName);
+
     // Group rows by field value
     const groupMap = new Map<string, TableRow[]>();
-    
+
+    // First, if the column has predefined options, create empty groups for all possible values
+    if (column && column.options && Array.isArray(column.options) && column.options.length > 0) {
+      column.options.forEach(option => {
+        let optionValue: string;
+        if (typeof option === 'string') {
+          optionValue = option;
+        } else if (option && typeof option === 'object' && 'value' in option) {
+          optionValue = option.value;
+        } else {
+          log.warn('GroupProcessor: Invalid option format', { option, fieldName });
+          return;
+        }
+
+        const groupKey = this.getGroupKey(optionValue);
+        if (!groupMap.has(groupKey)) {
+          groupMap.set(groupKey, []); // Create empty group
+        }
+      });
+
+      log.info('🔄 GroupProcessor: Created empty groups for all options', {
+        fieldName,
+        optionCount: column.options.length,
+        emptyGroupKeys: Array.from(groupMap.keys())
+      });
+    }
+
+    // Then populate groups with actual data rows
     rows.forEach((row, index) => {
       // Debug: log the actual data structure to understand the format
       if (index === 0) {
@@ -169,24 +199,38 @@ export class GroupProcessor {
     groupMap.forEach((groupRows, groupKey) => {
       const firstRow = groupRows[0];
 
-      // Handle different data structures - try both row.data and direct row access
+      // For empty groups, derive the value from the groupKey
+      // For non-empty groups, get value from the first row
       let value;
-      if (firstRow && firstRow.data) {
-        // Structured format: row.data.fieldName
-        value = firstRow.data[fieldName];
-      } else if (firstRow && typeof firstRow === 'object') {
-        // Direct format: row.fieldName
-        value = firstRow[fieldName];
+      if (groupRows.length === 0) {
+        // Empty group - derive value from groupKey
+        // The groupKey is created by getGroupKey() which normalizes the value
+        // We need to reverse this process to get the original value
+        value = this.getValueFromGroupKey(groupKey);
+        log.debug('🔄 GroupProcessor: Using derived value for empty group', {
+          groupKey,
+          derivedValue: value,
+          fieldName
+        });
       } else {
-        log.warn('GroupProcessor: Invalid firstRow in groupMap', { firstRow, fieldName });
-        return;
+        // Non-empty group - get value from first row
+        if (firstRow && firstRow.data) {
+          // Structured format: row.data.fieldName
+          value = firstRow.data[fieldName];
+        } else if (firstRow && typeof firstRow === 'object') {
+          // Direct format: row.fieldName
+          value = firstRow[fieldName];
+        } else {
+          log.warn('GroupProcessor: Invalid firstRow in groupMap', { firstRow, fieldName });
+          return;
+        }
       }
-      
+
       const groupId = `group_${fieldName}_${groupKey}`;
 
-      // Apply custom row ordering if available
+      // Apply custom row ordering if available (only for non-empty groups)
       let orderedChildren = groupRows;
-      if (groupRowOrders && groupRowOrders[groupId]) {
+      if (groupRows.length > 0 && groupRowOrders && groupRowOrders[groupId]) {
         orderedChildren = this.applyCustomRowOrdering(groupRows, groupRowOrders[groupId]);
         log.debug('✅ Applied custom row ordering', {
           groupId,
@@ -531,6 +575,28 @@ export class GroupProcessor {
       return JSON.stringify(value);
     }
     return String(value);
+  }
+
+  /**
+   * Reverse operation of getGroupKey - convert groupKey back to original value
+   */
+  private static getValueFromGroupKey(groupKey: string): any {
+    if (groupKey === '__null__') {
+      return null;
+    }
+
+    // Try to parse as JSON (for object values)
+    if (groupKey.startsWith('{') || groupKey.startsWith('[')) {
+      try {
+        return JSON.parse(groupKey);
+      } catch (e) {
+        // If JSON parsing fails, treat as string
+        return groupKey;
+      }
+    }
+
+    // Return as string (the most common case)
+    return groupKey;
   }
   
   private static formatGroupValue(value: any, fieldName: string, columns: Column[]): string {
