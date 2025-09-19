@@ -44,9 +44,10 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
     ([key]) => !legendStateInternalKeys.includes(key)
   );
 
-  // Computed values from visual state - FIXED VERSION
-  const hiddenColumnCount = actualColumnVisibilityEntries.filter(([_, visible]) => visible === false).length;
-  const visibleColumnCount = actualColumnVisibilityEntries.filter(([_, visible]) => visible !== false).length;
+  // Computed values from visual state - CONSISTENT VERSION
+  // Count based on actual columns, not just columnVisibility entries
+  const hiddenColumnCount = columns.filter(col => columnVisibility[col.id] === false).length;
+  const visibleColumnCount = columns.filter(col => columnVisibility[col.id] !== false).length;
   
   // Event handlers using observable methods
   const handleOpenChange = React.useCallback((open: boolean) => {

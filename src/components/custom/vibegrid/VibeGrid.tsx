@@ -11,6 +11,7 @@ import { observable } from '@legendapp/state';
 import { createHydrationManager, type VibeGridHydrationManager } from './stores/init-state';
 import { VibeGridLoadingOverlay, useVibeGridLoadingState } from './components/VibeGridLoadingOverlay';
 import { createVibeGridPreferences } from './stores/simple-persistence';
+import { syncState, when } from '@legendapp/state';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -129,24 +130,24 @@ export function VibeGrid<T extends Record<string, any> = any>(
   useEffect(() => {
     // Initialize observables and setup persistence checking
     const initializeVibeGrid = () => {
-    try {
-      fileLog.info('🚀 Initializing VibeGrid', {
-        tableId,
-        entityType,
-        columnCount: columns.length
-      });
+      try {
+        fileLog.info('🚀 Initializing VibeGrid', {
+          tableId,
+          entityType,
+          columnCount: columns.length
+        });
 
-      // Mark CSS and basic dependencies as ready immediately
-      initManager.markReady('cssStylesLoaded');
-      initManager.markReady('entityDataLoaded');
-      initManager.markReady('entityObservableReady');
+        // Mark CSS and basic dependencies as ready immediately
+        initManager.markReady('cssStylesLoaded');
+        initManager.markReady('entityDataLoaded');
+        initManager.markReady('entityObservableReady');
 
-      // Create the three-layer observables directly with visual state connection
-      const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns, visualState.visualInputs$);
-      const tableInteraction$ = createTableInteraction$(tableCore$);
+        // Create the three-layer observables directly with visual state connection
+        const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns, visualState.visualInputs$);
+        const tableInteraction$ = createTableInteraction$(tableCore$);
 
-      // Create a proper viewport observable with Legend State observables for each property
-      const tableViewport$ = {
+        // Create a proper viewport observable with Legend State observables for each property
+        const tableViewport$ = {
         scrollTop: observable(0),
         scrollLeft: observable(0),
         viewportWidth: observable(0),
@@ -161,119 +162,151 @@ export function VibeGrid<T extends Record<string, any> = any>(
         }
       };
 
-      const observables = {
-        tableCore$,
-        tableCoreSync$,
-        tableInteraction$,
-        tableViewport$
-      };
-      observablesRef.current = observables;
+        const observables = {
+          tableCore$,
+          tableCoreSync$,
+          tableInteraction$,
+          tableViewport$
+        };
+        observablesRef.current = observables;
 
-      fileLog.debug('✅ Created pure observables', { entityType, columnCount: columns.length });
+        fileLog.debug('✅ Created pure observables', { entityType, columnCount: columns.length });
 
-      // Mark data state dependencies as ready
-      initManager.markReady('dataStateReady');
-      initManager.markReady('interactionStateReady');
+        // Mark data state dependencies as ready
+        initManager.markReady('dataStateReady');
+        initManager.markReady('interactionStateReady');
 
-      // Mark persistence as loaded (Legend State handles this automatically)
-      initManager.markReady('dataPersistenceLoaded');
-      initManager.markReady('visualPersistenceLoaded');
+        // Mark persistence as loaded (Legend State handles this automatically)
+        initManager.markReady('dataPersistenceLoaded');
+        initManager.markReady('visualPersistenceLoaded');
 
-      // Initialize isolated visual state for this VibeGrid instance
-      const orgId = universeOrgId$.get();
-      const userId = universeUserId$.get();
-      if (orgId && userId) {
-
-        // Initialize simple persistence with columns first
-        simplePersistence.operations.initializeColumns(columns);
-
-        // Initialize visual state columns
+        // Initialize isolated visual state for this VibeGrid instance
+        const orgId = universeOrgId$.get();
+        const userId = universeUserId$.get();
+        if (orgId && userId) {
+        // Initialize visual state columns first
         visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
 
         // Keep visual state synchronized with tableCore$ observables
         visualState.visualInputs$.columns.set(columns);
 
-        // Load saved preferences from simple persistence and apply to visual state
-        const savedPrefs = simplePersistence.preferences$.get();
-        if (savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0) {
-          visualState.visualInputs$.columnWidths.set(savedPrefs.columnWidths);
-          fileLog.info('✅ Loaded column widths from simple persistence', { columnWidths: savedPrefs.columnWidths });
-        }
-        if (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0) {
-          visualState.visualInputs$.columnOrder.set(savedPrefs.columnOrder);
-          fileLog.info('✅ Loaded column order from simple persistence', { columnOrder: savedPrefs.columnOrder });
-        }
-        if (savedPrefs.columnVisibility && Object.keys(savedPrefs.columnVisibility).length > 0) {
-          visualState.visualInputs$.columnVisibility.set(savedPrefs.columnVisibility);
-          fileLog.info('✅ Loaded column visibility from simple persistence', { columnVisibility: savedPrefs.columnVisibility });
-        }
-        if (savedPrefs.sortBy) {
-          // Handle both direct array and Legend State wrapped format
-          const sortByArray = savedPrefs.sortBy.value || savedPrefs.sortBy;
-          if (Array.isArray(sortByArray) && sortByArray.length > 0) {
-            visualState.visualInputs$.sortBy.set(sortByArray);
-            fileLog.info('✅ Loaded sort configuration from simple persistence', { sortBy: sortByArray });
+        // Wait for Legend State persistence to load, then apply saved preferences
+        const persistenceState = syncState(simplePersistence.preferences$);
+        when(persistenceState.isPersistLoaded).then(() => {
+          fileLog.info('💾 Persistence loaded, applying saved preferences');
+
+          // Initialize simple persistence with columns (will check if data already exists)
+          simplePersistence.operations.initializeColumns(columns);
+
+          // Load saved preferences from simple persistence and apply to visual state
+          const savedPrefs = simplePersistence.preferences$.get();
+          if (savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0) {
+            visualState.visualInputs$.columnWidths.set(savedPrefs.columnWidths);
+            fileLog.info('✅ Loaded column widths from simple persistence', { columnWidths: savedPrefs.columnWidths });
           }
-        }
-        if (savedPrefs.filters && savedPrefs.filters.length > 0) {
-          visualState.visualInputs$.filters.set(savedPrefs.filters);
-          fileLog.info('✅ Loaded filters from simple persistence', { filters: savedPrefs.filters });
-        }
-        // Group configuration - Debug what we have
-        fileLog.info('🔍 Group config debugging', {
-          hasGroupConfig: !!savedPrefs.groupConfig,
-          groupConfig: savedPrefs.groupConfig,
-          hasFields: !!savedPrefs.groupConfig?.fields,
-          fieldsIsArray: Array.isArray(savedPrefs.groupConfig?.fields),
-          fieldsLength: savedPrefs.groupConfig?.fields?.length,
-          validationPasses: !!(savedPrefs.groupConfig && savedPrefs.groupConfig.fields && Array.isArray(savedPrefs.groupConfig.fields) && savedPrefs.groupConfig.fields.length > 0)
+          if (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0) {
+            visualState.visualInputs$.columnOrder.set(savedPrefs.columnOrder);
+            fileLog.info('✅ Loaded column order from simple persistence', { columnOrder: savedPrefs.columnOrder });
+          }
+          if (savedPrefs.columnVisibility && Object.keys(savedPrefs.columnVisibility).length > 0) {
+            // Handle both direct object and Legend State wrapped format (like sortBy)
+            let columnVisibilityData = savedPrefs.columnVisibility;
+
+            // Extract from nested Legend State structure if needed
+            while (columnVisibilityData?.value && typeof columnVisibilityData.value === 'object') {
+              columnVisibilityData = columnVisibilityData.value;
+            }
+
+            // Ensure we have a clean object with boolean values
+            const cleanVisibility: Record<string, boolean> = {};
+            if (columnVisibilityData && typeof columnVisibilityData === 'object') {
+              for (const [key, value] of Object.entries(columnVisibilityData)) {
+                if (typeof key === 'string' && typeof value === 'boolean') {
+                  cleanVisibility[key] = value;
+                }
+              }
+            }
+
+            if (Object.keys(cleanVisibility).length > 0) {
+              visualState.visualInputs$.columnVisibility.set(cleanVisibility);
+              fileLog.info('✅ Loaded column visibility from simple persistence', {
+                columnVisibility: cleanVisibility,
+                hiddenColumns: Object.entries(cleanVisibility).filter(([_, visible]) => !visible).map(([id]) => id)
+              });
+            }
+          }
+          if (savedPrefs.sortBy) {
+            // Handle both direct array and Legend State wrapped format
+            const sortByArray = savedPrefs.sortBy.value || savedPrefs.sortBy;
+            if (Array.isArray(sortByArray) && sortByArray.length > 0) {
+              visualState.visualInputs$.sortBy.set(sortByArray);
+              fileLog.info('✅ Loaded sort configuration from simple persistence', { sortBy: sortByArray });
+            }
+          }
+          if (savedPrefs.filters && savedPrefs.filters.length > 0) {
+            visualState.visualInputs$.filters.set(savedPrefs.filters);
+            fileLog.info('✅ Loaded filters from simple persistence', { filters: savedPrefs.filters });
+          }
+          // Group configuration - Debug what we have
+          fileLog.info('🔍 Group config debugging', {
+            hasGroupConfig: !!savedPrefs.groupConfig,
+            groupConfig: savedPrefs.groupConfig,
+            hasFields: !!savedPrefs.groupConfig?.fields,
+            fieldsIsArray: Array.isArray(savedPrefs.groupConfig?.fields),
+            fieldsLength: savedPrefs.groupConfig?.fields?.length,
+            validationPasses: !!(savedPrefs.groupConfig && savedPrefs.groupConfig.fields && Array.isArray(savedPrefs.groupConfig.fields) && savedPrefs.groupConfig.fields.length > 0)
+          });
+
+          if (savedPrefs.groupConfig && savedPrefs.groupConfig.fields && Array.isArray(savedPrefs.groupConfig.fields) && savedPrefs.groupConfig.fields.length > 0) {
+            try {
+              // Convert serializable GroupConfig (with Array) back to runtime GroupConfig (with Set)
+              const runtimeGroupConfig: GroupConfig = {
+                fields: savedPrefs.groupConfig.fields,
+                sortBy: savedPrefs.groupConfig.sortBy || 'name',
+                sortDirection: savedPrefs.groupConfig.sortDirection || 'asc',
+                aggregations: savedPrefs.groupConfig.aggregations || [],
+                expandedGroups: new Set(savedPrefs.groupConfig.expandedGroups || []), // Convert Array back to Set
+                colorScheme: savedPrefs.groupConfig.colorScheme || 'auto'
+              };
+              visualState.visualInputs$.groupConfig.set(runtimeGroupConfig);
+              fileLog.info('✅ Loaded group configuration from simple persistence', {
+                groupConfig: runtimeGroupConfig,
+                fieldsCount: runtimeGroupConfig.fields.length,
+                expandedGroupsCount: runtimeGroupConfig.expandedGroups.size
+              });
+            } catch (error) {
+              fileLog.error('❌ Failed to load group configuration from persistence', { error, savedGroupConfig: savedPrefs.groupConfig });
+            }
+          }
+
+          // Load row ordering from persistence
+          if (savedPrefs.flatRowOrder && savedPrefs.flatRowOrder.length > 0) {
+            tableCore$.flatRowOrder.set(savedPrefs.flatRowOrder);
+            fileLog.info('✅ Loaded flat row order from simple persistence', {
+              rowCount: savedPrefs.flatRowOrder.length,
+              firstFew: savedPrefs.flatRowOrder.slice(0, 3)
+            });
+          }
+
+          if (savedPrefs.groupRowOrders && Object.keys(savedPrefs.groupRowOrders).length > 0) {
+            tableCore$.groupRowOrders.set(savedPrefs.groupRowOrders);
+            fileLog.info('✅ Loaded group row orders from simple persistence', {
+              groupCount: Object.keys(savedPrefs.groupRowOrders).length,
+              groups: Object.keys(savedPrefs.groupRowOrders)
+            });
+          }
+
+          fileLog.info('🎯 All preferences loaded from persistence');
+        }).catch(error => {
+          fileLog.error('❌ Failed to wait for persistence loading', { error });
+          // Fallback: Initialize with defaults if persistence fails
+          simplePersistence.operations.initializeColumns(columns);
         });
 
-        if (savedPrefs.groupConfig && savedPrefs.groupConfig.fields && Array.isArray(savedPrefs.groupConfig.fields) && savedPrefs.groupConfig.fields.length > 0) {
-          try {
-            // Convert serializable GroupConfig (with Array) back to runtime GroupConfig (with Set)
-            const runtimeGroupConfig: GroupConfig = {
-              fields: savedPrefs.groupConfig.fields,
-              sortBy: savedPrefs.groupConfig.sortBy || 'name',
-              sortDirection: savedPrefs.groupConfig.sortDirection || 'asc',
-              aggregations: savedPrefs.groupConfig.aggregations || [],
-              expandedGroups: new Set(savedPrefs.groupConfig.expandedGroups || []), // Convert Array back to Set
-              colorScheme: savedPrefs.groupConfig.colorScheme || 'auto'
-            };
-            visualState.visualInputs$.groupConfig.set(runtimeGroupConfig);
-            fileLog.info('✅ Loaded group configuration from simple persistence', {
-              groupConfig: runtimeGroupConfig,
-              fieldsCount: runtimeGroupConfig.fields.length,
-              expandedGroupsCount: runtimeGroupConfig.expandedGroups.size
-            });
-          } catch (error) {
-            fileLog.error('❌ Failed to load group configuration from persistence', { error, savedGroupConfig: savedPrefs.groupConfig });
-          }
-        }
-
-        // Load row ordering from persistence
-        if (savedPrefs.flatRowOrder && savedPrefs.flatRowOrder.length > 0) {
-          tableCore$.flatRowOrder.set(savedPrefs.flatRowOrder);
-          fileLog.info('✅ Loaded flat row order from simple persistence', {
-            rowCount: savedPrefs.flatRowOrder.length,
-            firstFew: savedPrefs.flatRowOrder.slice(0, 3)
-          });
-        }
-
-        if (savedPrefs.groupRowOrders && Object.keys(savedPrefs.groupRowOrders).length > 0) {
-          tableCore$.groupRowOrders.set(savedPrefs.groupRowOrders);
-          fileLog.info('✅ Loaded group row orders from simple persistence', {
-            groupCount: Object.keys(savedPrefs.groupRowOrders).length,
-            groups: Object.keys(savedPrefs.groupRowOrders)
-          });
-        }
-
         // Set up reactive sync from visual state to simple persistence
-        // Watch for changes and save them automatically
+        // Watch for changes and save them automatically (using bulk methods to avoid conflicts)
         visualState.visualInputs$.columnWidths.onChange((newWidths) => {
-          Object.entries(newWidths).forEach(([columnId, width]) => {
-            simplePersistence.operations.setColumnWidth(columnId, width);
-          });
+          simplePersistence.operations.setAllColumnWidths(newWidths);
           fileLog.debug('💾 Saved column widths to simple persistence', { newWidths });
         });
 
@@ -283,9 +316,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         });
 
         visualState.visualInputs$.columnVisibility.onChange((newVisibility) => {
-          Object.entries(newVisibility).forEach(([columnId, visible]) => {
-            simplePersistence.operations.setColumnVisibility(columnId, visible);
-          });
+          simplePersistence.operations.setAllColumnVisibility(newVisibility);
           fileLog.debug('💾 Saved column visibility to simple persistence', { newVisibility });
         });
 
@@ -338,11 +369,26 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         // Row order persistence - flat mode (ungrouped)
         tableCore$.flatRowOrder.onChange((newFlatRowOrder) => {
-          simplePersistence.operations.setFlatRowOrder(newFlatRowOrder);
-          fileLog.debug('📋 Saved flat row order to simple persistence', {
-            rowCount: newFlatRowOrder.length,
-            firstFew: newFlatRowOrder.slice(0, 3)
-          });
+          try {
+            simplePersistence.operations.setFlatRowOrder(newFlatRowOrder);
+            fileLog.debug('📋 Saved flat row order to simple persistence', {
+              rowCount: newFlatRowOrder.length,
+              firstFew: newFlatRowOrder.slice(0, 3)
+            });
+          } catch (error) {
+            if (error instanceof Error && error.name === 'QuotaExceededError') {
+              fileLog.error('🚨 localStorage quota exceeded, running emergency cleanup', { error });
+              simplePersistence.operations.emergencyCleanup();
+              // Try again after cleanup
+              try {
+                simplePersistence.operations.setFlatRowOrder(newFlatRowOrder.slice(0, 100)); // Save only first 100 items
+              } catch (retryError) {
+                fileLog.error('❌ Retry failed after emergency cleanup', { retryError });
+              }
+            } else {
+              fileLog.error('❌ Failed to save flat row order', { error });
+            }
+          }
         });
 
         // Row order persistence - grouped mode
@@ -362,7 +408,30 @@ export function VibeGrid<T extends Record<string, any> = any>(
               groupIdType: typeof groupId,
               rowOrderType: typeof rowOrder
             });
-            simplePersistence.operations.setGroupRowOrder(groupId, rowOrder);
+
+            try {
+              simplePersistence.operations.setGroupRowOrder(groupId, rowOrder);
+            } catch (error) {
+              if (error instanceof Error && error.name === 'QuotaExceededError') {
+                fileLog.error('🚨 localStorage quota exceeded on group row order, running emergency cleanup', {
+                  groupId,
+                  error
+                });
+                simplePersistence.operations.emergencyCleanup();
+                // Try again with limited data after cleanup
+                try {
+                  const limitedRowOrder = {
+                    ...rowOrder,
+                    rowIds: rowOrder.rowIds ? rowOrder.rowIds.slice(0, 50) : [] // Save only first 50 items
+                  };
+                  simplePersistence.operations.setGroupRowOrder(groupId, limitedRowOrder);
+                } catch (retryError) {
+                  fileLog.error('❌ Retry failed after emergency cleanup', { groupId, retryError });
+                }
+              } else {
+                fileLog.error('❌ Failed to save group row order', { groupId, error });
+              }
+            }
           });
           fileLog.debug('📋 Saved group row orders to simple persistence', {
             groupCount: Object.keys(newGroupRowOrders).length,
@@ -372,22 +441,21 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         // Group config persistence is now handled by reactive persistence wrapper
 
-        fileLog.info('🎯 Visual state initialized with simple persistence', {
+        fileLog.info('🎯 Visual state initialized', {
           entityType, orgId, userId,
-          columnsCount: columns.length,
-          hasPersistedState: !!(savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0)
+          columnsCount: columns.length
         });
         initManager.markReady('visualStateReady');
-      } else {
-        fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
-        initManager.markError('visualStateReady', 'Missing orgId or userId', true);
-      }
+        } else {
+          fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
+          initManager.markError('visualStateReady', 'Missing orgId or userId', true);
+        }
 
-      // Wait for container ref to be available for renderer initialization (optimized)
-      let retryCount = 0;
-      const maxRetries = 30; // Reduced max retries since we're using RAF
+        // Wait for container ref to be available for renderer initialization (optimized)
+        let retryCount = 0;
+        const maxRetries = 30; // Reduced max retries since we're using RAF
 
-      const checkReadyToInitializeRenderer = () => {
+        const checkReadyToInitializeRenderer = () => {
         // First check if container ref is available
         if (!containerRef.current) {
           retryCount++;
@@ -491,17 +559,17 @@ export function VibeGrid<T extends Record<string, any> = any>(
             });
           }
         });
-      };
+        };
 
-      // Start checking for container readiness after a small delay to allow React to render
-      // Use RAF instead of setTimeout for better performance
-      requestAnimationFrame(checkReadyToInitializeRenderer);
+        // Start checking for container readiness after a small delay to allow React to render
+        // Use RAF instead of setTimeout for better performance
+        requestAnimationFrame(checkReadyToInitializeRenderer);
 
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      fileLog.error('❌ Failed to initialize VibeGrid', err);
-      initManager.markError('rendererInitialized', errorMsg, true);
-    }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        fileLog.error('❌ Failed to initialize VibeGrid', err);
+        initManager.markError('rendererInitialized', errorMsg, true);
+      }
     };
 
     // Call the initialization function
