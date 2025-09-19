@@ -113,6 +113,11 @@ export class BodyRenderer {
     const rowElement = this.createElement('div', 'vibegridx-row');
     rowElement.dataset.rowId = row.id;
 
+    // Add group ID for data rows in grouped mode (needed for drag and drop)
+    if (row.type === 'data' && row.groupId) {
+      rowElement.setAttribute('data-group-id', row.groupId);
+    }
+
     // startX now comes from visual state which already includes drag + checkbox columns (70px total)
     const adjustedStartX = startX;
 
@@ -790,30 +795,18 @@ export class BodyRenderer {
           return false;
         }
 
-        // Handle async row movement (fire and forget for now, success determined by UI state)
-        (async () => {
-          try {
-            const success = await this.tableCore$.moveRowInGroup(sourceGroupId, targetGroupId, draggedRowId, newIndex);
-            fileLog.info('✅ Row moved successfully (grouped)', {
-              draggedRowId,
-              sourceGroupId,
-              targetGroupId,
-              newIndex,
-              success
-            });
-          } catch (error) {
-            fileLog.error('❌ Failed to move row (grouped)', {
-              draggedRowId,
-              sourceGroupId,
-              targetGroupId,
-              newIndex,
-              error: error.message
-            });
-          }
-        })();
+        // Move row within group using data state method
+        const success = this.tableCore$.moveRowInGroup(sourceGroupId, targetGroupId, draggedRowId, newIndex);
 
-        // Return true immediately for UI responsiveness
-        return true;
+        fileLog.info('✅ Row move delegated to drag handler', {
+          draggedRowId,
+          sourceGroupId,
+          targetGroupId,
+          newIndex,
+          success
+        });
+
+        return success;
       },
 
       onFlatRowMove: (fromIndex: number, toIndex: number) => {

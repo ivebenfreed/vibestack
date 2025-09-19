@@ -10,6 +10,20 @@ import { configureSynced, syncObservable } from '@legendapp/state/sync';
 import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
 import { log } from '@/logger';
 import type { GroupConfig, SortConfig, FilterConfig } from '../types';
+
+// Serializable version of GroupConfig for persistence (Sets converted to arrays)
+interface SerializableGroupConfig {
+  fields: Array<{ field: string; displayName: string }>;
+  sortBy: 'name' | 'count' | 'custom';
+  sortDirection: 'asc' | 'desc';
+  aggregations: Array<{
+    field: string;
+    function: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'unique';
+    displayName?: string;
+  }>;
+  expandedGroups: string[]; // Array instead of Set for serialization
+  colorScheme?: 'auto' | 'none' | 'custom';
+}
 import type { GroupRowOrderConfig } from './data-state';
 
 const persistLog = log('vibegrid/simple-persistence');
@@ -32,8 +46,8 @@ export interface VibeGridPreferences {
   sortBy: SortConfig[];
   filters: FilterConfig[];
 
-  // Grouping configuration
-  groupConfig: GroupConfig | null;
+  // Grouping configuration (serializable version)
+  groupConfig: SerializableGroupConfig | null;
 
   // Row ordering state
   groupRowOrders: Record<string, GroupRowOrderConfig>;
@@ -132,11 +146,26 @@ export function createVibeGridPreferences(entityType: string) {
 
       // Update group configuration
       setGroupConfig(groupConfig: GroupConfig | null) {
-        preferences$.groupConfig.set(groupConfig);
+        // Convert runtime GroupConfig to serializable version
+        const serializableConfig: SerializableGroupConfig | null = groupConfig ? {
+          fields: groupConfig.fields,
+          sortBy: groupConfig.sortBy,
+          sortDirection: groupConfig.sortDirection,
+          aggregations: groupConfig.aggregations,
+          expandedGroups: Array.from(groupConfig.expandedGroups || new Set()), // Convert Set to Array
+          colorScheme: groupConfig.colorScheme
+        } : null;
+
+        preferences$.groupConfig.set(serializableConfig);
         preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('👥 Group configuration saved', {
+        persistLog.info('👥 Group configuration saved to localStorage', {
           hasConfig: !!groupConfig,
-          fields: groupConfig?.fields?.length || 0
+          originalConfig: groupConfig,
+          serializableConfig: serializableConfig,
+          fields: groupConfig?.fields?.length || 0,
+          expandedGroupsCount: groupConfig?.expandedGroups?.size || 0,
+          hasFields: !!serializableConfig?.fields,
+          fieldsArray: serializableConfig?.fields
         });
       },
 
@@ -156,6 +185,11 @@ export function createVibeGridPreferences(entityType: string) {
 
       // Update group row orders for a specific group
       setGroupRowOrder(groupId: string, rowOrder: GroupRowOrderConfig) {
+        if (!rowOrder || !rowOrder.rowIds) {
+          persistLog.error('❌ Invalid rowOrder passed to setGroupRowOrder', { groupId, rowOrder });
+          return;
+        }
+
         const current = preferences$.groupRowOrders.get();
         preferences$.groupRowOrders.set({
           ...current,

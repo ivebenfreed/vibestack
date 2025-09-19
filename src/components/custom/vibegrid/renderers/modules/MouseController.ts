@@ -40,6 +40,11 @@ export class MouseController {
   private dragPreviewElement: HTMLElement | null = null;
   private dropLineElement: HTMLElement | null = null;
 
+  // Row drag state
+  private isRowDrag = false;
+  private dragRowId: string | null = null;
+  private dragRowGroupId: string | null = null;
+
   // Event listeners for cleanup
   private eventListeners: Array<{
     element: EventTarget;
@@ -100,6 +105,9 @@ export class MouseController {
     this.isTracking = true;
     this.isColumnDrag = false;
     this.dragColumnId = null;
+    this.isRowDrag = false;
+    this.dragRowId = null;
+    this.dragRowGroupId = null;
 
     // Provide immediate visual feedback on mouse down
     const target = e.target as HTMLElement;
@@ -145,14 +153,21 @@ export class MouseController {
       const columnId = cellElement.getAttribute('data-column-id');
       const cellId = `${rowId}:${columnId}`;
 
-      // Check if this is a drag handle cell - if so, allow HTML5 drag and drop
+      // Check if this is a drag handle cell - if so, prepare for row drag
       if (columnId === '__drag_handle') {
-        // Don't track mouse for drag handle cells - allow HTML5 drag and drop
-        this.isDragging = false;
-        this.isTracking = false;
-        this.startPosition = { x: 0, y: 0 };
-        fileLog.info('🖱️ Allowing HTML5 drag for drag handle cell', {
+        // Get row element to extract group information
+        const rowElement = cellElement.closest('[data-row-id]');
+        const groupElement = rowElement?.closest('[data-group-id]');
+        const groupId = groupElement?.getAttribute('data-group-id');
+
+        this.isRowDrag = true;
+        this.dragRowId = rowId;
+        this.dragRowGroupId = groupId || null;
+
+        fileLog.info('🖱️ Row drag handle mouse down - preparing for row drag', {
           cellId,
+          rowId,
+          groupId,
           targetElement: target.tagName
         });
         return;
@@ -239,7 +254,9 @@ export class MouseController {
         distance,
         threshold: this.dragThreshold,
         isColumnDrag: this.isColumnDrag,
-        dragColumnId: this.dragColumnId
+        dragColumnId: this.dragColumnId,
+        isRowDrag: this.isRowDrag,
+        dragRowId: this.dragRowId
       });
 
       if (this.isColumnDrag && this.dragColumnId) {
@@ -248,9 +265,21 @@ export class MouseController {
         this.tableInteraction$.isDragging.set(true);
         this.tableInteraction$.dragSource.set(this.dragColumnId);
         this.createDragPreview(this.dragColumnId);
+      } else if (this.isRowDrag && this.dragRowId) {
+        // Start row drag
+        fileLog.info('🚀 Row drag started', {
+          rowId: this.dragRowId,
+          groupId: this.dragRowGroupId
+        });
+        this.tableInteraction$.isDragging.set(true);
+        this.tableInteraction$.dragSource.set(this.dragRowId);
+        this.createRowDragPreview(this.dragRowId);
       } else if (this.isColumnDrag) {
         // Column drag was attempted but failed - don't fall back to cell selection
         fileLog.warn('⚠️ Column drag detected but dragColumnId is missing');
+      } else if (this.isRowDrag) {
+        // Row drag was attempted but failed - don't fall back to cell selection
+        fileLog.warn('⚠️ Row drag detected but dragRowId is missing');
       } else {
         // PURE: Start drag selection with focused cell as anchor (only for cell drags)
         const startCell = this.tableInteraction$.focusedCell.get();
@@ -283,8 +312,32 @@ export class MouseController {
       }
     }
 
+    // Handle row drag target detection
+    if (this.isDragging && this.isRowDrag && this.dragRowId) {
+      const target = e.target as HTMLElement;
+      const targetRowElement = target.closest('[data-row-id]');
+      if (targetRowElement) {
+        const targetRowId = targetRowElement.getAttribute('data-row-id');
+        // Skip drag handle cells and group headers for drop targets
+        const targetCellElement = target.closest('[data-column-id]');
+        const targetColumnId = targetCellElement?.getAttribute('data-column-id');
+
+        if (targetRowId && targetRowId !== this.dragRowId) {
+          this.tableInteraction$.dragTarget.set(targetRowId);
+          this.showRowDropIndicator(targetRowElement, e.clientY);
+          fileLog.info('🎯 Row drag over target', {
+            sourceRowId: this.dragRowId,
+            targetRowId
+          });
+        }
+      } else {
+        // Clear drop indicator when not over a valid target
+        this.hideRowDropIndicator();
+      }
+    }
+
     // Handle cell drag selection updates
-    if (this.isDragging && !this.isColumnDrag && this.tableInteraction$.isDragSelecting.get()) {
+    if (this.isDragging && !this.isColumnDrag && !this.isRowDrag && this.tableInteraction$.isDragSelecting.get()) {
       const target = e.target as HTMLElement;
       const cellElement = target.closest('[data-row-id][data-column-id]');
 
@@ -351,6 +404,11 @@ export class MouseController {
     if (this.isDragging && this.isColumnDrag && this.dragPreviewElement) {
       this.updateDragPreviewPosition(e.clientX, e.clientY);
     }
+
+    // Update drag preview position for row drag
+    if (this.isDragging && this.isRowDrag && this.dragPreviewElement) {
+      this.updateDragPreviewPosition(e.clientX, e.clientY);
+    }
   }
 
 
@@ -364,7 +422,8 @@ export class MouseController {
       withinContainer: this.container.contains(e.target as Node),
       wasTracking: this.isTracking,
       wasDragging: this.isDragging,
-      wasColumnDrag: this.isColumnDrag
+      wasColumnDrag: this.isColumnDrag,
+      wasRowDrag: this.isRowDrag
     });
 
     if (this.isDragging) {
@@ -399,6 +458,21 @@ export class MouseController {
         this.removeDragPreview();
         this.hideDropLine();
         fileLog.info('🎯 Column drag state reset, continuing to general reset');
+      } else if (this.isRowDrag && this.dragRowId) {
+        // Handle row drag completion
+        const targetRowId = this.tableInteraction$.dragTarget.get();
+        if (targetRowId && targetRowId !== this.dragRowId) {
+          this.handleRowDrop(targetRowId, e.clientY);
+        }
+
+        // Reset row drag state
+        fileLog.info('🏁 Row drag ended', { rowId: this.dragRowId });
+        this.tableInteraction$.isDragging.set(false);
+        this.tableInteraction$.dragSource.set(null);
+        this.tableInteraction$.dragTarget.set(null);
+        this.removeRowDragPreview();
+        this.hideRowDropIndicator();
+        fileLog.info('🎯 Row drag state reset, continuing to general reset');
       } else {
         // PURE: End drag selection reactively
         const dragResult = this.tableInteraction$.endDragSelect();
@@ -419,11 +493,15 @@ export class MouseController {
       this.isTracking = false;
       this.isColumnDrag = false;
       this.dragColumnId = null;
+      this.isRowDrag = false;
+      this.dragRowId = null;
+      this.dragRowGroupId = null;
       this.startPosition = { x: 0, y: 0 };
       fileLog.info('🖱️ Drag state reset immediately', {
         isDragging: this.isDragging,
         isTracking: this.isTracking,
-        isColumnDrag: this.isColumnDrag
+        isColumnDrag: this.isColumnDrag,
+        isRowDrag: this.isRowDrag
       });
 
       // Clear the flag after a brief delay to allow normal clicks again
@@ -437,11 +515,15 @@ export class MouseController {
       this.isTracking = false;
       this.isColumnDrag = false;
       this.dragColumnId = null;
+      this.isRowDrag = false;
+      this.dragRowId = null;
+      this.dragRowGroupId = null;
       this.startPosition = { x: 0, y: 0 };
       fileLog.info('🖱️ Non-drag mouse up - state reset', {
         isDragging: this.isDragging,
         isTracking: this.isTracking,
-        isColumnDrag: this.isColumnDrag
+        isColumnDrag: this.isColumnDrag,
+        isRowDrag: this.isRowDrag
       });
     }
   }
@@ -694,16 +776,23 @@ export class MouseController {
       wasTracking: this.isTracking,
       wasDragging: this.isDragging,
       wasColumnDrag: this.isColumnDrag,
-      dragColumnId: this.dragColumnId
+      dragColumnId: this.dragColumnId,
+      wasRowDrag: this.isRowDrag,
+      dragRowId: this.dragRowId
     });
 
     this.isDragging = false;
     this.isTracking = false;
     this.isColumnDrag = false;
     this.dragColumnId = null;
+    this.isRowDrag = false;
+    this.dragRowId = null;
+    this.dragRowGroupId = null;
     this.startPosition = { x: 0, y: 0 };
     this.removeDragPreview();
     this.hideDropLine();
+    this.removeRowDragPreview();
+    this.hideRowDropIndicator();
   }
 
   /**
@@ -776,7 +865,7 @@ export class MouseController {
     if (!this.dragPreviewElement) return;
 
     this.dragPreviewElement.style.left = `${x}px`;
-    this.dragPreviewElement.style.top = `${y - 10}px`; // Slight offset above cursor
+    this.dragPreviewElement.style.top = `${y}px`; // Transform handles positioning above cursor
   }
 
   /**
@@ -847,6 +936,272 @@ export class MouseController {
       this.dropLineElement.remove();
       this.dropLineElement = null;
       fileLog.debug('🎯 Drop line hidden');
+    }
+  }
+
+  /**
+   * Create floating drag preview for row drag
+   */
+  private createRowDragPreview(rowId: string): void {
+    // Get row info for preview text
+    const rowElement = this.container.querySelector(`[data-row-id="${rowId}"]`);
+    const rowText = rowElement?.textContent?.trim().slice(0, 50) + '...' || `Row ${rowId}`;
+
+    // Create floating preview element
+    this.dragPreviewElement = document.createElement('div');
+    this.dragPreviewElement.className = 'vibegridx-row-drag-preview';
+    // Clone visible cells to create cell-styled preview
+    const cells = rowElement.querySelectorAll('.vibegridx-cell');
+    const visibleCells = Array.from(cells).slice(0, 4); // First 4 cells
+
+    if (visibleCells.length > 0) {
+      const cellTexts = visibleCells.map(cell => {
+        const text = cell.textContent?.trim() || '';
+        return text.length > 15 ? text.substring(0, 15) + '...' : text;
+      }).filter(text => text.length > 0);
+
+      this.dragPreviewElement.textContent = cellTexts.join(' • ');
+    } else {
+      this.dragPreviewElement.textContent = rowText;
+    }
+
+    // Style the preview (similar to column drag preview)
+    Object.assign(this.dragPreviewElement.style, {
+      position: 'fixed',
+      background: 'hsl(var(--background))',
+      color: 'hsl(var(--muted-foreground))',
+      padding: '6px 12px',
+      borderRadius: '4px',
+      fontSize: '12px',
+      fontWeight: '500',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      border: '2px solid #3b82f6',
+      whiteSpace: 'nowrap',
+      zIndex: '99999',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      pointerEvents: 'none',
+      opacity: '0.9',
+      transform: 'translateY(-100%)', // Position above cursor, left-aligned
+      transition: 'none' // No transitions during drag
+    });
+
+    document.body.appendChild(this.dragPreviewElement);
+    fileLog.info('🚀 Row drag preview created', { rowId, text: rowText });
+  }
+
+  /**
+   * Remove row drag preview element
+   */
+  private removeRowDragPreview(): void {
+    if (this.dragPreviewElement) {
+      this.dragPreviewElement.remove();
+      this.dragPreviewElement = null;
+      fileLog.info('🚀 Row drag preview removed');
+    }
+  }
+
+  /**
+   * Show row drop indicator (blue line above/below row)
+   */
+  private showRowDropIndicator(targetRowElement: HTMLElement, mouseY: number): void {
+    // Calculate if inserting before or after based on mouse position
+    const rect = targetRowElement.getBoundingClientRect();
+    const rowCenterY = rect.top + rect.height / 2;
+    const insertBefore = mouseY < rowCenterY;
+
+    // Get the container
+    const container = targetRowElement.closest('.vibegridx-container');
+    if (!container) return;
+
+    // Remove existing drop indicator
+    this.hideRowDropIndicator();
+
+    // Create new drop indicator
+    this.dropLineElement = document.createElement('div');
+    this.dropLineElement.className = 'vibegrid-row-drop-indicator';
+
+    // Calculate position relative to the container
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = targetRowElement.getBoundingClientRect();
+    const linePosition = insertBefore ?
+      rowRect.top - containerRect.top :
+      rowRect.bottom - containerRect.top;
+
+    // Style the drop indicator
+    Object.assign(this.dropLineElement.style, {
+      position: 'absolute',
+      left: '0',
+      right: '0',
+      top: `${linePosition - 1.5}px`,
+      height: '3px',
+      background: '#3b82f6',
+      borderRadius: '1.5px',
+      zIndex: '1000',
+      boxShadow: '0 0 6px rgba(59, 130, 246, 0.4)',
+      pointerEvents: 'none'
+    });
+
+    // Ensure container has relative positioning
+    (container as HTMLElement).style.position = 'relative';
+    container.appendChild(this.dropLineElement);
+
+    fileLog.debug('🎯 Row drop indicator shown', { insertBefore, linePosition });
+  }
+
+  /**
+   * Hide row drop indicator
+   */
+  private hideRowDropIndicator(): void {
+    if (this.dropLineElement) {
+      this.dropLineElement.remove();
+      this.dropLineElement = null;
+      fileLog.debug('🎯 Row drop indicator hidden');
+    }
+  }
+
+  /**
+   * Handle row drop completion - call DragDropManager
+   */
+  private handleRowDrop(targetRowId: string, mouseY: number): void {
+    if (!this.dragRowId) return;
+
+    // Calculate drop position
+    const targetRowElement = this.container.querySelector(`[data-row-id="${targetRowId}"]`);
+    if (!targetRowElement) return;
+
+    const rect = targetRowElement.getBoundingClientRect();
+    const insertBefore = mouseY < rect.top + rect.height / 2;
+
+    // Get target group for grouped mode
+    const targetGroupElement = targetRowElement.closest('[data-group-id]');
+    const targetGroupId = targetGroupElement?.getAttribute('data-group-id') || null;
+
+    // Calculate target index
+    const targetIndex = this.calculateRowDropIndex(targetRowElement, targetGroupId, insertBefore);
+
+    fileLog.info('🎯 Row dropped for reordering', {
+      sourceRowId: this.dragRowId,
+      sourceGroupId: this.dragRowGroupId,
+      targetRowId,
+      targetGroupId,
+      targetIndex,
+      insertBefore,
+      mouseY
+    });
+
+    // Call the appropriate DragDropManager method
+    if (this.dragRowGroupId || targetGroupId) {
+      // Grouped mode - call onRowMove
+      const finalTargetGroupId = targetGroupId || this.dragRowGroupId || '';
+      this.callRowMoveHandler(this.dragRowId, finalTargetGroupId, targetIndex);
+    } else {
+      // Flat mode - call onFlatRowMove
+      const sourceIndex = this.calculateRowIndex(this.dragRowId);
+      this.callFlatRowMoveHandler(sourceIndex, targetIndex);
+    }
+  }
+
+  /**
+   * Calculate target index for row drop
+   */
+  private calculateRowDropIndex(targetRowElement: HTMLElement, groupId: string | null, insertBefore: boolean): number {
+    if (groupId) {
+      // Grouped mode - find position within the specific group
+      const groupContainer = targetRowElement.closest(`[data-group-id="${groupId}"]`)?.parentElement;
+      if (!groupContainer) return 0;
+
+      // Only get rows that belong to the specific group
+      const dataRows = Array.from(groupContainer.querySelectorAll(`.vibegridx-row:not(.vibegridx-group-header)[data-group-id="${groupId}"]`));
+      const targetIndex = dataRows.indexOf(targetRowElement);
+
+      if (targetIndex === -1) {
+        fileLog.error('❌ Target row not found in group data rows', {
+          targetRowId: targetRowElement.dataset.rowId,
+          groupId,
+          dataRowsCount: dataRows.length,
+          insertBefore
+        });
+        return 0;
+      }
+
+      const calculatedIndex = insertBefore ? targetIndex : targetIndex + 1;
+      fileLog.debug('🎯 calculateRowDropIndex for grouped mode', {
+        targetRowId: targetRowElement.dataset.rowId,
+        groupId,
+        targetIndex,
+        insertBefore,
+        calculatedIndex,
+        dataRowsInGroup: dataRows.length
+      });
+
+      return calculatedIndex;
+    } else {
+      // Flat mode - find position in all rows
+      const container = targetRowElement.closest('.vibegridx-container');
+      if (!container) return 0;
+
+      const dataRows = Array.from(container.querySelectorAll('.vibegridx-row:not(.vibegridx-group-header)'));
+      const targetIndex = dataRows.indexOf(targetRowElement);
+      return insertBefore ? targetIndex : targetIndex + 1;
+    }
+  }
+
+  /**
+   * Calculate current index of a row
+   */
+  private calculateRowIndex(rowId: string): number {
+    const rowElement = this.container.querySelector(`[data-row-id="${rowId}"]`);
+    if (!rowElement) return 0;
+
+    const container = rowElement.closest('.vibegridx-container');
+    if (!container) return 0;
+
+    const dataRows = Array.from(container.querySelectorAll('.vibegridx-row:not(.vibegridx-group-header)'));
+    return dataRows.indexOf(rowElement);
+  }
+
+  /**
+   * Call DragDropManager onRowMove handler
+   */
+  private callRowMoveHandler(draggedRowId: string, targetGroupId: string, newIndex: number): void {
+    // Access DragDropManager through BodyRenderer
+    if (this.bodyRenderer?.dragDropManager?.callbacks?.onRowMove) {
+      const success = this.bodyRenderer.dragDropManager.callbacks.onRowMove(draggedRowId, targetGroupId, newIndex);
+      fileLog.info(success ? '🎯 Same-group row move' : '❌ Row move failed', {
+        draggedRowId,
+        targetGroupId,
+        newIndex,
+        success
+      });
+    } else {
+      fileLog.error('❌ DragDropManager onRowMove not available', {
+        hasBodyRenderer: !!this.bodyRenderer,
+        hasDragDropManager: !!this.bodyRenderer?.dragDropManager,
+        hasCallbacks: !!this.bodyRenderer?.dragDropManager?.callbacks,
+        hasOnRowMove: !!this.bodyRenderer?.dragDropManager?.callbacks?.onRowMove
+      });
+    }
+  }
+
+  /**
+   * Call DragDropManager onFlatRowMove handler
+   */
+  private callFlatRowMoveHandler(fromIndex: number, toIndex: number): void {
+    // Access DragDropManager through BodyRenderer
+    if (this.bodyRenderer?.dragDropManager?.callbacks?.onFlatRowMove) {
+      const success = this.bodyRenderer.dragDropManager.callbacks.onFlatRowMove(fromIndex, toIndex);
+      fileLog.info(success ? '🎯 Flat row move' : '❌ Flat row move failed', {
+        fromIndex,
+        toIndex,
+        success
+      });
+    } else {
+      fileLog.error('❌ DragDropManager onFlatRowMove not available', {
+        hasBodyRenderer: !!this.bodyRenderer,
+        hasDragDropManager: !!this.bodyRenderer?.dragDropManager,
+        hasCallbacks: !!this.bodyRenderer?.dragDropManager?.callbacks,
+        hasOnFlatRowMove: !!this.bodyRenderer?.dragDropManager?.callbacks?.onFlatRowMove
+      });
     }
   }
 

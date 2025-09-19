@@ -222,6 +222,12 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
       // Apply grouping if configured
       if (groupConfig && groupConfig.fields && groupConfig.fields.length > 0) {
         const groupRowOrders = tableCore$.groupRowOrders.get();
+        fileLog.info('🔄 processedRows: Reading groupRowOrders for grouping', {
+          groupRowOrdersKeys: Object.keys(groupRowOrders),
+          groupRowOrdersCount: Object.keys(groupRowOrders).length,
+          entityType,
+          groupFields: groupConfig.fields.map(f => f.field)
+        });
         const groupResult = GroupProcessor.processData(rows, columns, groupConfig, groupRowOrders);
 
         fileLog.info('✅ Processed rows with grouping', {
@@ -289,6 +295,14 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         groupId,
         rowCount: rowIds.length
       });
+
+      // FORCE: Trigger processedRows recomputation by accessing it
+      const currentProcessedRows = tableCore$.processedRows.get();
+      fileLog.info('🔄 Force-triggered processedRows recomputation after groupRowOrders change', {
+        groupId,
+        processedRowsCount: currentProcessedRows.length,
+        timestamp: Date.now()
+      });
     },
 
     moveRowInGroupByIndex(groupId: string, fromIndex: number, toIndex: number) {
@@ -335,6 +349,14 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
 
     // Higher-level method for drag and drop that handles row movement by ID
     async moveRowInGroup(sourceGroupId: string, targetGroupId: string, draggedRowId: string, newIndex: number): Promise<boolean> {
+      fileLog.info('🔧 moveRowInGroup called', {
+        sourceGroupId,
+        targetGroupId,
+        draggedRowId,
+        newIndex,
+        isCrossGroup: sourceGroupId !== targetGroupId
+      });
+
       // Handle cross-group moves
       if (sourceGroupId !== targetGroupId) {
         return await this.moveRowBetweenGroups(sourceGroupId, targetGroupId, draggedRowId, newIndex);
@@ -346,10 +368,25 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
       // If no order exists yet, create one from current group data
       if (!groupOrder) {
         const processedRows = tableCore$.processedRows.get();
+        if (!processedRows || !Array.isArray(processedRows)) {
+          fileLog.error('❌ Invalid processedRows when creating group order', {
+            processedRows: typeof processedRows,
+            sourceGroupId
+          });
+          return false;
+        }
+
         const groupRows = processedRows.filter(row =>
-          row.type === 'data' && (row.groupId === sourceGroupId || row.parentGroupId === sourceGroupId)
+          row && row.type === 'data' && (row.groupId === sourceGroupId || row.parentGroupId === sourceGroupId)
         );
-        const initialOrder = groupRows.map(row => row.id).filter(Boolean);
+        const initialOrder = groupRows.map(row => row?.id).filter(Boolean);
+
+        fileLog.info('🔍 Creating group order', {
+          sourceGroupId,
+          processedRowsCount: processedRows.length,
+          groupRowsCount: groupRows.length,
+          initialOrderCount: initialOrder.length
+        });
 
         groupOrder = {
           groupId: sourceGroupId,
@@ -357,8 +394,10 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
           lastModified: new Date().toISOString()
         };
 
+        // Ensure orders is a valid object before spreading
+        const safeOrders = orders || {};
         tableCore$.groupRowOrders.set({
-          ...orders,
+          ...safeOrders,
           [sourceGroupId]: groupOrder
         });
 
@@ -369,6 +408,15 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
       }
 
       // Find current position of the dragged row
+      if (!groupOrder.rowIds || !Array.isArray(groupOrder.rowIds)) {
+        fileLog.error('❌ Invalid groupOrder.rowIds', {
+          sourceGroupId,
+          groupOrder,
+          rowIdsType: typeof groupOrder.rowIds
+        });
+        return false;
+      }
+
       const currentIndex = groupOrder.rowIds.indexOf(draggedRowId);
       if (currentIndex === -1) {
         fileLog.warn('⚠️ Dragged row not found in group order', {
@@ -384,13 +432,62 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         return true;
       }
 
+      // Validate newIndex - allow up to length (for appending at end)
+      if (typeof newIndex !== 'number' || newIndex < 0 || newIndex > groupOrder.rowIds.length) {
+        fileLog.error('❌ Invalid newIndex for row move', {
+          newIndex,
+          newIndexType: typeof newIndex,
+          currentIndex,
+          rowIdsLength: groupOrder.rowIds.length,
+          sourceGroupId,
+          validRange: `0 to ${groupOrder.rowIds.length}`
+        });
+        return false;
+      }
+
       // Move the row
-      const newRowIds = [...groupOrder.rowIds];
-      const [movedRowId] = newRowIds.splice(currentIndex, 1);
-      newRowIds.splice(newIndex, 0, movedRowId);
+      let newRowIds;
+      try {
+        newRowIds = [...groupOrder.rowIds];
+        fileLog.debug('🔄 Before splice operations', {
+          originalLength: newRowIds.length,
+          currentIndex,
+          newIndex,
+          draggedRowId
+        });
+
+        const [movedRowId] = newRowIds.splice(currentIndex, 1);
+        newRowIds.splice(newIndex, 0, movedRowId);
+
+        fileLog.debug('🔄 After splice operations', {
+          newLength: newRowIds.length,
+          movedRowId
+        });
+      } catch (error) {
+        fileLog.error('❌ Error during array manipulation', {
+          error: error.message,
+          currentIndex,
+          newIndex,
+          rowIdsLength: groupOrder.rowIds.length
+        });
+        return false;
+      }
+
+      // Ensure orders is a valid object before spreading
+      const safeOrders = orders || {};
+
+      fileLog.info('🔄 About to update groupRowOrders with moved row', {
+        sourceGroupId,
+        draggedRowId,
+        currentIndex,
+        newIndex,
+        oldRowIds: groupOrder.rowIds,
+        newRowIds,
+        entityType
+      });
 
       tableCore$.groupRowOrders.set({
-        ...orders,
+        ...safeOrders,
         [sourceGroupId]: {
           ...groupOrder,
           rowIds: newRowIds,
@@ -398,12 +495,14 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         }
       });
 
-      fileLog.info('🔄 Row moved within group by ID (no persistence)', {
+      fileLog.info('🔄 groupRowOrders.set COMPLETED - Row moved within group by ID', {
         sourceGroupId,
         draggedRowId,
         from: currentIndex,
         to: newIndex,
-        newOrderLength: newRowIds.length
+        newOrderLength: newRowIds.length,
+        updatedOrdersKeys: Object.keys(tableCore$.groupRowOrders.get()),
+        entityType
       });
 
       return true;
