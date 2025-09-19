@@ -162,9 +162,9 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
     groupRowOrders: {} as Record<string, GroupRowOrderConfig>,
     flatRowOrder: [] as string[],
 
-    // Computed groupConfig - will be provided by external visual state
+    // Computed groupConfig - reads from external visual state
     get groupConfig() {
-      return null; // Default - will be overridden by visual state integration
+      return visualInputs$?.groupConfig?.get() || null;
     },
 
     // Computed processed data (lazy)
@@ -419,12 +419,25 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
 
     // Move row between different groups - purely reactive approach
     async moveRowBetweenGroups(sourceGroupId: string, targetGroupId: string, draggedRowId: string, newIndex: number): Promise<boolean> {
-      // Extract the status value from group IDs (e.g., "group_status_done" -> "done")
-      const extractStatusFromGroupId = (groupId: string): string => {
-        return groupId.replace('group_status_', '');
+      // Extract the field name and value from group IDs (e.g., "group_status_done" -> {field: "status", value: "done"})
+      const parseGroupId = (groupId: string): { field: string; value: string } | null => {
+        const match = groupId.match(/^group_([^_]+)_(.+)$/);
+        if (!match) {
+          fileLog.warn('🔍 Could not parse group ID', { groupId });
+          return null;
+        }
+        return { field: match[1], value: match[2] };
       };
 
-      const newStatus = extractStatusFromGroupId(targetGroupId);
+      const targetGroupInfo = parseGroupId(targetGroupId);
+      const sourceGroupInfo = parseGroupId(sourceGroupId);
+
+      if (!targetGroupInfo) {
+        fileLog.error('❌ Invalid target group ID format', { targetGroupId });
+        return false;
+      }
+
+      const { field: fieldName, value: newValue } = targetGroupInfo;
       const entityType = tableCore$.entityType.get();
 
       // Update the actual row data using the proper entity update system
@@ -436,26 +449,31 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
         // Use the full org-prefixed entity type for entity operations
         const fullEntityType = entityType;
 
-        // Get the update function and update the row's status
+        // Get the update function and update the row's field value
         const updateEntity = getUpdateFunction(fullEntityType as any);
-        await updateEntity(draggedRowId, { status: newStatus });
+        const updateData = { [fieldName]: newValue };
+        await updateEntity(draggedRowId, updateData);
 
-        fileLog.info('🔄 Cross-group move completed via reactive status update', {
+        fileLog.info('🔄 Cross-group move completed via reactive field update', {
           draggedRowId,
-          oldStatus: extractStatusFromGroupId(sourceGroupId),
-          newStatus,
+          fieldName,
+          oldValue: sourceGroupInfo?.value,
+          newValue,
           sourceGroupId,
           targetGroupId,
+          updateData,
           note: 'Row will appear in new group automatically via reactive system'
         });
 
         return true;
       } catch (error) {
-        fileLog.error('❌ Failed to update row status for cross-group move', {
+        fileLog.error('❌ Failed to update row field for cross-group move', {
           draggedRowId,
-          newStatus,
+          fieldName,
+          newValue,
           entityType,
           fullEntityType: entityType,
+          updateData: { [fieldName]: newValue },
           error: error.message
         });
         return false;
@@ -497,6 +515,37 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
     clearFlatRowOrder() {
       tableCore$.flatRowOrder.set([]);
       fileLog.info('🗑️ Flat row order cleared (no persistence)');
+    },
+
+    // Group expansion toggle - delegates to visual state
+    toggleGroupExpansion(groupId: string) {
+      fileLog.info('🎯 Group expansion toggle - calling visual state', { groupId });
+
+      // Get the group config from visual state
+      const groupConfig = visualInputs$?.groupConfig?.get();
+      if (!groupConfig || !groupConfig.expandedGroups) {
+        fileLog.warn('🎯 No group config found, cannot toggle expansion', { groupId });
+        return;
+      }
+
+      // Toggle the expansion state
+      const newExpandedGroups = new Set(groupConfig.expandedGroups);
+      if (newExpandedGroups.has(groupId)) {
+        newExpandedGroups.delete(groupId);
+        fileLog.info('🎯 Group collapsed', { groupId });
+      } else {
+        newExpandedGroups.add(groupId);
+        fileLog.info('🎯 Group expanded', { groupId });
+      }
+
+      // Update the visual state with new expanded groups
+      const newGroupConfig = {
+        ...groupConfig,
+        expandedGroups: newExpandedGroups
+      };
+
+      // Set the new config back to visual state
+      visualInputs$?.groupConfig?.set(newGroupConfig);
     }
   });
 

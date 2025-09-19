@@ -193,6 +193,7 @@ export class BodyRenderer {
       position: relative;
     `;
     dragColumn.dataset.rowId = row.id;
+    dragColumn.dataset.columnId = '__drag_handle';
 
     // Add drag functionality for data rows in both grouped and flat modes
     if (canDragRow) {

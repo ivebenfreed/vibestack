@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xrgbJbu1vEHunbeQrWN3yj5xRyeT7kv2iDsi9RKAfdg6pwe4f4DhgE9Hd6osLFz
+\restrict 8hy4Zzu8OdW2kFUxxwkoOPX38caEYoUXq1qFEip21uzmYMSBJItTI90Z9P8x2sz
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -729,7 +729,7 @@ d2964d1e-e5ba-4c9f-aa34-772e85b8d57a	01920000-1000-7000-8000-000000000001	2025-0
 e626c888-608f-41f0-9823-940945972ee2	01920000-1000-7000-8000-000000000001	2025-09-11 21:44:32.896	2025-09-11 21:44:32.896	Test Project with Collections	Testing automatic collection creation fix	high	active	\N	\N	\N	0	\N	\N
 597c2d4c-8d83-41a0-9943-01de8db09aa0	01920000-1000-7000-8000-000000000001	2025-09-11 21:48:06.802	2025-09-11 21:48:06.802	Test Lore Canon Project	Testing automatic lore and canon collection creation	\N	planning	\N	\N	\N	0	\N	\N
 54582251-750a-43c9-91dc-a66265c16872	01920000-1000-7000-8000-000000000001	2025-09-11 21:49:09.594	2025-09-11 21:49:09.594	Auto Collections Test Project	Testing automatic lore and canon collection creation with fixed schema	\N	planning	\N	\N	\N	0	\N	\N
-e5c416f7-576e-4118-9152-6c72fd731d54	01920000-1000-7000-8000-000000000001	2025-09-11 21:50:24.079	2025-09-11 21:51:07.094	Final Collections Test	Testing the fully fixed lore and canon collection creation	\N	planning	\N	\N	\N	0	57b3c595-d7e5-4cde-93a3-7d5006a334e8	4cde515d-41e4-40bc-8838-d54bba679bd6
+e5c416f7-576e-4118-9152-6c72fd731d54	01920000-1000-7000-8000-000000000001	2025-09-11 21:50:24.079	2025-09-18 23:37:22.037	Final Collections Test	Testing the fully fixed lore and canon collection creation	high	planning	\N	\N	\N	0	57b3c595-d7e5-4cde-93a3-7d5006a334e8	4cde515d-41e4-40bc-8838-d54bba679bd6
 \.
 
 
@@ -1279,5 +1279,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xrgbJbu1vEHunbeQrWN3yj5xRyeT7kv2iDsi9RKAfdg6pwe4f4DhgE9Hd6osLFz
+\unrestrict 8hy4Zzu8OdW2kFUxxwkoOPX38caEYoUXq1qFEip21uzmYMSBJItTI90Z9P8x2sz
 

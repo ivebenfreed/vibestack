@@ -145,6 +145,19 @@ export class MouseController {
       const columnId = cellElement.getAttribute('data-column-id');
       const cellId = `${rowId}:${columnId}`;
 
+      // Check if this is a drag handle cell - if so, allow HTML5 drag and drop
+      if (columnId === '__drag_handle') {
+        // Don't track mouse for drag handle cells - allow HTML5 drag and drop
+        this.isDragging = false;
+        this.isTracking = false;
+        this.startPosition = { x: 0, y: 0 };
+        fileLog.info('🖱️ Allowing HTML5 drag for drag handle cell', {
+          cellId,
+          targetElement: target.tagName
+        });
+        return;
+      }
+
       // Detect if click is on an editable element
       // IMPORTANT: Content elements with -editable classes have their own click handlers
       // that call stopPropagation(). We should NOT pass isEditableElement=true for them
