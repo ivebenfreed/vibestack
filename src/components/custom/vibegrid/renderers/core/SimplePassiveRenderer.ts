@@ -122,6 +122,7 @@ export class SimplePassiveRenderer {
   // Focused observers - replacing mega-observer pattern
   private dataObserverDisposer: (() => void) | null = null;
   private visualObserverDisposer: (() => void) | null = null;
+  private columnVisibilityObserverDisposer: (() => void) | null = null;
   private interactionObserverDisposer: (() => void) | null = null;
   private scrollObserverDisposer: (() => void) | null = null;
   private dragSelectionObserverDisposer: (() => void) | null = null;
@@ -358,10 +359,42 @@ export class SimplePassiveRenderer {
       });
     });
 
+    // COLUMN VISIBILITY OBSERVER: Dedicated observer for column visibility changes
+    this.columnVisibilityObserverDisposer = this.visualState.visualInputs$.columnVisibility.onChange(() => {
+
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ COLUMN VISIBILITY: Observers not enabled yet');
+        return;
+      }
+
+      // GUARD: Only render if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('⏸️ COLUMN VISIBILITY: Skipping render during initialization');
+        return;
+      }
+
+      const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
+      const hiddenColumns = Object.entries(columnVisibility).filter(([_, visible]) => visible === false);
+
+      fileLog.info('🎨 Column visibility changed - forcing layout re-render', {
+        hiddenColumnsCount: hiddenColumns.length,
+        hiddenColumns: hiddenColumns.map(([id]) => id)
+      });
+
+      // Force re-render when column visibility changes
+      batch(() => {
+        this.renderHeader();
+        this.renderBody();
+      });
+    });
+
     // VISUAL OBSERVER: Only watches layout changes (columns, viewport dimensions)
     // Track non-scroll visual changes to avoid duplicate renders with scroll observer
     let lastVisualLayout = '';
     this.visualObserverDisposer = observe(() => {
+
       // GUARD: Skip if observers are not enabled yet
       if (!this.observersEnabled) {
         fileLog.debug('⏸️ VISUAL: Observers not enabled yet');
@@ -377,13 +410,25 @@ export class SimplePassiveRenderer {
 
       const visualState = this.visualState.visualState$.get(true);
 
+      // IMPORTANT: Read ALL visual inputs to track changes - this triggers the observer
+      const columnOrder = this.visualState.visualInputs$.columnOrder.get();
+      const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
+      const columnWidths = this.visualState.visualInputs$.columnWidths.get();
+
       // Create a signature of layout-only changes (exclude scroll position)
-      // Include column order in signature to detect reordering
-      const columnOrderSignature = visualState.columnState.columnOrder?.join(',') || '';
-      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}-${columnOrderSignature}`;
+      // Include column order and visibility in signature to detect changes
+      const columnOrderSignature = columnOrder?.join(',') || '';
+      const columnVisibilitySignature = Object.entries(columnVisibility || {})
+        .filter(([_, visible]) => visible === false)  // Only track hidden columns
+        .map(([id]) => id)
+        .sort()
+        .join(',');
+      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}-${columnOrderSignature}-hidden:${columnVisibilitySignature}`;
 
       fileLog.debug('🔍 Visual observer triggered', {
         columnOrderSignature,
+        columnVisibilitySignature,
+        hiddenColumnCount: columnVisibilitySignature.split(',').filter(Boolean).length,
         currentLayoutSignature: layoutSignature,
         previousLayoutSignature: lastVisualLayout,
         columnOrderLength: visualState.columnState.columnOrder?.length || 0,
@@ -1405,6 +1450,10 @@ export class SimplePassiveRenderer {
     if (this.visualObserverDisposer) {
       this.visualObserverDisposer();
       this.visualObserverDisposer = null;
+    }
+    if (this.columnVisibilityObserverDisposer) {
+      this.columnVisibilityObserverDisposer();
+      this.columnVisibilityObserverDisposer = null;
     }
     if (this.interactionObserverDisposer) {
       this.interactionObserverDisposer();

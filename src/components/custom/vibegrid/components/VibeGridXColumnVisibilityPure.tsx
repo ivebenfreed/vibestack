@@ -38,9 +38,15 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
   const isOpen = tableInteraction$.columnVisibilityMenuState.isOpen.get();
   const searchValue = tableInteraction$.columnVisibilityMenuState.searchValue.get();
 
-  // Computed values from visual state
-  const hiddenColumnCount = Object.values(columnVisibility).filter(visible => visible === false).length;
-  const visibleColumnCount = Object.values(columnVisibility).filter(visible => visible !== false).length;
+  // Filter out Legend State internal properties when calculating counts
+  const legendStateInternalKeys = ['value', 'isFromPersist', 'isFromSync', 'changes'];
+  const actualColumnVisibilityEntries = Object.entries(columnVisibility).filter(
+    ([key]) => !legendStateInternalKeys.includes(key)
+  );
+
+  // Computed values from visual state - FIXED VERSION
+  const hiddenColumnCount = actualColumnVisibilityEntries.filter(([_, visible]) => visible === false).length;
+  const visibleColumnCount = actualColumnVisibilityEntries.filter(([_, visible]) => visible !== false).length;
   
   // Event handlers using observable methods
   const handleOpenChange = React.useCallback((open: boolean) => {
@@ -111,7 +117,9 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
   };
 
   const isColumnVisible = (columnId: string): boolean => {
-    return columnVisibility[columnId] !== false;
+    // Ensure explicit boolean value - treat undefined as true (default visible)
+    const visible = columnVisibility[columnId] === false ? false : true;
+    return visible;
   };
 
   const canHideColumn = (column: Column): boolean => {
@@ -135,7 +143,7 @@ export const VibeGridXColumnVisibilityPure = observer(function VibeGridXColumnVi
         <Checkbox
           checked={isVisible}
           disabled={!canHide}
-          onCheckedChange={() => {
+          onCheckedChange={(checked) => {
             if (canHide) {
               handleToggleColumn(column.id);
             }

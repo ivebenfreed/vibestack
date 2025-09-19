@@ -28,6 +28,39 @@ import type { GroupRowOrderConfig } from './data-state';
 
 const persistLog = log('vibegrid/simple-persistence');
 
+// Storage size management
+const MAX_STORAGE_SIZE = 1024 * 1024 * 2; // 2MB limit for safety
+const ROW_ORDER_LIMIT = 1000; // Limit row orders to prevent bloat
+
+function checkStorageSize(key: string): boolean {
+  try {
+    const data = localStorage.getItem(key);
+    if (data && data.length > MAX_STORAGE_SIZE) {
+      persistLog.warn('🚨 Storage approaching quota limit', {
+        key,
+        size: data.length,
+        limit: MAX_STORAGE_SIZE
+      });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    persistLog.error('❌ Storage size check failed', { key, error });
+    return false;
+  }
+}
+
+function limitRowOrders(rowOrder: string[]): string[] {
+  if (rowOrder.length > ROW_ORDER_LIMIT) {
+    persistLog.warn('🚨 Row order truncated to prevent storage bloat', {
+      original: rowOrder.length,
+      limited: ROW_ORDER_LIMIT
+    });
+    return rowOrder.slice(0, ROW_ORDER_LIMIT);
+  }
+  return rowOrder;
+}
+
 // Configure global persistence plugin using configureSynced (Method 3)
 const persistOptions = configureSynced({
   persist: {
@@ -190,20 +223,34 @@ export function createVibeGridPreferences(entityType: string) {
           return;
         }
 
+        // Limit row order size to prevent storage bloat
+        const limitedRowOrder: GroupRowOrderConfig = {
+          ...rowOrder,
+          rowIds: limitRowOrders(rowOrder.rowIds)
+        };
+
         const current = preferences$.groupRowOrders.get();
         preferences$.groupRowOrders.set({
           ...current,
-          [groupId]: rowOrder
+          [groupId]: limitedRowOrder
         });
         preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('📋 Group row order saved', { groupId, rowCount: rowOrder.rowIds.length });
+        persistLog.debug('📋 Group row order saved', {
+          groupId,
+          originalCount: rowOrder.rowIds.length,
+          savedCount: limitedRowOrder.rowIds.length
+        });
       },
 
       // Update flat row order (ungrouped mode)
       setFlatRowOrder(rowOrder: string[]) {
-        preferences$.flatRowOrder.set(rowOrder);
+        const limitedRowOrder = limitRowOrders(rowOrder);
+        preferences$.flatRowOrder.set(limitedRowOrder);
         preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('📋 Flat row order saved', { rowCount: rowOrder.length });
+        persistLog.debug('📋 Flat row order saved', {
+          originalCount: rowOrder.length,
+          savedCount: limitedRowOrder.length
+        });
       },
 
       // Clear all row ordering (useful when switching modes)
@@ -284,6 +331,40 @@ export function createVibeGridPreferences(entityType: string) {
         const storageKey = `vibegrid-simple-${entityType}`;
         localStorage.removeItem(storageKey);
         persistLog.info('🗑️ Persistence cleared', { entityType, storageKey });
+      },
+
+      // Emergency cleanup for quota exceeded errors
+      emergencyCleanup() {
+        const storageKey = `vibegrid-simple-${entityType}`;
+        try {
+          // Clear large data arrays that might be causing bloat
+          const currentPrefs = preferences$.get();
+          const cleanedPrefs = {
+            ...currentPrefs,
+            groupRowOrders: {}, // Clear all row orders
+            flatRowOrder: [], // Clear flat order
+            selectedCells: [] // Clear selections
+          };
+
+          // Try to save cleaned version
+          localStorage.setItem(storageKey, JSON.stringify(cleanedPrefs));
+
+          // Update observables
+          preferences$.groupRowOrders.set({});
+          preferences$.flatRowOrder.set([]);
+          preferences$.selectedCells.set([]);
+          preferences$.lastUpdated.set(new Date().toISOString());
+
+          persistLog.info('🧹 Emergency cleanup completed', {
+            entityType,
+            storageKey,
+            clearedArrays: ['groupRowOrders', 'flatRowOrder', 'selectedCells']
+          });
+        } catch (error) {
+          persistLog.error('❌ Emergency cleanup failed', { entityType, error });
+          // Last resort: clear everything
+          localStorage.removeItem(storageKey);
+        }
       }
     }
   };
