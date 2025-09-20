@@ -123,6 +123,7 @@ export class SimplePassiveRenderer {
   private dataObserverDisposer: (() => void) | null = null;
   private visualObserverDisposer: (() => void) | null = null;
   private columnVisibilityObserverDisposer: (() => void) | null = null;
+  private columnOrderObserverDisposer: (() => void) | null = null;
   private interactionObserverDisposer: (() => void) | null = null;
   private scrollObserverDisposer: (() => void) | null = null;
   private dragSelectionObserverDisposer: (() => void) | null = null;
@@ -390,10 +391,56 @@ export class SimplePassiveRenderer {
       });
     });
 
+    // COLUMN ORDER OBSERVER: Dedicated observer for column order changes (like column visibility)
+    this.columnOrderObserverDisposer = this.visualState.visualInputs$.columnOrder.onChange(() => {
+      fileLog.info('🔄 COLUMN ORDER CHANGE DETECTED via dedicated observer', {
+        observersEnabled: this.observersEnabled,
+        timestamp: Date.now()
+      });
+
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('⏸️ COLUMN ORDER: Observers not enabled yet');
+        return;
+      }
+
+      // GUARD: Only render if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('⏸️ COLUMN ORDER: Skipping render during initialization');
+        return;
+      }
+
+      const columnOrder = this.visualState.visualInputs$.columnOrder.get();
+
+      fileLog.info('🎨 Column order changed - forcing layout re-render', {
+        columnOrderLength: columnOrder.length,
+        columnOrder: columnOrder
+      });
+
+      // Force re-render when column order changes
+      batch(() => {
+        this.renderHeader();
+        this.renderBody();
+      });
+    });
+
     // VISUAL OBSERVER: Only watches layout changes (columns, viewport dimensions)
     // Track non-scroll visual changes to avoid duplicate renders with scroll observer
     let lastVisualLayout = '';
+
+    fileLog.info('🎯 CREATING VISUAL OBSERVER', {
+      visualStateExists: !!this.visualState,
+      visualInputsExists: !!this.visualState?.visualInputs$,
+      columnOrderExists: !!this.visualState?.visualInputs$?.columnOrder,
+      observersEnabled: this.observersEnabled
+    });
+
     this.visualObserverDisposer = observe(() => {
+      fileLog.info('🔍 VISUAL OBSERVER CALLBACK ENTERED', {
+        observersEnabled: this.observersEnabled,
+        timestamp: Date.now()
+      });
 
       // GUARD: Skip if observers are not enabled yet
       if (!this.observersEnabled) {
@@ -429,15 +476,17 @@ export class SimplePassiveRenderer {
         .join(',');
       const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}-${columnOrderSignature}-hidden:${columnVisibilitySignature}-widths:${columnWidthsSignature}`;
 
-      fileLog.debug('🔍 Visual observer triggered', {
+      fileLog.info('🔍 VISUAL OBSERVER TRIGGERED', {
         columnOrderSignature,
+        columnOrder: columnOrder,
         columnVisibilitySignature,
         columnWidthsSignature,
         hiddenColumnCount: columnVisibilitySignature.split(',').filter(Boolean).length,
         currentLayoutSignature: layoutSignature,
         previousLayoutSignature: lastVisualLayout,
         columnOrderLength: visualState.columnState.columnOrder?.length || 0,
-        willTriggerRender: layoutSignature !== lastVisualLayout
+        willTriggerRender: layoutSignature !== lastVisualLayout,
+        visualStateColumnOrder: visualState.columnState.columnOrder
       });
 
       // Only render if actual layout changed, not just scroll position
@@ -789,7 +838,11 @@ export class SimplePassiveRenderer {
 
             // Enable observers after initialization is complete
             this.observersEnabled = true;
-            fileLog.info('🔄 Observers enabled after initialization');
+            fileLog.info('🔄 OBSERVERS ENABLED after initialization', {
+              observersEnabled: this.observersEnabled,
+              timestamp: Date.now(),
+              visualObserverExists: !!this.visualObserverDisposer
+            });
 
             fileLog.info('✅ Post-initialization complete');
           });
@@ -1460,6 +1513,10 @@ export class SimplePassiveRenderer {
     if (this.columnVisibilityObserverDisposer) {
       this.columnVisibilityObserverDisposer();
       this.columnVisibilityObserverDisposer = null;
+    }
+    if (this.columnOrderObserverDisposer) {
+      this.columnOrderObserverDisposer();
+      this.columnOrderObserverDisposer = null;
     }
     if (this.interactionObserverDisposer) {
       this.interactionObserverDisposer();

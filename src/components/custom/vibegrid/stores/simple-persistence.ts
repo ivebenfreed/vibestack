@@ -194,15 +194,37 @@ export interface VibeGridPreferences {
 
 // Factory function to create isolated preferences store for each VibeGrid instance
 export function createVibeGridPreferences(entityType: string, orgId?: string) {
+  // CRITICAL FIX: Extract base entity name if entityType already has org prefix
+  // This prevents double orgId in storage keys like "vibegrid-simple-org1_org1_entity"
+  let baseEntityType = entityType;
+
+  // Check if entityType already contains an org prefix (from EntityNameUtils.ensureOrgPrefix)
+  if (entityType.includes('_') && entityType.length > 36) {
+    const parts = entityType.split('_');
+    const firstPart = parts[0];
+
+    // If first part looks like a UUID (36 chars with dashes), extract just the entity name
+    if (firstPart.length === 36 && firstPart.includes('-')) {
+      baseEntityType = parts.slice(1).join('_');
+      persistLog.info('🔧 Extracted base entity type from prefixed entityType', {
+        originalEntityType: entityType,
+        extractedOrgId: firstPart,
+        baseEntityType,
+        providedOrgId: orgId
+      });
+    }
+  }
+
   // Normalize entityType to URL format for consistent localStorage keys
   // This handles cases where entityType might be PascalCase (WorkTask) vs URL format (work-task)
-  const normalizedEntityType = entityType
+  const normalizedEntityType = baseEntityType
     .replace(/([A-Z])/g, '-$1')  // Convert PascalCase to kebab-case
     .toLowerCase()
     .replace(/^-/, '');          // Remove leading dash
 
   persistLog.info('🎯 Creating simple VibeGrid preferences store', {
     entityType,
+    baseEntityType,
     normalizedEntityType,
     orgId
   });
@@ -793,7 +815,23 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
 // Utility to inspect what's saved in localStorage for debugging
 export function inspectVibeGridPersistence(entityType: string, orgId?: string) {
   // Apply the same normalization as createVibeGridPreferences
-  const normalizedEntityType = entityType
+
+  // CRITICAL FIX: Extract base entity name if entityType already has org prefix
+  // This prevents double orgId in storage keys like "vibegrid-simple-org1_org1_entity"
+  let baseEntityType = entityType;
+
+  // Check if entityType already contains an org prefix (from EntityNameUtils.ensureOrgPrefix)
+  if (entityType.includes('_') && entityType.length > 36) {
+    const parts = entityType.split('_');
+    const firstPart = parts[0];
+
+    // If first part looks like a UUID (36 chars with dashes), extract just the entity name
+    if (firstPart.length === 36 && firstPart.includes('-')) {
+      baseEntityType = parts.slice(1).join('_');
+    }
+  }
+
+  const normalizedEntityType = baseEntityType
     .replace(/([A-Z])/g, '-$1')
     .toLowerCase()
     .replace(/^-/, '');

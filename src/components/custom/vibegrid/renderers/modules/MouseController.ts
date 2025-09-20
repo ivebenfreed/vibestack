@@ -45,6 +45,9 @@ export class MouseController {
   private dragRowId: string | null = null;
   private dragRowGroupId: string | null = null;
 
+  // Column resize state
+  private isColumnResize = false;
+
   // Event listeners for cleanup
   private eventListeners: Array<{
     element: EventTarget;
@@ -108,6 +111,7 @@ export class MouseController {
     this.isRowDrag = false;
     this.dragRowId = null;
     this.dragRowGroupId = null;
+    this.isColumnResize = false;
 
     // Provide immediate visual feedback on mouse down
     const target = e.target as HTMLElement;
@@ -122,7 +126,33 @@ export class MouseController {
       parentClassName: target.parentElement?.className
     });
 
-    // Check for column header drag first
+    // Check for column resize handle first (highest priority)
+    const resizeHandle = target.closest('.vibegridx-resize-handle');
+    if (resizeHandle) {
+      const headerElement = resizeHandle.closest('[data-column-id]');
+      const columnId = headerElement?.getAttribute('data-column-id');
+      if (columnId) {
+        this.isColumnResize = true;
+        // Get initial column width from the visual state
+        const columnWidths = this.visualState.visualInputs$.columnWidths.get();
+        const initialWidth = columnWidths[columnId] || 150; // Default width
+
+        // Delegate to interaction state following the proper pattern
+        this.tableInteraction$.startColumnResize(columnId, e.clientX, initialWidth);
+
+        fileLog.info('📏 Column resize handle mouse down', {
+          columnId,
+          initialWidth,
+          element: resizeHandle.tagName
+        });
+
+        // Prevent default to avoid text selection during resize
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Check for column header drag second
     const headerElement = target.closest('[data-column-id]:not([data-row-id])');
     if (headerElement) {
       const columnId = headerElement.getAttribute('data-column-id');
@@ -241,6 +271,12 @@ export class MouseController {
       return;
     }
 
+    // Handle column resize immediately (no threshold needed)
+    if (this.isColumnResize) {
+      this.handleColumnResize(e);
+      return;
+    }
+
     // Calculate distance from start position
     const distance = Math.hypot(
       e.clientX - this.startPosition.x,
@@ -259,7 +295,10 @@ export class MouseController {
         dragRowId: this.dragRowId
       });
 
-      if (this.isColumnDrag && this.dragColumnId) {
+      if (this.isColumnResize) {
+        // Handle column resize (no drag threshold needed - start immediately)
+        this.handleColumnResize(e);
+      } else if (this.isColumnDrag && this.dragColumnId) {
         // Start column drag
         fileLog.info('🎯 Column drag started', { columnId: this.dragColumnId });
         this.tableInteraction$.isDragging.set(true);
@@ -1203,6 +1242,34 @@ export class MouseController {
         hasOnFlatRowMove: !!this.bodyRenderer?.dragDropManager?.callbacks?.onFlatRowMove
       });
     }
+  }
+
+  /**
+   * Handle column resize during mouse move - delegates to interaction state
+   */
+  private handleColumnResize(e: MouseEvent): void {
+    // Delegate to interaction state following the proper pattern
+    const result = this.tableInteraction$.updateColumnResize(e.clientX);
+
+    if (result) {
+      fileLog.debug('📏 Column resize updated via interaction state', {
+        columnId: result.columnId,
+        newWidth: result.newWidth,
+        mouseX: e.clientX
+      });
+
+      // Update visual state with new width (interaction state calculates the width)
+      const currentWidths = this.visualState.visualInputs$.columnWidths.get();
+      const updatedWidths = {
+        ...currentWidths,
+        [result.columnId]: result.newWidth
+      };
+
+      this.visualState.visualInputs$.columnWidths.set(updatedWidths);
+    }
+
+    // Prevent text selection during resize
+    e.preventDefault();
   }
 
   /**

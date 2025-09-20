@@ -853,8 +853,29 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     groupConfig: GroupConfig | null;
   } {
     try {
+      // CRITICAL FIX: Extract base entity name if entityType already has org prefix
+      // This prevents double orgId in storage keys like "vibegrid-simple-org1_org1_entity"
+      let baseEntityType = entityType;
+
+      // Check if entityType already contains an org prefix (from EntityNameUtils.ensureOrgPrefix)
+      if (entityType.includes('_') && entityType.length > 36) {
+        const parts = entityType.split('_');
+        const firstPart = parts[0];
+
+        // If first part looks like a UUID (36 chars with dashes), extract just the entity name
+        if (firstPart.length === 36 && firstPart.includes('-')) {
+          baseEntityType = parts.slice(1).join('_');
+          fileLog.info('🔧 Extracted base entity type from prefixed entityType during loading', {
+            originalEntityType: entityType,
+            extractedOrgId: firstPart,
+            baseEntityType,
+            providedOrgId: orgId
+          });
+        }
+      }
+
       // Normalize entityType to match localStorage keys
-      const normalizedEntityType = entityType
+      const normalizedEntityType = baseEntityType
         .replace(/([A-Z])/g, '-$1')
         .toLowerCase()
         .replace(/^-/, '');
@@ -864,7 +885,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
 
       if (stored) {
         const parsed = JSON.parse(stored);
-        fileLog.info('✅ INIT: Loading ALL saved preferences from localStorage', {
+        fileLog.info('[PERSIST] ✅ LOADING ALL saved preferences from localStorage', {
           storageKey,
           hasColumnVisibility: !!parsed.columnVisibility,
           hasColumnWidths: !!parsed.columnWidths,
@@ -874,10 +895,24 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
           hasGroupConfig: !!parsed.groupConfig
         });
 
+        // Parse and validate column order with detailed logging
+        const parsedColumnOrder = Array.isArray(parsed.columnOrder) ? parsed.columnOrder : null;
+
+        fileLog.info('[PERSIST] 📋 DETAILED PARSING column order from localStorage', {
+          rawParsedColumnOrder: parsed.columnOrder,
+          parsedColumnOrderType: typeof parsed.columnOrder,
+          parsedColumnOrderIsArray: Array.isArray(parsed.columnOrder),
+          parsedColumnOrderLength: parsed.columnOrder?.length || 0,
+          finalParsedColumnOrder: parsedColumnOrder,
+          finalParsedLength: parsedColumnOrder?.length || 0,
+          firstFewColumns: parsedColumnOrder?.slice(0, 5) || 'none',
+          fullParsedData: parsed
+        });
+
         return {
           columnVisibility: parsed.columnVisibility && typeof parsed.columnVisibility === 'object' ? parsed.columnVisibility : null,
           columnWidths: parsed.columnWidths && typeof parsed.columnWidths === 'object' ? parsed.columnWidths : null,
-          columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : null,
+          columnOrder: parsedColumnOrder,
           sortBy: Array.isArray(parsed.sortBy) ? parsed.sortBy : null,
           filters: Array.isArray(parsed.filters) ? parsed.filters : null,
           groupConfig: parsed.groupConfig && parsed.groupConfig.fields && Array.isArray(parsed.groupConfig.fields) ? {
@@ -912,11 +947,31 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     // Load ALL saved preferences during initialization
     const savedPrefs = this.loadAllSavedPreferences(columns, entityType, orgId);
 
+    // Calculate final values with detailed logging
+    const finalColumnOrder = (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0)
+      ? savedPrefs.columnOrder
+      : columns.map(col => col.id);
+    const defaultColumnOrder = columns.map(col => col.id);
+
+    fileLog.info('[PERSIST] 📋 DETAILED COLUMN ORDER LOADING', {
+      entityType,
+      savedColumnOrderExists: !!savedPrefs.columnOrder,
+      savedColumnOrder: savedPrefs.columnOrder,
+      savedColumnOrderLength: savedPrefs.columnOrder?.length || 0,
+      defaultColumnOrder,
+      defaultColumnOrderLength: defaultColumnOrder.length,
+      finalColumnOrder,
+      finalColumnOrderLength: finalColumnOrder.length,
+      isUsingSavedOrder: !!savedPrefs.columnOrder,
+      savedPrefsKeys: Object.keys(savedPrefs),
+      columnsPassedIn: columns.map(c => c.id)
+    });
+
     return {
       columns,
       columnWidths: savedPrefs.columnWidths || Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
       columnVisibility: savedPrefs.columnVisibility || Object.fromEntries(columns.map(col => [col.id, true])),
-      columnOrder: savedPrefs.columnOrder || columns.map(col => col.id),
+      columnOrder: finalColumnOrder,
       groupConfig: savedPrefs.groupConfig || null,
       sortBy: savedPrefs.sortBy || [],
       filters: savedPrefs.filters || [],
@@ -1016,39 +1071,40 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
    * Reorder columns
    */
   reorderColumns(sourceColumnId: string, targetColumnId: string, insertBefore: boolean = true) {
-    batch(() => {
-      const currentOrder = [...visualInputs$.columnOrder.get()];
-      const sourceIndex = currentOrder.indexOf(sourceColumnId);
-      const targetIndex = currentOrder.indexOf(targetColumnId);
+    const currentOrder = [...visualInputs$.columnOrder.get()];
+    const sourceIndex = currentOrder.indexOf(sourceColumnId);
+    const targetIndex = currentOrder.indexOf(targetColumnId);
 
-      if (sourceIndex === -1 || targetIndex === -1) {
-        fileLog.warn('⚠️ Column reorder failed: column not found', {
-          sourceColumnId,
-          targetColumnId,
-          sourceIndex,
-          targetIndex
-        });
-        return;
-      }
-
-      // Remove source column
-      const [sourceColumn] = currentOrder.splice(sourceIndex, 1);
-
-      // Recalculate target index after removal
-      const adjustedTargetIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
-
-      // Insert at appropriate position
-      const insertIndex = insertBefore ? adjustedTargetIndex : adjustedTargetIndex + 1;
-      currentOrder.splice(insertIndex, 0, sourceColumn);
-
-      visualInputs$.columnOrder.set(currentOrder);
-
-      fileLog.info('🔄 Column reordered', {
+    if (sourceIndex === -1 || targetIndex === -1) {
+      fileLog.warn('⚠️ Column reorder failed: column not found', {
         sourceColumnId,
         targetColumnId,
-        insertBefore,
-        newOrder: currentOrder
+        sourceIndex,
+        targetIndex
       });
+      return;
+    }
+
+    // Remove source column
+    const [sourceColumn] = currentOrder.splice(sourceIndex, 1);
+
+    // Recalculate target index after removal
+    const adjustedTargetIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+
+    // Insert at appropriate position
+    const insertIndex = insertBefore ? adjustedTargetIndex : adjustedTargetIndex + 1;
+    currentOrder.splice(insertIndex, 0, sourceColumn);
+
+    // Direct set without batch() to match toggleSort pattern
+    visualInputs$.columnOrder.set(currentOrder);
+
+    fileLog.info('🔄 Column reordered', {
+      sourceColumnId,
+      targetColumnId,
+      insertBefore,
+      newOrder: currentOrder,
+      beforeOrder: [...visualInputs$.columnOrder.get()],
+      visualInputsState: visualInputs$.get()
     });
   },
 

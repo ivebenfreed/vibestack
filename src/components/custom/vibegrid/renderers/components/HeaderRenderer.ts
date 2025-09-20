@@ -101,6 +101,13 @@ export class HeaderRenderer {
       columnOrderString: (visualStateData.columnState.columnOrder || []).join(',') // Track column order for drag operations
     };
 
+    fileLog.info('🔄 HEADER RENDER STATE CHECK', {
+      currentOrderString: currentRenderState.columnOrderString,
+      lastOrderString: this.lastRenderState?.columnOrderString,
+      orderChanged: this.lastRenderState?.columnOrderString !== currentRenderState.columnOrderString,
+      columnOrder: visualStateData.columnState.columnOrder
+    });
+
     // Skip render if nothing actually changed (Legend State optimization pattern)
     if (this.lastRenderState &&
         this.lastRenderState.columnCount === currentRenderState.columnCount &&
