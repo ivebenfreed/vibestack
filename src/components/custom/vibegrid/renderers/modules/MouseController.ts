@@ -693,14 +693,23 @@ export class MouseController {
             this.tableInteraction$.selectRange(lastSelectedCell, cellId, { rows, columns, columnVisibility });
           } else {
             // No previous selection, just select this cell
-            this.selectionController.selectCell(cellId);
+            this.tableInteraction$.selectedCells.set(new Set([cellId]));
           }
         } else if (e.ctrlKey || e.metaKey) {
           // Ctrl+click: Toggle cell selection (add/remove from current selection)
-          this.selectionController.toggleCellSelection(cellId);
+          const selectedCells = this.tableInteraction$.selectedCells.get();
+          const newSelectedCells = new Set(selectedCells);
+
+          if (newSelectedCells.has(cellId)) {
+            newSelectedCells.delete(cellId);
+          } else {
+            newSelectedCells.add(cellId);
+          }
+
+          this.tableInteraction$.selectedCells.set(newSelectedCells);
         } else {
           // Regular click: Replace selection with this cell
-          this.selectionController.selectCell(cellId);
+          this.tableInteraction$.selectedCells.set(new Set([cellId]));
         }
 
         // Prevent event propagation
