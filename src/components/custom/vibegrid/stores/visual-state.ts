@@ -833,6 +833,43 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
   },
 
   /**
+   * Load saved column visibility from localStorage
+   *
+   * CRITICAL FOR PERSISTENCE: This method is called during createDefaultColumnState()
+   * to ensure saved column visibility preferences are loaded BEFORE default values
+   * are applied. This integration point is essential for column persistence to work.
+   *
+   * 🎯 SUCCESS PATTERN: Load saved preferences during initialization, not after.
+   */
+  loadSavedColumnVisibility(columns: Column[], entityType: string, orgId: string): Record<string, boolean> | null {
+    try {
+      // Normalize entityType to match localStorage keys
+      const normalizedEntityType = entityType
+        .replace(/([A-Z])/g, '-$1')
+        .toLowerCase()
+        .replace(/^-/, '');
+
+      const storageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
+      const stored = localStorage.getItem(storageKey);
+
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.columnVisibility && typeof parsed.columnVisibility === 'object') {
+          fileLog.info('✅ INIT: Loaded column visibility from localStorage during initialization', {
+            storageKey,
+            hiddenColumns: Object.entries(parsed.columnVisibility).filter(([_, visible]) => !visible).map(([id]) => id)
+          });
+          return parsed.columnVisibility;
+        }
+      }
+    } catch (error) {
+      fileLog.warn('⚠️ Failed to load column visibility during init', { error });
+    }
+
+    return null;
+  },
+
+  /**
    * Create default column state
    */
   createDefaultColumnState(
@@ -844,7 +881,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     return {
       columns,
       columnWidths: Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
-      columnVisibility: Object.fromEntries(columns.map(col => [col.id, true])),
+      columnVisibility: this.loadSavedColumnVisibility(columns, entityType, orgId) || Object.fromEntries(columns.map(col => [col.id, true])),
       columnOrder: columns.map(col => col.id),
       groupConfig: null, // Include groupConfig in default state
       // Note: sortBy and filters are preserved from persistence/current state in initializeColumns

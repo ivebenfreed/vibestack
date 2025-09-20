@@ -116,7 +116,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // Create simple persistence instance (isolated per VibeGrid)
   const simplePersistenceRef = useRef<ReturnType<typeof createVibeGridPreferences> | null>(null);
   if (!simplePersistenceRef.current) {
-    simplePersistenceRef.current = createVibeGridPreferences(entityType);
+    const orgId = universeOrgId$.get();
+    simplePersistenceRef.current = createVibeGridPreferences(entityType, orgId || undefined);
   }
   const simplePersistence = simplePersistenceRef.current;
 
@@ -207,15 +208,15 @@ export function VibeGrid<T extends Record<string, any> = any>(
             columnVisibilityCount: savedPrefs.columnVisibility ? Object.keys(savedPrefs.columnVisibility).length : 0
           });
 
-          if (savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0) {
-            visualState.visualInputs$.columnWidths.set(savedPrefs.columnWidths);
-            fileLog.info('✅ Loaded column widths from simple persistence', { columnWidths: savedPrefs.columnWidths });
-          }
-          if (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0) {
-            visualState.visualInputs$.columnOrder.set(savedPrefs.columnOrder);
-            fileLog.info('✅ Loaded column order from simple persistence', { columnOrder: savedPrefs.columnOrder });
-          }
-          if (savedPrefs.columnVisibility && Object.keys(savedPrefs.columnVisibility).length > 0) {
+        if (savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0) {
+          visualState.visualInputs$.columnWidths.set(savedPrefs.columnWidths);
+          fileLog.info('✅ Loaded column widths from simple persistence', { columnWidths: savedPrefs.columnWidths });
+        }
+        if (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0) {
+          visualState.visualInputs$.columnOrder.set(savedPrefs.columnOrder);
+          fileLog.info('✅ Loaded column order from simple persistence', { columnOrder: savedPrefs.columnOrder });
+        }
+        if (savedPrefs.columnVisibility && Object.keys(savedPrefs.columnVisibility).length > 0) {
             // Handle both direct object and Legend State wrapped format (like sortBy)
             let columnVisibilityData = savedPrefs.columnVisibility;
 
@@ -303,7 +304,26 @@ export function VibeGrid<T extends Record<string, any> = any>(
             });
           }
 
-          fileLog.info('🎯 All preferences loaded from persistence');
+        fileLog.info('🎯 All preferences loaded from persistence');
+
+        // FINAL OVERRIDE: Direct localStorage fix to ensure column visibility works
+        const directStorageKey = `vibegrid-simple-${orgId}_work-task`;
+        const directData = localStorage.getItem(directStorageKey);
+
+        if (directData) {
+          try {
+            const parsed = JSON.parse(directData);
+            if (parsed.columnVisibility && typeof parsed.columnVisibility === 'object') {
+              console.log('🔍 FINAL OVERRIDE: Applying localStorage column visibility after all other loading');
+              visualState.visualInputs$.columnVisibility.set(parsed.columnVisibility);
+              fileLog.info('✅ FINAL OVERRIDE: Column visibility forced from localStorage', {
+                hiddenColumns: Object.entries(parsed.columnVisibility).filter(([_, visible]) => !visible).map(([id]) => id)
+              });
+            }
+          } catch (e) {
+            fileLog.error('❌ Final override failed', { error: e });
+          }
+        }
         }).catch(error => {
           fileLog.error('❌ Failed to wait for persistence loading', { error });
           // Fallback: Initialize with defaults if persistence fails

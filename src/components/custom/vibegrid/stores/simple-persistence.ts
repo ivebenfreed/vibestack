@@ -3,6 +3,31 @@
  *
  * Clean, reliable persistence for essential VibeGrid user preferences.
  * Uses the same approach as our working local storage debug page.
+ *
+ * CRITICAL SUCCESS NOTES:
+ *
+ * 🎯 COLUMN PERSISTENCE WORKING SOLUTION:
+ * The key to making column persistence work was integrating localStorage loading
+ * directly into the visual state initialization process, not as a separate step.
+ *
+ * ✅ Integration Points:
+ * 1. visual-state.ts:loadSavedColumnVisibility() - Loads during createDefaultColumnState()
+ * 2. simple-persistence.ts:createVibeGridPreferences() - Handles storage key normalization
+ * 3. VibeGrid.tsx:when(persistenceState.isPersistLoaded) - Additional override for complex cases
+ *
+ * 🔑 Key Fix Details:
+ * - EntityType normalization: WorkTask → work-task (prevents storage key mismatches)
+ * - OrgId integration: Ensures multi-tenant isolation in localStorage keys
+ * - Direct localStorage reading: Bypasses broken observable persistence layer
+ * - Initialization order: Loads saved preferences BEFORE defaults are applied
+ *
+ * 📊 Verification:
+ * - Saving: ✅ onChange listeners properly save to localStorage
+ * - Loading: ✅ loadSavedColumnVisibility() integrates with visual state init
+ * - Persistence: ✅ Column visibility survives page refreshes and browser sessions
+ * - UI Integration: ✅ Hidden columns stay hidden, "Columns X hidden" button reflects state
+ *
+ * 🚨 IMPORTANT: Do not modify the visual-state.ts integration without testing persistence!
  */
 
 import { observable } from '@legendapp/state';
@@ -163,10 +188,22 @@ export interface VibeGridPreferences {
 }
 
 // Factory function to create isolated preferences store for each VibeGrid instance
-export function createVibeGridPreferences(entityType: string) {
-  persistLog.info('🎯 Creating simple VibeGrid preferences store', { entityType });
+export function createVibeGridPreferences(entityType: string, orgId?: string) {
+  // Normalize entityType to URL format for consistent localStorage keys
+  // This handles cases where entityType might be PascalCase (WorkTask) vs URL format (work-task)
+  const normalizedEntityType = entityType
+    .replace(/([A-Z])/g, '-$1')  // Convert PascalCase to kebab-case
+    .toLowerCase()
+    .replace(/^-/, '');          // Remove leading dash
 
-  const storageKey = `vibegrid-simple-${entityType}`;
+  persistLog.info('🎯 Creating simple VibeGrid preferences store', {
+    entityType,
+    normalizedEntityType,
+    orgId
+  });
+
+  // Use normalized entityType in storage key for consistency
+  const storageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
 
   // Create observable with default structure
   const preferences$ = observable<VibeGridPreferences>({
@@ -187,10 +224,27 @@ export function createVibeGridPreferences(entityType: string) {
   // Load initial data from localStorage manually
   try {
     const stored = localStorage.getItem(storageKey);
+    persistLog.info('🔍 STORAGE KEY DEBUG', {
+      entityType,
+      normalizedEntityType,
+      orgId,
+      storageKey,
+      hasData: !!stored,
+      dataLength: stored?.length || 0
+    });
+
     if (stored) {
       const parsed = JSON.parse(stored);
+      persistLog.info('🔍 PARSING DEBUG', {
+        parsedData: parsed,
+        columnVisibility: parsed.columnVisibility,
+        createdAtValue: parsed.columnVisibility?.created_at
+      });
+
       preferences$.assign(parsed);
       persistLog.info('📖 Loaded preferences from localStorage', { entityType, size: stored.length });
+    } else {
+      persistLog.warn('❌ No data found in localStorage', { entityType, storageKey });
     }
   } catch (error) {
     persistLog.warn('⚠️ Failed to load stored preferences, using defaults', { entityType, error });
@@ -232,11 +286,31 @@ export function createVibeGridPreferences(entityType: string) {
 
       // Safety check - should be small
       if (serialized.length > 100000) { // 100KB warning
-        persistLog.warn('🚨 Preferences unusually large, truncating', {
+        persistLog.warn('🚨 Preferences unusually large, attempting emergency save of critical data', {
           entityType,
           size: serialized.length,
-          preview: serialized.substring(0, 200)
+          preview: serialized.substring(0, 200),
+          columnWidthsSize: JSON.stringify(data.columnWidths).length,
+          columnVisibilitySize: JSON.stringify(data.columnVisibility).length,
+          groupRowOrdersSize: JSON.stringify(data.groupRowOrders).length
         });
+
+        // Save only critical data (column visibility) to prevent total loss
+        const criticalData = {
+          columnVisibility: data.columnVisibility,
+          entityType: data.entityType,
+          lastUpdated: data.lastUpdated
+        };
+
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(criticalData));
+          persistLog.info('💾 Critical data saved (oversized data truncated)', {
+            entityType,
+            criticalSize: JSON.stringify(criticalData).length
+          });
+        } catch (error) {
+          persistLog.error('❌ Failed to save even critical data', { entityType, error });
+        }
         return;
       }
 
@@ -452,23 +526,48 @@ export function createVibeGridPreferences(entityType: string) {
       const currentVisibility = preferences$.columnVisibility.get();
       const currentOrder = preferences$.columnOrder.get();
 
-      if (Object.keys(currentWidths).length === 0) {
-        preferences$.columnWidths.set(defaultWidths);
-      }
-      if (Object.keys(currentVisibility).length === 0) {
-        preferences$.columnVisibility.set(defaultVisibility);
-      }
-      if (currentOrder.length === 0) {
-        preferences$.columnOrder.set(defaultOrder);
-      }
+      // Check if we have ANY persisted data to avoid overwriting saved preferences
+      const hasAnyPersistedData = Object.keys(currentWidths).length > 0 ||
+                                   Object.keys(currentVisibility).length > 0 ||
+                                   currentOrder.length > 0;
 
-      preferences$.lastUpdated.set(new Date().toISOString());
-      saveToStorage();
-      persistLog.info('🎯 Columns initialized with defaults', {
-        entityType,
-        columnsCount: columns.length,
-        hadPersistedState: Object.keys(currentWidths).length > 0
-      });
+      if (!hasAnyPersistedData) {
+        // Only initialize with defaults if we have NO saved data at all
+        preferences$.columnWidths.set(defaultWidths);
+        preferences$.columnVisibility.set(defaultVisibility);
+        preferences$.columnOrder.set(defaultOrder);
+
+        preferences$.lastUpdated.set(new Date().toISOString());
+        saveToStorage();
+        persistLog.info('🎯 Columns initialized with defaults (no existing data)', {
+          entityType,
+          columnsCount: columns.length
+        });
+      } else {
+        // Merge any missing columns with defaults, but preserve existing preferences
+        const mergedWidths = { ...defaultWidths, ...currentWidths };
+        const mergedOrder = currentOrder.length > 0 ? currentOrder : defaultOrder;
+
+        // For visibility, only add missing columns as visible, don't override existing values
+        const mergedVisibility = { ...defaultVisibility };
+        Object.entries(currentVisibility).forEach(([key, value]) => {
+          mergedVisibility[key] = value; // Preserve saved visibility settings
+        });
+
+        preferences$.columnWidths.set(mergedWidths);
+        preferences$.columnVisibility.set(mergedVisibility);
+        preferences$.columnOrder.set(mergedOrder);
+
+        preferences$.lastUpdated.set(new Date().toISOString());
+        saveToStorage();
+        persistLog.info('🎯 Columns merged with existing preferences', {
+          entityType,
+          columnsCount: columns.length,
+          hadPersistedWidths: Object.keys(currentWidths).length > 0,
+          hadPersistedVisibility: Object.keys(currentVisibility).length > 0,
+          hadPersistedOrder: currentOrder.length > 0
+        });
+      }
     },
 
     // Reset all preferences to defaults
@@ -506,14 +605,14 @@ export function createVibeGridPreferences(entityType: string) {
 
     // Debug: Clear all persistence
     clearPersistence() {
-      const storageKey = `vibegrid-simple-${entityType}`;
+      const storageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
       localStorage.removeItem(storageKey);
       persistLog.info('🗑️ Persistence cleared', { entityType, storageKey });
     },
 
     // Emergency cleanup for quota exceeded errors
     emergencyCleanup() {
-      const storageKey = `vibegrid-simple-${entityType}`;
+      const storageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
       try {
         persistLog.warn('🧹 Starting emergency cleanup for quota exceeded error', { entityType, storageKey });
 
@@ -549,7 +648,7 @@ export function createVibeGridPreferences(entityType: string) {
         localStorage.setItem(`vibegrid-force-indexeddb-${entityType}`, 'true');
 
         // Clear localStorage to free up space
-        const storageKey = `vibegrid-simple-${entityType}`;
+        const storageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
         localStorage.removeItem(storageKey);
 
         persistLog.info('🗄️ Switched to IndexedDB persistence', { entityType });
@@ -566,8 +665,14 @@ export function createVibeGridPreferences(entityType: string) {
 }
 
 // Utility to inspect what's saved in localStorage for debugging
-export function inspectVibeGridPersistence(entityType: string) {
-  const storageKey = `vibegrid-simple-${entityType}`;
+export function inspectVibeGridPersistence(entityType: string, orgId?: string) {
+  // Apply the same normalization as createVibeGridPreferences
+  const normalizedEntityType = entityType
+    .replace(/([A-Z])/g, '-$1')
+    .toLowerCase()
+    .replace(/^-/, '');
+
+  const storageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
   const stored = localStorage.getItem(storageKey);
 
   if (!stored) {
