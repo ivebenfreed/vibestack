@@ -151,8 +151,8 @@ export interface VibeGridPreferences {
   groupRowOrders: Record<string, GroupRowOrderConfig>;
   flatRowOrder: string[];
 
-  // Viewport state (optional - may not want to persist scroll position)
-  scrollPosition?: { top: number; left: number };
+  // Viewport state (intentionally excluded - scroll position should not persist for better UX)
+  // scrollPosition?: { top: number; left: number };
 
   // Selection state (transient - usually not persisted)
   selectedCells?: string[];
@@ -178,7 +178,7 @@ export function createVibeGridPreferences(entityType: string) {
     groupConfig: null,
     groupRowOrders: {},
     flatRowOrder: [],
-    scrollPosition: { top: 0, left: 0 },
+    // scrollPosition: { top: 0, left: 0 }, // Intentionally excluded for better UX
     selectedCells: [],
     entityType,
     lastUpdated: new Date().toISOString()
@@ -222,7 +222,7 @@ export function createVibeGridPreferences(entityType: string) {
         groupConfig: preferences$.groupConfig.get(),
         groupRowOrders: preferences$.groupRowOrders.get(),
         flatRowOrder: preferences$.flatRowOrder.get(),
-        scrollPosition: preferences$.scrollPosition.get(),
+        // scrollPosition: preferences$.scrollPosition.get(), // Intentionally excluded for better UX
         selectedCells: preferences$.selectedCells.get(),
         entityType: preferences$.entityType.get(),
         lastUpdated: preferences$.lastUpdated.get()
@@ -373,13 +373,13 @@ export function createVibeGridPreferences(entityType: string) {
       });
     },
 
-    // Update scroll position (optional - usually not persisted for UX reasons)
-    setScrollPosition(position: { top: number; left: number }) {
-      preferences$.scrollPosition.set(position);
-      preferences$.lastUpdated.set(new Date().toISOString());
-      saveToStorage();
-      persistLog.debug('📜 Scroll position saved', { position });
-    },
+    // Update scroll position (disabled - scroll position should not persist for better UX)
+    // setScrollPosition(position: { top: number; left: number }) {
+    //   preferences$.scrollPosition.set(position);
+    //   preferences$.lastUpdated.set(new Date().toISOString());
+    //   saveToStorage();
+    //   persistLog.debug('📜 Scroll position saved', { position });
+    // },
 
     // Update selected cells (transient - usually not persisted)
     setSelectedCells(cells: string[]) {
@@ -490,7 +490,7 @@ export function createVibeGridPreferences(entityType: string) {
         groupConfig: null,
         groupRowOrders: {},
         flatRowOrder: [],
-        scrollPosition: { top: 0, left: 0 },
+        // scrollPosition: { top: 0, left: 0 }, // Intentionally excluded for better UX
         selectedCells: [],
         lastUpdated: new Date().toISOString()
       });
@@ -530,7 +530,7 @@ export function createVibeGridPreferences(entityType: string) {
           groupConfig: null,
           groupRowOrders: {},
           flatRowOrder: [],
-          scrollPosition: { top: 0, left: 0 },
+          // scrollPosition: { top: 0, left: 0 }, // Intentionally excluded for better UX
           selectedCells: [],
           entityType,
           lastUpdated: new Date().toISOString()
@@ -589,7 +589,7 @@ export function inspectVibeGridPersistence(entityType: string) {
       hasGroupConfig: !!parsed.groupConfig,
       hasGroupRowOrders: !!parsed.groupRowOrders && Object.keys(parsed.groupRowOrders).length > 0,
       hasFlatRowOrder: !!parsed.flatRowOrder && parsed.flatRowOrder.length > 0,
-      hasScrollPosition: !!parsed.scrollPosition,
+      // hasScrollPosition: !!parsed.scrollPosition, // Intentionally excluded for better UX
       hasSelectedCells: !!parsed.selectedCells && parsed.selectedCells.length > 0
     });
     return parsed;
