@@ -34,6 +34,7 @@ import type { Column, GroupConfig, GroupField } from '../types';
 import type { TableCore$ } from '../stores/data-state';
 import type { TableInteraction$ } from '../stores/interaction-state';
 import { createVibeGridVisualState } from '../stores/visual-state';
+import { formatFieldName } from '../column-defaults';
 
 interface GroupConfigDropdownPureProps {
   tableCore$: TableCore$;
@@ -163,14 +164,33 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
       if (col.id === '__selection' || col.id === 'id' || col.field?.startsWith('__')) {
         return false;
       }
-      
+
       // Only include select and enum fields for grouping
       const cellType = col.cellType || col.type;
       const hasOptions = col.options && col.options.length > 0;
-      const isSelectType = cellType === 'select' || cellType === 'select-multi' || cellType === 'reference-select';
-      
-      // Include if it's explicitly a select type OR has options (indicating enum values)
-      return isSelectType || hasOptions;
+
+      // Check for all single-select types that can be grouped
+      const singleSelectTypes = [
+        'select',
+        'single-select',
+        'reference-select',
+        'user_reference',
+        'entity_reference',
+        'custom_user_reference',
+        'custom_entity_reference',
+        'priority_option',
+        'status_option',
+        'category_option',
+        'task_type_option'
+      ];
+
+      const isSelectType = singleSelectTypes.includes(cellType as string);
+
+      // Exclude multi-select types from grouping
+      const isMultiSelect = cellType === 'select-multi' || cellType === 'multi-select';
+
+      // Include if it's a single-select type OR has options (but not multi-select)
+      return (isSelectType || hasOptions) && !isMultiSelect;
     });
   }, [columns]);
 
@@ -180,7 +200,7 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
 
     const newField: GroupField = {
       field: column.field || column.id,
-      displayName: column.name || column.id
+      displayName: column.label || formatFieldName(column.field || column.id)
     };
 
     const newConfig: GroupConfig = {
@@ -286,18 +306,40 @@ export const GroupConfigDropdownPure = observer(function GroupConfigDropdownPure
         {availableForGrouping.length > 0 && (
           <>
             <DropdownMenuLabel className="text-xs">Group by Field</DropdownMenuLabel>
-            {availableForGrouping.map(column => (
-              <DropdownMenuItem 
-                key={column.id}
-                onClick={() => handleAddGroupField(column.id)}
-                className="flex items-center justify-between"
-              >
-                <span className="text-sm">{column.name || column.id}</span>
-                <Badge variant="outline" className="text-xs">
-                  {column.cellType || column.type || 'select'}
-                </Badge>
-              </DropdownMenuItem>
-            ))}
+            {availableForGrouping.map(column => {
+              // Format the type label for better user understanding
+              const cellType = column.cellType || column.type || 'select';
+              let typeLabel = 'Select';
+
+              if (['user_reference', 'custom_user_reference'].includes(cellType as string)) {
+                typeLabel = 'User';
+              } else if (['entity_reference', 'custom_entity_reference'].includes(cellType as string)) {
+                typeLabel = 'Relationship';
+              } else if (cellType === 'priority_option') {
+                typeLabel = 'Priority';
+              } else if (cellType === 'status_option' || cellType === 'status') {
+                typeLabel = 'Status';
+              } else if (cellType === 'category_option') {
+                typeLabel = 'Category';
+              } else if (cellType === 'task_type_option') {
+                typeLabel = 'Type';
+              } else if (['select', 'single-select', 'reference-select'].includes(cellType as string)) {
+                typeLabel = 'Select';
+              }
+
+              return (
+                <DropdownMenuItem
+                  key={column.id}
+                  onClick={() => handleAddGroupField(column.id)}
+                  className="flex items-center justify-between"
+                >
+                  <span className="text-sm">{column.label || formatFieldName(column.field || column.id)}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {typeLabel}
+                  </Badge>
+                </DropdownMenuItem>
+              );
+            })}
           </>
         )}
 

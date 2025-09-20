@@ -10,6 +10,7 @@ import { observable, computed } from '@legendapp/state';
 import { universeSchema$, universeOrgId$ } from '../observables';
 import { getEntity$ } from '../observables';
 import { log } from '@/logger';
+import { OptionsManager } from '@/legend-state/reference-system/options-manager';
 
 const fileLog = log('legend-state/table-columns');
 
@@ -113,17 +114,151 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
     if (isReferenceField(field.type)) {
       column.referenceType = field.type as any;
       column.type = 'select'; // Reference fields are rendered as selects
-      column.cellType = 'select'; // FIXED: Ensure cellType is set for reference fields
+      column.cellType = field.type; // KEEP ORIGINAL TYPE for proper editor selection
 
-      // System options are deprecated - modern system uses custom fields with enum arrays
+      // Load system options for priority and status fields
+      if (field.type === 'priority_option' || field.type === 'status_option') {
+        const optionType = field.type === 'priority_option' ? 'priority' : 'status';
+        const archetype = entity.archetype || 'task'; // Default to task archetype
 
-      // Infer target entity for entity_reference
-      if (field.type === 'entity_reference') {
-        column.referenceEntity = inferTargetEntity(field.name, entity.archetype);
+        fileLog.info(`🔍 Loading system options for ${field.type}`, {
+          entityName,
+          fieldName: field.name,
+          optionType,
+          archetype
+        });
+
+        const optionSet$ = OptionsManager.getSystemOptions(optionType, archetype);
+        const optionSet = optionSet$.peek();
+
+        fileLog.info(`🔍 System options result for ${field.type}`, {
+          hasOptionSet: !!optionSet,
+          hasOptions: !!(optionSet?.options),
+          optionCount: optionSet?.options?.length || 0,
+          optionSet
+        });
+
+        if (optionSet && optionSet.options) {
+          column.options = optionSet.options.map((opt: any) => ({
+            value: opt.value,
+            label: opt.label,
+            color: opt.color
+          }));
+
+          fileLog.info(`✅ Loaded system options for ${field.type}`, {
+            entityName,
+            fieldName: field.name,
+            archetype,
+            optionCount: column.options.length,
+            options: column.options
+          });
+        } else {
+          fileLog.warn(`⚠️ No system options found for ${field.type}, will load dynamically`, {
+            entityName,
+            fieldName: field.name,
+            optionType,
+            archetype
+          });
+
+          // Mark that this needs dynamic loading via relationship provider
+          column.needsDynamicOptions = true;
+          column.optionType = optionType;
+          column.archetype = archetype;
+        }
       }
 
-      // Auto-detect options for reference fields that should have select options
-      if (shouldDetectOptions(field.name)) {
+      // Handle user_reference fields - load users from the organization
+      if (field.type === 'user_reference' || field.type === 'custom_user_reference') {
+        fileLog.info(`🔍 Loading user options for ${field.type}`, {
+          entityName,
+          fieldName: field.name
+        });
+
+        // Get users from the entity data for now (should ideally load from users table)
+        const users$ = getEntity$('User');
+
+        fileLog.info(`🔍 User entity check`, {
+          hasUsersObservable: !!users$
+        });
+
+        if (users$) {
+          const users = users$.peek();
+
+          fileLog.info(`🔍 Users data check`, {
+            hasUsers: !!users,
+            usersType: typeof users,
+            userCount: users && typeof users === 'object' ? Object.keys(users).length : 0
+          });
+
+          if (users && typeof users === 'object') {
+            const userOptions = Object.values(users).map((user: any) => ({
+              value: user.id,
+              label: user.name || user.email || user.id
+            }));
+
+            if (userOptions.length > 0) {
+              column.options = userOptions;
+
+              fileLog.info(`✅ Loaded user options for ${field.type}`, {
+                entityName,
+                fieldName: field.name,
+                userCount: userOptions.length,
+                options: userOptions.slice(0, 3)
+              });
+            } else {
+              fileLog.warn(`⚠️ No user options created for ${field.type}`, {
+                entityName,
+                fieldName: field.name
+              });
+            }
+          } else {
+            fileLog.warn(`⚠️ No users data available for ${field.type}`, {
+              entityName,
+              fieldName: field.name
+            });
+          }
+        } else {
+          fileLog.warn(`⚠️ No User entity observable for ${field.type}`, {
+            entityName,
+            fieldName: field.name
+          });
+        }
+      }
+
+      // Infer target entity for entity_reference and load options
+      if (field.type === 'entity_reference' || field.type === 'custom_entity_reference') {
+        const targetEntity = inferTargetEntity(field.name, entity.archetype);
+        column.referenceEntity = targetEntity;
+
+        // Load options from the target entity
+        if (targetEntity) {
+          const targetEntity$ = getEntity$(targetEntity);
+          if (targetEntity$) {
+            const targetData = targetEntity$.peek();
+            if (targetData && typeof targetData === 'object') {
+              const entityOptions = Object.values(targetData).map((item: any) => ({
+                value: item.id,
+                label: item.name || item.title || item.id
+              }));
+
+              if (entityOptions.length > 0) {
+                column.options = entityOptions;
+
+                fileLog.info(`✅ Loaded entity options for ${field.type}`, {
+                  entityName,
+                  fieldName: field.name,
+                  targetEntity,
+                  optionCount: entityOptions.length,
+                  options: entityOptions.slice(0, 3)
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Auto-detect options for other reference fields
+      if (!column.options && shouldDetectOptions(field.name)) {
         const detectedOptions = detectColumnOptions(entityName, field.name);
         if (detectedOptions && detectedOptions.length > 0) {
           column.options = detectedOptions;

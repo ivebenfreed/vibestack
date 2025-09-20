@@ -172,7 +172,26 @@ export function createEditor(props: EditorProps): React.ReactElement {
     case 'reference-multi':
       console.log('🔧 createEditor: Creating ReferenceMultiEditor');
       return <ReferenceMultiEditor {...props} />;
-      
+
+    // System option reference types
+    case 'priority_option':
+    case 'status_option':
+    case 'category_option':
+    case 'task_type_option':
+      console.log('🔧 createEditor: Creating SelectEditor for system option type', cellType);
+      return <SelectEditor {...props} />;
+
+    // User and entity reference types
+    case 'user_reference':
+    case 'custom_user_reference':
+      console.log('🔧 createEditor: Creating SelectEditor for user reference', cellType);
+      return <SelectEditor {...props} />;
+
+    case 'entity_reference':
+    case 'custom_entity_reference':
+      console.log('🔧 createEditor: Creating SelectEditor for entity reference', cellType);
+      return <SelectEditor {...props} />;
+
     default:
       // Default to text editor for unknown types
       console.warn(`Unknown cell type: ${cellType}, defaulting to text editor`);

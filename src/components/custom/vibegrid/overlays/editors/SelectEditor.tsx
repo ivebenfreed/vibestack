@@ -22,6 +22,15 @@ export function SelectEditor({
   onCancel,
   relationshipContext
 }: SelectEditorProps) {
+  console.log('📋 SelectEditor: Rendering', {
+    columnId: column.id,
+    cellType: column.cellType || column.type,
+    hasOptions: !!(column.options || column.enumOptions),
+    optionCount: (column.options || column.enumOptions || []).length,
+    hasRelationshipContext: !!relationshipContext,
+    initialValue
+  });
+
   // Convert the old relationshipContext format to the new RelationshipContext
   const newRelationshipContext: RelationshipContext | undefined = relationshipContext ? {
     currentEntity: null, // Will be set by the actual editor call
