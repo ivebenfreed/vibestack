@@ -586,7 +586,6 @@ export function createTableInteraction$(tableCore$?: any) {
      */
     toggleRowCells(rowId: string, visibleColumns: any[]) {
       const currentSelection = tableInteraction$.selectedCells.get();
-      const newSelection = new Set(currentSelection);
 
       const rowCells: string[] = [];
       for (const column of visibleColumns) {
@@ -597,20 +596,19 @@ export function createTableInteraction$(tableCore$?: any) {
       const isRowSelected = rowCells.every(cellId => currentSelection.has(cellId));
 
       if (isRowSelected) {
-        // Deselect row
+        // Deselect row - remove only this row's cells from selection
+        const newSelection = new Set(currentSelection);
         for (const cellId of rowCells) {
           newSelection.delete(cellId);
         }
+        tableInteraction$.selectedCells.set(newSelection);
         fileLog.info('📋 Row cells deselected', { rowId });
       } else {
-        // Select row
-        for (const cellId of rowCells) {
-          newSelection.add(cellId);
-        }
-        fileLog.info('📋 Row cells selected', { rowId });
+        // Select row - clear all previous selections and select only this row
+        const newSelection = new Set(rowCells);
+        tableInteraction$.selectedCells.set(newSelection);
+        fileLog.info('📋 Row cells selected (previous selection cleared)', { rowId });
       }
-
-      tableInteraction$.selectedCells.set(newSelection);
     },
 
     toggleCellSelection(rowId: string, columnId: string, isCtrlKey: boolean = false, isShiftKey: boolean = false) {
