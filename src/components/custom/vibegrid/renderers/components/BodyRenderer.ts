@@ -146,15 +146,21 @@ export class BodyRenderer {
     rowElement.appendChild(rowHeader);
 
     // Add cells with absolute positioning
-    let currentX = adjustedStartX;
+    // CRITICAL FIX: Use actual column layouts from visual state for proper positioning
+    const visualStateData = this.visualState.visualState$.get();
+    const columnLayouts = visualStateData.visibleColumns;
+
     columns.forEach((column, colIndex) => {
-      const cell = this.createCellElement(row, column, colIndex, currentX);
+      // Find the corresponding column layout with actual width and x-offset
+      const layout = columnLayouts.find(l => l.id === column.id);
+      if (!layout) return;
+
+      // Use the layout's xOffset for absolute positioning (already includes cumulative positioning)
+      const cell = this.createCellElement(row, column, colIndex, layout.xOffset);
       rowElement.appendChild(cell);
-      currentX += column.width;
     });
 
     // Use UNIFIED visual state's totalWidth - no duplicate calculation
-    const visualStateData = this.visualState.visualState$.get();
     const totalRowWidth = visualStateData.geometry.totalWidth;
     rowElement.style.width = `${totalRowWidth}px`;
     rowElement.style.minWidth = `${totalRowWidth}px`;

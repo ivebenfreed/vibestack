@@ -792,6 +792,12 @@ export function createTableInteraction$(tableCore$?: any) {
 
     startColumnResize(columnId: string, startX: number, startWidth: number) {
       batch(() => {
+        // Clear any existing selections when starting column resize
+        tableInteraction$.selectedCells.set(new Set());
+        tableInteraction$.editingCell.set(null);
+        tableInteraction$.editValue.set('');
+
+        // Set column resize state
         tableInteraction$.resizingColumn.set(columnId);
         tableInteraction$.resizeStartX.set(startX);
         tableInteraction$.resizeStartWidth.set(startWidth);
@@ -803,7 +809,7 @@ export function createTableInteraction$(tableCore$?: any) {
         });
       });
 
-      fileLog.info('<� Column resize started', { columnId, startX, startWidth });
+      fileLog.info('<� Column resize started, selections cleared', { columnId, startX, startWidth });
     },
 
     updateColumnResize(currentX: number) {

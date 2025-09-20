@@ -98,7 +98,9 @@ export class HeaderRenderer {
       visibleColumnsLength: visualStateData.visibleColumns.length,
       visibleRangeStart: visualStateData.geometry.visibleColumnRange.start,
       visibleRangeEnd: visualStateData.geometry.visibleColumnRange.end,
-      columnOrderString: (visualStateData.columnState.columnOrder || []).join(',') // Track column order for drag operations
+      columnOrderString: (visualStateData.columnState.columnOrder || []).join(','), // Track column order for drag operations
+      // CRITICAL: Track column widths to detect resize changes
+      columnWidthsString: visualStateData.visibleColumns.map(col => `${col.id}:${col.width}`).join(',')
     };
 
     fileLog.info('🔄 HEADER RENDER STATE CHECK', {
@@ -115,7 +117,8 @@ export class HeaderRenderer {
         this.lastRenderState.visibleColumnsLength === currentRenderState.visibleColumnsLength &&
         this.lastRenderState.visibleRangeStart === currentRenderState.visibleRangeStart &&
         this.lastRenderState.visibleRangeEnd === currentRenderState.visibleRangeEnd &&
-        this.lastRenderState.columnOrderString === currentRenderState.columnOrderString) {
+        this.lastRenderState.columnOrderString === currentRenderState.columnOrderString &&
+        this.lastRenderState.columnWidthsString === currentRenderState.columnWidthsString) {
 
       fileLog.debug('🔄 HEADER RENDER SKIPPED - no changes detected', currentRenderState);
       return;
@@ -191,14 +194,12 @@ export class HeaderRenderer {
 
       const headerCell = this.createColumnHeader(column, columnIndex, 0);
 
-      // Use consistent width source - same as what ColumnWidthManager uses
-      const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
-
-      // Position at xOffset from visual state (already includes drag + row header columns)
+      // CRITICAL FIX: Use column layout's width and offset for consistency
+      // This ensures header cells match body cells exactly
       headerCell.style.position = 'absolute';
       headerCell.style.left = `${columnLayout.xOffset}px`;
       headerCell.style.top = '0';
-      headerCell.style.width = `${actualWidth}px`;
+      headerCell.style.width = `${columnLayout.width}px`;
       headerCell.style.height = `${HEADER_HEIGHT}px`;
 
       headerRow.appendChild(headerCell);

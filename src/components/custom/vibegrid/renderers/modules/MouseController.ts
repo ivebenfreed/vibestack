@@ -48,6 +48,11 @@ export class MouseController {
   // Column resize state
   private isColumnResize = false;
 
+  // Throttling for resize updates
+  private resizeThrottleTimeout: number | null = null;
+  private lastResizeUpdate: number = 0;
+  private readonly RESIZE_THROTTLE_MS = 16; // ~60fps
+
   // Event listeners for cleanup
   private eventListeners: Array<{
     element: EventTarget;
@@ -471,6 +476,12 @@ export class MouseController {
 
     if (this.isDragging || this.isColumnResize) {
       if (this.isColumnResize) {
+        // Clear any pending throttled update to ensure final state is applied
+        if (this.resizeThrottleTimeout) {
+          window.clearTimeout(this.resizeThrottleTimeout);
+          this.resizeThrottleTimeout = null;
+        }
+
         // Handle column resize completion
         const resizeResult = this.tableInteraction$.endColumnResize();
 
@@ -481,8 +492,24 @@ export class MouseController {
         });
 
         // Apply the final width to visual state
+        fileLog.info('[RESIZE] 📏 Attempting to persist column width', {
+          hasResizeResult: !!resizeResult,
+          columnId: resizeResult?.columnId,
+          newWidth: resizeResult?.newWidth,
+          hasVisualOperations: !!this.visualState?.visualOperations,
+          hasSetColumnWidth: !!this.visualState?.visualOperations?.setColumnWidth
+        });
+
         if (resizeResult?.columnId && resizeResult?.newWidth) {
+          fileLog.info('[RESIZE] 📏 Calling setColumnWidth to persist', {
+            columnId: resizeResult.columnId,
+            newWidth: resizeResult.newWidth
+          });
           this.visualState.visualOperations.setColumnWidth(resizeResult.columnId, resizeResult.newWidth);
+        } else {
+          fileLog.warn('[RESIZE] ⚠️ Cannot persist column width - missing data', {
+            resizeResult
+          });
         }
 
         // CRITICAL FIX: Prevent click event after resize operation (same as drag)
@@ -1288,8 +1315,43 @@ export class MouseController {
         deltaFromStart: e.clientX - this.startPosition.x
       });
 
-      // NOTE: Let SimplePassiveRenderer handle live updates via reactive observer
-      // Visual state will get updated at the end of resize in onMouseUp
+      // CRITICAL: Update visual state LIVE during resize for immediate header updates
+      // This allows the header cells to update their width as the user drags
+      // THROTTLED to avoid excessive re-renders (~60fps)
+      if (result.columnId && result.newWidth && this.visualState?.visualOperations?.setColumnWidth) {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - this.lastResizeUpdate;
+
+        // Clear any pending throttled update
+        if (this.resizeThrottleTimeout) {
+          window.clearTimeout(this.resizeThrottleTimeout);
+          this.resizeThrottleTimeout = null;
+        }
+
+        if (timeSinceLastUpdate >= this.RESIZE_THROTTLE_MS) {
+          // Enough time has passed, update immediately
+          fileLog.info('[RESIZE] 🎨 Updating visual state LIVE (immediate)', {
+            columnId: result.columnId,
+            newWidth: result.newWidth,
+            timeSinceLastUpdate
+          });
+          this.visualState.visualOperations.setColumnWidth(result.columnId, result.newWidth);
+          this.lastResizeUpdate = now;
+        } else {
+          // Too soon, schedule an update
+          const delay = this.RESIZE_THROTTLE_MS - timeSinceLastUpdate;
+          this.resizeThrottleTimeout = window.setTimeout(() => {
+            fileLog.info('[RESIZE] 🎨 Updating visual state LIVE (throttled)', {
+              columnId: result.columnId,
+              newWidth: result.newWidth,
+              delay
+            });
+            this.visualState.visualOperations.setColumnWidth(result.columnId, result.newWidth);
+            this.lastResizeUpdate = Date.now();
+            this.resizeThrottleTimeout = null;
+          }, delay);
+        }
+      }
     }
 
     // Prevent text selection during resize
@@ -1313,6 +1375,12 @@ export class MouseController {
     // Clean up drag preview and drop line
     this.removeDragPreview();
     this.hideDropLine();
+
+    // Clean up any pending resize throttle timeout
+    if (this.resizeThrottleTimeout) {
+      window.clearTimeout(this.resizeThrottleTimeout);
+      this.resizeThrottleTimeout = null;
+    }
 
     // Restore text selection
     this.container.style.userSelect = '';

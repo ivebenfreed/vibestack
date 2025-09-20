@@ -466,6 +466,9 @@ export let visualSyncStatus$: any = null;
  * Create visual operations for a specific VibeGrid instance
  */
 export function createVisualOperations(visualInputs$: any, visualState$: any) {
+  // CRITICAL: Use the instance-specific visualInputs$ passed as parameter
+  // NOT a global one!
+
   return {
 
     /**
@@ -511,13 +514,29 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
    * Update column width - SINGLE MUTATION POINT
    */
   setColumnWidth(columnId: string, width: number) {
+    // CRITICAL: Use the instance-specific visualInputs$ from closure
     const currentWidths = visualInputs$.columnWidths.get();
+    fileLog.info('[RESIZE] 📏 setColumnWidth called - persisting width', {
+      columnId,
+      width,
+      currentWidths,
+      newWidths: {...currentWidths, [columnId]: width},
+      visualInputsId: visualInputs$._id || 'no-id' // Debug: check instance
+    });
+
+    // Direct set without batch() to match reorderColumns pattern
+    // This ensures the visual observer triggers immediately
     visualInputs$.columnWidths.set({
       ...currentWidths,
       [columnId]: width
     });
 
-    fileLog.debug('📏 Column width updated', { columnId, width });
+    fileLog.info('[RESIZE] 📏 Column width updated in visualInputs$ - should trigger visual observer', {
+      columnId,
+      width,
+      updatedWidths: visualInputs$.columnWidths.get(),
+      visualInputsId: visualInputs$._id || 'no-id' // Debug: check instance
+    });
   },
 
   /**

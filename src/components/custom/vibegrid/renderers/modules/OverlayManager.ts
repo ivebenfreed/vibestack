@@ -410,13 +410,33 @@ export class OverlayManager {
    * Update column resize preview
    */
   updateColumnResizePreview(resizeState: any): void {
+    // Only log when there's an actual resize happening
+    if (resizeState?.isResizing) {
+      fileLog.info('[RESIZE] 🎨 OverlayManager.updateColumnResizePreview called', {
+        resizeState,
+        canvasOverlayExists: !!this.canvasOverlay,
+        isInitialized: this.canvasOverlay?.isInitialized
+      });
+    }
+
     // Ensure overlay is initialized
     if (!this.canvasOverlay?.isInitialized) {
+      if (resizeState?.isResizing) {
+        fileLog.info('[RESIZE] 🎨 Initializing overlay for resize preview');
+      }
       this.initializeOverlay();
     }
-    
+
     if (this.canvasOverlay && this.canvasOverlay.isInitialized) {
+      if (resizeState?.isResizing) {
+        fileLog.info('[RESIZE] 🎨 Passing resize state to canvasOverlay');
+      }
       this.canvasOverlay.updateColumnResizePreview(resizeState);
+    } else if (resizeState?.isResizing) {
+      fileLog.warn('[RESIZE] ⚠️ Cannot update resize preview - overlay not ready', {
+        canvasOverlay: !!this.canvasOverlay,
+        isInitialized: this.canvasOverlay?.isInitialized
+      });
     }
   }
   

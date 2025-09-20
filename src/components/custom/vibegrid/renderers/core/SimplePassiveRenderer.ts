@@ -124,6 +124,7 @@ export class SimplePassiveRenderer {
   private visualObserverDisposer: (() => void) | null = null;
   private columnVisibilityObserverDisposer: (() => void) | null = null;
   private columnOrderObserverDisposer: (() => void) | null = null;
+  private columnWidthsObserverDisposer: (() => void) | null = null; // Add dedicated observer for column widths
   private interactionObserverDisposer: (() => void) | null = null;
   private scrollObserverDisposer: (() => void) | null = null;
   private dragSelectionObserverDisposer: (() => void) | null = null;
@@ -425,6 +426,40 @@ export class SimplePassiveRenderer {
       });
     });
 
+    // COLUMN WIDTHS OBSERVER: Dedicated observer for column width changes
+    this.columnWidthsObserverDisposer = this.visualState.visualInputs$.columnWidths.onChange(() => {
+      fileLog.info('[RESIZE] 🔄 COLUMN WIDTH CHANGE DETECTED via dedicated observer', {
+        observersEnabled: this.observersEnabled,
+        timestamp: Date.now()
+      });
+
+      // GUARD: Skip if observers are not enabled yet
+      if (!this.observersEnabled) {
+        fileLog.debug('[RESIZE] ⏸️ COLUMN WIDTHS: Observers not enabled yet');
+        return;
+      }
+
+      // GUARD: Only render if grid is fully initialized
+      const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
+      if (!isFullyInitialized) {
+        fileLog.debug('[RESIZE] ⏸️ COLUMN WIDTHS: Skipping render during initialization');
+        return;
+      }
+
+      const columnWidths = this.visualState.visualInputs$.columnWidths.get();
+
+      fileLog.info('[RESIZE] 🎨 Column widths changed - forcing layout re-render', {
+        columnWidths,
+        columnCount: Object.keys(columnWidths).length
+      });
+
+      // Force re-render when column widths change (same as column order)
+      batch(() => {
+        this.renderHeader();
+        this.renderBody();
+      });
+    });
+
     // VISUAL OBSERVER: Only watches layout changes (columns, viewport dimensions)
     // Track non-scroll visual changes to avoid duplicate renders with scroll observer
     let lastVisualLayout = '';
@@ -455,12 +490,20 @@ export class SimplePassiveRenderer {
         return;
       }
 
-      const visualState = this.visualState.visualState$.get(true);
+      // CRITICAL: Don't use .get(true) here as it bypasses dependency tracking!
+      const visualState = this.visualState.visualState$.get();
 
       // IMPORTANT: Read ALL visual inputs to track changes - this triggers the observer
       const columnOrder = this.visualState.visualInputs$.columnOrder.get();
       const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
       const columnWidths = this.visualState.visualInputs$.columnWidths.get();
+
+      fileLog.info('[RESIZE] 🔍 VISUAL OBSERVER TRIGGERED - columnWidths change detected', {
+        columnWidths,
+        columnOrderLength: columnOrder.length,
+        timestamp: Date.now(),
+        visualInputsId: this.visualState.visualInputs$._id || 'no-id' // Debug: check instance
+      });
 
       // Create a signature of layout-only changes (exclude scroll position)
       // Include column order, visibility, AND widths in signature to detect changes
@@ -486,7 +529,8 @@ export class SimplePassiveRenderer {
         previousLayoutSignature: lastVisualLayout,
         columnOrderLength: visualState.columnState.columnOrder?.length || 0,
         willTriggerRender: layoutSignature !== lastVisualLayout,
-        visualStateColumnOrder: visualState.columnState.columnOrder
+        visualStateColumnOrder: visualState.columnState.columnOrder,
+        columnWidths: columnWidths
       });
 
       // Only render if actual layout changed, not just scroll position
@@ -514,18 +558,24 @@ export class SimplePassiveRenderer {
 
     // INTERACTION OBSERVER: Only watches interaction changes (selection, editing, drag)
     this.interactionObserverDisposer = observe(() => {
-      fileLog.info('[RESIZE] 🔍 INTERACTION OBSERVER ENTRY - checking all interaction state', {
-        observersEnabled: this.observersEnabled,
-        timestamp: Date.now()
-      });
+      // CRITICAL: Use .get(true) to avoid creating dependency when just checking state
+      // We only want to track actual selection, editing, and drag state changes
+      const columnResize = this.tableInteraction$.columnResize.get(true);
+
+      // Only log resize-specific info when actually resizing
+      if (columnResize?.isResizing) {
+        fileLog.info('[RESIZE] 🔍 Column resize active in interaction observer', {
+          observersEnabled: this.observersEnabled,
+          timestamp: Date.now(),
+          columnResizeState: columnResize
+        });
+      }
 
       // GUARD: Skip if observers are not enabled yet
       if (!this.observersEnabled) {
         fileLog.debug('⏸️ INTERACTION: Observers not enabled yet');
         return;
       }
-      // CRITICAL FIX: Remove (true) parameter to enable Legend State dependency tracking
-      const columnResize = this.tableInteraction$.columnResize.get();
       const selectedCells = this.tableInteraction$.selectedCells.get();
       const editingCell = this.tableInteraction$.editingCell.get();
       const editValue = this.tableInteraction$.editValue.get();
@@ -537,18 +587,21 @@ export class SimplePassiveRenderer {
       const dragSelectStart = this.tableInteraction$.dragSelectStart.get();
       const dragSelectCurrent = this.tableInteraction$.dragSelectCurrent.get();
 
-      fileLog.info('[RESIZE] 🖱️ INTERACTION OBSERVER TRIGGERED', {
-        selectedCount: selectedCells.size,
-        isEditing: !!editingCell,
-        isDragging,
-        isDragSelecting,
-        isResizing: !!columnResize?.isResizing,
-        columnResizeDetails: columnResize ? {
-          columnId: columnResize.columnId,
-          newWidth: columnResize.newWidth,
-          isResizing: columnResize.isResizing
-        } : null
-      });
+      // Only log detailed state when something interesting is happening
+      if (isDragging || editingCell || isDragSelecting || columnResize?.isResizing) {
+        fileLog.info('🖱️ INTERACTION OBSERVER TRIGGERED', {
+          selectedCount: selectedCells.size,
+          isEditing: !!editingCell,
+          isDragging,
+          isDragSelecting,
+          isResizing: !!columnResize?.isResizing,
+          columnResizeDetails: columnResize?.isResizing ? {
+            columnId: columnResize.columnId,
+            newWidth: columnResize.newWidth,
+            isResizing: columnResize.isResizing
+          } : null
+        });
+      }
 
       // Only update DOM classes and overlays, no re-renders
       this.updateDOMSelectionClasses(selectedCells);
@@ -1537,6 +1590,10 @@ export class SimplePassiveRenderer {
     if (this.columnOrderObserverDisposer) {
       this.columnOrderObserverDisposer();
       this.columnOrderObserverDisposer = null;
+    }
+    if (this.columnWidthsObserverDisposer) {
+      this.columnWidthsObserverDisposer();
+      this.columnWidthsObserverDisposer = null;
     }
     if (this.interactionObserverDisposer) {
       this.interactionObserverDisposer();
