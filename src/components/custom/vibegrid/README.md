@@ -1,373 +1,382 @@
-# VibeGridX - Complete POC Implementation
+# VibeGrid: High-Performance Hybrid Data Grid
 
-A high-performance data grid component built with XState v5 machines, hybrid rendering, and entity integration for Notion/ClickUp-level performance.
+VibeGrid is a sophisticated data grid component that combines React's declarative UI with direct DOM manipulation for maximum performance. Built on Legend State observables, it implements a **Pure Observable Architecture** for enterprise applications requiring complex data manipulation, real-time synchronization, and extensive customization.
 
-## 🎯 Performance Targets
+## 🚀 Key Features
 
-- **Initial Render**: < 70ms
-- **Cell Updates**: < 0.5ms  
-- **Scroll Performance**: 60+ FPS
-- **Virtual Scrolling**: 1000+ rows with actor lifecycle management
-- **Hardware Acceleration**: Canvas overlays with Konva
+### Performance & Scalability
+- **Virtual Scrolling**: Handle 100,000+ rows at 60fps
+- **Hybrid Rendering**: React for UI controls, direct DOM for table body
+- **Smart Change Detection**: Minimal re-renders using Legend State precision
+- **Memory Management**: Automatic cleanup and element pooling
+
+### Data Management
+- **Real-time Entity Sync**: Direct connection to Legend State entity atoms
+- **Multi-level Grouping**: Hierarchical organization with aggregations
+- **Advanced Filtering**: 12+ operators with type-specific UIs
+- **Multi-column Sorting**: Priority-based sorting with visual indicators
+
+### Interactions
+- **Excel-like Selection**: Cell, row, range, and multi-selection
+- **Inline Editing**: Single-click editing with type-specific editors
+- **Drag & Drop**: Row reordering within/between groups
+- **Keyboard Navigation**: Full arrow key, Tab, Enter support
+
+### Column Management
+- **Dynamic Visibility**: Show/hide with persistent preferences
+- **Interactive Resizing**: Mouse resize with constraints
+- **Column Reordering**: Drag-and-drop rearrangement
+- **Type Safety**: Compile-time validation of field types
 
 ## 🏗️ Architecture Overview
 
-### Three-Layer Architecture
+### Hybrid Rendering Model
 
-1. **XState v5 Machine Layer** - Complex state coordination
-2. **Entity Integration Layer** - Connects to existing domain atoms
-3. **Hybrid Rendering Layer** - React business logic + Direct DOM performance
+```typescript
+// React Layer - Declarative UI shell
+<VibeGrid tableId="tasks" entityType="task" columns={columns}>
+  <VibeGridXHeaderPure />        // React controls & menus
+  <div ref={containerRef} />     // DOM manipulation target
+</VibeGrid>
 
-### Actor Hierarchy
+// DOM Layer - Performance-critical table body
+class SimplePassiveRenderer {
+  createRowElement(): HTMLElement // Direct DOM creation
+  updateOnlyChanged()            // Minimal DOM updates
+}
 
+// Canvas Layer - Pixel-perfect overlays
+class SelectionOverlayDOM {
+  updateWithVisualPositions()    // Precise positioning
+}
 ```
-TableBaseMachine (Orchestrator)
-├── SelectionCoordinator - Multi-cell selection and keyboard navigation
-├── EditCoordinator - Inline editing with optimistic updates
-├── ViewCoordinator - Grouping, sorting, and filtering
-├── DragCoordinator - Drag and drop operations
-└── RowActors (Virtual) - Individual row state management
+
+### Three-Layer State System
+
+```typescript
+// 1. Data State - Entity processing and grouping
+const tableCore$ = observable({
+  processedRows: computed(() => transformAndGroupData()),
+  groupRowOrders: Record<string, string[]>,
+  toggleGroupExpansion: (groupId: string) => void
+});
+
+// 2. Visual State - Layout and positioning (computed)
+const visualState$ = computed((): VisualState => ({
+  columnLayouts: calculateColumnPositions(),
+  geometry: calculateViewportGeometry(),
+  visualRows: applyGroupingAndVirtualization()
+}));
+
+// 3. Interaction State - Selection and editing
+const tableInteraction$ = observable({
+  selectedCells: Set<string>,
+  editingCell: string | null,
+  focusedCell: string | null,
+  isDragging: boolean
+});
 ```
 
 ## 📁 File Structure
 
 ```
-vibegridx/
-├── types.ts                      # Comprehensive TypeScript definitions
-├── VibeGridX.tsx                 # Main React component
-├── index.ts                      # Export API
-│
-├── machines/                     # XState v5 Coordinators
-│   ├── table-machine.ts          # Base orchestrator machine
-│   ├── selection-coordinator.ts  # Selection and keyboard handling
-│   ├── edit-coordinator.ts       # Inline editing with optimistic updates
-│   ├── view-coordinator.ts       # Grouping, sorting, filtering
-│   ├── drag-coordinator.ts       # Drag and drop operations
-│   └── row-actor.ts              # Individual row state management
-│
-├── renderers/                    # Hybrid Rendering System
-│   └── AtomicTableRenderer.ts    # Direct DOM performance layer
-│
-├── integration/                  # Entity Layer
-│   └── EntityIntegration.ts      # Domain atom connectors
-│
-├── virtualization/               # Virtual Scrolling
-│   └── VirtualScrollManager.ts   # Actor lifecycle management
-│
-└── overlays/                     # Canvas Overlays
-    └── CanvasOverlayManager.ts   # Konva hardware acceleration
+src/components/custom/vibegrid/
+├── VibeGrid.tsx                      # Main React component
+├── types.ts                          # Core type definitions
+├── column-types.ts                   # Type-safe column system
+├── stores/                           # Legend State observables
+│   ├── data-state.ts                # Entity data and grouping
+│   ├── visual-state.ts              # Layout and positioning
+│   ├── interaction-state.ts         # Selection and editing
+│   ├── simple-persistence.ts        # LocalStorage sync
+│   └── init-state.ts               # Initialization management
+├── renderers/                        # DOM manipulation
+│   ├── core/SimplePassiveRenderer.ts # Main renderer
+│   ├── components/BodyRenderer.ts    # Row and cell creation
+│   ├── factories/DOMElementFactory.ts # Element creation
+│   └── modules/                      # Specialized controllers
+├── overlays/                         # Canvas-based interactions
+│   ├── SelectionOverlayDOM.ts       # Selection rectangles
+│   ├── ReactiveOverlayManager.tsx   # React overlay coordination
+│   └── editors/                     # Cell editors
+├── components/                       # React UI components
+│   ├── VibeGridXHeaderPure.tsx      # Header with controls
+│   ├── GroupConfigPanel.tsx         # Grouping configuration
+│   └── VibeGridXColumnVisibility.tsx # Column management
+├── utils/                           # Utilities
+├── constants/                       # Shared constants
+└── tests/                          # Component tests
 ```
 
-## 🚀 Usage
+## 🚀 Quick Start
 
 ### Basic Usage
 
-```tsx
-import { VibeGridX } from '@/components/custom/vibegridx';
-
-<VibeGridX
-  entityType="task"
-  height={600}
-  enableVirtualScrolling={true}
-  enableCanvasOverlays={true}
-  enableGrouping={true}
-  enableFiltering={true}
-  onCellClick={(rowId, columnId) => console.log('Cell clicked:', rowId, columnId)}
-  onSelectionChange={(selectedCells) => console.log('Selection:', selectedCells)}
-/>
-```
-
-### Supported Entity Types
-
-- **Tasks** - Full task management with status, priority, assignments
-- **Projects** - Project tracking with timelines, budgets, teams  
-- **Users** - User management with roles, departments, activity
-
-### Configuration Options
-
-```tsx
-interface VibeGridXProps {
-  entityType: 'task' | 'project' | 'user';
-  height?: number;
-  width?: number;
-  
-  // Performance options
-  enableVirtualScrolling?: boolean;
-  enableCanvasOverlays?: boolean;
-  bufferSize?: number;
-  
-  // Feature flags
-  enableGrouping?: boolean;
-  enableFiltering?: boolean;
-  enableSorting?: boolean;
-  enableDragAndDrop?: boolean;
-  
-  // Event handlers
-  onCellClick?: (rowId: string, columnId: string) => void;
-  onCellDoubleClick?: (rowId: string, columnId: string) => void;
-  onSelectionChange?: (selectedCells: Set<string>) => void;
-  onEditingChange?: (editingCell: CellRef | null) => void;
-}
-```
-
-## 🎛️ XState v5 Machines
-
-### TableBaseMachine
-
-The orchestrator machine that:
-- Spawns and manages coordinator actors
-- Routes events to appropriate coordinators
-- Manages entity configuration and visibility
-- Tracks performance metrics
-
-### Coordinator Actors
-
-**SelectionCoordinator**
-- Multi-cell selection (Ctrl+Click, Shift+Click)
-- Spreadsheet-style keyboard navigation
-- Range selection with drag
-- Copy/paste preparation
-
-**EditCoordinator**
-- Inline cell editing with validation
-- Optimistic updates with rollback
-- New row creation workflow
-- Bulk editing mode
-
-**ViewCoordinator**
-- Dynamic grouping by any column
-- Multi-column sorting
-- Advanced filtering with operators
-- Viewport management for virtual scrolling
-
-**DragCoordinator**
-- Row and column reordering
-- Visual drag indicators
-- Drop target validation
-- Constraints system
-
-**RowActor (Virtual)**
-- Individual row state management
-- Optimistic operation tracking
-- Validation error handling
-- Performance metrics per row
-
-## 🔄 Entity Integration
-
-### Domain Adapter Pattern
-
-Connects to existing VibeStack domain atoms:
-
-```tsx
-// Task adapter connects to tasksAtom
-const taskAdapter = createTaskAdapter();
-
-// Provides unified interface
-interface DomainAtomAdapter<T> {
-  getAll: () => Record<string, T>;
-  getById: (id: string) => T | undefined;
-  update: (id: string, updates: Partial<T>) => Promise<void>;
-  create: (data: Omit<T, 'id'>) => Promise<T>;
-  delete: (id: string) => Promise<void>;
-  bulkUpdate: (updates: Array<{id: string; data: Partial<T>}>) => Promise<void>;
-}
-```
-
-### Real-time Sync
-
-- Listens to domain atom changes
-- Optimistic updates with server reconciliation
-- Anti-echo protection
-- Conflict resolution with last-write-wins
-
-## ⚡ Hybrid Rendering
-
-### AtomicTableRenderer
-
-Direct DOM manipulation for performance:
-
 ```typescript
-class AtomicTableRenderer {
-  render(state: RenderState): void;           // Full render
-  updateCell(rowId: string, columnId: string, value: any): void;  // Atomic update
-  setEditingCell(cellRef: CellRef | null): void;    // Edit mode
-  setSelectedCells(selectedCells: Set<string>): void;  // Selection
+import { VibeGrid } from '@/components/custom/vibegrid';
+import type { Column } from '@/components/custom/vibegrid/types';
+
+interface Task {
+  id: string;
+  title: string;
+  status: 'todo' | 'in-progress' | 'done';
+  priority: 'low' | 'medium' | 'high';
+  assignee: string;
+  dueDate: Date;
 }
-```
 
-**Performance Features:**
-- Virtual DOM bypass for cell updates
-- Batch update processing
-- Shape object pooling
-- Throttled scroll events
-- Layer-based rendering optimization
-
-### Canvas Overlays (Optional)
-
-Konva-powered hardware acceleration for:
-- Selection indicators
-- Drag and drop visualizations  
-- Performance-critical overlays
-- Smooth animations
-
-## 🔄 Virtual Scrolling
-
-### Actor Lifecycle Management
-
-```typescript
-class VirtualScrollManager {
-  // Actor pool management
-  private actorManager: ActorLifecycleManager;
-  
-  // Performance optimized viewport
-  handleScroll(scrollTop: number): void;
-  updateVisibleActors(visibleRowIds: string[]): void;
-  
-  // Lifecycle methods
-  getRowActor(rowId: string): ActorRefFrom<any> | null;
-  releaseActor(rowId: string): void;
-}
-```
-
-**Features:**
-- Spawns actors only for visible rows
-- Actor pooling for reuse
-- Buffer zones for smooth scrolling
-- Performance monitoring
-
-## 🎯 Performance Monitoring
-
-### Built-in Metrics
-
-```typescript
-const metrics = vibeGridXRef.current?.getMetrics();
-
-console.log({
-  renderer: {
-    lastRenderTime: 45.2,    // ms
-    visibleRows: 50,
-    cacheSize: { rows: 52, cells: 300 }
+const columns: Column<Task>[] = [
+  {
+    id: 'title',
+    field: 'title',
+    name: 'Task Title',
+    cellType: 'text',
+    width: 300,
+    editable: true
   },
-  machine: {
-    activeActors: 15,
-    optimisticOperations: 3,
-    version: 42
+  {
+    id: 'status',
+    field: 'status',
+    name: 'Status',
+    cellType: 'select',
+    options: [
+      { value: 'todo', label: 'To Do', color: '#6b7280' },
+      { value: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+      { value: 'done', label: 'Done', color: '#10b981' }
+    ]
+  },
+  {
+    id: 'priority',
+    field: 'priority',
+    name: 'Priority',
+    cellType: 'select',
+    width: 120
+  },
+  {
+    id: 'dueDate',
+    field: 'dueDate',
+    name: 'Due Date',
+    cellType: 'date',
+    width: 150
+  }
+];
+
+function TaskTable() {
+  return (
+    <VibeGrid<Task>
+      tableId="task-table"
+      entityType="task"
+      columns={columns}
+      height={600}
+      enableGrouping={true}
+      enableSelectionColumn={true}
+      onEntityUpdate={async (rowId, updates) => {
+        // Handle entity updates
+        await updateTask(rowId, updates);
+      }}
+    />
+  );
+}
+```
+
+### Advanced Configuration
+
+```typescript
+function AdvancedTaskTable() {
+  return (
+    <VibeGrid<Task>
+      tableId="advanced-task-table"
+      entityType="task"
+      columns={columns}
+      height="100vh"
+      width="100%"
+
+      // Performance options
+      enableVirtualScrolling={true}
+      bufferSize={20}
+
+      // Feature toggles
+      enableGrouping={true}
+      enableFiltering={true}
+      enableSorting={true}
+      enableDragAndDrop={true}
+      enableSelectionColumn={true}
+
+      // Event handlers
+      onCellClick={(rowId, columnId) => console.log('Cell clicked', rowId, columnId)}
+      onSelectionChange={(selectedCells) => console.log('Selection changed', selectedCells)}
+      onEntityUpdate={handleEntityUpdate}
+      onBatchEntityUpdate={handleBatchUpdate}
+    />
+  );
+}
+```
+
+## 🔧 Development Guidelines
+
+### State Management Rules
+
+1. **Always use visual operations**, never direct observable mutation:
+```typescript
+// ✅ Correct
+visualState.visualOperations.setColumnWidth(columnId, width);
+visualState.visualOperations.toggleSort(field);
+
+// ❌ Wrong - bypasses reactive system
+visualInputs$.columnWidths.set({...});
+```
+
+2. **Batch related updates** to prevent unnecessary re-renders:
+```typescript
+batch(() => {
+  visualInputs$.scrollLeft.set(scrollLeft);
+  visualInputs$.scrollTop.set(scrollTop);
+});
+```
+
+### DOM Manipulation
+
+1. **Use factories and renderers**, never direct createElement:
+```typescript
+// ✅ Correct
+const row = domFactory.createRowElement(rowData, index);
+const cell = bodyRenderer.createCellElement(row, column);
+
+// ❌ Wrong - bypasses consistent styling
+const row = document.createElement('div');
+```
+
+2. **Leverage the coordinate system** for positioning:
+```typescript
+// ✅ Correct - uses computed geometry
+const geometry = visualState$.get().geometry;
+const cellPosition = getCellPosition(rowIndex, colIndex, geometry);
+
+// ❌ Wrong - manual calculation
+const x = colIndex * 150; // Fragile
+```
+
+### Performance Best Practices
+
+1. **Use computed observables** for derived state:
+```typescript
+const sortedRows$ = computed(() => {
+  const rows = tableCore$.processedRows.get();
+  const sortBy = visualInputs$.sortBy.get();
+  return applySorting(rows, sortBy);
+});
+```
+
+2. **Implement change detection** to avoid unnecessary work:
+```typescript
+observe(() => {
+  const newRows = sortedRows$.get();
+  const changes = detectChanges(previousRows, newRows);
+  if (changes.length > 0) {
+    updateOnlyChangedDOM(changes);
   }
 });
 ```
 
-### Performance Targets
+## 🧪 Testing
 
-- Monitor render times > 50ms
-- Track actor spawn/stop counts
-- Memory usage monitoring  
-- Frame rate tracking during scrolling
-
-## 🧪 Demo Routes
-
-Access comprehensive demos at:
-
-1. **`/debug/vibegridx-demo`** - Interactive POC demonstration
-2. **`/debug/vibegridx-architecture-demo`** - Architecture overview and implementation status
-
-### Demo Features
-
-- Interactive grid simulation
-- Real-time performance metrics
-- Configuration toggles
-- Event logging
-- Architecture visualization
-- Implementation status tracking
-
-## 🔧 Integration Guide
-
-### 1. Connect to Domain Atoms
-
-Replace mock adapters with real domain atom connections:
-
-```tsx
-// In EntityIntegration.ts
-export const createTaskAdapter = (): DomainAtomAdapter => {
-  return {
-    getAll: () => {
-      // Replace with actual domain atom selector
-      return useSelector(tasksAtom, (tasks) => tasks, shallowEqual);
-    },
-    
-    update: async (id: string, updates: any) => {
-      // Replace with actual domain service call
-      await taskService.update(id, updates);
-    },
-    
-    // ... other methods
-  };
-};
-```
-
-### 2. Use VibeGridX
-
-Use VibeGridX for data grid needs:
-
-```tsx
-<VibeGridX entityType="task" height={600} />
-```
-
-### 3. Add Required Dependencies
+### Running Tests
 
 ```bash
-npm install @xstate/react konva
+# Run all VibeGrid tests
+./scripts/playwright-test.sh tests/playwright/vibegrid/
+
+# Run specific test category
+./scripts/playwright-test.sh tests/playwright/vibegrid/01-basic-rendering.spec.js
+./scripts/playwright-test.sh tests/playwright/vibegrid/02-edit-mode-exit-data-validation.spec.js
+./scripts/playwright-test.sh tests/playwright/vibegrid/03-column-operations.spec.js
 ```
 
-### 4. Performance Testing
+### Test Categories
 
-Test with large datasets to validate performance targets:
+1. **Basic Rendering** - Table structure, data loading, virtual scrolling
+2. **Edit Mode & Validation** - Inline editing, data validation, persistence
+3. **Column Operations** - Sorting, resizing, visibility, reordering
+4. **Selection & Interaction** - Cell selection, keyboard navigation, context menus
+5. **Grouping & Aggregation** - Multi-level grouping, drag-and-drop, expansion state
 
-```tsx
-// Generate test data
-const largeTasks = generateMockTasks(10000);
+### MCP Playwright Testing
 
-// Measure performance
-console.time('VibeGridX Initial Render');
-// ... render
-console.timeEnd('VibeGridX Initial Render');
+Use MCP tools for interactive testing during development:
+
+```typescript
+// Navigate to test page
+mcp__playwright__browser_navigate("http://localhost:4000/debug/test-vibegrid-pure");
+
+// Take snapshot of current state
+mcp__playwright__browser_snapshot();
+
+// Click on specific cell
+mcp__playwright__browser_click("Cell in row 1, column title", "e23");
+
+// Verify selection state
+mcp__playwright__browser_take_screenshot("selection-state.png");
 ```
 
-## ✅ Implementation Status
+## 🐛 Debugging
 
-**Complete (Ready for Integration):**
-- ✅ XState v5 Machine Architecture
-- ✅ All Coordinator Actors  
-- ✅ Hybrid Rendering System
-- ✅ Entity Integration Layer
-- ✅ Virtual Scrolling with Actor Management
-- ✅ Canvas Overlay System
-- ✅ Complete TypeScript Support
-- ✅ Demo Routes and Documentation
+### Common Issues
 
-**Next Steps:**
-1. Connect to actual domain atoms
-2. Replace existing grid usage
-3. Performance testing with real data
-4. Add missing npm dependencies
+1. **State not updating**: Check if using visual operations vs direct observable mutation
+2. **Performance degradation**: Monitor RAF usage and DOM mutation counts
+3. **Selection/editing misalignment**: Verify coordinate system calculations
+4. **Persistence not working**: Check Legend State sync configuration
 
-## 🎨 Architecture Benefits
+### Debug Tools
 
-### Performance
-- **Sub-millisecond cell updates** via direct DOM manipulation
-- **Scalable to 10,000+ rows** with virtual scrolling and actor pooling
-- **Hardware acceleration** via optional Canvas overlays
-- **Memory efficient** with actor lifecycle management
+```typescript
+// Enable debug logging
+const fileLog = log('components/VibeGrid');
+fileLog.debug('Current state', visualState$.get());
 
-### Maintainability  
-- **Separation of concerns** via actor-per-concern pattern
-- **Type safety** with comprehensive TypeScript definitions
-- **Testable** XState machines with predictable state transitions
-- **Extensible** adapter pattern for new entity types
+// Use Legend State DevTools (browser extension)
+// Monitor observable changes in real-time
 
-### Developer Experience
-- **Declarative API** similar to existing VibeStack patterns
-- **Hot swappable** coordinators for feature development
-- **Built-in debugging** with XState DevTools integration
-- **Performance monitoring** with real-time metrics
+// Check DOM structure
+console.log('Active rows:', renderer.activeRows.size);
+console.log('Coordinate mapping:', renderer.coordinateMapping);
+```
 
-This POC successfully demonstrates the feasibility of achieving **Notion/ClickUp-level performance** while maintaining React for business logic and integrating seamlessly with existing VibeStack architecture.
+### Common Patterns
+
+**Creating New Features:**
+1. Add types to `types.ts`
+2. Extend visual state if needed
+3. Create DOM factory methods
+4. Add renderer logic
+5. Write Playwright tests
+
+**Debugging Performance:**
+- Check `fileLog.debug()` outputs in browser console
+- Use Legend State DevTools for reactive debugging
+- Monitor RAF usage and DOM mutation counts
+
+**Entity Integration:**
+- Connect via `getEntity$(entityType)`
+- Use reactive `processedRows` computed
+- Handle updates through entity operations
+
+## 🔗 Integration Points
+
+- **Legend State Entities**: Direct reactive connection to entity atoms
+- **DataForge Field System**: Compatible with 25+ DataForge field types
+- **Authentication Context**: Org/user scoped preferences and permissions
+- **WebSocket Sync**: Real-time updates via Durable Objects synchronization
+- **Better Auth**: Multi-tenant user context for personalized views
+
+## 📚 Related Documentation
+
+- [Legend State Documentation](https://legendapp.com/open-source/state/)
+- [DataForge Field Types](../../../server/dataforge/fields/)
+- [Testing Guide](../../../tests/playwright/TESTING-GUIDE.md)
+- [Performance Optimization](./docs/PERFORMANCE.md)
+- [Architecture Deep Dive](./docs/ARCHITECTURE.md)
+
+---
+
+**VibeGrid** represents a sophisticated approach to building high-performance data grids that combines the best aspects of React's declarative model with the raw performance of direct DOM manipulation, all while maintaining type safety, testability, and developer experience through reactive state management.

@@ -578,12 +578,12 @@ rm -rf .playwright/profiles/profile-main/
 
 
 
-## Current Project Focus: Sync Simplification & Legend State
+## Current Project Focus: VibeGrid & Legend State
 
 **Active Development Areas:**
-- **Sync Architecture Simplification**: Moving away from complex WAL-based sync to simpler notification-based approach
-- **Legend State Integration**: Implementing Legend State for reactive state management and sync
-- **UltraTable Improvements**: Enhanced table component with better performance and state management
+- **VibeGrid Pure Observable Architecture**: High-performance data grid with Legend State integration
+- **Hybrid Rendering System**: React + Direct DOM manipulation for optimal performance
+- **Real-time Entity Synchronization**: WebSocket-based sync with Durable Objects
 - **Testing Infrastructure**: Sophisticated test data seeding and multi-org simulation
 
 **Key Planning Documents:**
@@ -591,17 +591,156 @@ rm -rf .playwright/profiles/profile-main/
 - `planning/active/testing-infrastructure/` - Test system improvements
 
 **Component Organization:**
-- **UltraTable**: Restructured from flat files to organized subfolder at `apps/worker/src/components/custom/ultratable/`
-  - Main components: `UltraTable.tsx`, `UltraTableCell.tsx`, `UltraTableEditor.tsx`, `UltraTableSelection.tsx`
-  - Core engine: `core/UltraTableRenderer.ts`, `core/UltraTableDataManager.ts`
-  - Utilities: `utils/clipboard.ts`, `state/selection-state.ts`, `hooks/use-ultra-table-selection.ts`
+- **VibeGrid**: Advanced data grid at `src/components/custom/vibegrid/`
+  - **Architecture**: Hybrid React/DOM with Pure Observable pattern
+  - **State**: `stores/` - Legend State observables (data-state, visual-state, interaction-state)
+  - **Rendering**: `renderers/` - DOM manipulation and React components
+  - **Features**: Virtual scrolling, grouping, sorting, filtering, drag-and-drop
+  - **Testing**: `tests/playwright/vibegrid/` - Comprehensive E2E test suites
+
+## VibeGrid: High-Performance Data Grid Architecture
+
+**VibeGrid** is a sophisticated hybrid React/DOM data grid with Legend State reactive architecture.
+
+### Core Architecture
+
+**Hybrid Rendering Model:**
+```typescript
+// React handles UI shell and controls
+<VibeGrid tableId="tasks" entityType="task" columns={columns}>
+  <VibeGridXHeaderPure />        // React component
+  <div ref={containerRef} />     // DOM manipulation target
+</VibeGrid>
+
+// Direct DOM handles table body performance
+class SimplePassiveRenderer {
+  createRowElement(): HTMLElement // Direct DOM creation
+  updateWithChanges()            // Minimal DOM updates
+}
+```
+
+**Three-Layer State System:**
+```typescript
+// 1. Data State - Entity processing and grouping
+const tableCore$ = observable({
+  processedRows: computed(() => transformData()),
+  groupRowOrders: Record<string, string[]>
+});
+
+// 2. Visual State - Layout and positioning
+const visualState$ = computed(() => ({
+  columnLayouts: ColumnLayout[],
+  geometry: ViewportGeometry
+}));
+
+// 3. Interaction State - Selection and editing
+const tableInteraction$ = observable({
+  selectedCells: Set<string>,
+  editingCell: string | null
+});
+```
+
+### Key Features & Implementation
+
+**Virtual Scrolling with Mixed Row Types:**
+- Handles 100,000+ rows with consistent 60fps
+- Unified VirtualRow system for data, groups, and summaries
+- Smart viewport management with change detection
+
+**Advanced Grouping System:**
+- Multi-level hierarchical grouping
+- Drag-and-drop reordering within/between groups
+- Persistent expansion state with aggregations
+- Cross-group item movement with field updates
+
+**Type-Safe Column System:**
+```typescript
+interface Column<T, K extends keyof T = keyof T> {
+  field: K & string;
+  cellType: FieldTypeToCellType<T[K]>; // Compile-time validation
+}
+```
+
+### Development Guidelines
+
+**When Working with VibeGrid:**
+
+1. **State Changes**: Always use visual operations, never direct observable mutation
+   ```typescript
+   // ✅ Correct
+   visualState.visualOperations.setColumnWidth(columnId, width);
+
+   // ❌ Wrong
+   visualInputs$.columnWidths.set({...});
+   ```
+
+2. **DOM Manipulation**: Use factories and renderers, never direct createElement
+   ```typescript
+   // ✅ Correct
+   const row = domFactory.createRowElement(rowData, index);
+
+   // ❌ Wrong
+   const row = document.createElement('div');
+   ```
+
+3. **Performance**: Batch updates and use RAF for DOM changes
+   ```typescript
+   batch(() => {
+     visualInputs$.scrollLeft.set(scrollLeft);
+     visualInputs$.scrollTop.set(scrollTop);
+   });
+   ```
+
+4. **Testing**: Use MCP Playwright tools for E2E testing
+   ```bash
+   # Run comprehensive test suite
+   ./scripts/playwright-test.sh tests/playwright/vibegrid/
+   ```
+
+### File Structure Guide
+
+```
+src/components/custom/vibegrid/
+├── VibeGrid.tsx                 # Main React component
+├── stores/                      # Legend State observables
+│   ├── data-state.ts           # Entity data and grouping
+│   ├── visual-state.ts         # Layout and positioning
+│   ├── interaction-state.ts    # Selection and editing
+│   └── simple-persistence.ts   # LocalStorage sync
+├── renderers/                   # DOM manipulation
+│   ├── core/SimplePassiveRenderer.ts
+│   ├── components/BodyRenderer.ts
+│   └── factories/DOMElementFactory.ts
+├── overlays/                    # Canvas-based interactions
+├── types.ts                     # Core type definitions
+└── column-types.ts             # Type-safe column system
+```
+
+### Common Patterns
+
+**Creating New Features:**
+1. Add types to `types.ts`
+2. Extend visual state if needed
+3. Create DOM factory methods
+4. Add renderer logic
+5. Write Playwright tests
+
+**Debugging Performance:**
+- Check `fileLog.debug()` outputs in browser console
+- Use Legend State DevTools for reactive debugging
+- Monitor RAF usage and DOM mutation counts
+
+**Entity Integration:**
+- Connect via `getEntity$(entityType)`
+- Use reactive `processedRows` computed
+- Handle updates through entity operations
 
 ## Interaction Protocol Memorization
 
 - Maintain a precise understanding of the interaction flow between components
 - Track message types, data transformations, and sync mechanisms
-- Memorize the nuanced communication patterns in the Elevra architecture
-- Pay special attention to WebSocket message structures and sync protocols
+- Memorize the nuanced communication patterns in the VibeGrid architecture
+- Pay special attention to Legend State observable patterns and DOM coordination
 
 
 ## Test User Credentials

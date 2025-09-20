@@ -181,10 +181,9 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
       // Get entity observable directly like atomic bridge does
       const entityObs = getEntity$(entityType);
 
-      // TODO: These should be provided by visual state integration
-      // For now, use empty arrays as fallback until visual state integration is complete
-      const sortBy: SortConfig[] = [];
-      const filters: FilterConfig[] = [];
+      // Get sorting and filtering from visual state integration
+      const sortBy: SortConfig[] = visualInputs$?.sortBy?.get() || [];
+      const filters: FilterConfig[] = visualInputs$?.filters?.get() || [];
 
       // Get the data from the entity observable
       let data = {};
