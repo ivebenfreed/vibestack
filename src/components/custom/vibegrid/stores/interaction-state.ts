@@ -285,14 +285,13 @@ export function createTableInteraction$(tableCore$?: any) {
         this.setFocusedCell(cellId);
 
         // 2. Handle selection
-        if (!ctrlKey && !shiftKey) {
+        // Ctrl+click is disabled in this system - treat it as regular click
+        if (!shiftKey) {
           this.selectCell(cellId, false);
-        } else if (ctrlKey) {
-          this.selectCell(cellId, true);
         }
 
         // 3. For editable cells, start editing (this is the key missing piece)
-        if (isEditable && !ctrlKey && !shiftKey) {
+        if (isEditable && !shiftKey) {
           // Get the actual cell value for editing
           const [rowId, columnId] = cellId.split(':');
           const processedRows = tableCore$?.processedRows?.get() || [];
@@ -321,7 +320,7 @@ export function createTableInteraction$(tableCore$?: any) {
         isEditable,
         ctrlKey,
         shiftKey,
-        didStartEdit: isEditable && !ctrlKey && !shiftKey
+        didStartEdit: isEditable && !shiftKey
       });
     },
 

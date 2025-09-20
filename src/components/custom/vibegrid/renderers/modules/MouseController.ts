@@ -715,9 +715,9 @@ export class MouseController {
           });
 
           // Handle different click types properly:
-          // Regular click (no modifiers) -> replace selection
-          // Ctrl+click -> toggle row (add/remove from existing selection)
+          // Regular click -> toggle row selection
           // Shift+click -> range selection
+          // Ctrl+click -> disabled (treated as regular click)
           if (e.shiftKey) {
             // Shift+click: Range selection
             const lastRowId = this.selectionController.getLastSelectedRowId();
@@ -726,11 +726,9 @@ export class MouseController {
             } else {
               this.selectionController.selectRow(rowId);
             }
-          } else if (e.ctrlKey || e.metaKey) {
-            // Ctrl+click: Toggle row (add/remove from existing selection)
-            this.selectionController.toggleRowSelection(rowId);
           } else {
-            // Regular checkbox click: Toggle row selection (checkboxes should always toggle)
+            // Regular click or Ctrl+click: Toggle row selection
+            // (Ctrl+click is disabled in this system, treated as regular click)
             this.selectionController.toggleRowSelection(rowId);
           }
         }
