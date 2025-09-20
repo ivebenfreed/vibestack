@@ -12,7 +12,6 @@
 
 import { log } from '@/logger';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
-import { onChange } from '@legendapp/state';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
@@ -105,7 +104,7 @@ export class BodyRenderer {
    * Setup observer to watch selection changes and update checkboxes
    */
   private setupSelectionObserver(): void {
-    this.selectionObserverDisposer = onChange(this.tableInteraction$.selectedCells, () => {
+    this.selectionObserverDisposer = this.tableInteraction$.selectedCells.onChange(() => {
       // Update all row checkboxes when selection changes
       this.updateAllRowCheckboxes();
       fileLog.debug('📦 Checkbox states updated due to selection change');
