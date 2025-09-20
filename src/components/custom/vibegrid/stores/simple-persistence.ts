@@ -16,9 +16,9 @@
  * directly into the visual state initialization process, not as a separate step.
  *
  * ✅ Integration Points:
- * 1. visual-state.ts:loadSavedColumnVisibility() - Loads during createDefaultColumnState()
- * 2. simple-persistence.ts:createVibeGridPreferences() - Handles storage key normalization
- * 3. VibeGrid.tsx:when(persistenceState.isPersistLoaded) - Additional override for complex cases
+ * 1. visual-state.ts:loadAllSavedPreferences() - Loads during createDefaultColumnState()
+ * 2. simple-persistence.ts:createVibeGridPreferences() - Handles saving and storage operations
+ * 3. VibeGrid.tsx:onChange handlers - Trigger saves via operations.setXXX() methods
  *
  * 🔑 Key Fix Details:
  * - EntityType normalization: WorkTask → work-task (prevents storage key mismatches)
@@ -27,10 +27,10 @@
  * - Initialization order: Loads saved preferences BEFORE defaults are applied
  *
  * 📊 Verification:
- * - Saving: ✅ onChange listeners properly save to localStorage
- * - Loading: ✅ loadSavedColumnVisibility() integrates with visual state init
- * - Persistence: ✅ Column visibility survives page refreshes and browser sessions
- * - UI Integration: ✅ Hidden columns stay hidden, "Columns X hidden" button reflects state
+ * - Saving: ✅ onChange listeners properly save to localStorage via operations.setXXX()
+ * - Loading: ✅ loadAllSavedPreferences() integrates with visual state init
+ * - Persistence: ✅ All preferences survive page refreshes and browser sessions
+ * - UI Integration: ✅ Visual state reflects saved preferences correctly
  *
  * 🚨 IMPORTANT: Do not modify the visual-state.ts integration without testing persistence!
  */
@@ -226,154 +226,12 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
     lastUpdated: new Date().toISOString()
   });
 
-  // Load initial data from localStorage manually
-  try {
-    const stored = localStorage.getItem(storageKey);
-    persistLog.info('🔍 STORAGE KEY DEBUG', {
-      entityType,
-      normalizedEntityType,
-      orgId,
-      storageKey,
-      hasData: !!stored,
-      dataLength: stored?.length || 0
-    });
-
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      persistLog.info('🔍 PARSING DEBUG', {
-        parsedData: parsed,
-        columnVisibility: parsed.columnVisibility,
-        createdAtValue: parsed.columnVisibility?.created_at
-      });
-
-      // Defensive filtering during load
-      const filteredData: Partial<VibeGridPreferences> = {
-        entityType: parsed.entityType || entityType,
-        lastUpdated: parsed.lastUpdated || new Date().toISOString()
-      };
-
-      // Filter column widths
-      if (parsed.columnWidths && typeof parsed.columnWidths === 'object') {
-        const filteredColumnWidths: Record<string, number> = {};
-        for (const [key, value] of Object.entries(parsed.columnWidths)) {
-          if (typeof value === 'number' && isFinite(value) && value > 0) {
-            filteredColumnWidths[key] = value;
-          }
-        }
-        filteredData.columnWidths = filteredColumnWidths;
-      } else {
-        filteredData.columnWidths = {};
-      }
-
-      // Filter column order
-      if (Array.isArray(parsed.columnOrder)) {
-        filteredData.columnOrder = parsed.columnOrder.filter(item => typeof item === 'string' && item.length > 0);
-      } else {
-        filteredData.columnOrder = [];
-      }
-
-      // Filter column visibility
-      if (parsed.columnVisibility && typeof parsed.columnVisibility === 'object') {
-        const filteredColumnVisibility: Record<string, boolean> = {};
-        for (const [key, value] of Object.entries(parsed.columnVisibility)) {
-          if (typeof value === 'boolean') {
-            filteredColumnVisibility[key] = value;
-          }
-        }
-        filteredData.columnVisibility = filteredColumnVisibility;
-      } else {
-        filteredData.columnVisibility = {};
-      }
-
-      // Filter sortBy
-      if (Array.isArray(parsed.sortBy)) {
-        filteredData.sortBy = parsed.sortBy.filter(sort =>
-          sort &&
-          typeof sort === 'object' &&
-          typeof sort.field === 'string' &&
-          sort.field.length > 0 &&
-          (sort.direction === 'asc' || sort.direction === 'desc')
-        );
-      } else {
-        filteredData.sortBy = [];
-      }
-
-      // Filter filters
-      if (Array.isArray(parsed.filters)) {
-        filteredData.filters = parsed.filters.filter(filter =>
-          filter &&
-          typeof filter === 'object' &&
-          typeof filter.field === 'string' &&
-          filter.field.length > 0 &&
-          typeof filter.operator === 'string' &&
-          filter.value !== undefined
-        );
-      } else {
-        filteredData.filters = [];
-      }
-
-      // Filter groupConfig (validate structure)
-      if (parsed.groupConfig && typeof parsed.groupConfig === 'object') {
-        const gc = parsed.groupConfig;
-        if (Array.isArray(gc.fields) &&
-            typeof gc.sortBy === 'string' &&
-            typeof gc.sortDirection === 'string' &&
-            Array.isArray(gc.aggregations) &&
-            Array.isArray(gc.expandedGroups)) {
-          filteredData.groupConfig = gc;
-        } else {
-          filteredData.groupConfig = null;
-        }
-      } else {
-        filteredData.groupConfig = null;
-      }
-
-      // Filter groupRowOrders
-      if (parsed.groupRowOrders && typeof parsed.groupRowOrders === 'object') {
-        const filteredGroupRowOrders: Record<string, GroupRowOrderConfig> = {};
-        for (const [key, value] of Object.entries(parsed.groupRowOrders)) {
-          if (value &&
-              typeof value === 'object' &&
-              Array.isArray(value.rowIds) &&
-              value.rowIds.every(id => typeof id === 'string')) {
-            filteredGroupRowOrders[key] = {
-              ...value,
-              rowIds: limitRowOrders(value.rowIds)
-            };
-          }
-        }
-        filteredData.groupRowOrders = filteredGroupRowOrders;
-      } else {
-        filteredData.groupRowOrders = {};
-      }
-
-      // Filter flatRowOrder
-      if (Array.isArray(parsed.flatRowOrder)) {
-        const validRowIds = parsed.flatRowOrder.filter(id => typeof id === 'string' && id.length > 0);
-        filteredData.flatRowOrder = limitRowOrders(validRowIds);
-      } else {
-        filteredData.flatRowOrder = [];
-      }
-
-      // Filter selectedCells
-      if (Array.isArray(parsed.selectedCells)) {
-        filteredData.selectedCells = parsed.selectedCells.filter(cell => typeof cell === 'string' && cell.length > 0);
-      } else {
-        filteredData.selectedCells = [];
-      }
-
-      preferences$.assign(filteredData);
-      persistLog.info('📖 Loaded and filtered preferences from localStorage', {
-        entityType,
-        size: stored.length,
-        filteredKeys: Object.keys(filteredData)
-      });
-    } else {
-      persistLog.warn('❌ No data found in localStorage', { entityType, storageKey });
-    }
-  } catch (error) {
-    persistLog.warn('⚠️ Failed to load stored preferences, using defaults', { entityType, error });
-  }
+  // NOTE: Loading is now handled by visual-state.ts:loadAllSavedPreferences()
+  // during initialization. This ensures loading happens BEFORE defaults are applied.
+  persistLog.info('💾 Preferences store created (loading handled by visual-state)', {
+    entityType,
+    storageKey
+  });
 
   // Manual save function
   const saveToStorage = () => {
