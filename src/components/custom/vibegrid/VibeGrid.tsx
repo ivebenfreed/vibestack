@@ -186,14 +186,19 @@ export function VibeGrid<T extends Record<string, any> = any>(
         const userId = universeUserId$.get();
         if (orgId && userId) {
         // Initialize visual state columns first
-        visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
+        const defaultState = visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
+
+        // Apply loaded preferences to visual inputs (this is where sortBy gets applied!)
+        visualState.visualOperations.applyLoadedPreferencesToVisualInputs(visualState.visualInputs$, defaultState);
 
         // Keep visual state synchronized with tableCore$ observables
         visualState.visualInputs$.columns.set(columns);
 
-        // Wait for Legend State persistence to load, then apply saved preferences
-        const persistenceState = syncState(simplePersistence.preferences$);
-        when(persistenceState.isPersistLoaded).then(() => {
+        // Initialize simple persistence (no async needed since it's manual localStorage)
+        fileLog.info('🔄 Initializing simple persistence directly');
+
+        // Simple persistence loads synchronously from localStorage, so no need to wait
+        {
           fileLog.info('💾 Persistence loaded, applying saved preferences');
 
           // Initialize simple persistence with columns (will check if data already exists)
@@ -306,29 +311,100 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         fileLog.info('🎯 All preferences loaded from persistence');
 
-        // FINAL OVERRIDE: Direct localStorage fix to ensure column visibility works
-        const directStorageKey = `vibegrid-simple-${orgId}_work-task`;
+        fileLog.info('🚀 About to execute FINAL OVERRIDE section');
+        // FINAL OVERRIDE: Direct localStorage loading for all properties (the correct way)
+        // Use the EXACT same logic as createVibeGridPreferences
+        const normalizedEntityType = entityType
+          .replace(/([A-Z])/g, '-$1')
+          .toLowerCase()
+          .replace(/^-/, '');
+        const directStorageKey = orgId ? `vibegrid-simple-${orgId}_${normalizedEntityType}` : `vibegrid-simple-${normalizedEntityType}`;
+
+        fileLog.info('🔍 FINAL OVERRIDE: Storage key computation', {
+          directStorageKey,
+          entityType,
+          normalizedEntityType,
+          orgId,
+          keyExists: !!localStorage.getItem(directStorageKey)
+        });
+
         const directData = localStorage.getItem(directStorageKey);
+        fileLog.info('🔍 FINAL OVERRIDE: localStorage data check', {
+          hasData: !!directData,
+          dataLength: directData?.length || 0
+        });
 
         if (directData) {
           try {
             const parsed = JSON.parse(directData);
+            fileLog.info('🔍 FINAL OVERRIDE: Applying all saved preferences from localStorage', {
+              hasColumnVisibility: !!parsed.columnVisibility,
+              hasColumnWidths: !!parsed.columnWidths,
+              hasColumnOrder: !!parsed.columnOrder,
+              hasSortBy: !!parsed.sortBy,
+              hasFilters: !!parsed.filters,
+              hasGroupConfig: !!parsed.groupConfig
+            });
+
+            // Column visibility
             if (parsed.columnVisibility && typeof parsed.columnVisibility === 'object') {
-              console.log('🔍 FINAL OVERRIDE: Applying localStorage column visibility after all other loading');
               visualState.visualInputs$.columnVisibility.set(parsed.columnVisibility);
-              fileLog.info('✅ FINAL OVERRIDE: Column visibility forced from localStorage', {
+              fileLog.info('✅ FINAL OVERRIDE: Column visibility loaded from localStorage', {
                 hiddenColumns: Object.entries(parsed.columnVisibility).filter(([_, visible]) => !visible).map(([id]) => id)
               });
             }
+
+            // Column widths
+            if (parsed.columnWidths && typeof parsed.columnWidths === 'object') {
+              visualState.visualInputs$.columnWidths.set(parsed.columnWidths);
+              fileLog.info('✅ FINAL OVERRIDE: Column widths loaded from localStorage', {
+                columnCount: Object.keys(parsed.columnWidths).length
+              });
+            }
+
+            // Column order
+            if (parsed.columnOrder && Array.isArray(parsed.columnOrder)) {
+              visualState.visualInputs$.columnOrder.set(parsed.columnOrder);
+              fileLog.info('✅ FINAL OVERRIDE: Column order loaded from localStorage', {
+                columnCount: parsed.columnOrder.length
+              });
+            }
+
+            // Sort configuration
+            if (parsed.sortBy && Array.isArray(parsed.sortBy) && parsed.sortBy.length > 0) {
+              visualState.visualInputs$.sortBy.set(parsed.sortBy);
+              fileLog.info('✅ FINAL OVERRIDE: Sort configuration loaded from localStorage', {
+                sortBy: parsed.sortBy
+              });
+            }
+
+            // Filters
+            if (parsed.filters && Array.isArray(parsed.filters) && parsed.filters.length > 0) {
+              visualState.visualInputs$.filters.set(parsed.filters);
+              fileLog.info('✅ FINAL OVERRIDE: Filters loaded from localStorage', {
+                filterCount: parsed.filters.length
+              });
+            }
+
+            // Group configuration
+            if (parsed.groupConfig && parsed.groupConfig.fields && Array.isArray(parsed.groupConfig.fields) && parsed.groupConfig.fields.length > 0) {
+              // Convert serializable format back to runtime format (arrays to Sets)
+              const runtimeGroupConfig = {
+                ...parsed.groupConfig,
+                expandedGroups: new Set(parsed.groupConfig.expandedGroups || [])
+              };
+              visualState.visualInputs$.groupConfig.set(runtimeGroupConfig);
+              fileLog.info('✅ FINAL OVERRIDE: Group configuration loaded from localStorage', {
+                fieldCount: parsed.groupConfig.fields.length,
+                fields: parsed.groupConfig.fields
+              });
+            }
+
           } catch (e) {
             fileLog.error('❌ Final override failed', { error: e });
           }
         }
-        }).catch(error => {
-          fileLog.error('❌ Failed to wait for persistence loading', { error });
-          // Fallback: Initialize with defaults if persistence fails
-          simplePersistence.operations.initializeColumns(columns);
-        });
+        }
 
         // Note: Emergency clear was successful, removing for normal operation
 
@@ -351,16 +427,20 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         visualState.visualInputs$.columnVisibility.onChange((newVisibility) => {
           try {
+            fileLog.info('🔔 columnVisibility onChange triggered', { newVisibility });
             // Extract the actual value from Legend State wrapper
             const actualVisibility = newVisibility?.value || newVisibility;
+            fileLog.info('🔍 Extracted visibility data', { actualVisibility });
 
             // Only save if it looks like actual visibility data (not entity data)
             const isValidVisibility = actualVisibility && typeof actualVisibility === 'object' &&
               Object.values(actualVisibility).every(v => typeof v === 'boolean');
 
+            fileLog.info('✅ Validation result', { isValidVisibility, keys: Object.keys(actualVisibility || {}).length });
+
             if (isValidVisibility) {
               simplePersistence.operations.setAllColumnVisibility(actualVisibility);
-              fileLog.debug('💾 Saved column visibility to persistence', {
+              fileLog.info('💾 Saved column visibility to persistence', {
                 columnCount: Object.keys(actualVisibility).length
               });
             } else {
@@ -373,8 +453,17 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
 
         visualState.visualInputs$.sortBy.onChange((newSortBy) => {
-          simplePersistence.operations.setSortBy(newSortBy);
-          fileLog.debug('💾 Saved sort configuration to simple persistence', { newSortBy });
+          // Get the actual value from Legend State observable
+          const actualSortBy = visualState.visualInputs$.sortBy.get();
+          fileLog.info('🔔 sortBy onChange triggered', {
+            rawNewSortBy: newSortBy,
+            actualSortBy
+          });
+          simplePersistence.operations.setSortBy(actualSortBy);
+          fileLog.info('💾 Saved sort configuration to simple persistence', {
+            actualSortBy,
+            sortCount: Array.isArray(actualSortBy) ? actualSortBy.length : 0
+          });
         });
 
         // Use a debounced approach to prevent partial saves from rapid updates

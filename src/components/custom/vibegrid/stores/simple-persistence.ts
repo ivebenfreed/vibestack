@@ -4,6 +4,11 @@
  * Clean, reliable persistence for essential VibeGrid user preferences.
  * Uses the same approach as our working local storage debug page.
  *
+ * 🔄 ARCHITECTURE NOTE:
+ * - SAVING: Handled here via operations.setXXX() methods (called from VibeGrid onChange handlers)
+ * - LOADING: Handled in visual-state.ts via loadAllSavedPreferences() during initialization
+ * - This separation ensures loading happens BEFORE defaults are applied, which is critical for persistence
+ *
  * CRITICAL SUCCESS NOTES:
  *
  * 🎯 COLUMN PERSISTENCE WORKING SOLUTION:
@@ -241,8 +246,128 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
         createdAtValue: parsed.columnVisibility?.created_at
       });
 
-      preferences$.assign(parsed);
-      persistLog.info('📖 Loaded preferences from localStorage', { entityType, size: stored.length });
+      // Defensive filtering during load
+      const filteredData: Partial<VibeGridPreferences> = {
+        entityType: parsed.entityType || entityType,
+        lastUpdated: parsed.lastUpdated || new Date().toISOString()
+      };
+
+      // Filter column widths
+      if (parsed.columnWidths && typeof parsed.columnWidths === 'object') {
+        const filteredColumnWidths: Record<string, number> = {};
+        for (const [key, value] of Object.entries(parsed.columnWidths)) {
+          if (typeof value === 'number' && isFinite(value) && value > 0) {
+            filteredColumnWidths[key] = value;
+          }
+        }
+        filteredData.columnWidths = filteredColumnWidths;
+      } else {
+        filteredData.columnWidths = {};
+      }
+
+      // Filter column order
+      if (Array.isArray(parsed.columnOrder)) {
+        filteredData.columnOrder = parsed.columnOrder.filter(item => typeof item === 'string' && item.length > 0);
+      } else {
+        filteredData.columnOrder = [];
+      }
+
+      // Filter column visibility
+      if (parsed.columnVisibility && typeof parsed.columnVisibility === 'object') {
+        const filteredColumnVisibility: Record<string, boolean> = {};
+        for (const [key, value] of Object.entries(parsed.columnVisibility)) {
+          if (typeof value === 'boolean') {
+            filteredColumnVisibility[key] = value;
+          }
+        }
+        filteredData.columnVisibility = filteredColumnVisibility;
+      } else {
+        filteredData.columnVisibility = {};
+      }
+
+      // Filter sortBy
+      if (Array.isArray(parsed.sortBy)) {
+        filteredData.sortBy = parsed.sortBy.filter(sort =>
+          sort &&
+          typeof sort === 'object' &&
+          typeof sort.field === 'string' &&
+          sort.field.length > 0 &&
+          (sort.direction === 'asc' || sort.direction === 'desc')
+        );
+      } else {
+        filteredData.sortBy = [];
+      }
+
+      // Filter filters
+      if (Array.isArray(parsed.filters)) {
+        filteredData.filters = parsed.filters.filter(filter =>
+          filter &&
+          typeof filter === 'object' &&
+          typeof filter.field === 'string' &&
+          filter.field.length > 0 &&
+          typeof filter.operator === 'string' &&
+          filter.value !== undefined
+        );
+      } else {
+        filteredData.filters = [];
+      }
+
+      // Filter groupConfig (validate structure)
+      if (parsed.groupConfig && typeof parsed.groupConfig === 'object') {
+        const gc = parsed.groupConfig;
+        if (Array.isArray(gc.fields) &&
+            typeof gc.sortBy === 'string' &&
+            typeof gc.sortDirection === 'string' &&
+            Array.isArray(gc.aggregations) &&
+            Array.isArray(gc.expandedGroups)) {
+          filteredData.groupConfig = gc;
+        } else {
+          filteredData.groupConfig = null;
+        }
+      } else {
+        filteredData.groupConfig = null;
+      }
+
+      // Filter groupRowOrders
+      if (parsed.groupRowOrders && typeof parsed.groupRowOrders === 'object') {
+        const filteredGroupRowOrders: Record<string, GroupRowOrderConfig> = {};
+        for (const [key, value] of Object.entries(parsed.groupRowOrders)) {
+          if (value &&
+              typeof value === 'object' &&
+              Array.isArray(value.rowIds) &&
+              value.rowIds.every(id => typeof id === 'string')) {
+            filteredGroupRowOrders[key] = {
+              ...value,
+              rowIds: limitRowOrders(value.rowIds)
+            };
+          }
+        }
+        filteredData.groupRowOrders = filteredGroupRowOrders;
+      } else {
+        filteredData.groupRowOrders = {};
+      }
+
+      // Filter flatRowOrder
+      if (Array.isArray(parsed.flatRowOrder)) {
+        const validRowIds = parsed.flatRowOrder.filter(id => typeof id === 'string' && id.length > 0);
+        filteredData.flatRowOrder = limitRowOrders(validRowIds);
+      } else {
+        filteredData.flatRowOrder = [];
+      }
+
+      // Filter selectedCells
+      if (Array.isArray(parsed.selectedCells)) {
+        filteredData.selectedCells = parsed.selectedCells.filter(cell => typeof cell === 'string' && cell.length > 0);
+      } else {
+        filteredData.selectedCells = [];
+      }
+
+      preferences$.assign(filteredData);
+      persistLog.info('📖 Loaded and filtered preferences from localStorage', {
+        entityType,
+        size: stored.length,
+        filteredKeys: Object.keys(filteredData)
+      });
     } else {
       persistLog.warn('❌ No data found in localStorage', { entityType, storageKey });
     }
@@ -253,31 +378,105 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
   // Manual save function
   const saveToStorage = () => {
     try {
-      // Extract only the plain values, not the observable metadata
+      // Extract and filter all values defensively
       const columnWidths = preferences$.columnWidths.get();
       const columnOrder = preferences$.columnOrder.get();
       const columnVisibility = preferences$.columnVisibility.get();
+      const sortBy = preferences$.sortBy.get();
+      const filters = preferences$.filters.get();
+      const groupConfig = preferences$.groupConfig.get();
+      const groupRowOrders = preferences$.groupRowOrders.get();
+      const flatRowOrder = preferences$.flatRowOrder.get();
+      const selectedCells = preferences$.selectedCells.get();
+
+      // Defensive filtering for column widths
+      const filteredColumnWidths: Record<string, number> = {};
+      for (const [key, value] of Object.entries(columnWidths || {})) {
+        if (typeof value === 'number' && isFinite(value) && value > 0) {
+          filteredColumnWidths[key] = value;
+        }
+      }
+
+      // Defensive filtering for column order
+      const filteredColumnOrder = Array.isArray(columnOrder) ?
+        columnOrder.filter(item => typeof item === 'string' && item.length > 0) : [];
+
+      // Defensive filtering for column visibility
+      const filteredColumnVisibility: Record<string, boolean> = {};
+      for (const [key, value] of Object.entries(columnVisibility || {})) {
+        if (typeof value === 'boolean') {
+          filteredColumnVisibility[key] = value;
+        }
+      }
+
+      // Defensive filtering for sortBy
+      const filteredSortBy = Array.isArray(sortBy) ?
+        sortBy.filter(sort =>
+          sort &&
+          typeof sort === 'object' &&
+          typeof sort.field === 'string' &&
+          sort.field.length > 0 &&
+          (sort.direction === 'asc' || sort.direction === 'desc')
+        ) : [];
+
+      // Defensive filtering for filters
+      const filteredFilters = Array.isArray(filters) ?
+        filters.filter(filter =>
+          filter &&
+          typeof filter === 'object' &&
+          typeof filter.field === 'string' &&
+          filter.field.length > 0 &&
+          typeof filter.operator === 'string' &&
+          filter.value !== undefined
+        ) : [];
+
+      // Defensive filtering for groupRowOrders
+      const filteredGroupRowOrders: Record<string, GroupRowOrderConfig> = {};
+      for (const [key, value] of Object.entries(groupRowOrders || {})) {
+        if (value &&
+            typeof value === 'object' &&
+            Array.isArray(value.rowIds) &&
+            value.rowIds.every(id => typeof id === 'string')) {
+          filteredGroupRowOrders[key] = {
+            ...value,
+            rowIds: limitRowOrders(value.rowIds)
+          };
+        }
+      }
+
+      // Defensive filtering for flatRowOrder
+      const filteredFlatRowOrder = Array.isArray(flatRowOrder) ?
+        limitRowOrders(flatRowOrder.filter(id => typeof id === 'string' && id.length > 0)) : [];
+
+      // Defensive filtering for selectedCells
+      const filteredSelectedCells = Array.isArray(selectedCells) ?
+        selectedCells.filter(cell => typeof cell === 'string' && cell.length > 0) : [];
 
       // Debug what's causing the huge size
       persistLog.debug('🔍 Analyzing storage size', {
-        columnWidthsSize: JSON.stringify(columnWidths).length,
-        columnOrderSize: JSON.stringify(columnOrder).length,
-        columnVisibilitySize: JSON.stringify(columnVisibility).length,
-        columnWidthsKeys: Object.keys(columnWidths || {}).length,
-        columnWidthsPreview: JSON.stringify(columnWidths).substring(0, 100)
+        columnWidthsSize: JSON.stringify(filteredColumnWidths).length,
+        columnOrderSize: JSON.stringify(filteredColumnOrder).length,
+        columnVisibilitySize: JSON.stringify(filteredColumnVisibility).length,
+        sortBySize: JSON.stringify(filteredSortBy).length,
+        filtersSize: JSON.stringify(filteredFilters).length,
+        groupConfigSize: JSON.stringify(groupConfig).length,
+        groupRowOrdersSize: JSON.stringify(filteredGroupRowOrders).length,
+        flatRowOrderSize: JSON.stringify(filteredFlatRowOrder).length,
+        columnWidthsKeys: Object.keys(filteredColumnWidths).length,
+        columnWidthsPreview: JSON.stringify(filteredColumnWidths).substring(0, 100)
       });
 
       const data: VibeGridPreferences = {
-        columnWidths: columnWidths,
-        columnOrder: columnOrder,
-        columnVisibility: columnVisibility,
-        sortBy: preferences$.sortBy.get(),
-        filters: preferences$.filters.get(),
-        groupConfig: preferences$.groupConfig.get(),
-        groupRowOrders: preferences$.groupRowOrders.get(),
-        flatRowOrder: preferences$.flatRowOrder.get(),
+        columnWidths: filteredColumnWidths,
+        columnOrder: filteredColumnOrder,
+        columnVisibility: filteredColumnVisibility,
+        sortBy: filteredSortBy,
+        filters: filteredFilters,
+        groupConfig: groupConfig, // groupConfig is already validated in setGroupConfig
+        groupRowOrders: filteredGroupRowOrders,
+        flatRowOrder: filteredFlatRowOrder,
         // scrollPosition: preferences$.scrollPosition.get(), // Intentionally excluded for better UX
-        selectedCells: preferences$.selectedCells.get(),
+        selectedCells: filteredSelectedCells,
         entityType: preferences$.entityType.get(),
         lastUpdated: preferences$.lastUpdated.get()
       };
@@ -315,7 +514,21 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
       }
 
       localStorage.setItem(storageKey, serialized);
-      persistLog.debug('💾 Preferences saved', { entityType, size: serialized.length });
+      persistLog.debug('💾 Preferences saved successfully', {
+        entityType,
+        size: serialized.length,
+        properties: {
+          columnWidths: Object.keys(filteredColumnWidths).length,
+          columnOrder: filteredColumnOrder.length,
+          columnVisibility: Object.keys(filteredColumnVisibility).length,
+          sortBy: filteredSortBy.length,
+          filters: filteredFilters.length,
+          groupConfig: !!groupConfig,
+          groupRowOrders: Object.keys(filteredGroupRowOrders).length,
+          flatRowOrder: filteredFlatRowOrder.length,
+          selectedCells: filteredSelectedCells.length
+        }
+      });
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         persistLog.error('🚨 QuotaExceededError during manual save', { entityType, error });
@@ -367,10 +580,18 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
 
     // Update column order
     setColumnOrder(order: string[]) {
-      preferences$.columnOrder.set(order);
+      // Defensive filtering - only save valid string array
+      const filteredOrder = Array.isArray(order) ?
+        order.filter(item => typeof item === 'string' && item.length > 0) : [];
+
+      preferences$.columnOrder.set(filteredOrder);
       preferences$.lastUpdated.set(new Date().toISOString());
       saveToStorage();
-      persistLog.debug('🔄 Column order saved', { order });
+      persistLog.debug('🔄 Column order saved', {
+        originalCount: order?.length || 0,
+        filteredCount: filteredOrder.length,
+        filteredOrder
+      });
     },
 
     // Update column visibility (individual)
@@ -387,6 +608,12 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
 
     // Update all column visibility (bulk - preferred for onChange handlers)
     setAllColumnVisibility(columnVisibility: Record<string, boolean>) {
+      persistLog.info('📞 setAllColumnVisibility called', {
+        entityType,
+        inputData: columnVisibility,
+        inputKeys: Object.keys(columnVisibility || {}).length
+      });
+
       // Defensive filtering - only save actual boolean values
       const filteredVisibility: Record<string, boolean> = {};
       for (const [key, value] of Object.entries(columnVisibility || {})) {
@@ -398,7 +625,7 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
       preferences$.columnVisibility.set(filteredVisibility);
       preferences$.lastUpdated.set(new Date().toISOString());
       saveToStorage();
-      persistLog.debug('👁️ All column visibility saved', {
+      persistLog.info('👁️ All column visibility saved', {
         originalCount: Object.keys(columnVisibility || {}).length,
         filteredCount: Object.keys(filteredVisibility).length,
         filteredVisibility
@@ -407,18 +634,47 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
 
     // Update sort configuration
     setSortBy(sortBy: SortConfig[]) {
-      preferences$.sortBy.set(sortBy);
+      // Defensive filtering - only save valid sort configurations
+      const filteredSortBy = Array.isArray(sortBy) ?
+        sortBy.filter(sort =>
+          sort &&
+          typeof sort === 'object' &&
+          typeof sort.field === 'string' &&
+          sort.field.length > 0 &&
+          (sort.direction === 'asc' || sort.direction === 'desc')
+        ) : [];
+
+      preferences$.sortBy.set(filteredSortBy);
       preferences$.lastUpdated.set(new Date().toISOString());
       saveToStorage();
-      persistLog.debug('📊 Sort configuration saved', { sortBy });
+      persistLog.debug('📊 Sort configuration saved', {
+        originalCount: sortBy?.length || 0,
+        filteredCount: filteredSortBy.length,
+        filteredSortBy
+      });
     },
 
     // Update filters
     setFilters(filters: FilterConfig[]) {
-      preferences$.filters.set(filters);
+      // Defensive filtering - only save valid filter configurations
+      const filteredFilters = Array.isArray(filters) ?
+        filters.filter(filter =>
+          filter &&
+          typeof filter === 'object' &&
+          typeof filter.field === 'string' &&
+          filter.field.length > 0 &&
+          typeof filter.operator === 'string' &&
+          filter.value !== undefined
+        ) : [];
+
+      preferences$.filters.set(filteredFilters);
       preferences$.lastUpdated.set(new Date().toISOString());
       saveToStorage();
-      persistLog.debug('🔍 Filters saved', { filters });
+      persistLog.debug('🔍 Filters saved', {
+        originalCount: filters?.length || 0,
+        filteredCount: filteredFilters.length,
+        filteredFilters
+      });
     },
 
     // Update group configuration
@@ -457,10 +713,17 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
 
     // Update selected cells (transient - usually not persisted)
     setSelectedCells(cells: string[]) {
-      preferences$.selectedCells.set(cells);
+      // Defensive filtering - only save valid cell identifiers
+      const filteredCells = Array.isArray(cells) ?
+        cells.filter(cell => typeof cell === 'string' && cell.length > 0) : [];
+
+      preferences$.selectedCells.set(filteredCells);
       preferences$.lastUpdated.set(new Date().toISOString());
       saveToStorage();
-      persistLog.debug('🎯 Selected cells saved', { count: cells.length });
+      persistLog.debug('🎯 Selected cells saved', {
+        originalCount: cells?.length || 0,
+        filteredCount: filteredCells.length
+      });
     },
 
     // Update group row orders for a specific group
@@ -492,12 +755,17 @@ export function createVibeGridPreferences(entityType: string, orgId?: string) {
 
     // Update flat row order (ungrouped mode)
     setFlatRowOrder(rowOrder: string[]) {
-      const limitedRowOrder = limitRowOrders(rowOrder);
+      // Defensive filtering - only save valid string IDs
+      const filteredRowOrder = Array.isArray(rowOrder) ?
+        rowOrder.filter(id => typeof id === 'string' && id.length > 0) : [];
+      const limitedRowOrder = limitRowOrders(filteredRowOrder);
+
       preferences$.flatRowOrder.set(limitedRowOrder);
       preferences$.lastUpdated.set(new Date().toISOString());
       saveToStorage();
       persistLog.debug('📋 Flat row order saved', {
-        originalCount: rowOrder.length,
+        originalCount: rowOrder?.length || 0,
+        filteredCount: filteredRowOrder.length,
         savedCount: limitedRowOrder.length
       });
     },

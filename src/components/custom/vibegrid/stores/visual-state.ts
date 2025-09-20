@@ -830,18 +830,28 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
       userId,
       columnsCount: columns.length
     });
+
+    // Return defaultState so caller can access _savedPrefs for applyLoadedPreferencesToVisualInputs
+    return defaultState;
   },
 
   /**
-   * Load saved column visibility from localStorage
+   * Load ALL saved preferences from localStorage during initialization
    *
    * CRITICAL FOR PERSISTENCE: This method is called during createDefaultColumnState()
-   * to ensure saved column visibility preferences are loaded BEFORE default values
-   * are applied. This integration point is essential for column persistence to work.
+   * to ensure ALL saved preferences are loaded BEFORE default values are applied.
+   * This is the single source for loading all persisted visual state.
    *
-   * 🎯 SUCCESS PATTERN: Load saved preferences during initialization, not after.
+   * 🎯 SUCCESS PATTERN: Load all saved preferences during initialization, not after.
    */
-  loadSavedColumnVisibility(columns: Column[], entityType: string, orgId: string): Record<string, boolean> | null {
+  loadAllSavedPreferences(columns: Column[], entityType: string, orgId: string): {
+    columnVisibility: Record<string, boolean> | null;
+    columnWidths: Record<string, number> | null;
+    columnOrder: string[] | null;
+    sortBy: SortConfig[] | null;
+    filters: FilterConfig[] | null;
+    groupConfig: GroupConfig | null;
+  } {
     try {
       // Normalize entityType to match localStorage keys
       const normalizedEntityType = entityType
@@ -854,19 +864,40 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
 
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.columnVisibility && typeof parsed.columnVisibility === 'object') {
-          fileLog.info('✅ INIT: Loaded column visibility from localStorage during initialization', {
-            storageKey,
-            hiddenColumns: Object.entries(parsed.columnVisibility).filter(([_, visible]) => !visible).map(([id]) => id)
-          });
-          return parsed.columnVisibility;
-        }
+        fileLog.info('✅ INIT: Loading ALL saved preferences from localStorage', {
+          storageKey,
+          hasColumnVisibility: !!parsed.columnVisibility,
+          hasColumnWidths: !!parsed.columnWidths,
+          hasColumnOrder: !!parsed.columnOrder,
+          hasSortBy: !!parsed.sortBy,
+          hasFilters: !!parsed.filters,
+          hasGroupConfig: !!parsed.groupConfig
+        });
+
+        return {
+          columnVisibility: parsed.columnVisibility && typeof parsed.columnVisibility === 'object' ? parsed.columnVisibility : null,
+          columnWidths: parsed.columnWidths && typeof parsed.columnWidths === 'object' ? parsed.columnWidths : null,
+          columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : null,
+          sortBy: Array.isArray(parsed.sortBy) ? parsed.sortBy : null,
+          filters: Array.isArray(parsed.filters) ? parsed.filters : null,
+          groupConfig: parsed.groupConfig && parsed.groupConfig.fields && Array.isArray(parsed.groupConfig.fields) ? {
+            ...parsed.groupConfig,
+            expandedGroups: new Set(parsed.groupConfig.expandedGroups || []) // Convert array back to Set
+          } : null
+        };
       }
     } catch (error) {
-      fileLog.warn('⚠️ Failed to load column visibility during init', { error });
+      fileLog.warn('⚠️ Failed to load preferences during init', { error });
     }
 
-    return null;
+    return {
+      columnVisibility: null,
+      columnWidths: null,
+      columnOrder: null,
+      sortBy: null,
+      filters: null,
+      groupConfig: null
+    };
   },
 
   /**
@@ -878,17 +909,56 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     orgId: string,
     userId: string
   ) {
+    // Load ALL saved preferences during initialization
+    const savedPrefs = this.loadAllSavedPreferences(columns, entityType, orgId);
+
     return {
       columns,
-      columnWidths: Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
-      columnVisibility: this.loadSavedColumnVisibility(columns, entityType, orgId) || Object.fromEntries(columns.map(col => [col.id, true])),
-      columnOrder: columns.map(col => col.id),
-      groupConfig: null, // Include groupConfig in default state
-      // Note: sortBy and filters are preserved from persistence/current state in initializeColumns
+      columnWidths: savedPrefs.columnWidths || Object.fromEntries(columns.map(col => [col.id, col.width || 150])),
+      columnVisibility: savedPrefs.columnVisibility || Object.fromEntries(columns.map(col => [col.id, true])),
+      columnOrder: savedPrefs.columnOrder || columns.map(col => col.id),
+      groupConfig: savedPrefs.groupConfig || null,
+      sortBy: savedPrefs.sortBy || [],
+      filters: savedPrefs.filters || [],
       entityType,
       orgId,
-      userId
+      userId,
+      // Include saved preferences for later application to visual inputs
+      _savedPrefs: savedPrefs
     };
+  },
+
+  /**
+   * Apply loaded preferences to visual inputs
+   * This method should be called after createDefaultColumnState to apply saved data to reactive observables
+   */
+  applyLoadedPreferencesToVisualInputs(visualInputs$: any, defaultState: any) {
+    const savedPrefs = defaultState._savedPrefs;
+    if (!savedPrefs) return;
+
+    // Apply saved sortBy to visual inputs
+    if (savedPrefs.sortBy && savedPrefs.sortBy.length > 0) {
+      visualInputs$.sortBy?.set(savedPrefs.sortBy);
+      fileLog.info('✅ INIT: Applied saved sortBy to visual inputs', {
+        sortBy: savedPrefs.sortBy
+      });
+    }
+
+    // Apply saved filters to visual inputs
+    if (savedPrefs.filters && savedPrefs.filters.length > 0) {
+      visualInputs$.filters?.set(savedPrefs.filters);
+      fileLog.info('✅ INIT: Applied saved filters to visual inputs', {
+        filters: savedPrefs.filters
+      });
+    }
+
+    // Apply saved groupConfig to visual inputs
+    if (savedPrefs.groupConfig) {
+      visualInputs$.groupConfig?.set(savedPrefs.groupConfig);
+      fileLog.info('✅ INIT: Applied saved groupConfig to visual inputs', {
+        groupConfig: savedPrefs.groupConfig
+      });
+    }
   },
 
   /**
