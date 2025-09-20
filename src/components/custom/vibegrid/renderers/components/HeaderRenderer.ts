@@ -191,11 +191,14 @@ export class HeaderRenderer {
 
       const headerCell = this.createColumnHeader(column, columnIndex, 0);
 
+      // Use consistent width source - same as what ColumnWidthManager uses
+      const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
+
       // Position at xOffset from visual state (already includes drag + row header columns)
       headerCell.style.position = 'absolute';
       headerCell.style.left = `${columnLayout.xOffset}px`;
       headerCell.style.top = '0';
-      headerCell.style.width = `${columnLayout.width}px`;
+      headerCell.style.width = `${actualWidth}px`;
       headerCell.style.height = `${HEADER_HEIGHT}px`;
 
       headerRow.appendChild(headerCell);
@@ -239,9 +242,8 @@ export class HeaderRenderer {
     // Update sort indicator if column is sorted
     this.updateSortIndicator(headerCell, column);
     
-    // Add resize handle
+    // Add resize handle (MouseController will handle resize events)
     const resizeHandle = this.domFactory.createResizeHandle();
-    this.setupResizeHandler(resizeHandle, column);
     headerCell.appendChild(resizeHandle);
     
     // Set up passive interaction attributes for MouseController
@@ -386,83 +388,6 @@ export class HeaderRenderer {
     });
   }
 
-  /**
-   * Set up resize handler for column
-   */
-  private setupResizeHandler(resizeHandle: HTMLElement, column: any): void {
-    let isResizing = false;
-    let startX = 0;
-    // Get actual width from centralized visual state
-    let startWidth = this.visualState.visualOperations.getColumnWidth(column.id);
-
-    resizeHandle.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
-      isResizing = true;
-      startX = e.pageX;
-      // Update startWidth from current reactive state
-      const currentColumnWidths = this.visualState.visualInputs$.columnWidths.get();
-      startWidth = currentColumnWidths[column.id] || column.width || 150;
-      
-      // Update interaction state
-      this.tableInteraction$.columnResize.set({
-        isResizing: true,
-        columnId: column.id,
-        startWidth: startWidth,
-        newWidth: startWidth
-      });
-      
-      // Add document-level listeners for resize
-      let resizeRAF: number | null = null;
-      const handleMouseMove = (e: MouseEvent) => {
-        if (!isResizing) return;
-        
-        // Throttle resize updates with requestAnimationFrame
-        if (!resizeRAF) {
-          resizeRAF = requestAnimationFrame(() => {
-            const deltaX = e.pageX - startX;
-            const newWidth = Math.max(50, startWidth + deltaX); // Min width 50px
-            
-            // Update resize state
-            this.tableInteraction$.columnResize.set({
-              isResizing: true,
-              columnId: column.id,
-              startWidth: startWidth,
-              newWidth: newWidth
-            });
-            
-            resizeRAF = null;
-          });
-        }
-      };
-      
-      const handleMouseUp = () => {
-        if (!isResizing) return;
-        isResizing = false;
-        
-        // Cancel any pending resize RAF
-        if (resizeRAF) {
-          cancelAnimationFrame(resizeRAF);
-          resizeRAF = null;
-        }
-        
-        const resizeState = this.tableInteraction$.columnResize.get();
-        if (resizeState && resizeState.newWidth) {
-          // Apply the new width
-          this.visualState.visualOperations.setColumnWidth(column.id, resizeState.newWidth);
-        }
-        
-        // Clear resize state
-        this.tableInteraction$.columnResize.set(null);
-        
-        // Clean up listeners
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-      
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    });
-  }
 
 
   /**

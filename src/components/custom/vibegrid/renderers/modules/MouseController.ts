@@ -116,14 +116,16 @@ export class MouseController {
     // Provide immediate visual feedback on mouse down
     const target = e.target as HTMLElement;
 
-    fileLog.debug('🖱️ Mouse down on element', {
+    fileLog.info('🖱️ Mouse down on element', {
       tagName: target.tagName,
       className: target.className,
       id: target.id,
       hasDataColumnId: target.hasAttribute('data-column-id'),
       hasDataRowId: target.hasAttribute('data-row-id'),
       parentTagName: target.parentElement?.tagName,
-      parentClassName: target.parentElement?.className
+      parentClassName: target.parentElement?.className,
+      hasResizeHandle: target.classList.contains('vibegridx-resize-handle'),
+      closestResizeHandle: !!target.closest('.vibegridx-resize-handle')
     });
 
     // Check for column resize handle first (highest priority)
@@ -140,10 +142,11 @@ export class MouseController {
         // Delegate to interaction state following the proper pattern
         this.tableInteraction$.startColumnResize(columnId, e.clientX, initialWidth);
 
-        fileLog.info('📏 Column resize handle mouse down', {
+        fileLog.info('[RESIZE] 📏 Column resize handle mouse down', {
           columnId,
           initialWidth,
-          element: resizeHandle.tagName
+          element: resizeHandle.tagName,
+          mouseX: e.clientX
         });
 
         // Prevent default to avoid text selection during resize
@@ -462,11 +465,31 @@ export class MouseController {
       wasTracking: this.isTracking,
       wasDragging: this.isDragging,
       wasColumnDrag: this.isColumnDrag,
-      wasRowDrag: this.isRowDrag
+      wasRowDrag: this.isRowDrag,
+      wasColumnResize: this.isColumnResize
     });
 
-    if (this.isDragging) {
-      if (this.isColumnDrag && this.dragColumnId) {
+    if (this.isDragging || this.isColumnResize) {
+      if (this.isColumnResize) {
+        // Handle column resize completion
+        const resizeResult = this.tableInteraction$.endColumnResize();
+
+        fileLog.info('[RESIZE] 📏 Column resize ended via MouseController', {
+          columnId: resizeResult?.columnId,
+          newWidth: resizeResult?.newWidth,
+          finalMouseX: e.clientX
+        });
+
+        // Apply the final width to visual state
+        if (resizeResult?.columnId && resizeResult?.newWidth) {
+          this.visualState.visualOperations.setColumnWidth(resizeResult.columnId, resizeResult.newWidth);
+        }
+
+        // CRITICAL FIX: Prevent click event after resize operation (same as drag)
+        e.preventDefault();
+        e.stopPropagation();
+        this.justEndedDrag = true; // Reuse the same flag to prevent clicks after resize
+      } else if (this.isColumnDrag && this.dragColumnId) {
         // Handle column drag completion
         const targetColumnId = this.tableInteraction$.dragTarget.get();
         if (targetColumnId && targetColumnId !== this.dragColumnId) {
@@ -535,6 +558,7 @@ export class MouseController {
       this.isRowDrag = false;
       this.dragRowId = null;
       this.dragRowGroupId = null;
+      this.isColumnResize = false;
       this.startPosition = { x: 0, y: 0 };
       fileLog.info('🖱️ Drag state reset immediately', {
         isDragging: this.isDragging,
@@ -557,6 +581,7 @@ export class MouseController {
       this.isRowDrag = false;
       this.dragRowId = null;
       this.dragRowGroupId = null;
+      this.isColumnResize = false;
       this.startPosition = { x: 0, y: 0 };
       fileLog.info('🖱️ Non-drag mouse up - state reset', {
         isDragging: this.isDragging,
@@ -572,9 +597,12 @@ export class MouseController {
    * This is the ONLY click handler in the entire VibeGrid system
    */
   private onClick(e: MouseEvent): void {
-    // Ignore clicks that resulted from drag operations
-    if (this.isDragging) {
-      fileLog.info('🖱️ Click blocked - was result of drag operation');
+    // Ignore clicks that resulted from drag or resize operations
+    if (this.isDragging || this.justEndedDrag) {
+      fileLog.info('🖱️ Click blocked - was result of drag or resize operation', {
+        isDragging: this.isDragging,
+        justEndedDrag: this.justEndedDrag
+      });
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -827,6 +855,7 @@ export class MouseController {
     this.isRowDrag = false;
     this.dragRowId = null;
     this.dragRowGroupId = null;
+    this.isColumnResize = false;
     this.startPosition = { x: 0, y: 0 };
     this.removeDragPreview();
     this.hideDropLine();
@@ -1252,20 +1281,15 @@ export class MouseController {
     const result = this.tableInteraction$.updateColumnResize(e.clientX);
 
     if (result) {
-      fileLog.debug('📏 Column resize updated via interaction state', {
+      fileLog.info('[RESIZE] 📏 Column resize move - interaction state updated', {
         columnId: result.columnId,
         newWidth: result.newWidth,
-        mouseX: e.clientX
+        mouseX: e.clientX,
+        deltaFromStart: e.clientX - this.startPosition.x
       });
 
-      // Update visual state with new width (interaction state calculates the width)
-      const currentWidths = this.visualState.visualInputs$.columnWidths.get();
-      const updatedWidths = {
-        ...currentWidths,
-        [result.columnId]: result.newWidth
-      };
-
-      this.visualState.visualInputs$.columnWidths.set(updatedWidths);
+      // NOTE: Let SimplePassiveRenderer handle live updates via reactive observer
+      // Visual state will get updated at the end of resize in onMouseUp
     }
 
     // Prevent text selection during resize

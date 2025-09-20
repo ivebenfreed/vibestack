@@ -35,22 +35,21 @@ export class ColumnWidthManager {
 
     const headerCell = this.headerContainer.querySelector(`[data-field="${columnId}"]`) as HTMLElement;
     if (headerCell) {
-      // Update the flex-basis style to match new width
-      const currentStyle = headerCell.style.cssText;
-      const updatedStyle = currentStyle.replace(
-        /flex:\s*0\s+0\s+\d+px/,
-        `flex: 0 0 ${newWidth}px`
-      );
-      headerCell.style.cssText = updatedStyle;
+      // Update the width style to match HeaderRenderer's absolute positioning approach
+      headerCell.style.width = `${newWidth}px`;
 
-      fileLog.debug('📏 Updated header cell width', {
+      fileLog.info('[RESIZE] 📏 ColumnWidthManager updated header cell width', {
         columnId,
         newWidth,
-        previousStyle: currentStyle.match(/flex:\s*0\s+0\s+\d+px/)?.[0],
-        updatedStyle: `flex: 0 0 ${newWidth}px`
+        method: 'direct-width-style',
+        elementFound: true
       });
     } else {
-      fileLog.warn('⚠️ Header cell not found for width update', { columnId });
+      fileLog.warn('[RESIZE] ⚠️ ColumnWidthManager header cell not found for width update', {
+        columnId,
+        selector: `[data-field="${columnId}"]`,
+        containerExists: !!this.headerContainer
+      });
     }
   }
 
@@ -72,13 +71,18 @@ export class ColumnWidthManager {
         cell.style.cssText = updatedStyle;
       });
 
-      fileLog.debug('📏 Updated body cell widths', {
+      fileLog.info('[RESIZE] 📏 ColumnWidthManager updated body cell widths', {
         columnId,
         newWidth,
-        cellsUpdated: bodyCells.length
+        cellsUpdated: bodyCells.length,
+        selector: `[data-column-id="${columnId}"]`
       });
     } else {
-      fileLog.debug('📏 No body cells found for width update', { columnId });
+      fileLog.warn('[RESIZE] ⚠️ ColumnWidthManager no body cells found for width update', {
+        columnId,
+        selector: `[data-column-id="${columnId}"]`,
+        containerExists: !!this.bodyContainer
+      });
     }
   }
 

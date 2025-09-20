@@ -818,9 +818,20 @@ export function createTableInteraction$(tableCore$?: any) {
 
       const currentResize = tableInteraction$.columnResize.get();
       if (currentResize) {
+        fileLog.info('[RESIZE] 🔧 INTERACTION STATE: Setting columnResize with new width', {
+          resizingColumn,
+          newWidth,
+          previousWidth: currentResize.newWidth,
+          isResizing: currentResize.isResizing
+        });
+
         tableInteraction$.columnResize.set({
           ...currentResize,
           newWidth
+        });
+
+        fileLog.info('[RESIZE] ✅ INTERACTION STATE: columnResize.set() completed', {
+          newState: tableInteraction$.columnResize.get()
         });
       }
 

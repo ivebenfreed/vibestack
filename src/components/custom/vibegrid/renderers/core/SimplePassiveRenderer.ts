@@ -514,29 +514,40 @@ export class SimplePassiveRenderer {
 
     // INTERACTION OBSERVER: Only watches interaction changes (selection, editing, drag)
     this.interactionObserverDisposer = observe(() => {
+      fileLog.info('[RESIZE] 🔍 INTERACTION OBSERVER ENTRY - checking all interaction state', {
+        observersEnabled: this.observersEnabled,
+        timestamp: Date.now()
+      });
+
       // GUARD: Skip if observers are not enabled yet
       if (!this.observersEnabled) {
         fileLog.debug('⏸️ INTERACTION: Observers not enabled yet');
         return;
       }
-      const selectedCells = this.tableInteraction$.selectedCells.get(true);
-      const editingCell = this.tableInteraction$.editingCell.get(true);
-      const editValue = this.tableInteraction$.editValue.get(true);
-      const selectAllState = this.tableInteraction$.selectAllCheckboxState.get(true);
-      const columnResize = this.tableInteraction$.columnResize.get(true);
-      const isDragging = this.tableInteraction$.isDragging.get(true);
-      const dragSource = this.tableInteraction$.dragSource.get(true);
-      const dragTarget = this.tableInteraction$.dragTarget.get(true);
-      const isDragSelecting = this.tableInteraction$.isDragSelecting.get(true);
-      const dragSelectStart = this.tableInteraction$.dragSelectStart.get(true);
-      const dragSelectCurrent = this.tableInteraction$.dragSelectCurrent.get(true);
+      // CRITICAL FIX: Remove (true) parameter to enable Legend State dependency tracking
+      const columnResize = this.tableInteraction$.columnResize.get();
+      const selectedCells = this.tableInteraction$.selectedCells.get();
+      const editingCell = this.tableInteraction$.editingCell.get();
+      const editValue = this.tableInteraction$.editValue.get();
+      const selectAllState = this.tableInteraction$.selectAllCheckboxState.get();
+      const isDragging = this.tableInteraction$.isDragging.get();
+      const dragSource = this.tableInteraction$.dragSource.get();
+      const dragTarget = this.tableInteraction$.dragTarget.get();
+      const isDragSelecting = this.tableInteraction$.isDragSelecting.get();
+      const dragSelectStart = this.tableInteraction$.dragSelectStart.get();
+      const dragSelectCurrent = this.tableInteraction$.dragSelectCurrent.get();
 
-      fileLog.info('🖱️ INTERACTION OBSERVER TRIGGERED', {
+      fileLog.info('[RESIZE] 🖱️ INTERACTION OBSERVER TRIGGERED', {
         selectedCount: selectedCells.size,
         isEditing: !!editingCell,
         isDragging,
         isDragSelecting,
-        isResizing: !!columnResize?.isResizing
+        isResizing: !!columnResize?.isResizing,
+        columnResizeDetails: columnResize ? {
+          columnId: columnResize.columnId,
+          newWidth: columnResize.newWidth,
+          isResizing: columnResize.isResizing
+        } : null
       });
 
       // Only update DOM classes and overlays, no re-renders
@@ -567,9 +578,18 @@ export class SimplePassiveRenderer {
       }
 
       // Handle column resize with direct DOM updates (no re-render)
-      if (columnResize?.isResizing && columnResize.columnId && columnResize.newWidth) {
-        this.columnWidthManager?.updateHeaderCellWidth(columnResize.columnId, columnResize.newWidth);
-        this.columnWidthManager?.updateBodyCellWidths(columnResize.columnId, columnResize.newWidth);
+      // CRITICAL FIX: Access columnResize state right here so Legend State tracks dependency
+      const currentColumnResize = this.tableInteraction$.columnResize.get(true);
+      if (currentColumnResize?.isResizing && currentColumnResize.columnId && currentColumnResize.newWidth) {
+        fileLog.info('[RESIZE] 📏 SimplePassiveRenderer handling column resize', {
+          columnId: currentColumnResize.columnId,
+          newWidth: currentColumnResize.newWidth,
+          isResizing: currentColumnResize.isResizing,
+          hasColumnWidthManager: !!this.columnWidthManager
+        });
+
+        this.columnWidthManager?.updateHeaderCellWidth(currentColumnResize.columnId, currentColumnResize.newWidth);
+        this.columnWidthManager?.updateBodyCellWidths(currentColumnResize.columnId, currentColumnResize.newWidth);
       }
     });
 
