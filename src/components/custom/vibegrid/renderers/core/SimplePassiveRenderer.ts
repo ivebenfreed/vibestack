@@ -851,7 +851,8 @@ export class SimplePassiveRenderer {
         scrollController: this.scrollController,
         selectionController: this.selectionController,
         tableInteraction$: this.tableInteraction$,
-        visualState: this.visualState
+        visualState: this.visualState,
+        tableCore$: this.tableCore$
       });
 
       // Configure ColumnWidthManager with DOM containers

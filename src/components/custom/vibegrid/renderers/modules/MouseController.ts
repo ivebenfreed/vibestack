@@ -17,6 +17,7 @@ export interface MouseControllerOptions {
   selectionController?: any; // For row/column selection operations
   tableInteraction$: any; // For reactive state updates
   visualState: ReturnType<typeof createVibeGridVisualState>;
+  tableCore$?: any; // For accessing processed rows and columns
 }
 
 export class MouseController {
@@ -26,6 +27,7 @@ export class MouseController {
   private selectionController?: any;
   private tableInteraction$: any;
   private visualState: ReturnType<typeof createVibeGridVisualState>;
+  private tableCore$?: any;
 
   // Mouse state tracking
   private isDragging = false;
@@ -67,6 +69,7 @@ export class MouseController {
     this.selectionController = options.selectionController;
     this.tableInteraction$ = options.tableInteraction$;
     this.visualState = options.visualState;
+    this.tableCore$ = options.tableCore$;
 
     // Prevent text selection during drag operations
     this.container.style.userSelect = 'none';
@@ -653,7 +656,57 @@ export class MouseController {
       const cellElement = target.closest('[data-row-id][data-column-id]');
       const rowHeaderElement = target.closest('[data-interaction-type="row-header"]');
 
-      if (rowHeaderElement && this.selectionController) {
+      if (cellElement && this.selectionController) {
+        // Handle cell clicks
+        const rowId = cellElement.getAttribute('data-row-id');
+        const columnId = cellElement.getAttribute('data-column-id');
+        const cellId = `${rowId}:${columnId}`;
+
+        fileLog.info('🖱️ Cell click detected', {
+          cellId,
+          rowId,
+          columnId,
+          isShiftKey: e.shiftKey,
+          isCtrlKey: e.ctrlKey || e.metaKey
+        });
+
+        // Handle different click types:
+        // Regular click -> single cell selection
+        // Ctrl+click -> add to selection
+        // Shift+click -> range selection
+        if (e.shiftKey) {
+          // Shift+click: Range selection from last selected cell
+          const selectedCells = this.tableInteraction$.selectedCells.get();
+          const lastSelectedCell = selectedCells.size > 0 ? Array.from(selectedCells).pop() : null;
+
+          if (lastSelectedCell) {
+            fileLog.info('🖱️ Shift+click range selection', {
+              from: lastSelectedCell,
+              to: cellId
+            });
+
+            // Get data context for range selection
+            const rows = this.tableCore$?.processedRows?.get() || [];
+            const columns = this.tableCore$?.columns?.get() || [];
+            const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
+
+            this.tableInteraction$.selectRange(lastSelectedCell, cellId, { rows, columns, columnVisibility });
+          } else {
+            // No previous selection, just select this cell
+            this.selectionController.selectCell(cellId);
+          }
+        } else if (e.ctrlKey || e.metaKey) {
+          // Ctrl+click: Toggle cell selection (add/remove from current selection)
+          this.selectionController.toggleCellSelection(cellId);
+        } else {
+          // Regular click: Replace selection with this cell
+          this.selectionController.selectCell(cellId);
+        }
+
+        // Prevent event propagation
+        e.stopPropagation();
+
+      } else if (rowHeaderElement && this.selectionController) {
         // Handle row header clicks
         const rowId = rowHeaderElement.getAttribute('data-row-id');
         if (rowId) {
