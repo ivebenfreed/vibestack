@@ -12,6 +12,7 @@
 
 import { log } from '@/logger';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
+import { onChange } from '@legendapp/state';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
@@ -75,6 +76,9 @@ export class BodyRenderer {
   // Store context for potential drag selection
   private lastClickedCell: { cellId: string; row: any; column: any } | null = null;
 
+  // Observer cleanup
+  private selectionObserverDisposer?: () => void;
+
   constructor(options: BodyRendererOptions) {
     this.tableCore$ = options.tableCore$;
     this.tableInteraction$ = options.tableInteraction$;
@@ -91,7 +95,36 @@ export class BodyRenderer {
     // Initialize drag and drop manager with container
     this.initializeDragDrop();
 
+    // Setup observer for selection changes to update checkboxes
+    this.setupSelectionObserver();
+
     fileLog.info('🏗️ BodyRenderer initialized (Phase 2.1 consolidated)');
+  }
+
+  /**
+   * Setup observer to watch selection changes and update checkboxes
+   */
+  private setupSelectionObserver(): void {
+    this.selectionObserverDisposer = onChange(this.tableInteraction$.selectedCells, () => {
+      // Update all row checkboxes when selection changes
+      this.updateAllRowCheckboxes();
+      fileLog.debug('📦 Checkbox states updated due to selection change');
+    });
+  }
+
+  /**
+   * Cleanup observers and resources
+   */
+  destroy(): void {
+    if (this.selectionObserverDisposer) {
+      this.selectionObserverDisposer();
+      this.selectionObserverDisposer = undefined;
+    }
+
+    // Clear active rows
+    this.activeRows.clear();
+
+    fileLog.info('🧹 BodyRenderer destroyed');
   }
 
   // ====================================
