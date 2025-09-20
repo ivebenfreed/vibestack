@@ -191,70 +191,38 @@ export function VibeGrid<T extends Record<string, any> = any>(
         // Apply loaded preferences to visual inputs (this is where sortBy gets applied!)
         visualState.visualOperations.applyLoadedPreferencesToVisualInputs(visualState.visualInputs$, defaultState);
 
-        // Keep visual state synchronized with tableCore$ observables
-        // CRITICAL: Preserve saved preferences when updating columns
-        const currentColumnOrder = visualState.visualInputs$.columnOrder.get();
-        const currentColumnVisibility = visualState.visualInputs$.columnVisibility.get();
-        const currentColumnWidths = visualState.visualInputs$.columnWidths.get();
-
+        // Set columns in visual state - preferences are already loaded and applied above
         visualState.visualInputs$.columns.set(columns);
-
-        // Restore all saved preferences that could be overridden
-        visualState.visualInputs$.columnOrder.set(currentColumnOrder);
-        visualState.visualInputs$.columnVisibility.set(currentColumnVisibility);
-        visualState.visualInputs$.columnWidths.set(currentColumnWidths);
-
-        fileLog.info('[PERSIST] 🔒 PRESERVED all column preferences after columns update', {
-          columnsSet: columns.map(c => c.id),
-          preservedOrder: currentColumnOrder,
-          preservedVisibility: Object.keys(currentColumnVisibility).length,
-          preservedWidths: Object.keys(currentColumnWidths).length
-        });
-
-        // Add immediate check to see if preservation worked
-        const immediateCheck = visualState.visualInputs$.columnOrder.get();
-        fileLog.info('[PERSIST] 🔍 IMMEDIATE CHECK - right after preservation', {
-          immediateOrder: immediateCheck,
-          immediateOrderFirst5: immediateCheck.slice(0, 5),
-          isPreservationWorking: JSON.stringify(immediateCheck) === JSON.stringify(currentColumnOrder),
-          preservedOrderFirst5: currentColumnOrder.slice(0, 5)
-        });
-
-        // VERIFICATION: Check what's actually in visual inputs after all processing
-        setTimeout(() => {
-          const finalColumnOrder = visualState.visualInputs$.columnOrder.get();
-          const finalColumnVisibility = visualState.visualInputs$.columnVisibility.get();
-          fileLog.info('[PERSIST] 🔍 FINAL VERIFICATION - what visual inputs actually contain', {
-            finalColumnOrder,
-            finalColumnVisibility,
-            firstFiveColumns: finalColumnOrder.slice(0, 5),
-            isOrderSameAsPreserved: JSON.stringify(finalColumnOrder) === JSON.stringify(currentColumnOrder),
-            preservedOrderFirst5: currentColumnOrder.slice(0, 5),
-            immediateOrderFirst5: immediateCheck.slice(0, 5),
-            changedAfterPreservation: JSON.stringify(finalColumnOrder) !== JSON.stringify(immediateCheck)
-          });
-        }, 100);
-
-        // All persistence loading is now handled inside visual state during initializeColumns()
-        // No need for duplicate loading logic here
 
 
         // Note: Emergency clear was successful, removing for normal operation
 
         // Set up reactive sync from visual state to simple persistence
         visualState.visualInputs$.columnWidths.onChange((newWidths) => {
-          // Extract the actual value from Legend State wrapper
-          const actualWidths = newWidths?.value || newWidths;
+          try {
+            // GUARD: Don't save during initialization - only save user changes
+            const isInitialized = initManager.isFullyHydrated$.get();
+            if (!isInitialized) {
+              fileLog.info('[PERSIST] ⏸️ columnWidths onChange SKIPPED - still initializing');
+              return;
+            }
 
-          // Only save if it looks like actual column widths (not entity data)
-          const isValidWidths = actualWidths && typeof actualWidths === 'object' &&
-            Object.values(actualWidths).every(v => typeof v === 'number' && v > 0 && v < 2000);
+            fileLog.info('[PERSIST] 🔔 columnWidths onChange triggered', { newWidths });
+            const actualWidths = newWidths?.value || newWidths;
+            fileLog.info('[PERSIST] 🔍 Extracted columnWidths data', { actualWidths });
 
-          if (isValidWidths) {
-            simplePersistence.operations.setAllColumnWidths(actualWidths);
-            fileLog.debug('💾 Saved column widths to simple persistence', { actualWidths });
-          } else {
-            fileLog.warn('🚨 Rejecting invalid column widths data', { actualWidths });
+            // Only save if it looks like actual column widths (not entity data)
+            const isValidWidths = actualWidths && typeof actualWidths === 'object' &&
+              Object.values(actualWidths).every(v => typeof v === 'number' && v > 0 && v < 2000);
+
+            if (isValidWidths) {
+              simplePersistence.operations.setAllColumnWidths(actualWidths);
+              fileLog.info('[PERSIST] 💾 SAVED columnWidths to localStorage', { actualWidths });
+            } else {
+              fileLog.warn('[PERSIST] 🚨 Rejecting invalid columnWidths data', { actualWidths });
+            }
+          } catch (error) {
+            fileLog.error('❌ Error in columnWidths onChange callback', { error });
           }
         });
 
@@ -388,8 +356,30 @@ export function VibeGrid<T extends Record<string, any> = any>(
         });
 
         visualState.visualInputs$.filters.onChange((newFilters) => {
-          simplePersistence.operations.setFilters(newFilters);
-          fileLog.debug('💾 Saved filters to simple persistence', { newFilters });
+          try {
+            fileLog.info('[PERSIST] 🔔 filters onChange triggered', { newFilters });
+            const actualFilters = newFilters?.value || newFilters;
+            fileLog.info('[PERSIST] 🔍 Extracted filters data', { actualFilters });
+
+            const isValidFilters = Array.isArray(actualFilters) &&
+              actualFilters.every(filter =>
+                filter &&
+                typeof filter === 'object' &&
+                typeof filter.field === 'string' &&
+                filter.field.length > 0 &&
+                typeof filter.operator === 'string' &&
+                filter.value !== undefined
+              );
+
+            if (isValidFilters) {
+              simplePersistence.operations.setFilters(actualFilters);
+              fileLog.info('[PERSIST] 💾 SAVED filters to localStorage', { actualFilters });
+            } else {
+              fileLog.warn('[PERSIST] 🚨 Rejecting invalid filters data', { actualFilters });
+            }
+          } catch (error) {
+            fileLog.error('❌ Error in filters onChange callback', { error });
+          }
         });
 
         // Row order persistence - flat mode (ungrouped)
