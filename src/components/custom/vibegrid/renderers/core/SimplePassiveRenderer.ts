@@ -416,18 +416,23 @@ export class SimplePassiveRenderer {
       const columnWidths = this.visualState.visualInputs$.columnWidths.get();
 
       // Create a signature of layout-only changes (exclude scroll position)
-      // Include column order and visibility in signature to detect changes
+      // Include column order, visibility, AND widths in signature to detect changes
       const columnOrderSignature = columnOrder?.join(',') || '';
       const columnVisibilitySignature = Object.entries(columnVisibility || {})
         .filter(([_, visible]) => visible === false)  // Only track hidden columns
         .map(([id]) => id)
         .sort()
         .join(',');
-      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}-${columnOrderSignature}-hidden:${columnVisibilitySignature}`;
+      const columnWidthsSignature = Object.entries(columnWidths || {})
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, width]) => `${id}:${width}`)
+        .join(',');
+      const layoutSignature = `${visualState.columnLayouts.length}-${visualState.geometry.totalWidth}-${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}-${columnOrderSignature}-hidden:${columnVisibilitySignature}-widths:${columnWidthsSignature}`;
 
       fileLog.debug('🔍 Visual observer triggered', {
         columnOrderSignature,
         columnVisibilitySignature,
+        columnWidthsSignature,
         hiddenColumnCount: columnVisibilitySignature.split(',').filter(Boolean).length,
         currentLayoutSignature: layoutSignature,
         previousLayoutSignature: lastVisualLayout,
@@ -444,6 +449,7 @@ export class SimplePassiveRenderer {
           totalWidth: visualState.geometry.totalWidth,
           viewportSize: `${visualState.geometry.viewportWidth}x${visualState.geometry.viewportHeight}`,
           columnOrder: columnOrderSignature || 'default',
+          columnWidths: columnWidthsSignature || 'default',
           previousLayoutSignature: lastVisualLayout,
           currentLayoutSignature: layoutSignature
         });
