@@ -200,6 +200,13 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
           // Load saved preferences from simple persistence and apply to visual state
           const savedPrefs = simplePersistence.preferences$.get();
+          fileLog.info('🔄 Attempting to load saved preferences', {
+            hasColumnWidths: !!savedPrefs.columnWidths,
+            columnWidthsCount: savedPrefs.columnWidths ? Object.keys(savedPrefs.columnWidths).length : 0,
+            hasColumnVisibility: !!savedPrefs.columnVisibility,
+            columnVisibilityCount: savedPrefs.columnVisibility ? Object.keys(savedPrefs.columnVisibility).length : 0
+          });
+
           if (savedPrefs.columnWidths && Object.keys(savedPrefs.columnWidths).length > 0) {
             visualState.visualInputs$.columnWidths.set(savedPrefs.columnWidths);
             fileLog.info('✅ Loaded column widths from simple persistence', { columnWidths: savedPrefs.columnWidths });
@@ -303,22 +310,47 @@ export function VibeGrid<T extends Record<string, any> = any>(
           simplePersistence.operations.initializeColumns(columns);
         });
 
-        // Set up reactive sync from visual state to simple persistence
-        // Watch for changes and save them automatically (using bulk methods to avoid conflicts)
-        visualState.visualInputs$.columnWidths.onChange((newWidths) => {
-          simplePersistence.operations.setAllColumnWidths(newWidths);
-          fileLog.debug('💾 Saved column widths to simple persistence', { newWidths });
-        });
+        // Note: Emergency clear was successful, removing for normal operation
 
-        visualState.visualInputs$.columnOrder.onChange((newOrder) => {
-          simplePersistence.operations.setColumnOrder(newOrder);
-          fileLog.debug('💾 Saved column order to simple persistence', { newOrder });
+        // Set up reactive sync from visual state to simple persistence
+        visualState.visualInputs$.columnWidths.onChange((newWidths) => {
+          // Extract the actual value from Legend State wrapper
+          const actualWidths = newWidths?.value || newWidths;
+
+          // Only save if it looks like actual column widths (not entity data)
+          const isValidWidths = actualWidths && typeof actualWidths === 'object' &&
+            Object.values(actualWidths).every(v => typeof v === 'number' && v > 0 && v < 2000);
+
+          if (isValidWidths) {
+            simplePersistence.operations.setAllColumnWidths(actualWidths);
+            fileLog.debug('💾 Saved column widths to simple persistence', { actualWidths });
+          } else {
+            fileLog.warn('🚨 Rejecting invalid column widths data', { actualWidths });
+          }
         });
 
         visualState.visualInputs$.columnVisibility.onChange((newVisibility) => {
-          simplePersistence.operations.setAllColumnVisibility(newVisibility);
-          fileLog.debug('💾 Saved column visibility to simple persistence', { newVisibility });
+          try {
+            // Extract the actual value from Legend State wrapper
+            const actualVisibility = newVisibility?.value || newVisibility;
+
+            // Only save if it looks like actual visibility data (not entity data)
+            const isValidVisibility = actualVisibility && typeof actualVisibility === 'object' &&
+              Object.values(actualVisibility).every(v => typeof v === 'boolean');
+
+            if (isValidVisibility) {
+              simplePersistence.operations.setAllColumnVisibility(actualVisibility);
+              fileLog.debug('💾 Saved column visibility to persistence', {
+                columnCount: Object.keys(actualVisibility).length
+              });
+            } else {
+              fileLog.warn('🚨 Rejecting invalid column visibility data', { actualVisibility });
+            }
+          } catch (error) {
+            fileLog.error('❌ Error in columnVisibility onChange callback', { error });
+          }
         });
+
 
         visualState.visualInputs$.sortBy.onChange((newSortBy) => {
           simplePersistence.operations.setSortBy(newSortBy);

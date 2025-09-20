@@ -166,6 +166,8 @@ export interface VibeGridPreferences {
 export function createVibeGridPreferences(entityType: string) {
   persistLog.info('🎯 Creating simple VibeGrid preferences store', { entityType });
 
+  const storageKey = `vibegrid-simple-${entityType}`;
+
   // Create observable with default structure
   const preferences$ = observable<VibeGridPreferences>({
     columnWidths: {},
@@ -182,269 +184,347 @@ export function createVibeGridPreferences(entityType: string) {
     lastUpdated: new Date().toISOString()
   });
 
-  // Apply persistence using smart persistence selection
-  let currentPersistConfig = getOptimalPersistenceConfig(entityType);
-
-  syncObservable(preferences$, currentPersistConfig({
-    persist: {
-      name: entityType === 'WorkTask' ? 'preferences' : `vibegrid-simple-${entityType}`,
-      indexedDB: entityType === 'WorkTask' ? {
-        itemID: `vibegrid-${entityType}`
-      } : undefined
+  // Load initial data from localStorage manually
+  try {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      preferences$.assign(parsed);
+      persistLog.info('📖 Loaded preferences from localStorage', { entityType, size: stored.length });
     }
-  }));
+  } catch (error) {
+    persistLog.warn('⚠️ Failed to load stored preferences, using defaults', { entityType, error });
+  }
+
+  // Manual save function
+  const saveToStorage = () => {
+    try {
+      // Extract only the plain values, not the observable metadata
+      const columnWidths = preferences$.columnWidths.get();
+      const columnOrder = preferences$.columnOrder.get();
+      const columnVisibility = preferences$.columnVisibility.get();
+
+      // Debug what's causing the huge size
+      persistLog.debug('🔍 Analyzing storage size', {
+        columnWidthsSize: JSON.stringify(columnWidths).length,
+        columnOrderSize: JSON.stringify(columnOrder).length,
+        columnVisibilitySize: JSON.stringify(columnVisibility).length,
+        columnWidthsKeys: Object.keys(columnWidths || {}).length,
+        columnWidthsPreview: JSON.stringify(columnWidths).substring(0, 100)
+      });
+
+      const data: VibeGridPreferences = {
+        columnWidths: columnWidths,
+        columnOrder: columnOrder,
+        columnVisibility: columnVisibility,
+        sortBy: preferences$.sortBy.get(),
+        filters: preferences$.filters.get(),
+        groupConfig: preferences$.groupConfig.get(),
+        groupRowOrders: preferences$.groupRowOrders.get(),
+        flatRowOrder: preferences$.flatRowOrder.get(),
+        scrollPosition: preferences$.scrollPosition.get(),
+        selectedCells: preferences$.selectedCells.get(),
+        entityType: preferences$.entityType.get(),
+        lastUpdated: preferences$.lastUpdated.get()
+      };
+
+      const serialized = JSON.stringify(data);
+
+      // Safety check - should be small
+      if (serialized.length > 100000) { // 100KB warning
+        persistLog.warn('🚨 Preferences unusually large, truncating', {
+          entityType,
+          size: serialized.length,
+          preview: serialized.substring(0, 200)
+        });
+        return;
+      }
+
+      localStorage.setItem(storageKey, serialized);
+      persistLog.debug('💾 Preferences saved', { entityType, size: serialized.length });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        persistLog.error('🚨 QuotaExceededError during manual save', { entityType, error });
+        // Trigger emergency cleanup but don't throw
+        operations.emergencyCleanup();
+      } else {
+        persistLog.error('❌ Failed to save preferences', { entityType, error });
+      }
+    }
+  };
 
   persistLog.info('✅ Simple VibeGrid preferences initialized', {
     entityType,
-    storageKey: `vibegrid-simple-${entityType}`
+    storageKey
   });
 
-  return {
-    preferences$,
+  const operations = {
+    // Update column width (individual)
+    setColumnWidth(columnId: string, width: number) {
+      const current = preferences$.columnWidths.get();
+      preferences$.columnWidths.set({
+        ...current,
+        [columnId]: width
+      });
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('📏 Column width saved', { columnId, width });
+    },
 
-    // Simple operations to update preferences
-    operations: {
-      // Update column width (individual)
-      setColumnWidth(columnId: string, width: number) {
-        const current = preferences$.columnWidths.get();
-        preferences$.columnWidths.set({
-          ...current,
-          [columnId]: width
-        });
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('📏 Column width saved', { columnId, width });
-      },
-
-      // Update all column widths (bulk - preferred for onChange handlers)
-      setAllColumnWidths(columnWidths: Record<string, number>) {
-        try {
-          preferences$.columnWidths.set(columnWidths);
-          preferences$.lastUpdated.set(new Date().toISOString());
-          persistLog.debug('📏 All column widths saved', { columnWidths });
-        } catch (error) {
-          if (error instanceof Error && error.name === 'QuotaExceededError') {
-            persistLog.error('🚨 QuotaExceededError in setAllColumnWidths, triggering emergency cleanup', { error });
-            this.emergencyCleanup();
-            throw error;
-          } else {
-            persistLog.error('❌ Failed to save all column widths', { error });
-            throw error;
-          }
+    // Update all column widths (bulk - preferred for onChange handlers)
+    setAllColumnWidths(columnWidths: Record<string, number>) {
+      // Defensive filtering - only save actual width numbers
+      const filteredWidths: Record<string, number> = {};
+      for (const [key, value] of Object.entries(columnWidths || {})) {
+        if (typeof value === 'number' && isFinite(value) && value > 0) {
+          filteredWidths[key] = value;
         }
-      },
+      }
 
-      // Update column order
-      setColumnOrder(order: string[]) {
-        preferences$.columnOrder.set(order);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('🔄 Column order saved', { order });
-      },
+      preferences$.columnWidths.set(filteredWidths);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('📏 All column widths saved', {
+        originalCount: Object.keys(columnWidths || {}).length,
+        filteredCount: Object.keys(filteredWidths).length,
+        filteredWidths
+      });
+    },
 
-      // Update column visibility (individual)
-      setColumnVisibility(columnId: string, visible: boolean) {
-        const current = preferences$.columnVisibility.get();
-        preferences$.columnVisibility.set({
-          ...current,
-          [columnId]: visible
-        });
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('👁️ Column visibility saved', { columnId, visible });
-      },
+    // Update column order
+    setColumnOrder(order: string[]) {
+      preferences$.columnOrder.set(order);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('🔄 Column order saved', { order });
+    },
 
-      // Update all column visibility (bulk - preferred for onChange handlers)
-      setAllColumnVisibility(columnVisibility: Record<string, boolean>) {
-        try {
-          // Validate data before saving to prevent corruption
-          const validatedVisibility = validateColumnVisibility(columnVisibility);
-          preferences$.columnVisibility.set(validatedVisibility);
-          preferences$.lastUpdated.set(new Date().toISOString());
-          persistLog.debug('👁️ All column visibility saved', { columnVisibility: validatedVisibility });
-        } catch (error) {
-          if (error instanceof Error && error.name === 'QuotaExceededError') {
-            persistLog.error('🚨 QuotaExceededError in setAllColumnVisibility, triggering emergency cleanup', { error });
-            this.emergencyCleanup();
-            throw error;
-          } else {
-            persistLog.error('❌ Failed to save all column visibility', { error });
-            throw error;
-          }
+    // Update column visibility (individual)
+    setColumnVisibility(columnId: string, visible: boolean) {
+      const current = preferences$.columnVisibility.get();
+      preferences$.columnVisibility.set({
+        ...current,
+        [columnId]: visible
+      });
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('👁️ Column visibility saved', { columnId, visible });
+    },
+
+    // Update all column visibility (bulk - preferred for onChange handlers)
+    setAllColumnVisibility(columnVisibility: Record<string, boolean>) {
+      // Defensive filtering - only save actual boolean values
+      const filteredVisibility: Record<string, boolean> = {};
+      for (const [key, value] of Object.entries(columnVisibility || {})) {
+        if (typeof value === 'boolean') {
+          filteredVisibility[key] = value;
         }
-      },
+      }
 
-      // Update sort configuration
-      setSortBy(sortBy: SortConfig[]) {
-        preferences$.sortBy.set(sortBy);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('📊 Sort configuration saved', { sortBy });
-      },
+      preferences$.columnVisibility.set(filteredVisibility);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('👁️ All column visibility saved', {
+        originalCount: Object.keys(columnVisibility || {}).length,
+        filteredCount: Object.keys(filteredVisibility).length,
+        filteredVisibility
+      });
+    },
 
-      // Update filters
-      setFilters(filters: FilterConfig[]) {
-        preferences$.filters.set(filters);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('🔍 Filters saved', { filters });
-      },
+    // Update sort configuration
+    setSortBy(sortBy: SortConfig[]) {
+      preferences$.sortBy.set(sortBy);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('📊 Sort configuration saved', { sortBy });
+    },
 
-      // Update group configuration
-      setGroupConfig(groupConfig: GroupConfig | null) {
-        // Convert runtime GroupConfig to serializable version
-        const serializableConfig: SerializableGroupConfig | null = groupConfig ? {
-          fields: groupConfig.fields,
-          sortBy: groupConfig.sortBy,
-          sortDirection: groupConfig.sortDirection,
-          aggregations: groupConfig.aggregations,
-          expandedGroups: Array.from(groupConfig.expandedGroups || new Set()), // Convert Set to Array
-          colorScheme: groupConfig.colorScheme
-        } : null;
+    // Update filters
+    setFilters(filters: FilterConfig[]) {
+      preferences$.filters.set(filters);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('🔍 Filters saved', { filters });
+    },
 
-        preferences$.groupConfig.set(serializableConfig);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.info('👥 Group configuration saved to localStorage', {
-          hasConfig: !!groupConfig,
-          originalConfig: groupConfig,
-          serializableConfig: serializableConfig,
-          fields: groupConfig?.fields?.length || 0,
-          expandedGroupsCount: groupConfig?.expandedGroups?.size || 0,
-          hasFields: !!serializableConfig?.fields,
-          fieldsArray: serializableConfig?.fields
-        });
-      },
+    // Update group configuration
+    setGroupConfig(groupConfig: GroupConfig | null) {
+      // Convert runtime GroupConfig to serializable version
+      const serializableConfig: SerializableGroupConfig | null = groupConfig ? {
+        fields: groupConfig.fields,
+        sortBy: groupConfig.sortBy,
+        sortDirection: groupConfig.sortDirection,
+        aggregations: groupConfig.aggregations,
+        expandedGroups: Array.from(groupConfig.expandedGroups || new Set()), // Convert Set to Array
+        colorScheme: groupConfig.colorScheme
+      } : null;
 
-      // Update scroll position (optional - usually not persisted for UX reasons)
-      setScrollPosition(position: { top: number; left: number }) {
-        preferences$.scrollPosition.set(position);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('📜 Scroll position saved', { position });
-      },
+      preferences$.groupConfig.set(serializableConfig);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.info('👥 Group configuration saved to localStorage', {
+        hasConfig: !!groupConfig,
+        originalConfig: groupConfig,
+        serializableConfig: serializableConfig,
+        fields: groupConfig?.fields?.length || 0,
+        expandedGroupsCount: groupConfig?.expandedGroups?.size || 0,
+        hasFields: !!serializableConfig?.fields,
+        fieldsArray: serializableConfig?.fields
+      });
+    },
 
-      // Update selected cells (transient - usually not persisted)
-      setSelectedCells(cells: string[]) {
-        preferences$.selectedCells.set(cells);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('🎯 Selected cells saved', { count: cells.length });
-      },
+    // Update scroll position (optional - usually not persisted for UX reasons)
+    setScrollPosition(position: { top: number; left: number }) {
+      preferences$.scrollPosition.set(position);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('📜 Scroll position saved', { position });
+    },
 
-      // Update group row orders for a specific group
-      setGroupRowOrder(groupId: string, rowOrder: GroupRowOrderConfig) {
-        if (!rowOrder || !rowOrder.rowIds) {
-          persistLog.error('❌ Invalid rowOrder passed to setGroupRowOrder', { groupId, rowOrder });
-          return;
-        }
+    // Update selected cells (transient - usually not persisted)
+    setSelectedCells(cells: string[]) {
+      preferences$.selectedCells.set(cells);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('🎯 Selected cells saved', { count: cells.length });
+    },
 
-        // Limit row order size to prevent storage bloat
-        const limitedRowOrder: GroupRowOrderConfig = {
-          ...rowOrder,
-          rowIds: limitRowOrders(rowOrder.rowIds)
-        };
+    // Update group row orders for a specific group
+    setGroupRowOrder(groupId: string, rowOrder: GroupRowOrderConfig) {
+      if (!rowOrder || !rowOrder.rowIds) {
+        persistLog.error('❌ Invalid rowOrder passed to setGroupRowOrder', { groupId, rowOrder });
+        return;
+      }
 
-        try {
-          const current = preferences$.groupRowOrders.get();
-          preferences$.groupRowOrders.set({
-            ...current,
-            [groupId]: limitedRowOrder
-          });
-          preferences$.lastUpdated.set(new Date().toISOString());
-          persistLog.debug('📋 Group row order saved', {
-            groupId,
-            originalCount: rowOrder.rowIds.length,
-            savedCount: limitedRowOrder.rowIds.length
-          });
-        } catch (error) {
-          if (error instanceof Error && error.name === 'QuotaExceededError') {
-            persistLog.error('🚨 QuotaExceededError in setGroupRowOrder, triggering emergency cleanup', {
-              groupId,
-              error
-            });
-            this.emergencyCleanup();
-            throw error; // Re-throw to let caller handle
-          } else {
-            persistLog.error('❌ Failed to save group row order', { groupId, error });
-            throw error;
-          }
-        }
-      },
+      // Limit row order size to prevent storage bloat
+      const limitedRowOrder: GroupRowOrderConfig = {
+        ...rowOrder,
+        rowIds: limitRowOrders(rowOrder.rowIds)
+      };
 
-      // Update flat row order (ungrouped mode)
-      setFlatRowOrder(rowOrder: string[]) {
-        const limitedRowOrder = limitRowOrders(rowOrder);
+      const current = preferences$.groupRowOrders.get();
+      preferences$.groupRowOrders.set({
+        ...current,
+        [groupId]: limitedRowOrder
+      });
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('📋 Group row order saved', {
+        groupId,
+        originalCount: rowOrder.rowIds.length,
+        savedCount: limitedRowOrder.rowIds.length
+      });
+    },
 
-        try {
-          preferences$.flatRowOrder.set(limitedRowOrder);
-          preferences$.lastUpdated.set(new Date().toISOString());
-          persistLog.debug('📋 Flat row order saved', {
-            originalCount: rowOrder.length,
-            savedCount: limitedRowOrder.length
-          });
-        } catch (error) {
-          if (error instanceof Error && error.name === 'QuotaExceededError') {
-            persistLog.error('🚨 QuotaExceededError in setFlatRowOrder, triggering emergency cleanup', {
-              rowCount: rowOrder.length,
-              error
-            });
-            this.emergencyCleanup();
-            throw error; // Re-throw to let caller handle
-          } else {
-            persistLog.error('❌ Failed to save flat row order', { error });
-            throw error;
-          }
-        }
-      },
+    // Update flat row order (ungrouped mode)
+    setFlatRowOrder(rowOrder: string[]) {
+      const limitedRowOrder = limitRowOrders(rowOrder);
+      preferences$.flatRowOrder.set(limitedRowOrder);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('📋 Flat row order saved', {
+        originalCount: rowOrder.length,
+        savedCount: limitedRowOrder.length
+      });
+    },
 
-      // Clear all row ordering (useful when switching modes)
-      clearRowOrdering() {
-        preferences$.groupRowOrders.set({});
-        preferences$.flatRowOrder.set([]);
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.debug('🗑️ All row ordering cleared');
-      },
+    // Clear all row ordering (useful when switching modes)
+    clearRowOrdering() {
+      preferences$.groupRowOrders.set({});
+      preferences$.flatRowOrder.set([]);
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.debug('🗑️ All row ordering cleared');
+    },
 
-      // Initialize with column defaults
-      initializeColumns(columns: Array<{ id: string; width?: number }>) {
-        const defaultWidths = Object.fromEntries(
-          columns.map(col => [col.id, col.width || 150])
-        );
-        const defaultVisibility = Object.fromEntries(
-          columns.map(col => [col.id, true])
-        );
-        const defaultOrder = columns.map(col => col.id);
+    // Initialize with column defaults
+    initializeColumns(columns: Array<{ id: string; width?: number }>) {
+      const defaultWidths = Object.fromEntries(
+        columns.map(col => [col.id, col.width || 150])
+      );
+      const defaultVisibility = Object.fromEntries(
+        columns.map(col => [col.id, true])
+      );
+      const defaultOrder = columns.map(col => col.id);
 
-        // Only set defaults if not already persisted
-        const currentWidths = preferences$.columnWidths.get();
-        const currentVisibility = preferences$.columnVisibility.get();
-        const currentOrder = preferences$.columnOrder.get();
+      // Only set defaults if not already persisted
+      const currentWidths = preferences$.columnWidths.get();
+      const currentVisibility = preferences$.columnVisibility.get();
+      const currentOrder = preferences$.columnOrder.get();
 
-        if (Object.keys(currentWidths).length === 0) {
-          preferences$.columnWidths.set(defaultWidths);
-        }
-        if (Object.keys(currentVisibility).length === 0) {
-          preferences$.columnVisibility.set(defaultVisibility);
-        }
-        if (currentOrder.length === 0) {
-          preferences$.columnOrder.set(defaultOrder);
-        }
+      if (Object.keys(currentWidths).length === 0) {
+        preferences$.columnWidths.set(defaultWidths);
+      }
+      if (Object.keys(currentVisibility).length === 0) {
+        preferences$.columnVisibility.set(defaultVisibility);
+      }
+      if (currentOrder.length === 0) {
+        preferences$.columnOrder.set(defaultOrder);
+      }
 
-        preferences$.lastUpdated.set(new Date().toISOString());
-        persistLog.info('🎯 Columns initialized with defaults', {
-          entityType,
-          columnsCount: columns.length,
-          hadPersistedState: Object.keys(currentWidths).length > 0
-        });
-      },
+      preferences$.lastUpdated.set(new Date().toISOString());
+      saveToStorage();
+      persistLog.info('🎯 Columns initialized with defaults', {
+        entityType,
+        columnsCount: columns.length,
+        hadPersistedState: Object.keys(currentWidths).length > 0
+      });
+    },
 
-      // Reset all preferences to defaults
-      reset(columns: Array<{ id: string; width?: number }>) {
-        const defaultWidths = Object.fromEntries(
-          columns.map(col => [col.id, col.width || 150])
-        );
-        const defaultVisibility = Object.fromEntries(
-          columns.map(col => [col.id, true])
-        );
-        const defaultOrder = columns.map(col => col.id);
+    // Reset all preferences to defaults
+    reset(columns: Array<{ id: string; width?: number }>) {
+      const defaultWidths = Object.fromEntries(
+        columns.map(col => [col.id, col.width || 150])
+      );
+      const defaultVisibility = Object.fromEntries(
+        columns.map(col => [col.id, true])
+      );
+      const defaultOrder = columns.map(col => col.id);
 
+      preferences$.assign({
+        columnWidths: defaultWidths,
+        columnOrder: defaultOrder,
+        columnVisibility: defaultVisibility,
+        sortBy: [],
+        filters: [],
+        groupConfig: null,
+        groupRowOrders: {},
+        flatRowOrder: [],
+        scrollPosition: { top: 0, left: 0 },
+        selectedCells: [],
+        lastUpdated: new Date().toISOString()
+      });
+
+      saveToStorage();
+      persistLog.info('🔄 Preferences reset to defaults', { entityType });
+    },
+
+    // Get current preferences as plain object
+    getSnapshot(): VibeGridPreferences {
+      return preferences$.get();
+    },
+
+    // Debug: Clear all persistence
+    clearPersistence() {
+      const storageKey = `vibegrid-simple-${entityType}`;
+      localStorage.removeItem(storageKey);
+      persistLog.info('🗑️ Persistence cleared', { entityType, storageKey });
+    },
+
+    // Emergency cleanup for quota exceeded errors
+    emergencyCleanup() {
+      const storageKey = `vibegrid-simple-${entityType}`;
+      try {
+        persistLog.warn('🧹 Starting emergency cleanup for quota exceeded error', { entityType, storageKey });
+
+        // Clear localStorage completely for this key
+        localStorage.removeItem(storageKey);
+
+        // Reset to minimal state
         preferences$.assign({
-          columnWidths: defaultWidths,
-          columnOrder: defaultOrder,
-          columnVisibility: defaultVisibility,
+          columnWidths: {},
+          columnOrder: [],
+          columnVisibility: {},
           sortBy: [],
           filters: [],
           groupConfig: null,
@@ -452,115 +532,36 @@ export function createVibeGridPreferences(entityType: string) {
           flatRowOrder: [],
           scrollPosition: { top: 0, left: 0 },
           selectedCells: [],
+          entityType,
           lastUpdated: new Date().toISOString()
         });
 
-        persistLog.info('🔄 Preferences reset to defaults', { entityType });
-      },
+        persistLog.info('🧹 Emergency cleanup completed', { entityType });
+      } catch (error) {
+        persistLog.error('❌ Emergency cleanup failed', { entityType, error });
+      }
+    },
 
-      // Get current preferences as plain object
-      getSnapshot(): VibeGridPreferences {
-        return preferences$.get();
-      },
+    // Switch to IndexedDB persistence (for when localStorage fails)
+    switchToIndexedDB() {
+      try {
+        // Mark this entity to use IndexedDB
+        localStorage.setItem(`vibegrid-force-indexeddb-${entityType}`, 'true');
 
-      // Debug: Clear all persistence
-      clearPersistence() {
+        // Clear localStorage to free up space
         const storageKey = `vibegrid-simple-${entityType}`;
         localStorage.removeItem(storageKey);
-        persistLog.info('🗑️ Persistence cleared', { entityType, storageKey });
-      },
 
-      // Emergency cleanup for quota exceeded errors
-      emergencyCleanup() {
-        const storageKey = `vibegrid-simple-${entityType}`;
-        try {
-          persistLog.warn('🧹 Starting emergency cleanup for quota exceeded error', { entityType, storageKey });
-
-          // Step 1: Try minimal cleanup first
-          const currentPrefs = preferences$.get();
-          const cleanedPrefs = {
-            ...currentPrefs,
-            groupRowOrders: {}, // Clear all row orders
-            flatRowOrder: [], // Clear flat order
-            selectedCells: [] // Clear selections
-          };
-
-          // Try to save cleaned version
-          localStorage.setItem(storageKey, JSON.stringify(cleanedPrefs));
-
-          // Update observables
-          preferences$.groupRowOrders.set({});
-          preferences$.flatRowOrder.set([]);
-          preferences$.selectedCells.set([]);
-          preferences$.lastUpdated.set(new Date().toISOString());
-
-          persistLog.info('🧹 Emergency cleanup completed - minimal cleanup successful', {
-            entityType,
-            storageKey,
-            clearedArrays: ['groupRowOrders', 'flatRowOrder', 'selectedCells']
-          });
-        } catch (cleanupError) {
-          persistLog.warn('🧹 Minimal cleanup failed, trying aggressive cleanup', { cleanupError });
-
-          try {
-            // Step 2: Aggressive cleanup - keep only essential data
-            const essentialPrefs = {
-              columnWidths: {},
-              columnOrder: [],
-              columnVisibility: {},
-              sortBy: [],
-              filters: [],
-              groupConfig: null,
-              groupRowOrders: {},
-              flatRowOrder: [],
-              scrollPosition: { top: 0, left: 0 },
-              selectedCells: [],
-              lastUpdated: new Date().toISOString()
-            };
-
-            localStorage.setItem(storageKey, JSON.stringify(essentialPrefs));
-
-            // Reset observables to minimal state
-            preferences$.assign(essentialPrefs);
-
-            persistLog.info('🧹 Emergency cleanup completed - aggressive cleanup successful', {
-              entityType,
-              action: 'reset-to-defaults'
-            });
-          } catch (aggressiveError) {
-            persistLog.error('🧹 Aggressive cleanup failed, removing localStorage entry completely', { aggressiveError });
-
-            // Step 3: Last resort - remove the localStorage entry completely
-            try {
-              localStorage.removeItem(storageKey);
-              persistLog.info('🧹 Emergency cleanup completed - localStorage entry removed', { entityType });
-            } catch (removeError) {
-              persistLog.error('❌ Complete emergency cleanup failed', { entityType, removeError });
-            }
-          }
-        }
-      },
-
-      // Switch to IndexedDB persistence (for when localStorage fails)
-      switchToIndexedDB() {
-        try {
-          // Mark this entity to use IndexedDB
-          localStorage.setItem(`vibegrid-force-indexeddb-${entityType}`, 'true');
-
-          // Clear localStorage to free up space
-          const storageKey = `vibegrid-simple-${entityType}`;
-          localStorage.removeItem(storageKey);
-
-          persistLog.info('🗄️ Switched to IndexedDB persistence', { entityType });
-
-          // Note: To fully switch, the component would need to be remounted
-          // or we'd need to re-sync the observable with new persistence config
-
-        } catch (error) {
-          persistLog.error('❌ Failed to switch to IndexedDB', { entityType, error });
-        }
+        persistLog.info('🗄️ Switched to IndexedDB persistence', { entityType });
+      } catch (error) {
+        persistLog.error('❌ Failed to switch to IndexedDB', { entityType, error });
       }
     }
+  };
+
+  return {
+    preferences$,
+    operations
   };
 }
 
