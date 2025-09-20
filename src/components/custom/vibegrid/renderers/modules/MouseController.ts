@@ -672,8 +672,8 @@ export class MouseController {
 
         // Handle different click types:
         // Regular click -> single cell selection
-        // Ctrl+click -> add to selection
         // Shift+click -> range selection
+        // Ctrl/Cmd+click -> disabled (treated as regular click)
         if (e.shiftKey) {
           // Shift+click: Range selection from last selected cell
           const selectedCells = this.tableInteraction$.selectedCells.get();
@@ -695,20 +695,9 @@ export class MouseController {
             // No previous selection, just select this cell
             this.tableInteraction$.selectedCells.set(new Set([cellId]));
           }
-        } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl+click: Toggle cell selection (add/remove from current selection)
-          const selectedCells = this.tableInteraction$.selectedCells.get();
-          const newSelectedCells = new Set(selectedCells);
-
-          if (newSelectedCells.has(cellId)) {
-            newSelectedCells.delete(cellId);
-          } else {
-            newSelectedCells.add(cellId);
-          }
-
-          this.tableInteraction$.selectedCells.set(newSelectedCells);
         } else {
-          // Regular click: Replace selection with this cell
+          // Regular click or Ctrl/Cmd+click: Replace selection with this cell
+          // (Ctrl/Cmd+click is disabled in this system)
           this.tableInteraction$.selectedCells.set(new Set([cellId]));
         }
 
@@ -809,34 +798,28 @@ export class MouseController {
               isCtrlKey
             });
 
-            if (isCtrlKey && !isShiftKey && this.selectionController) {
-              // Ctrl+Click on header - select entire column
-              e.preventDefault();
-              this.selectionController.selectColumn(columnId);
-              fileLog.info('🎯 Column selected', { columnId });
-            } else {
-              // Regular click or Shift+click - toggle sort
-              // Shift+click enables multi-column sorting
-              const isMultiSort = isShiftKey;
+            // Ctrl+click for column selection is disabled in this system
+            // Regular click or Shift+click - toggle sort
+            // Shift+click enables multi-column sorting
+            const isMultiSort = isShiftKey;
 
-              fileLog.info('🔄 Column header clicked for sort', {
-                columnId,
-                field,
-                isMultiSort,
-                isShiftKey
-              });
+            fileLog.info('🔄 Column header clicked for sort', {
+              columnId,
+              field,
+              isMultiSort,
+              isShiftKey
+            });
 
               // Use visual state operations for sorting
-              fileLog.info('🔄 About to call toggleSort', {
-                hasVisualState: !!this.visualState,
-                hasVisualOperations: !!this.visualState?.visualOperations,
-                hasToggleSort: !!this.visualState?.visualOperations?.toggleSort,
-                field,
-                isMultiSort
-              });
-              this.visualState.visualOperations.toggleSort(field, isMultiSort);
-              fileLog.info('🔄 toggleSort call completed');
-            }
+            fileLog.info('🔄 About to call toggleSort', {
+              hasVisualState: !!this.visualState,
+              hasVisualOperations: !!this.visualState?.visualOperations,
+              hasToggleSort: !!this.visualState?.visualOperations?.toggleSort,
+              field,
+              isMultiSort
+            });
+            this.visualState.visualOperations.toggleSort(field, isMultiSort);
+            fileLog.info('🔄 toggleSort call completed');
           }
         } else if (!cellElement) {
         // Check if this was actually a column header click that didn't get detected
@@ -855,25 +838,18 @@ export class MouseController {
           });
 
           if (columnId && field) {
-            const isCtrlKey = e.ctrlKey || e.metaKey;
             const isShiftKey = e.shiftKey;
 
-            if (isCtrlKey && !isShiftKey && this.selectionController) {
-              // Ctrl+Click on header - select entire column
-              e.preventDefault();
-              this.selectionController.selectColumn(columnId);
-              fileLog.info('🎯 Column selected via fallback', { columnId });
-            } else {
-              // Regular click or Shift+click - toggle sort
-              const isMultiSort = isShiftKey;
-              fileLog.info('🔄 Column header clicked for sort via fallback', {
-                columnId,
-                field,
-                isMultiSort,
-                isShiftKey
-              });
-              this.visualState.visualOperations.toggleSort(field, isMultiSort);
-            }
+            // Ctrl+click for column selection is disabled in this system
+            // Regular click or Shift+click - toggle sort
+            const isMultiSort = isShiftKey;
+            fileLog.info('🔄 Column header clicked for sort via fallback', {
+              columnId,
+              field,
+              isMultiSort,
+              isShiftKey
+            });
+            this.visualState.visualOperations.toggleSort(field, isMultiSort);
             return; // Important: exit early to prevent "container click" message
           }
         }
