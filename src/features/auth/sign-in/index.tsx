@@ -12,8 +12,12 @@ import { UserAuthForm } from './components/user-auth-form'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useLegendAuth } from '@/legend-state/hooks/use-legend-auth'
 import { useEffect } from 'react'
+import { useRouteReady } from '@/legend-state/route-readiness'
 
 export default function SignIn() {
+  // Signal route readiness
+  useRouteReady();
+
   // Use Legend State as the default and only auth system
   const { isAuthenticated } = useLegendAuth();
   

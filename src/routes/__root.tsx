@@ -8,17 +8,15 @@ import { useEffect, useState } from 'react'
 import { InitializationErrorBoundary } from '@/components/error-boundary'
 import { AuthAwareProviders } from '@/components/providers/AuthAwareProviders'
 import { Task, Project, User } from '@/db/client-entities'
-// import { useAuth } from '@/state-machines' // 🔥 REPLACED with V2 orchestrator hook
 import { authClient } from '@/lib/auth'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { IntegrityMonitor } from '@/components/IntegrityMonitor'
-// Sync system replaced with Legend State reactive observables
-// XState machines removed in favor of reactive pattern
-import { useSystem } from '@/state-machines'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { log } from '@/logger'
 import React from 'react'
 import { useRouter } from '@tanstack/react-router'
+import { routeReadiness$, routeReadinessActions } from '@/legend-state/route-readiness'
+import { useSelector } from '@legendapp/state/react'
 
 // Router context interface with atom setters
 interface RouterContext {
@@ -47,6 +45,9 @@ localStorage.removeItem('vibestack-last-organization-id');
 
 // Initialize Legend State auth system
 rootLog.info('Legend State auth system handles authentication and initialization automatically');
+
+// Initialize app-wide loading stages
+import { appInitMethods$, useAppInitialization } from '@/legend-state/app-initialization-stages';
 
 // Initialize Legend State sync manager
 rootLog.info('Initializing Legend State sync manager')
@@ -98,26 +99,9 @@ window.addEventListener('auth:signout', () => {
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   // 🎯 LOADING COMPONENT: Show loading during navigation (intent preloading)
-  pendingComponent: () => (
-    <div className="h-svh w-full flex items-center justify-center bg-zinc-950">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <h1 className="text-xl font-semibold text-zinc-100">Loading Page</h1>
-        </div>
-        <div className="text-center space-y-2">
-          <p className="text-sm font-medium text-zinc-400">
-            Loading components...
-          </p>
-          <p className="text-xs text-zinc-500">
-            This will be faster next time
-          </p>
-        </div>
-      </div>
-    </div>
-  ),
+  pendingComponent: UnifiedLoadingScreen,
   component: function RootComponent() {
-    rootLog.info('RootComponent rendering at', Date.now());
+    rootLog.debug('RootComponent rendering at', Date.now()); // HMR test 8 - component mount ID tracking
     return (
       <InitializationErrorBoundary>
         {/* 🔥 FIXED: No provider needed - using direct actor access */}
@@ -130,7 +114,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponentInternal() {
-  rootLog.info('RootComponentInternal rendering at', Date.now());
+  rootLog.debug('RootComponentInternal rendering at', Date.now());
   const { isAuthenticated } = useUnifiedAuth()
   const navigate = useNavigate()
   
@@ -159,54 +143,105 @@ function RootComponentInternal() {
 }
 
 function AppWithInitialization() {
-  rootLog.info('AppWithInitialization rendering at', Date.now());
+  rootLog.debug('[APP-INIT] AppWithInitialization rendering at', Date.now());
   const navigate = useNavigate()
   const router = useRouter()
-  const { isSystemReady } = useSystem()
-  
-  // Use unified auth that combines both XState and Legend State auth
+
+  // Use unified auth
   const { isAuthenticated, isSystemReady: unifiedSystemReady } = useUnifiedAuth()
-  
-  // Use the unified system ready state (combines both sources)
-  const finalSystemReady = isSystemReady || unifiedSystemReady
-  
-  rootLog.info('AppWithInitialization states:', { 
-    isSystemReady, 
+
+  // Use app initialization to check if the app is fully loaded
+  const appInit = useAppInitialization()
+
+  // Start app initialization once when component mounts
+  React.useEffect(() => {
+    // Check if initialization is already in progress or completed
+    const currentStage = appInit.stage;
+    if (currentStage === 'idle') {
+      rootLog.debug('[APP-INIT] Starting app initialization from component mount');
+      appInitMethods$.initialize().catch((error) => {
+        rootLog.error('[APP-INIT] App initialization failed:', error);
+      });
+    }
+  }, []); // Run once on mount
+
+  // Use route readiness tracking
+  const routeReady = useSelector(routeReadiness$.isReady)
+  const shouldShowLoadingForRoute = useSelector(routeReadiness$.shouldShowLoading)
+
+  // Determine if we should show loading screen
+  const shouldShowLoading = !appInit.isReady || shouldShowLoadingForRoute
+
+  // Start route loading tracking only on initial mount
+  React.useEffect(() => {
+    // Reset route readiness on component mount (handles HMR)
+    routeReadinessActions.reset();
+    const pathname = router.state.location.pathname;
+    routeReadinessActions.startLoading(pathname);
+  }, []); // Empty deps - only run once on mount
+
+  rootLog.debug('[APP-INIT] AppWithInitialization states:', {
     unifiedSystemReady,
-    finalSystemReady,
     isAuthenticated: isAuthenticated,
-    source: 'unified auth (combines XState + Legend State)'
+    appInitReady: appInit.isReady,
+    appInitStage: appInit.stage,
+    appInitProgress: appInit.progressPercent,
+    routeReady,
+    shouldShowLoadingForRoute,
+    shouldShowLoading
   });
-  
+
   // Listen for auth state changes to handle navigation
   React.useEffect(() => {
     const handleAuthStateChange = (event: CustomEvent) => {
       const { authenticated, reason } = event.detail
       rootLog.info('Auth state changed:', { authenticated, reason })
-      
+
       // Note: Immediate navigation now handled in useAuth.signOut() to prevent component re-rendering
       const publicPaths = ['/sign-', '/reset-password', '/complete-registration', '/forgot-password', '/verify-email', '/otp-verify']
       const isPublicPath = publicPaths.some(path => window.location.pathname.startsWith(path))
-      
+
       if (!authenticated && reason === 'unauthenticated' && !isPublicPath) {
         // Handle edge cases where auth check fails (not from sign-out)
         rootLog.info('Unauthenticated state detected, redirecting to sign-in')
         navigate({ to: '/sign-in', replace: true })
       }
     }
-    
+
     window.addEventListener('auth:state-changed', handleAuthStateChange as EventListener)
-    
+
     return () => {
       window.removeEventListener('auth:state-changed', handleAuthStateChange as EventListener)
     }
   }, [navigate]);
-  
-  // Note: Removed root-level UnifiedLoadingScreen to prevent flickering
-  // Loading state is now handled entirely by AuthenticatedContent component
+
+  // Show loading screen until app initialization is complete
+  // Once app is ready, render outlet with loading overlay if route isn't ready
+  if (!appInit.isReady) {
+    rootLog.debug('[APP-INIT] Showing UnifiedLoadingScreen - app not ready', {
+      appInitReady: appInit.isReady,
+      stage: appInit.stage,
+      progress: appInit.progressPercent
+    });
+    return <UnifiedLoadingScreen />
+  }
+
+  rootLog.debug('[APP-INIT] App ready, rendering Outlet', {
+    appInitReady: appInit.isReady,
+    routeReady,
+    shouldShowLoadingForRoute,
+    stage: appInit.stage,
+    progress: appInit.progressPercent
+  });
+
   return (
     <>
       <Outlet />
+      {shouldShowLoadingForRoute && (
+        <div className="fixed inset-0 z-50">
+          <UnifiedLoadingScreen />
+        </div>
+      )}
       <IntegrityMonitor />
       <Toaster duration={3000} />
       {import.meta.env.MODE === 'development' && (

@@ -12,6 +12,7 @@ import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
 import { log } from '@/logger'
 import { auth$ } from '@/legend-state/auth'
+import { useRouteReady } from '@/legend-state/route-readiness'
 
 // Removed session tracking - components handle their own initialization state
 
@@ -22,7 +23,7 @@ export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
   beforeLoad: async ({ location }) => {
     // AUTH MACHINE REMOVED - Use Legend State auth directly
-    myLog.info('Auth check triggered', { path: location.pathname })
+    myLog.debug('[APP-INIT] _authenticated beforeLoad triggered', { path: location.pathname })
     
     // Check Legend State auth - wait for loading to complete
     const legendStateLoading = auth$.loading.get()
@@ -86,7 +87,10 @@ function RouteComponent() {
 }
 
 const AuthenticatedContent = observer(function AuthenticatedContent() {
-  
+
+  // Signal route readiness
+  useRouteReady();
+
   // Use unified auth system that combines XState and Legend State
   const unifiedAuth = useUnifiedAuth();
   
@@ -113,18 +117,31 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   // Simplified loading logic - removed artificial delay that caused flickering
   if (authState.isCheckingAuth || authState.isLoadingOrganizations ||
       (!authState.isAuthenticatedAndReady && !authState.needsOrganizationSelection)) {
+    myLog.debug('[APP-INIT] AuthenticatedContent showing loading screen - auth/org state', {
+      isCheckingAuth: authState.isCheckingAuth,
+      isLoadingOrganizations: authState.isLoadingOrganizations,
+      isAuthenticatedAndReady: authState.isAuthenticatedAndReady,
+      needsOrganizationSelection: authState.needsOrganizationSelection
+    });
     return <UnifiedLoadingScreen />;
   }
 
   // Show organization setup if needed (after loading is done)
   if (authState.needsOrganizationSelection) {
+    myLog.debug('[APP-INIT] AuthenticatedContent showing PostAuthOrganizationSetup');
     return <PostAuthOrganizationSetup />;
   }
 
   // Show loading if still not fully ready after org setup
   if (!authState.isAuthenticatedAndReady || !authState.organizationSetupComplete) {
+    myLog.debug('[APP-INIT] AuthenticatedContent showing loading screen - not ready', {
+      isAuthenticatedAndReady: authState.isAuthenticatedAndReady,
+      organizationSetupComplete: authState.organizationSetupComplete
+    });
     return <UnifiedLoadingScreen />;
   }
+
+  myLog.debug('[APP-INIT] AuthenticatedContent rendering main app content');
 
   // Render the main app with trial expiration guard
   return (

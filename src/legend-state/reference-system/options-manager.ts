@@ -336,16 +336,27 @@ export const OptionsManager = {
    * Preload commonly used system options
    */
   preloadSystemOptions() {
+    // Check if we have any organizations available before trying to load options
+    const orgId = getValidOrgId()
+    if (!orgId) {
+      fileLog.debug('[OptionsManager] No organizations available yet, skipping preloadSystemOptions')
+      return
+    }
+
     const commonTypes = ['priority', 'status', 'category']
     const commonArchetypes = ['task', 'project', 'record', 'document']
-    
+
     for (const type of commonTypes) {
       for (const archetype of commonArchetypes) {
-        // This will create the observable and trigger async loading
-        getSystemOptionsObservable(type, archetype)
+        try {
+          // This will create the observable and trigger async loading
+          getSystemOptionsObservable(type, archetype)
+        } catch (error) {
+          fileLog.error(`[OptionsManager] Error loading options for ${type}_${archetype}:`, error)
+        }
       }
     }
-    
+
     fileLog.info('[OptionsManager] Preloading system options for common combinations')
   },
   

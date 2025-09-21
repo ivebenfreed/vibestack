@@ -1,134 +1,51 @@
 import React from 'react';
-import { useAuth, useSystem, useAppInit } from '@/state-machines';
-import { Loader2, Database, Shield, Wifi, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { useAppInitialization } from '@/legend-state/app-initialization-stages';
 
 interface UnifiedLoadingScreenProps {
   routeName?: string;
 }
 
 export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
-  const { isAuthenticated, isCheckingAuth, isSigningIn } = useAuth();
-  const { isSystemReady } = useSystem();
-  const { 
-    isCheckingRequirements, 
-    isInitializingDatabase, 
-    isStartingSync, 
-    isStartingLiveChanges, 
-    isReady 
-  } = useAppInit();
-  
-  // 🎯 OPTIMIZED: Show loading for auth and initial org setup
-  // Once system is ready, dashboard shows with progressive data loading
-  const shouldShow = !isSystemReady && (
-    isCheckingAuth || 
-    isSigningIn || 
-    isCheckingRequirements ||
-    isInitializingDatabase ||
-    isStartingSync
-  );
+  // Use app initialization stages only
+  const appInit = useAppInitialization();
 
-  // Silent rendering - no console spam
+  // App initialization is triggered from __root.tsx
 
-  // Simple loading state - no complex phase detection
+
+  // Simple loading state - single unified loading experience
   const getLoadingState = () => {
-    if (isCheckingAuth) {
+    // Use a single simplified loading state since initialization is fast
+    if (appInit.hasError) {
       return {
-        phase: 'auth',
-        icon: Shield,
-        title: 'Checking Authentication',
-        message: 'Verifying your session...',
+        phase: 'error',
+        icon: AlertTriangle,
+        title: 'Initialization Error',
+        message: appInit.errors[0]?.message || 'Something went wrong',
         colorClasses: {
-          bg: 'bg-blue-50 dark:bg-blue-950',
-          icon: 'text-blue-600 dark:text-blue-400',
+          bg: 'bg-red-50 dark:bg-red-950',
+          icon: 'text-red-600 dark:text-red-400',
         }
       };
     }
 
-    if (isSigningIn) {
-      return {
-        phase: 'signing-in',
-        icon: Shield,
-        title: 'Signing In',
-        message: 'Authenticating your credentials...',
-        colorClasses: {
-          bg: 'bg-blue-50 dark:bg-blue-950',
-          icon: 'text-blue-600 dark:text-blue-400',
-        }
-      };
-    }
-
-    // App initialization states
-    if (isCheckingRequirements) {
-      return {
-        phase: 'starting',
-        icon: Loader2,
-        title: 'Starting...',
-        message: 'Preparing application...',
-        colorClasses: {
-          bg: 'bg-gray-50 dark:bg-gray-950',
-          icon: 'text-gray-600 dark:text-gray-400',
-        }
-      };
-    }
-
-    if (isInitializingDatabase) {
-      return {
-        phase: 'database',
-        icon: Database,
-        title: 'Setting up database...',
-        message: 'Initializing local storage...',
-        colorClasses: {
-          bg: 'bg-green-50 dark:bg-green-950',
-          icon: 'text-green-600 dark:text-green-400',
-        }
-      };
-    }
-
-    if (isStartingSync) {
-      return {
-        phase: 'sync',
-        icon: Wifi,
-        title: 'Syncing data...',
-        message: 'Connecting and syncing...',
-        colorClasses: {
-          bg: 'bg-purple-50 dark:bg-purple-950',
-          icon: 'text-purple-600 dark:text-purple-400',
-        }
-      };
-    }
-
-    if (isStartingLiveChanges) {
-      return {
-        phase: 'live-changes',
-        icon: RefreshCw,
-        title: 'Preparing live updates...',
-        message: 'Setting up real-time sync...',
-        colorClasses: {
-          bg: 'bg-orange-50 dark:bg-orange-950',
-          icon: 'text-orange-600 dark:text-orange-400',
-        }
-      };
-    }
-
-    // Default loading state for everything else
+    // Single loading state for all stages
     return {
       phase: 'loading',
       icon: Loader2,
       title: 'Loading Application',
       message: 'Setting up your workspace...',
       colorClasses: {
-        bg: 'bg-gray-50 dark:bg-gray-950',
-        icon: 'text-gray-600 dark:text-gray-400',
+        bg: 'bg-blue-50 dark:bg-blue-950',
+        icon: 'text-blue-600 dark:text-blue-400',
       }
     };
+
   };
 
   const loadingState = getLoadingState();
 
-  // Don't render anything if system is ready
-  if (!shouldShow) {
-    return null;
-  }
+
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
@@ -152,14 +69,14 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
             </p>
           </div>
 
-          {/* Progress bar (if available) */}
-          {loadingState.progress !== undefined && (
-            <div className="w-full bg-muted rounded-full h-2">
-              <div 
-                className={`h-2 rounded-full transition-all duration-300 ${loadingState.colorClasses.progress}`}
-                style={{ width: `${Math.max(0, Math.min(100, loadingState.progress))}%` }}
-              />
-            </div>
+          {/* Error retry button */}
+          {appInit.hasError && (
+            <button
+              onClick={() => appInit.retry()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            >
+              Retry
+            </button>
           )}
 
           {/* Connection status indicator */}
@@ -177,14 +94,11 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
               <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">
                 {JSON.stringify({
                   phase: loadingState.phase,
-                  auth: {
-                    isAuthenticated,
-                    isCheckingAuth,
-                    isSigningIn,
-                  },
-                  system: {
-                    isSystemReady,
-                    shouldShow,
+                  appInit: {
+                    stage: appInit.stage,
+                    progress: appInit.progressPercent,
+                    isReady: appInit.isReady,
+                    hasError: appInit.hasError,
                   }
                 }, null, 2)}
               </pre>
