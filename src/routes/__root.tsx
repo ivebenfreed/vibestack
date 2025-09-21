@@ -98,10 +98,10 @@ window.addEventListener('auth:signout', () => {
 // and DexieProvider is mounted to handle the database events
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  // 🎯 LOADING COMPONENT: Show loading during navigation (intent preloading)
-  pendingComponent: UnifiedLoadingScreen,
+  // 🎯 LOADING COMPONENT: Handled manually in AppWithInitialization
+  // pendingComponent removed to prevent duplicate loading screens
   component: function RootComponent() {
-    rootLog.debug('RootComponent rendering at', Date.now()); // HMR test 8 - component mount ID tracking
+    rootLog.debug('RootComponent rendering at', Date.now()); // HMR test 10 - verifying HMR works after fix
     return (
       <InitializationErrorBoundary>
         {/* 🔥 FIXED: No provider needed - using direct actor access */}
@@ -237,11 +237,7 @@ function AppWithInitialization() {
   return (
     <>
       <Outlet />
-      {shouldShowLoadingForRoute && (
-        <div className="fixed inset-0 z-50">
-          <UnifiedLoadingScreen />
-        </div>
-      )}
+      {/* Loading screen overlay removed - was causing stuck loading state */}
       <IntegrityMonitor />
       <Toaster duration={3000} />
       {import.meta.env.MODE === 'development' && (

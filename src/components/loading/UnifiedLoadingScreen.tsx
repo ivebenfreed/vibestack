@@ -90,10 +90,11 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
           {/* Debug info in development */}
           {import.meta.env.MODE === 'development' && (
             <details className="w-full text-xs text-muted-foreground">
-              <summary className="cursor-pointer">Debug Info</summary>
+              <summary className="cursor-pointer">Debug Info (HMR Test)</summary>
               <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">
                 {JSON.stringify({
                   phase: loadingState.phase,
+                  timestamp: Date.now(),
                   appInit: {
                     stage: appInit.stage,
                     progress: appInit.progressPercent,
