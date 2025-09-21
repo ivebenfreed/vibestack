@@ -220,7 +220,25 @@ export function createDatabaseConnection(env: Env): void {
   initializeDatabaseManager(env);
 }
 
-// Legacy cleanup function (no-op since we don't share connections)
-export function cleanupDatabaseConnection(): void {
-  // No-op: postgres.js connections clean up automatically in Workers
+// Cleanup function to properly destroy database connections
+export async function cleanupDatabaseConnection(): Promise<void> {
+  try {
+    // Clean up any cached Kysely instances
+    if (globalThis.__kysely_instance) {
+      await globalThis.__kysely_instance.destroy();
+      globalThis.__kysely_instance = undefined;
+      console.log('💥 Destroyed cached Kysely instance');
+    }
+
+    // Clean up any cached postgres.js clients
+    if (globalThis.__postgres_client) {
+      await globalThis.__postgres_client.end();
+      globalThis.__postgres_client = undefined;
+      console.log('💥 Destroyed cached postgres.js client');
+    }
+
+    console.log('✅ Database connection cleanup completed');
+  } catch (error) {
+    console.error('❌ Error during database connection cleanup:', error);
+  }
 }

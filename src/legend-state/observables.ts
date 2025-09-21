@@ -14,6 +14,7 @@ import { initializationManager, ensureLegendStateReady, type PersistenceContext 
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { clearSchemaObservables, getSchemaObservable$, peekSchemaData$ } from './schema-observable'
 import { setPersistenceManagerReference, setPersistenceConfigSetter, setupFullPersistenceConfig } from './persistence-utils'
+import { syncNotifications$ } from './sync-notifications'
 import { log } from '@/logger';
 const fileLog = log('legend-state/observables.ts');
 
@@ -700,57 +701,63 @@ function createEntityObservable(entityName: string, schema?: any) {
     // Use empty array as in working example, even though we return object data
     initial: [],
 
-    // WebSocket subscription for real-time updates
+    // REACTIVE SYNC SUBSCRIPTION - Direct Legend State observable subscription
     subscribe: ({ refresh }: { refresh: () => void }) => {
-      const handler = (e: CustomEvent) => {
-        const notification = e.detail
-        
+      // Create reactive subscription to sync notifications for this entity
+      const notificationHandler = (notification: any) => {
+        if (!notification) return
+
         // Only log notifications in development for debugging
         if (typeof window !== 'undefined' && window.location?.hostname === 'localhost' && notification.test) {
           fileLog.info(`[Observable] ${entityName} received test notification:`, notification)
         }
-        
-        // **NEW: Enhanced notification handling for virtual entities**
+
+        // **Enhanced notification handling for virtual entities**
         let isRelevantNotification = false
-        
+
         if (isVirtual && schema._backendTables) {
           // Virtual entities listen to their backend tables
           isRelevantNotification = notification?.tables?.some((tableName: string) => {
             return schema._backendTables.includes(tableName)
           })
-          
+
           if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
             fileLog.info(`[Observable] Virtual entity ${entityName} sync triggered by backend table change:`, notification.tables)
           }
         } else {
-          // Regular entities use original logic
+          // Regular entities use original logic - entity name matching
           isRelevantNotification = notification?.tables?.some((tableName: string) => {
             const expectedTableName = entityName.toLowerCase() + 's'
             return tableName === expectedTableName
           })
-          
+
           if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-            fileLog.info(`[Observable] ${entityName} sync triggered by WebSocket`)
+            fileLog.info(`[Observable] ${entityName} sync triggered by direct observable notification`)
           }
         }
-        
+
         if (isRelevantNotification) {
+          fileLog.debug(`[Observable] Refreshing ${entityName} due to sync notification`, {
+            messageId: notification.messageId,
+            tables: notification.tables
+          })
           refresh()
         }
       }
-      
-      // Listen for table change notifications
-      if (typeof window !== 'undefined') {
-        window.addEventListener('vibestack:table-change-notification', handler as any)
-      }
-      
+
+      // DIRECT OBSERVABLE SUBSCRIPTION - No CustomEvent needed
+      const entityNotification$ = syncNotifications$.getNotificationFor(entityName)
+
+      // Subscribe to notifications using Legend State's when() for reactive subscription
+      const unsubscribe = when(entityNotification$, notificationHandler)
+
+      fileLog.info(`[Observable] ${entityName} subscribed to direct sync notifications`)
+
       // Return cleanup function
       return () => {
-        if (typeof window !== 'undefined') {
-          window.removeEventListener('vibestack:table-change-notification', handler as any)
-          if (window.location?.hostname === 'localhost') {
-            fileLog.info(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
-          }
+        unsubscribe()
+        if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+          fileLog.info(`[Observable] ${entityName} unsubscribed from direct sync notifications`)
         }
       }
     }

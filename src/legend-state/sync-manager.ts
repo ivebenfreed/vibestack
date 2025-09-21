@@ -14,6 +14,7 @@
 
 import { observable, computed, when } from '@legendapp/state'
 import { getOrgActorWebSocketUrl, syncConfig } from '../sync/config'
+import { syncNotifications$ } from './sync-notifications'
 import { log } from '@/logger'
 
 const fileLog = log('legend-state/sync-manager.ts')
@@ -175,32 +176,23 @@ function setupWebSocketHandlers(ws: WebSocket) {
       // Handle table change notifications
       if (message.type === 'srv_table_change_notification') {
         fileLog.info('🔔 Table notification:', JSON.stringify(message.tables))
-        
-        // Update sync state with notification data
-        syncState$.lastNotification.set({
+
+        const notification = {
           tables: message.tables,
           organizationId: message.organizationId,
           timestamp: message.timestamp || Date.now(),
           lsn: message.lsn,
           source: message.source,
           messageId: message.messageId
-        })
-        
-        // Dispatch direct event to Legend State observables (replacing CustomEvent)
-        fileLog.info('📋 Processing table notification directly in Legend State')
-        
-        // TODO: Direct Legend State entity refresh will replace this event dispatch
-        // For now, maintain compatibility with existing CustomEvent pattern
-        window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
-          detail: {
-            tables: message.tables,
-            organizationId: message.organizationId,
-            lsn: message.lsn,
-            source: message.source,
-            messageId: message.messageId,
-            timestamp: message.timestamp || Date.now()
-          }
-        }))
+        }
+
+        // Update sync state with notification data
+        syncState$.lastNotification.set(notification)
+
+        // DIRECT OBSERVABLE UPDATE - Replace CustomEvent with pure Legend State reactivity
+        syncNotifications$.addNotification(notification)
+
+        fileLog.info('📋 Table notification processed via direct Legend State observable update')
         
       } else if (message.type === 'srv_heartbeat') {
         fileLog.debug('💓 Heartbeat received')

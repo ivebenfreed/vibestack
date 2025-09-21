@@ -9,6 +9,7 @@
 
 import { observable, computed, batch } from '@legendapp/state';
 import { getEntity$, entityOperations, universeSchema$, universeLoading$, universeOrgId$, universeUserId$, universeContext$ } from '@/legend-state/observables';
+import { syncNotifications$, syncStatus$ } from '@/legend-state/sync-notifications';
 import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
@@ -154,6 +155,18 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
 
   // Create the core observable with default values
   const tableCore$ = observable({
+    // Sync status monitoring for this entity
+    get syncStatus() {
+      const status = syncStatus$.get()
+      const hasNotifications = syncNotifications$.hasNotificationsFor(entityType).get()
+
+      return {
+        isConnected: status.hasNotifications,
+        hasEntityNotifications: hasNotifications,
+        lastNotification: syncNotifications$.getNotificationFor(entityType).get(),
+        totalNotifications: status.totalCount
+      }
+    },
     // Entity metadata
     entityType,
     columns,

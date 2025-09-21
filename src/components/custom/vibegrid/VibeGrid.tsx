@@ -646,7 +646,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
       // Editing
       startEdit: (cellId: string, initialValue: any) => tableInteraction$.startEdit(cellId, initialValue),
-      saveEdit: () => tableInteraction$.saveEdit(),
+      saveEdit: async () => await tableInteraction$.saveEdit(),
       cancelEdit: () => tableInteraction$.cancelEdit(),
 
       // Viewport

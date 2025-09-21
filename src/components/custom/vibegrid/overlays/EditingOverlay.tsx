@@ -293,10 +293,10 @@ export class EditingOverlay {
       initialValue: value,
       onCommit: this.config.tableInteraction$ ? 
         // Direct commit to observables (new architecture)
-        (value) => {
+        async (value) => {
           console.log('🔍 EditingOverlay direct commit with value:', value);
           // Don't call updateEditValue here - saveEdit should use the passed value directly
-          this.config.tableInteraction$.saveEdit(value);
+          await this.config.tableInteraction$.saveEdit(value);
         } :
         // Fallback to renderer callback (old architecture)
         this.config.onCommit,

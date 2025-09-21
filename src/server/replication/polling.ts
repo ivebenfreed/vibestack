@@ -187,7 +187,9 @@ export class PollingManager {
       this.hasCompletedFirstPoll = false;
       
       // Cleanup centralized database connection
-      cleanupDatabaseConnection();
+      cleanupDatabaseConnection().catch(err => {
+        replicationLogger.error('Error during polling cleanup', { error: err.message }, MODULE_NAME);
+      });
       
       replicationLogger.debug('Polling stopped and database connection cleaned up', {}, MODULE_NAME);
     }

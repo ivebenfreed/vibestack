@@ -8,6 +8,7 @@
  */
 
 import { observable, computed, batch } from '@legendapp/state';
+import { getUpdateFunction } from '../utils/entity-update-helpers';
 import { log } from '@/logger';
 
 const fileLog = log('components/custom/vibegrid/stores/interaction-state.ts');
@@ -391,12 +392,12 @@ export function createTableInteraction$(tableCore$?: any) {
     },
 
     // Outside click handler with editing state logic
-    handleOutsideClick() {
+    async handleOutsideClick() {
       const isCurrentlyEditing = tableInteraction$.isEditing.get();
 
       if (isCurrentlyEditing) {
         fileLog.info('<� Outside click while editing - saving edit and preserving selection');
-        this.saveEdit();
+        await this.saveEdit();
         // Selection is preserved when finishing an edit
       } else {
         fileLog.info('<� Outside click - clearing selection');
@@ -654,7 +655,7 @@ export function createTableInteraction$(tableCore$?: any) {
       tableInteraction$.editValidation.set(null);
     },
 
-    saveEdit(finalValue?: any) {
+    async saveEdit(finalValue?: any) {
       const editingCell = tableInteraction$.editingCell.get();
       const isCancelling = tableInteraction$.isCancelling.get();
       const editValue = finalValue !== undefined ? finalValue : tableInteraction$.editValue.get();
@@ -670,9 +671,68 @@ export function createTableInteraction$(tableCore$?: any) {
         return;
       }
 
-      // The actual saving logic would be handled by the component
-      // This just updates the editing state
+      // Parse cell ID to extract row ID and field name (format: "<rowId>:<columnId>")
+      const cellParts = editingCell.split(':');
+      if (cellParts.length !== 2) {
+        fileLog.warn('⚠ Invalid cell ID format for entity update', {
+          editingCell,
+          expectedFormat: 'rowId:columnId',
+          actualParts: cellParts
+        });
+        return;
+      }
 
+      const rowId = cellParts[0];
+      const fieldName = cellParts[1]; // Column ID is the field name
+
+      // Get entity type from tableCore$
+      const entityType = tableCore$?.entityType?.get();
+      if (!entityType) {
+        fileLog.warn('⚠ No entity type available for entity update', { editingCell, rowId, fieldName });
+        return;
+      }
+
+      try {
+        // CRITICAL FIX: Actually persist the edit to the entity
+        fileLog.info('🔄 Persisting field edit to entity', {
+          entityType,
+          rowId,
+          fieldName,
+          editValue,
+          cellId: editingCell
+        });
+
+        const updateEntity = getUpdateFunction(entityType);
+        const updateData = { [fieldName]: editValue };
+
+        // Persist the change - this will trigger reactive sync
+        await updateEntity(rowId, updateData);
+
+        fileLog.info('✅ Field edit successfully persisted and will trigger sync', {
+          entityType,
+          rowId,
+          fieldName,
+          newValue: editValue
+        });
+
+      } catch (error) {
+        fileLog.error('❌ Failed to persist field edit', {
+          entityType,
+          rowId,
+          fieldName,
+          editValue,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        // Show error state (could add visual error indication here)
+        tableInteraction$.editValidation.set({
+          isValid: false,
+          message: `Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+        return; // Don't clear editing state on error
+      }
+
+      // Clear editing state after successful save
       batch(() => {
         tableInteraction$.editingCell.set(null);
         tableInteraction$.editValue.set(null);
@@ -681,7 +741,7 @@ export function createTableInteraction$(tableCore$?: any) {
         tableInteraction$.editValidation.set(null);
       });
 
-      fileLog.info('<� Edit saved', { cellId: editingCell, value: editValue });
+      fileLog.info('✅ Edit saved and synced', { cellId: editingCell, value: editValue });
     },
 
     cancelEdit() {
