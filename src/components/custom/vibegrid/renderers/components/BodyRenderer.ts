@@ -78,6 +78,9 @@ export class BodyRenderer {
   // Observer cleanup
   private selectionObserverDisposer?: () => void;
 
+  // NEW: Modular cell system support
+  private modularCellBridge: any = null;
+
   constructor(options: BodyRendererOptions) {
     this.tableCore$ = options.tableCore$;
     this.tableInteraction$ = options.tableInteraction$;
@@ -97,6 +100,9 @@ export class BodyRenderer {
     // Setup observer for selection changes to update checkboxes
     this.setupSelectionObserver();
 
+    // NEW: Initialize modular cell system via hydration manager
+    this.initializeModularCellSystem();
+
     fileLog.info('🏗️ BodyRenderer initialized (Phase 2.1 consolidated)');
   }
 
@@ -110,6 +116,29 @@ export class BodyRenderer {
       fileLog.debug('📦 Checkbox states updated due to selection change');
     });
   }
+
+  /**
+   * Initialize modular cell system for enhanced field type support
+   */
+  private async initializeModularCellSystem(): Promise<void> {
+    try {
+      // Dynamically import the modular system to avoid circular dependencies
+      const modularModule = await import('../../field-types');
+      this.modularCellBridge = modularModule.modularCellBridge;
+
+      fileLog.info('🎯 [FIELD-BRIDGE] Modular cell system initialized in BodyRenderer', {
+        supportedTypes: this.modularCellBridge.getStats().registry.totalTypes,
+        basicTypes: this.modularCellBridge.getStats().registry.basicTypes.length,
+        relationshipTypes: this.modularCellBridge.getStats().registry.relationshipTypes.length,
+        rollupTypes: this.modularCellBridge.getStats().registry.rollupTypes.length
+      });
+    } catch (error) {
+      fileLog.error('❌ [FIELD-BRIDGE] Modular cell system failed to initialize - FAIL FAST', { error });
+      // FAIL FAST - Don't use legacy, surface the real issue
+      throw error;
+    }
+  }
+
 
   /**
    * Cleanup observers and resources
@@ -475,7 +504,8 @@ export class BodyRenderer {
     colIndex: number,
     xPosition?: number
   ): HTMLElement {
-    // Single path for ALL cells - no smart vs regular distinction
+    // TODO: Integrate modular system once import issues are resolved
+    // For now, use legacy rendering for all cells
     const cellType = column.cellType || column.type || 'text';
     const cellElement = this.domFactory.createElement('div', 'vibegridx-cell');
     cellElement.dataset.rowId = row.id;
@@ -573,25 +603,55 @@ export class BodyRenderer {
       const editableClass = column.editable === false ? '' : 'vibegridx-cell-boolean-editable';
       contentElement = this.domFactory.createElement('span', `vibegridx-boolean-text ${editableClass}`.trim());
       contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else if (value == null || value === '') {
-      // Empty content - use editable class only if column is editable
-      const className = column.editable === false ? 'vibegridx-cell-empty' : 'vibegridx-cell-empty-editable';
-      contentElement = this.domFactory.createElement('span', className);
-      contentElement.textContent = column.editable === false ? '' : 'Click to edit';
-      contentElement.style.fontSize = '12px';
-      contentElement.style.opacity = '0.6';
     } else {
-      // Text content (default) - use editable class only if column is editable
-      const className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
-      contentElement = this.domFactory.createElement('span', className);
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
+      // NEW: Try modular system for text fields first, fallback to legacy
+      if (this.modularCellBridge && cellType === 'text' && this.modularCellBridge.isSupported(column)) {
+        try {
+          fileLog.debug('🎯 [FIELD-BRIDGE] Using modular system for text field', {
+            columnId: column.id,
+            fieldType: cellType,
+            value: value
+          });
 
-      // Add proper text overflow handling for long text
-      contentElement.style.maxWidth = '100%';
-      contentElement.style.overflow = 'hidden';
-      contentElement.style.textOverflow = 'ellipsis';
-      contentElement.style.whiteSpace = 'nowrap';
-      contentElement.style.display = 'block';
+          // Use modular system - it will return content element directly
+          const modularContent = this.modularCellBridge.createCell(
+            value,
+            column,
+            rowData,
+            { rowIndex: 0, columnIndex: colIndex, xPosition }
+          );
+
+          // Extract the inner content from modular cell (skip the outer container)
+          const innerContent = modularContent.querySelector('span') || modularContent.firstChild;
+          if (innerContent) {
+            contentElement = innerContent.cloneNode(true) as HTMLElement;
+            // Ensure proper VibeGrid classes
+            if (!contentElement.className.includes('vibegridx-cell-text')) {
+              contentElement.className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
+            }
+          } else {
+            throw new Error('No content found in modular cell');
+          }
+
+        } catch (error) {
+          fileLog.error('❌ [FIELD-BRIDGE] Modular system failed for text field - NO FALLBACK', {
+            error,
+            columnId: column.id,
+            fieldType: cellType
+          });
+          // FAIL FAST - Don't fallback, throw the error to surface issues
+          throw error;
+        }
+      } else {
+        // NO FALLBACK - Force modular system usage to surface issues
+        fileLog.error('❌ [FIELD-BRIDGE] Text field MUST use modular system - NO FALLBACK', {
+          columnId: column.id,
+          cellType,
+          modularBridgeAvailable: !!this.modularCellBridge,
+          isSupported: this.modularCellBridge ? this.modularCellBridge.isSupported(column) : false
+        });
+        throw new Error(`Text field ${column.id} must use modular system - fallback disabled for testing`);
+      }
     }
 
     // Ensure all content elements have proper overflow handling
@@ -736,6 +796,24 @@ export class BodyRenderer {
    */
   private isTagsField(columnId: string, value: any): boolean {
     return BadgeRenderer.isTagsField(columnId, value);
+  }
+
+  /**
+   * Create legacy text content element (fallback for modular system)
+   */
+  private createLegacyTextContent(value: any, column: any, cellType: string): HTMLElement {
+    const className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
+    const contentElement = this.domFactory.createElement('span', className);
+    contentElement.textContent = this.formatCellValue(value, cellType, column);
+
+    // Add proper text overflow handling for long text
+    contentElement.style.maxWidth = '100%';
+    contentElement.style.overflow = 'hidden';
+    contentElement.style.textOverflow = 'ellipsis';
+    contentElement.style.whiteSpace = 'nowrap';
+    contentElement.style.display = 'block';
+
+    return contentElement;
   }
 
   /**

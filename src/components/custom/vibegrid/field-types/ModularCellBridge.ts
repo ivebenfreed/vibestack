@@ -1,0 +1,257 @@
+/**
+ * Modular Cell Bridge
+ *
+ * Bridges the new modular field type system with the existing BodyRenderer.
+ * Provides a migration path from the old hardcoded cell creation to the new unified system.
+ */
+
+import type { Column } from '../column-types';
+import { FieldTypeRegistry, fieldTypeRegistry } from './FieldTypeRegistry';
+import { SchemaAdapter } from '../schema/SchemaAdapter';
+import { CellFactory } from '../factories/CellFactory';
+import { RelationshipDataManager } from '../managers/RelationshipDataManager';
+import { RollupCalculationManager } from '../managers/RollupCalculationManager';
+import { log } from '@/logger';
+
+// Import all field type implementations to register them
+import './implementations/basic/TextFieldType';
+import './implementations/basic/NumberFieldType';
+import './implementations/basic/DateFieldType';
+import './implementations/basic/BooleanFieldType';
+import './implementations/basic/SelectFieldType';
+import './implementations/basic/EmailFieldType';
+import './implementations/relationship/UserReferenceFieldType';
+import './implementations/rollup/RollupCountFieldType';
+
+const fileLog = log('components/custom/vibegrid/field-types/ModularCellBridge.ts');
+
+/**
+ * Bridge between old and new cell rendering systems
+ */
+export class ModularCellBridge {
+  private cellFactory: CellFactory;
+  private relationshipDataManager: RelationshipDataManager;
+  private rollupCalculationManager: RollupCalculationManager;
+
+  constructor() {
+    this.relationshipDataManager = new RelationshipDataManager();
+    this.rollupCalculationManager = new RollupCalculationManager();
+
+    this.cellFactory = new CellFactory(fieldTypeRegistry, {
+      enableEditing: true,
+      enableTooltips: true,
+      enableAccessibility: true
+    });
+
+    fileLog.info('🚀 [FIELD-BRIDGE] ModularCellBridge initialized', {
+      registeredTypes: fieldTypeRegistry.getRegisteredTypes().length,
+      basicTypes: fieldTypeRegistry.getTypesByCategory('basic').length,
+      relationshipTypes: fieldTypeRegistry.getTypesByCategory('relationship').length,
+      rollupTypes: fieldTypeRegistry.getTypesByCategory('rollup').length,
+      allTypes: fieldTypeRegistry.getRegisteredTypes()
+    });
+  }
+
+  /**
+   * Create a cell using the new modular system
+   *
+   * This method can be called from the existing BodyRenderer to gradually
+   * migrate cell creation to the new system.
+   */
+  createCell(
+    value: any,
+    column: Column,
+    rowData: any,
+    position: { rowIndex: number; columnIndex: number; xPosition?: number }
+  ): HTMLElement {
+    try {
+      fileLog.debug('🎯 [FIELD-BRIDGE] Creating cell with modular system', {
+        columnId: column.id,
+        fieldType: column.cellType || column.type,
+        value: value,
+        position
+      });
+
+      // Enhance the column with backend metadata
+      const enhancedColumn = this.enhanceColumn(column);
+
+      // Use the unified cell factory
+      const cellElement = this.cellFactory.createCell(value, enhancedColumn, rowData, position);
+
+      fileLog.debug('✅ [FIELD-BRIDGE] Cell created successfully', {
+        columnId: column.id,
+        elementClass: cellElement.className
+      });
+
+      return cellElement;
+
+    } catch (error) {
+      fileLog.error('❌ [FIELD-BRIDGE] Error creating cell with modular system - NO FALLBACK', {
+        error,
+        column: column.id,
+        value
+      });
+
+      // FAIL FAST - Don't fallback, surface the real issue
+      throw error;
+    }
+  }
+
+  /**
+   * Update a cell using the new modular system
+   */
+  updateCell(
+    cellElement: HTMLElement,
+    value: any,
+    column: Column,
+    rowData: any
+  ): void {
+    try {
+      const enhancedColumn = this.enhanceColumn(column);
+      this.cellFactory.updateCell(cellElement, value, enhancedColumn, rowData);
+
+    } catch (error) {
+      fileLog.error('Error updating cell with modular system', {
+        error,
+        column: column.id,
+        value
+      });
+
+      // Fallback to basic text update
+      cellElement.textContent = String(value || '');
+    }
+  }
+
+  /**
+   * Check if a field type is supported by the modular system
+   */
+  isSupported(column: Column): boolean {
+    const fieldType = column.cellType || column.type || 'text';
+    const isSupported = fieldTypeRegistry.hasFieldType(fieldType);
+
+    fileLog.debug('🔍 [FIELD-BRIDGE] Field type support check', {
+      columnId: column.id,
+      fieldType,
+      isSupported,
+      registeredTypes: fieldTypeRegistry.getRegisteredTypes().length
+    });
+
+    return isSupported;
+  }
+
+  /**
+   * Get the field type category for a column
+   */
+  getFieldCategory(column: Column): string {
+    if (!this.isSupported(column)) return 'unsupported';
+
+    const enhancedColumn = this.enhanceColumn(column);
+    const fieldTypeDefinition = fieldTypeRegistry.getFieldType(enhancedColumn);
+    return fieldTypeDefinition.category;
+  }
+
+  /**
+   * Check if a column requires async data loading
+   */
+  requiresAsyncData(column: Column): boolean {
+    const category = this.getFieldCategory(column);
+    return category === 'relationship';
+  }
+
+  /**
+   * Preload relationship data for multiple columns and rows
+   */
+  async preloadRelationshipData(columns: Column[], rowIds: string[]): Promise<void> {
+    const relationshipColumns = columns.filter(col => this.requiresAsyncData(col));
+
+    const loadPromises = relationshipColumns.map(async (column) => {
+      try {
+        const enhancedColumn = this.enhanceColumn(column);
+        await this.relationshipDataManager.loadData(enhancedColumn, rowIds);
+      } catch (error) {
+        fileLog.warn('Failed to preload relationship data', {
+          error,
+          column: column.id
+        });
+      }
+    });
+
+    await Promise.allSettled(loadPromises);
+  }
+
+  /**
+   * Get relationship data for a column
+   */
+  getRelationshipData(column: Column, rowId: string): any {
+    if (!this.requiresAsyncData(column)) return null;
+
+    const enhancedColumn = this.enhanceColumn(column);
+    return this.relationshipDataManager.getData(enhancedColumn, rowId);
+  }
+
+  /**
+   * Calculate rollup value for a column
+   */
+  calculateRollupValue(column: Column, rowData: any): any {
+    const category = this.getFieldCategory(column);
+    if (category !== 'rollup') return null;
+
+    const enhancedColumn = this.enhanceColumn(column);
+    return this.rollupCalculationManager.calculate(enhancedColumn, rowData);
+  }
+
+  /**
+   * Get registry statistics for debugging
+   */
+  getStats() {
+    return {
+      registry: {
+        totalTypes: fieldTypeRegistry.getRegisteredTypes().length,
+        basicTypes: fieldTypeRegistry.getTypesByCategory('basic'),
+        relationshipTypes: fieldTypeRegistry.getTypesByCategory('relationship'),
+        rollupTypes: fieldTypeRegistry.getTypesByCategory('rollup'),
+        computedTypes: fieldTypeRegistry.getTypesByCategory('computed')
+      },
+      cache: this.relationshipDataManager.getCacheStats()
+    };
+  }
+
+  private enhanceColumn(column: Column): any {
+    // Create a mock backend schema for this column
+    const mockSchema = SchemaAdapter.createMockSchema('UnknownEntity', [column]);
+    const enhancedColumns = SchemaAdapter.enhanceColumns([column], mockSchema, 'UnknownEntity');
+    return enhancedColumns[0];
+  }
+
+  private createFallbackCell(value: any, column: Column): HTMLElement {
+    const cell = document.createElement('div');
+    cell.className = 'vibegridx-cell vibegridx-fallback-cell';
+    cell.style.cssText = `
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      height: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      background-color: #fef3c7;
+      border-left: 3px solid #f59e0b;
+    `;
+
+    const content = document.createElement('span');
+    content.textContent = String(value || '');
+    content.title = `Fallback rendering for ${column.id} (${column.cellType || column.type})`;
+
+    cell.appendChild(content);
+    return cell;
+  }
+}
+
+// Create singleton instance
+export const modularCellBridge = new ModularCellBridge();
+
+// Development helper
+if (typeof window !== 'undefined') {
+  (window as any).vibeGridModularBridge = modularCellBridge;
+  fileLog.info('ModularCellBridge available globally as window.vibeGridModularBridge');
+}

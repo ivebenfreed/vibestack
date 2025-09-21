@@ -42,6 +42,9 @@ export interface VibeGridHydrationState {
   eventHandlersReady: boolean;
   mouseControllerReady: boolean;
   scrollControllerReady: boolean;
+
+  // NEW: Field type system dependencies
+  fieldTypeSystemReady: boolean;
 }
 
 export interface HydrationError {
@@ -95,6 +98,9 @@ export class VibeGridHydrationManager {
     eventHandlersReady: false,
     mouseControllerReady: false,
     scrollControllerReady: false,
+
+    // NEW: Field type system dependencies
+    fieldTypeSystemReady: false,
   });
 
   public errors$ = observable<HydrationError[]>([]);
@@ -150,6 +156,15 @@ export class VibeGridHydrationManager {
       tableId,
       entityType,
       totalDependencies: Object.keys(this.hydrationState$.get()).length,
+    });
+
+    // NEW: Initialize field type system immediately as part of construction
+    this.initializeFieldTypeSystem().catch((error) => {
+      fileLog.error('❌ [FIELD-SYSTEM] Constructor initialization failed - FAIL FAST', {
+        error: error.message,
+        stack: error.stack,
+        tableId: this.tableId
+      });
     });
 
     this.setupTimeouts();
@@ -306,6 +321,61 @@ export class VibeGridHydrationManager {
         reject(new Error(`Critical hydration errors: ${this.criticalErrors$.get().map(e => e.error).join(', ')}`));
       });
     });
+  }
+
+  /**
+   * Initialize field type system (NEW)
+   */
+  public async initializeFieldTypeSystem(): Promise<void> {
+    try {
+      fileLog.info('🔧 [FIELD-SYSTEM] Initializing field type system via hydration manager', {
+        tableId: this.tableId
+      });
+
+      // Dynamic import to avoid circular dependencies
+      const { fieldTypeRegistry, initializeFieldTypeSystem } = await import('../field-types');
+
+      // Validate that fieldTypeRegistry exists
+      if (!fieldTypeRegistry) {
+        throw new Error('fieldTypeRegistry not available after import');
+      }
+
+      // Call initialization with detailed error handling
+      try {
+        initializeFieldTypeSystem(); // This calls the function that accesses the registry
+
+        const stats = fieldTypeRegistry.getRegisteredTypes();
+
+        fileLog.info('🎯 [FIELD-SYSTEM] Field type system initialized via hydration', {
+          totalFieldTypes: stats.length,
+          basicTypes: fieldTypeRegistry.getTypesByCategory('basic'),
+          relationshipTypes: fieldTypeRegistry.getTypesByCategory('relationship'),
+          rollupTypes: fieldTypeRegistry.getTypesByCategory('rollup'),
+          computedTypes: fieldTypeRegistry.getTypesByCategory('computed'),
+          tableId: this.tableId
+        });
+
+        this.markReady('fieldTypeSystemReady');
+        fileLog.info('✅ [FIELD-SYSTEM] Field type system ready', { tableId: this.tableId });
+
+      } catch (initError) {
+        fileLog.error('❌ [FIELD-SYSTEM] Initialization function failed - FAIL FAST', {
+          error: initError.message,
+          stack: initError.stack,
+          tableId: this.tableId
+        });
+        throw initError;
+      }
+
+    } catch (error) {
+      fileLog.error('❌ [FIELD-SYSTEM] Complete failure - FAIL FAST', {
+        error: error.message,
+        stack: error.stack,
+        tableId: this.tableId
+      });
+      this.markError('fieldTypeSystemReady', `Field type system failed: ${error.message}`, false); // Not retryable
+      throw error; // FAIL FAST
+    }
   }
 
   /**
