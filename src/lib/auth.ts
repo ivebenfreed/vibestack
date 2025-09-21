@@ -70,8 +70,8 @@ export const initiateSignUp = async (/* Add necessary parameters */) => {
   }
 };
 
-// Re-export useAuth hook from state machines
-export { useAuth } from '@/state-machines/hooks'
+// Re-export useAuth hook from Legend State unified auth
+export { useUnifiedAuth as useAuth } from '@/legend-state/hooks/use-unified-auth'
 
 // Add other necessary functions like signOut, useSession hook integration, etc.
 // Example:

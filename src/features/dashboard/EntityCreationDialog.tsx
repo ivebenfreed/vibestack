@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { useOrgAbility, useOrgTrialStatus } from '@/contexts/AbilityContext'
 // Temporarily commented out - no longer using this pattern
 import { toast } from 'sonner'
@@ -98,7 +98,7 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
   const [selectedArchetype, setSelectedArchetype] = useState<string>('')
   const [creating, setCreating] = useState(false)
   
-  const { currentOrganization } = useAuth()
+  const { organization: currentOrganization } = useUnifiedAuth()
   const orgAbility = useOrgAbility(currentOrganization)
   const orgTrialStatus = useOrgTrialStatus(currentOrganization)
   

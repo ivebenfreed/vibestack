@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from '@tanstack/react-router';
-import { useAuth } from '@/state-machines';
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
 import { log } from '@/logger';
 
 const fileLog = log('components/guards/TrialExpiredGuard.tsx');
@@ -16,7 +16,7 @@ interface TrialExpiredGuardProps {
 export function TrialExpiredGuard({ children }: TrialExpiredGuardProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isTrialExpired, needsBillingSetup, isAuthenticated, isCheckingAuth } = useAuth();
+  const { isTrialExpired, needsBillingSetup, isAuthenticated, isCheckingAuth } = useUnifiedAuth();
   
   useEffect(() => {
     // Don't redirect if still checking auth

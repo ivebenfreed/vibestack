@@ -15,7 +15,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import SyncStatusIcon from '@/features/sync/components/SyncStatusIcon'
 import { TrialBanner } from '@/components/trial-banner'
 import { useOrgTrialStatus } from '@/contexts/AbilityContext'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { RotateCcw, Menu } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -104,7 +104,7 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false)
   const location = useLocation()
   const isMobile = useIsMobile()
-  const { currentOrganization } = useAuth()
+  const { organization: currentOrganization } = useUnifiedAuth()
   const orgTrialStatus = useOrgTrialStatus(currentOrganization)
   
   // Responsive behavior - auto-collapse on tablet screens

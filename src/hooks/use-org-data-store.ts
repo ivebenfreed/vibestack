@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react'
 import { useObservable, use$ } from '@legendapp/state/react'
 import { universeSchema$, universeLoading$, universeError$, universeUserId$, universeOrgId$, getEntity$, clearContext } from '@/legend-state'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { log } from '@/logger';
 const fileLog = log('hooks/use-org-data-store.ts');
 
 export function useOrgDataStore() {
-  const { currentOrganization, user } = useAuth()
+  const { organization: currentOrganization, user } = useUnifiedAuth()
   const schema = use$(universeSchema$)
   const loading = use$(universeLoading$)
   const error = use$(universeError$)

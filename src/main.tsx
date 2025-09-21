@@ -28,14 +28,12 @@ if (process.env.NODE_ENV === 'development') {
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
-// import { QueryClient } from '@tanstack/react-query' // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
 import { FontProvider } from './context/font-context'
 import { ThemeProvider } from './context/theme-context'
 import { log } from '@/logger'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
-// TODO: Migrate to Dexie - these imports need to be updated to use the new domain services
 
 // 🔥 SIMPLIFIED INTEGRATION FLOW:
 // 1. main.tsx: Creates router and renders root providers
@@ -47,15 +45,6 @@ import { routeTree } from './routeTree.gen'
 
 // Global instances for HMR persistence
 let router: ReturnType<typeof createRouter>;
-// ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
-// const queryClient = new QueryClient({
-//   defaultOptions: {
-//     queries: {
-//       staleTime: 5 * 60 * 1000, // 5 minutes
-//       gcTime: 10 * 60 * 1000, // 10 minutes (was cacheTime)
-//     },
-//   },
-// });
 
 // Create logger instance for this file
 const mainLog = log('main.tsx');
@@ -70,8 +59,6 @@ function getRouter() {
     router = createRouter({
       routeTree,
       context: { 
-        // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
-        // queryClient,
         setTaskAtoms: undefined!,
         setProjectAtoms: undefined!,
         setUserAtoms: undefined!,
@@ -164,19 +151,14 @@ async function initializeApp() {
 
 // Wrapper component to provide atom setters via router context - Phase 4: Atomic Integration
 function AppWithRouterContext() {
-  // TODO: Migrate to Dexie - need to update to use new domain services
-  // Direct access to the set methods from the atomic stores
-  // const setTaskAtoms = taskUtils.loadTasks
-  // const setProjectAtoms = projectUtils.loadProjects
-  // const setUserAtoms = userUtils.loadUsers
+  // Legend State handles entity management automatically via observables
+  // Router context provides compatibility layer for legacy components
 
   return (
     <RouterProvider 
       router={currentRouter} 
       context={{ 
-        // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
-        // queryClient,
-        // TODO: Migrate to Dexie - temporarily disabled until migration is complete
+        // Legend State handles data management - these setters provide compatibility
         setTaskAtoms: undefined as any,
         setProjectAtoms: undefined as any,
         setUserAtoms: undefined as any

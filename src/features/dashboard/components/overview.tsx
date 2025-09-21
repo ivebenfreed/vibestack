@@ -1,14 +1,15 @@
 import { useContext } from 'react';
-import { useAppInit, useSystem } from '@/state-machines'; // Orchestrator V2 hooks
+import { useAppInitialization } from '@/legend-state/app-initialization-stages';
+import { useSyncConnection } from '@/legend-state/hooks/use-sync-connection';
 // Removed unused imports: SyncState, Badge, icons, formatDateTime, getSyncStatusVisuals
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function Overview() {
-  // Use v2 orchestrator for sync loading state
-  const { isDatabaseInitialized, isSyncReady, liveChangesStatus } = useAppInit();
-  const { isSystemReady } = useSystem();
-  const isSyncLive = isSyncReady && liveChangesStatus === 'connected';
-  const isSyncLoading = !isSyncLive || !isDatabaseInitialized; 
+  // Use Legend State for sync loading state
+  const { isReady: isSystemReady } = useAppInitialization();
+  const { isConnected: isSyncReady, connectionStatus } = useSyncConnection();
+  const isSyncLive = isSyncReady && connectionStatus === 'connected';
+  const isSyncLoading = !isSyncLive || !isSystemReady; 
 
   if (isSyncLoading) {
     return (

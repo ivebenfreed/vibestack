@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Plus, Globe, Building2, User, Users, Heart, Target } from 'lucide-react';
-import { useAuth } from '@/state-machines';
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
 import { universeHelpers, currentOrganizations$ } from '@/legend-state/observables/universe-context';
 import { WorldCard } from './WorldCard';
 import { log } from '@/logger';
@@ -63,7 +63,7 @@ const INITIAL_FORM_DATA: CreateWorldFormData = {
 };
 
 export const WorldManager = observer(function WorldManager() {
-  const { user } = useAuth();
+  const { user } = useUnifiedAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingWorld, setEditingWorld] = useState<World | null>(null);
   const [formData, setFormData] = useState<CreateWorldFormData>(INITIAL_FORM_DATA);

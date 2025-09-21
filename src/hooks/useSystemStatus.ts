@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAppInit, useSystem } from '@/state-machines'
+import { useAppInitialization } from '@/legend-state/app-initialization-stages'
+import { useSyncConnection } from '@/legend-state/hooks/use-sync-connection'
 
 export type SystemMode = 'online' | 'offline' | 'degraded'
 
@@ -16,12 +17,12 @@ interface SystemStatus {
  * Combines network status, sync status, and database status
  */
 export function useSystemStatus(): SystemStatus {
-  const { isDatabaseInitialized, isSyncReady, connectionStatus, liveChangesStatus } = useAppInit()
-  const { isSystemReady } = useSystem()
+  const { isReady: isSystemReady } = useAppInitialization()
+  const { connectionStatus, isConnected: isSyncReady } = useSyncConnection()
   
   const isConnectionOnline = connectionStatus === 'connected'
-  const isDatabaseReady = isDatabaseInitialized
-  const isSyncLive = isSyncReady && liveChangesStatus === 'connected'
+  const isDatabaseReady = isSystemReady
+  const isSyncLive = isSyncReady && connectionStatus === 'connected'
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   
   // Map v2 data to sync state

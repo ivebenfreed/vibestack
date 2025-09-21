@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { log } from '@/logger'
 import { universeHelpers } from '@/legend-state'
 
@@ -10,16 +10,15 @@ const myLog = log('components/providers/AuthAwareProviders.tsx');
 
 // Auth-aware wrapper component - LiveStore is initialized globally by app init machine
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isCheckingAuth, isSigningOut } = useAuth()
-  
-  myLog.info('Auth state:', { 
-    isAuthenticated, 
-    isCheckingAuth,
-    isSigningOut
+  const { isAuthenticated, loading: isCheckingAuth } = useUnifiedAuth()
+
+  myLog.info('Auth state:', {
+    isAuthenticated,
+    isCheckingAuth
   });
-  
-  // Simple rule: render app layout when authenticated and not checking or signing out
-  if (isAuthenticated && !isCheckingAuth && !isSigningOut) {
+
+  // Simple rule: render app layout when authenticated and not checking
+  if (isAuthenticated && !isCheckingAuth) {
     return (
       <AbilityProvider>
         <AppLayout>{children}</AppLayout>
@@ -27,11 +26,11 @@ export function AuthAwareProviders({ children }: { children: React.ReactNode }) 
     )
   }
   
-  // Unauthenticated, auth check in progress, or signing out: Don't render children during sign-out
+  // Unauthenticated or auth check in progress
   return (
     <AbilityProvider>
       <PublicLayout>
-        {isSigningOut ? null : children}
+        {children}
       </PublicLayout>
     </AbilityProvider>
   )

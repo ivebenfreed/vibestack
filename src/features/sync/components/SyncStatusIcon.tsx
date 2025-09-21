@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useSync } from '@/state-machines';
+import { useSyncConnection } from '@/legend-state/hooks/use-sync-connection';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -26,9 +26,10 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
     isLiveSync,
     isError,
     isConnecting,
-    isIdle,
     statusText
-  } = useSync();
+  } = useSyncConnection();
+
+  const isIdle = !isConnected && !isConnecting;
   
   // Derived state
   const isOnline = isConnected;

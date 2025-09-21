@@ -11,7 +11,7 @@ import { KnowledgeTab } from '@/components/ui/knowledge-tab-simplified'
 import { ArrowLeft, Globe, Building2, User, Plus, Folder, BookOpen, Users, TrendingUp, Calendar, Target } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { getEntity$ } from '@/legend-state'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { useMemo } from 'react'
 
 export const Route = createFileRoute('/_authenticated/worlds/$worldId')({
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/_authenticated/worlds/$worldId')({
 
 function WorldDetailPage() {
   const { worldId } = Route.useParams()
-  const { user, userOrganizations } = useAuth()
+  const { user, userOrganizations } = useUnifiedAuth()
   
   // Get project data from Legend State 
   const projectStore = getEntity$('project')

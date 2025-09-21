@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Building, Users, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/state-machines';
+import { useAuth } from '@/lib/auth-compatibility';
 import { CreateOrganizationForm } from './CreateOrganizationForm';
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen';
 

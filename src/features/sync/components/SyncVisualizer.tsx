@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSync } from '@/state-machines';
+import { useSyncConnection } from '@/legend-state/hooks/use-sync-connection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SyncVisualizationCore } from './SyncVisualizationCore';
 

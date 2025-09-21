@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, AlertCircle, Mail, Loader2 } from 'lucide-react'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { authClient } from '@/lib/auth'
 import { toast } from 'sonner'
 
 export function EmailVerificationStatus() {
-  const { user } = useAuth()
+  const { user } = useUnifiedAuth()
   const navigate = useNavigate()
   const [isResending, setIsResending] = useState(false)
   const [localVerificationStatus, setLocalVerificationStatus] = useState<boolean | null>(null)

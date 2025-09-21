@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAppInit, useSystem } from '@/state-machines';
+import { useAppInitialization } from '@/legend-state/app-initialization-stages';
+import { useSyncConnection } from '@/legend-state/hooks/use-sync-connection';
 import { SyncManager, SyncState } from '@/sync/SyncManager';
 import { log } from '@/logger';
 const fileLog = log('features/sync/hooks/useSyncVisualizationState.ts');
@@ -26,8 +27,8 @@ export interface SyncVisualizationState {
 }
 
 export function useSyncVisualizationState(): SyncVisualizationState {
-  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
-  const { isSystemReady } = useSystem();
+  const { isReady: isSystemReady } = useAppInitialization();
+  const { connectionStatus, isConnected: isSyncReady, error: syncError } = useSyncConnection();
   
   // Map v2 data to legacy sync machine structure
   const isOnline = connectionStatus === 'connected';
@@ -38,7 +39,7 @@ export function useSyncVisualizationState(): SyncVisualizationState {
     isConnecting: connectionStatus === 'connecting',
     isInitialSync: connectionStatus === 'connecting' && !isSyncReady,
     isCatchupSync: false, // Not available in v2
-    isLiveSync: isSyncReady && liveChangesStatus === 'connected',
+    isLiveSync: isSyncReady && connectionStatus === 'connected',
     isIdle: connectionStatus === 'disconnected',
     syncPhase: isSyncReady ? 'live' : 'connecting',
     machineState: connectionStatus

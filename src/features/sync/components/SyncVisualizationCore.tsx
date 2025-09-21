@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useSync } from '@/state-machines';
+import { useSyncConnection } from '@/legend-state/hooks/use-sync-connection';
 
 interface SyncVisualizationCoreProps {
   className?: string; // Allow className for the container

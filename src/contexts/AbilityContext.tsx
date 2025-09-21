@@ -1,14 +1,14 @@
 import React, { createContext, useContext } from 'react';
 // Adjust import paths as necessary
 import { AppAbility, defineAbilityForOrganization, defineAbilityFor } from '../lib/ability';
-import { useAuth } from '@/state-machines';
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
 import { OrganizationInfo } from '@/state-machines/types';
 
 const defaultAbility = defineAbilityFor(null);
 export const AbilityContext = createContext<AppAbility>(defaultAbility);
 
 export const AbilityProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user, currentOrganization } = useAuth();
+  const { user, organization: currentOrganization } = useUnifiedAuth();
   
   // For global/universe context, use general ability without org-specific restrictions
   const ability = defineAbilityFor({ user, organization: null });
@@ -25,7 +25,7 @@ export const useAppAbility = () => useContext(AbilityContext);
 
 // Hook for organization-specific abilities
 export const useOrgAbility = (organization?: OrganizationInfo | null) => {
-  const { user, currentOrganization } = useAuth();
+  const { user, organization: currentOrganization } = useUnifiedAuth();
   
   // Use provided organization or fall back to current organization
   const targetOrg = organization || currentOrganization;

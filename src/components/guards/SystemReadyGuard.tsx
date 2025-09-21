@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useAuth, useSystem } from '@/state-machines';
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
+import { useAppInitialization } from '@/legend-state/app-initialization-stages';
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen';
 
 interface SystemReadyGuardProps {
@@ -15,8 +16,8 @@ interface SystemReadyGuardProps {
  * This prevents expensive orchestrator state checks on every route change.
  */
 export function SystemReadyGuard({ children }: SystemReadyGuardProps) {
-  const { user } = useAuth();
-  const { isSystemReady } = useSystem();
+  const { user } = useUnifiedAuth();
+  const { isReady: isSystemReady } = useAppInitialization();
   
   // Cache the ready state to avoid re-checking on every route change
   const [cachedIsReady, setCachedIsReady] = useState(false);
@@ -71,7 +72,7 @@ export function SystemReadyGuard({ children }: SystemReadyGuardProps) {
  * Best for scenarios where you want zero overhead after initial app boot.
  */
 export function SystemReadyGuardUltraCache({ children }: SystemReadyGuardProps) {
-  const { isSystemReady } = useSystem();
+  const { isReady: isSystemReady } = useAppInitialization();
   
   // Once ready, always ready (until page refresh)
   const isReadyRef = useRef(false);

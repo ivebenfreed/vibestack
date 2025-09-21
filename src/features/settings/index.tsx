@@ -2,7 +2,7 @@ import { Separator } from '@/components/ui/separator'
 import { ContentContainer } from '@/components/layout/content-container'
 import SidebarNav from './components/sidebar-nav'
 import { User, Settings as SettingsIcon, Palette, Bell, Building2, Users, CreditCard } from 'lucide-react'
-import { useAuth } from '@/state-machines'
+import { useAuth } from '@/lib/auth-compatibility'
 import { Outlet } from '@tanstack/react-router'
 
 const sidebarNavItems = [

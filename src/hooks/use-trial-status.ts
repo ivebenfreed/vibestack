@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/state-machines'
+import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 
 interface TrialStatus {
   isTrialOrg: boolean
@@ -18,7 +18,7 @@ const defaultStatus: TrialStatus = {
 }
 
 export function useTrialStatus(): TrialStatus {
-  const { currentOrganization, userOrganizations } = useAuth()
+  const { organization: currentOrganization, userOrganizations } = useUnifiedAuth()
   const [status, setStatus] = useState<TrialStatus>(defaultStatus)
   
   useEffect(() => {

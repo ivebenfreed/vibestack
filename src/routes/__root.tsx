@@ -1,4 +1,3 @@
-// import { QueryClient } from '@tanstack/react-query' // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
 import { createRootRouteWithContext, Outlet, useNavigate } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { Toaster } from '@/components/ui/sonner'
@@ -20,7 +19,6 @@ import { useSelector } from '@legendapp/state/react'
 
 // Router context interface with atom setters
 interface RouterContext {
-  // queryClient?: QueryClient // ❌ DISABLED: Made optional since we moved away from traditional queries per universal-reactive-data-pattern
   setTaskAtoms: (tasks: Task[]) => void
   setProjectAtoms: (projects: Project[]) => void
   setUserAtoms: (users: User[]) => void

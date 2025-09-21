@@ -158,12 +158,6 @@ importers:
       '@types/pg':
         specifier: ^8.15.5
         version: 8.15.5
-      '@xstate/react':
-        specifier: ^5.0.5
-        version: 5.0.5(@types/react@19.1.10)(react@19.1.1)(xstate@5.20.2)
-      '@xstate/store':
-        specifier: ^3.6.2
-        version: 3.8.5(react@19.1.1)(solid-js@1.9.9)
       '@xyflow/react':
         specifier: ^12.8.1
         version: 12.8.3(@types/react@19.1.10)(immer@10.1.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -323,9 +317,6 @@ importers:
       valibot:
         specifier: ^1.0.0
         version: 1.1.0(typescript@5.8.3)
-      xstate:
-        specifier: ^5.19.4
-        version: 5.20.2
       zod:
         specifier: ^4.0.17
         version: 4.0.17
