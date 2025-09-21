@@ -16,6 +16,7 @@ import type {
   FormattingContext,
   FieldMetadata
 } from '../../FieldTypeRegistry';
+import { fieldTypeRegistry } from '../../FieldTypeRegistry';
 import { log } from '@/logger';
 
 const fieldLog = log('components/custom/vibegrid/field-types/implementations/basic/TextFieldType.ts');
@@ -390,9 +391,7 @@ export const TextFieldType: VibeGridFieldType = {
   }
 };
 
-// Register with the global registry
-import { fieldTypeRegistry } from '../../FieldTypeRegistry';
-
+// Register immediately
 fieldLog.info('📝 [FIELD-TEXT] Registering TextFieldType');
 fieldTypeRegistry.register('text', TextFieldType);
 fieldTypeRegistry.register('longtext', TextFieldType);

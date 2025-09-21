@@ -16,6 +16,9 @@ import { syncState, when } from '@legendapp/state';
 // Import VibeGrid CSS styles
 import './vibegridx.css';
 
+
+
+// ====================================
 const fileLog = log('components/VibeGrid');
 
 // ====================================

@@ -101,7 +101,9 @@ export class BodyRenderer {
     this.setupSelectionObserver();
 
     // NEW: Initialize modular cell system via hydration manager
-    this.initializeModularCellSystem();
+    this.initializeModularCellSystem().catch(error => {
+      fileLog.error('❌ [FIELD-BRIDGE] Failed to initialize modular system in constructor', { error });
+    });
 
     fileLog.info('🏗️ BodyRenderer initialized (Phase 2.1 consolidated)');
   }
@@ -604,8 +606,8 @@ export class BodyRenderer {
       contentElement = this.domFactory.createElement('span', `vibegridx-boolean-text ${editableClass}`.trim());
       contentElement.textContent = this.formatCellValue(value, cellType, column);
     } else {
-      // NEW: Try modular system for text fields first, fallback to legacy
-      if (this.modularCellBridge && cellType === 'text' && this.modularCellBridge.isSupported(column)) {
+      // NEW: Try modular system for all supported field types
+      if (this.modularCellBridge && this.modularCellBridge.isSupported(column)) {
         try {
           fileLog.debug('🎯 [FIELD-BRIDGE] Using modular system for text field', {
             columnId: column.id,
@@ -643,14 +645,14 @@ export class BodyRenderer {
           throw error;
         }
       } else {
-        // NO FALLBACK - Force modular system usage to surface issues
-        fileLog.error('❌ [FIELD-BRIDGE] Text field MUST use modular system - NO FALLBACK', {
+        // FAIL FAST - No fallback allowed, modular system must work
+        fileLog.error('❌ [FIELD-BRIDGE] Text field MUST use modular system - FAIL FAST', {
           columnId: column.id,
           cellType,
           modularBridgeAvailable: !!this.modularCellBridge,
           isSupported: this.modularCellBridge ? this.modularCellBridge.isSupported(column) : false
         });
-        throw new Error(`Text field ${column.id} must use modular system - fallback disabled for testing`);
+        throw new Error(`Text field ${column.id} must use modular system - field type registry not initialized`);
       }
     }
 

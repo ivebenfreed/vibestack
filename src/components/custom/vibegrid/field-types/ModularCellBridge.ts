@@ -29,7 +29,7 @@ const fileLog = log('components/custom/vibegrid/field-types/ModularCellBridge.ts
  * Bridge between old and new cell rendering systems
  */
 export class ModularCellBridge {
-  private cellFactory: CellFactory;
+  private cellFactory: CellFactory | null = null;
   private relationshipDataManager: RelationshipDataManager;
   private rollupCalculationManager: RollupCalculationManager;
 
@@ -37,19 +37,35 @@ export class ModularCellBridge {
     this.relationshipDataManager = new RelationshipDataManager();
     this.rollupCalculationManager = new RollupCalculationManager();
 
-    this.cellFactory = new CellFactory(fieldTypeRegistry, {
-      enableEditing: true,
-      enableTooltips: true,
-      enableAccessibility: true
-    });
+    fileLog.info('🚀 [FIELD-BRIDGE] ModularCellBridge created (CellFactory will be initialized lazily)');
+  }
 
-    fileLog.info('🚀 [FIELD-BRIDGE] ModularCellBridge initialized', {
-      registeredTypes: fieldTypeRegistry.getRegisteredTypes().length,
-      basicTypes: fieldTypeRegistry.getTypesByCategory('basic').length,
-      relationshipTypes: fieldTypeRegistry.getTypesByCategory('relationship').length,
-      rollupTypes: fieldTypeRegistry.getTypesByCategory('rollup').length,
-      allTypes: fieldTypeRegistry.getRegisteredTypes()
-    });
+  private ensureCellFactory(): void {
+    if (!this.cellFactory) {
+      const registeredTypes = fieldTypeRegistry.getRegisteredTypes();
+      fileLog.info('🔧 [FIELD-BRIDGE] Initializing CellFactory', {
+        registeredTypesCount: registeredTypes.length,
+        registeredTypes: registeredTypes
+      });
+
+      if (registeredTypes.length === 0) {
+        throw new Error('Field type registry is empty - ensure field types are registered before using ModularCellBridge');
+      }
+
+      this.cellFactory = new CellFactory(fieldTypeRegistry, {
+        enableEditing: true,
+        enableTooltips: true,
+        enableAccessibility: true
+      });
+
+      fileLog.info('🎯 [FIELD-BRIDGE] CellFactory initialized lazily', {
+        registeredTypes: registeredTypes.length,
+        basicTypes: fieldTypeRegistry.getTypesByCategory('basic').length,
+        relationshipTypes: fieldTypeRegistry.getTypesByCategory('relationship').length,
+        rollupTypes: fieldTypeRegistry.getTypesByCategory('rollup').length,
+        allTypes: registeredTypes
+      });
+    }
   }
 
   /**
@@ -65,6 +81,9 @@ export class ModularCellBridge {
     position: { rowIndex: number; columnIndex: number; xPosition?: number }
   ): HTMLElement {
     try {
+      // Ensure cell factory is initialized
+      this.ensureCellFactory();
+
       fileLog.debug('🎯 [FIELD-BRIDGE] Creating cell with modular system', {
         columnId: column.id,
         fieldType: column.cellType || column.type,
@@ -76,7 +95,7 @@ export class ModularCellBridge {
       const enhancedColumn = this.enhanceColumn(column);
 
       // Use the unified cell factory
-      const cellElement = this.cellFactory.createCell(value, enhancedColumn, rowData, position);
+      const cellElement = this.cellFactory!.createCell(value, enhancedColumn, rowData, position);
 
       fileLog.debug('✅ [FIELD-BRIDGE] Cell created successfully', {
         columnId: column.id,
@@ -107,8 +126,9 @@ export class ModularCellBridge {
     rowData: any
   ): void {
     try {
+      this.ensureCellFactory();
       const enhancedColumn = this.enhanceColumn(column);
-      this.cellFactory.updateCell(cellElement, value, enhancedColumn, rowData);
+      this.cellFactory!.updateCell(cellElement, value, enhancedColumn, rowData);
 
     } catch (error) {
       fileLog.error('Error updating cell with modular system', {

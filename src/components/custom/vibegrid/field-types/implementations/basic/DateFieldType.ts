@@ -16,6 +16,8 @@ import type {
   FormattingContext,
   FieldMetadata
 } from '../../FieldTypeRegistry';
+import { fieldTypeRegistry } from '../../FieldTypeRegistry';
+import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
 
 /**
  * Date Cell Renderer
@@ -36,8 +38,9 @@ export class DateRenderer implements CellRenderer {
       return container;
     }
 
-    // Format value for display
-    const displayValue = this.formatValue(value, column);
+    // Use the exact same formatting as original BodyRenderer
+    const cellType = column.cellType || column.type || 'date';
+    const displayValue = this.formatCellValue(value, cellType, column);
     container.textContent = displayValue;
 
     // Apply date-specific styling
@@ -72,6 +75,24 @@ export class DateRenderer implements CellRenderer {
   canHandle(column: EnhancedColumn): boolean {
     const type = column.cellType || column.type || '';
     return ['date', 'datetime', 'datetime-local', 'time', 'timestamp', 'timestamptz'].includes(type);
+  }
+
+  private formatCellValue(value: any, type?: string, column?: any): string {
+    if (value === null || value === undefined) return '';
+    // Use the DataForge formatter if type is provided
+    if (type) {
+      try {
+        const formatted = formatFieldForDisplay(value, type, column);
+        if (formatted !== null && formatted !== undefined) {
+          return String(formatted);
+        }
+      } catch (error) {
+        // Fall back to simple formatting if DataForge formatter fails
+        console.warn('DataForge formatter failed, using fallback', error);
+      }
+    }
+    // Fallback to basic date formatting
+    return this.formatValue(value, column);
   }
 
   private formatValue(value: any, column: EnhancedColumn): string {
@@ -552,8 +573,7 @@ export const DateFieldType: VibeGridFieldType = {
   }
 };
 
-// Register with the global registry
-import { fieldTypeRegistry } from '../../FieldTypeRegistry';
+// Register immediately
 fieldTypeRegistry.register('date', DateFieldType);
 fieldTypeRegistry.register('datetime', DateFieldType);
 fieldTypeRegistry.register('datetime-local', DateFieldType);

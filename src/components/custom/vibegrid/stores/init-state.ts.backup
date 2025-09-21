@@ -158,11 +158,16 @@ export class VibeGridHydrationManager {
       totalDependencies: Object.keys(this.hydrationState$.get()).length,
     });
 
-    // Initialize field type system using dynamic import to avoid circular dependencies
-    this.initializeFieldTypeSystem().catch(error => {
-      fileLog.error('❌ [FIELD-SYSTEM] Dynamic initialization failed', { error: error.message });
-      this.markError('fieldTypeSystemReady', `Field type system failed: ${error.message}`, false);
-    });
+    // NEW: Initialize field type system immediately as part of construction
+    try {
+      this.initializeFieldTypeSystem();
+    } catch (error) {
+      fileLog.error('❌ [FIELD-SYSTEM] Constructor initialization failed - FAIL FAST', {
+        error: error.message,
+        stack: error.stack,
+        tableId: this.tableId
+      });
+    }
 
     this.setupTimeouts();
     this.logProgress();
@@ -323,18 +328,14 @@ export class VibeGridHydrationManager {
   /**
    * Initialize field type system (NEW)
    */
-  /**
-   * Initialize field type system (FIXED)
-   */
-  public async initializeFieldTypeSystem(): Promise<void> {
+  public initializeFieldTypeSystem(): void {
     try {
       fileLog.info('🔧 [FIELD-SYSTEM] Initializing field type system via hydration manager', {
         tableId: this.tableId
       });
 
-      // Use proper ES6 import to ensure all field types are registered
-      const fieldTypesModule = await import('../field-types');
-      const { fieldTypeRegistry, initializeFieldTypeSystem, modularCellBridge } = fieldTypesModule;
+      // Use synchronous import to avoid timing issues
+      const { fieldTypeRegistry, initializeFieldTypeSystem } = require('../field-types');
 
       // Validate that fieldTypeRegistry exists
       if (!fieldTypeRegistry) {
@@ -355,13 +356,6 @@ export class VibeGridHydrationManager {
           computedTypes: fieldTypeRegistry.getTypesByCategory('computed'),
           tableId: this.tableId
         });
-
-        // Make field system available globally for browser inspection
-        if (typeof window !== 'undefined') {
-          window.vibegridFieldRegistry = fieldTypeRegistry;
-          window.vibegridCellBridge = modularCellBridge;
-          fileLog.info('🌐 [FIELD-SYSTEM] Field system exposed globally for debugging');
-        }
 
         this.markReady('fieldTypeSystemReady');
         fileLog.info('✅ [FIELD-SYSTEM] Field type system ready', { tableId: this.tableId });

@@ -237,7 +237,11 @@ export class FieldTypeRegistry {
         columnId: column.id,
         availableTypes: Array.from(this.types.keys())
       });
-      return this.types.get('text')!;
+      const textType = this.types.get('text');
+      if (!textType) {
+        throw new Error(`Field type registry not properly initialized - 'text' type not found. Available types: ${Array.from(this.types.keys()).join(', ')}`);
+      }
+      return textType;
     }
 
     fieldLog.debug('✅ [FIELD-REGISTRY] Field type resolved', {

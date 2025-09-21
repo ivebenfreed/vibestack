@@ -5,6 +5,9 @@
  * Imports all field type implementations to ensure they are registered.
  */
 
+// Import registry first before any field type implementations
+import { fieldTypeRegistry } from './FieldTypeRegistry';
+
 // Core system exports
 export { FieldTypeRegistry, fieldTypeRegistry } from './FieldTypeRegistry';
 export { SchemaAdapter } from '../schema/SchemaAdapter';
@@ -84,7 +87,7 @@ import './implementations/computed/ComputedFieldTypes';
  */
 export function initializeFieldTypeSystem(): void {
   try {
-    // Direct access - no setTimeout recursion
+    // Field types are automatically registered via imports above
     const stats = fieldTypeRegistry.getRegisteredTypes();
 
     console.log('🎯 [FIELD-SYSTEM] VibeGrid Modular Field Type System Initialized', {

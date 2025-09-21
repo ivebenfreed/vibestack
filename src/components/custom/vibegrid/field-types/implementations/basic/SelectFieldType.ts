@@ -16,6 +16,8 @@ import type {
   FormattingContext,
   FieldMetadata
 } from '../../FieldTypeRegistry';
+import { fieldTypeRegistry } from '../../FieldTypeRegistry';
+import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
 
 interface SelectOption {
   value: string;
@@ -34,8 +36,8 @@ export class SelectRenderer implements CellRenderer {
   render(value: any, column: EnhancedColumn, rowData: any): HTMLElement {
     const container = document.createElement('span');
     container.className = column.editable === false
-      ? 'vibegridx-cell-select'
-      : 'vibegridx-cell-select-editable';
+      ? 'vibegridx-enum-badge'
+      : 'vibegridx-enum-badge vibegridx-cell-badge-editable';
 
     // Handle null/undefined values
     if (value == null || value === '') {
@@ -586,9 +588,10 @@ export const SelectFieldType: VibeGridFieldType = {
   }
 };
 
-// Register with the global registry
-import { fieldTypeRegistry } from '../../FieldTypeRegistry';
+// Register immediately
 fieldTypeRegistry.register('select', SelectFieldType);
 fieldTypeRegistry.register('single-select', SelectFieldType);
 fieldTypeRegistry.register('multi-select', SelectFieldType);
 fieldTypeRegistry.register('enum', SelectFieldType);
+fieldTypeRegistry.register('custom_select', SelectFieldType);
+fieldTypeRegistry.register('custom_option_reference', SelectFieldType);
