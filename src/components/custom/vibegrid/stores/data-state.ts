@@ -731,9 +731,9 @@ export function createTableCore$(entityType: string, visualInputs$?: any, initMa
       columns = generatedColumns;
       initManager.markReady('schemaLoaded');
     } catch (error) {
-      fileLog.error('💥 Schema loading failed - NO FALLBACK', { entityType, error });
+      fileLog.error('💥 Schema loading failed', { entityType, error });
       initManager.markError('schemaLoaded', `Schema loading failed: ${error.message}`, true);
-      throw error; // Fail fast - no fallbacks allowed
+      throw error;
     }
   };
 

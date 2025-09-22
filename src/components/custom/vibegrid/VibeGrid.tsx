@@ -684,16 +684,9 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // RENDER
   // ====================================
 
-  if (!observablesRef.current || !visualState.visualInputs$.columns.get() || visualState.visualInputs$.columns.get().length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading table structure...</p>
-        </div>
-      </div>
-    );
-  }
+  // Always render the main structure to ensure containerRef is available
+  // Loading state will be handled by the loading overlay within the main structure
+  const isDataReady = observablesRef.current && visualState.visualInputs$.columns.get() && visualState.visualInputs$.columns.get().length > 0;
 
   return (
     <div

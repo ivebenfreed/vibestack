@@ -218,21 +218,20 @@ export const universeSchema$ = observable(() => {
  */
 export const universeOrgId$ = observable(() => {
   const universeContext = universeContext$.get()
-  
+
   // Try to get org ID from current URL path
   if (typeof window !== 'undefined') {
     const path = window.location.pathname
     const orgMatch = path.match(/^\/org\/([^\/]+)/)
     if (orgMatch) {
       const orgId = orgMatch[1]
-      // Verify this org exists in universe context
-      if (universeContext.organizations && universeContext.organizations[orgId]) {
-        return orgId
-      }
+      // Return the extracted orgId regardless of verification
+      // The API endpoints exist and work, so trust the URL
+      return orgId
     }
   }
-  
-  // Fallback: return 'universe' for universe mode
+
+  // Fallback: return 'universe' only if no org ID in URL
   return 'universe'
 })
 

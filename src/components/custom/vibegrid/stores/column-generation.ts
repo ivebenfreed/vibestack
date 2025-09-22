@@ -5,7 +5,7 @@
  * as cell renderers for consistent behavior.
  */
 
-import { universeSchema$, universeOrgId$ } from '@/legend-state/observables';
+import { universeSchema$, universeOrgId$, universeLoading$, getOrgSchemaFromUniverse$ } from '@/legend-state/observables';
 import { log } from '@/logger';
 import type { Column } from '../types';
 
@@ -36,20 +36,87 @@ interface EntityField {
  */
 export async function generateColumnsFromEntitySchema<T = any>(entityType: string): Promise<Column<T>[]> {
   fileLog.info('🎯 Generating columns from entity schema', { entityType });
-  // AGGRESSIVE DEBUG: Log everything at the start
-  fileLog.info("🚨 [DEBUG] Function called with entityType", { entityType });
-  
+
   let schema;
+  let isLoading = false;
+
   try {
-    schema = universeSchema$.get();
-    fileLog.info("🚨 [DEBUG] Universe schema observable result", { hasSchema: !!schema, schemaType: typeof schema, schemaKeys: schema ? Object.keys(schema) : [] });
-  } catch (error) {
-    fileLog.info("🚨 [DEBUG] Universe schema observable error", { error: error.message });
+    // Try to check if schema system is still loading
+    isLoading = universeLoading$.get();
+    fileLog.info("🚨 [DEBUG] Universe loading state", { entityType, isLoading });
+  } catch (loadingError) {
+    fileLog.info("🚨 [DEBUG] Cannot check loading state, universe not ready", { entityType, error: loadingError.message });
+    throw new Error(`Universe schema system not ready for entity: ${entityType}`);
+  }
+
+  if (isLoading) {
+    fileLog.info("🚨 [DEBUG] Universe schema still loading, retrying later", { entityType });
+    throw new Error(`Universe schema still loading for entity: ${entityType}`);
+  }
+
+  // Get organization ID for direct API call
+  let orgId = universeOrgId$.get();
+  if (!orgId && entityType.includes("_")) {
+    const parts = entityType.split("_");
+    if (parts.length >= 2 && parts[0].match(/^[0-9a-fA-F-]+$/)) {
+      orgId = parts[0];
+    }
+  }
+
+  if (!orgId) {
+    throw new Error(`Cannot determine org ID for entity: ${entityType}`);
+  }
+
+  // Direct API call to get schema since universe schema isn't working
+  try {
+    fileLog.info('📡 Fetching schema directly from API', { entityType, orgId });
+    const response = await fetch(`/api/dataforge/orgs/${orgId}/schema`);
+    if (!response.ok) {
+      throw new Error(`Schema API returned ${response.status}: ${response.statusText}`);
+    }
+    const apiSchema = await response.json();
+    const baseEntityName = entityType.includes("_") ? entityType.split("_").pop() : entityType;
+    const entitySchema = apiSchema.schema?.find((entity: any) => entity.entityName === baseEntityName);
+
+    if (!entitySchema) {
+      throw new Error(`Entity ${baseEntityName} not found in schema`);
+    }
+
+    fileLog.info('✅ Fetched entity schema from API', {
+      entityType,
+      baseEntityName,
+      hasSchema: !!entitySchema,
+      fieldCount: entitySchema.fields?.length || 0
+    });
+
+    schema = { entities: [entitySchema] };
+  } catch (schemaError) {
+    fileLog.error("❌ Direct API schema fetch failed", { entityType, orgId, error: schemaError.message });
+    throw schemaError;
   }
 
   // Try to get schema from Legend State observables first
-  let entitySchema = null; // FORCE API FALLBACK: Skip universe schema lookup
-  fileLog.info("🚨 [DEBUG] Looking for entitySchema", { entityType, hasEntities: !!schema?.entities, entitySchema: !!entitySchema });
+  const baseEntityName = entityType.includes("_") ? entityType.split("_").pop() : entityType;
+  fileLog.info("🚨 [DEBUG] Entity name extraction", {
+    originalEntityType: entityType,
+    baseEntityName,
+    hasSchema: !!schema,
+    hasEntities: !!schema?.entities,
+    entitiesCount: schema?.entities?.length || 0,
+    availableEntities: schema?.entities?.map((e: any) => e.entityName) || []
+  });
+
+  let entitySchema = schema?.entities?.find((entity: any) => {
+    return entity.entityName === baseEntityName;
+  });
+
+  fileLog.info("🚨 [DEBUG] Looking for entitySchema", {
+    entityType,
+    baseEntityName,
+    hasEntities: !!schema?.entities,
+    entitySchema: !!entitySchema,
+    searchResult: entitySchema ? 'FOUND' : 'NOT_FOUND'
+  });
   if (entitySchema) {
     fileLog.info("🚨 [DEBUG] Found entitySchema from universe", {
       entityType,
@@ -61,43 +128,6 @@ export async function generateColumnsFromEntitySchema<T = any>(entityType: strin
     });
   }
 
-  // If not available from universe schema, fetch directly from API
-  if (!entitySchema) {
-    // Try to get orgId from observable, or extract from prefixed entityType
-    let orgId = universeOrgId$.get();
-    if (!orgId && entityType.includes("_")) {
-      // Extract org ID from prefixed entity type: "01920000-1000-7000-8000-000000000001_WorkTask"
-      const parts = entityType.split("_");
-      if (parts.length >= 2 && parts[0].match(/^[0-9a-fA-F-]+$/)) {
-        orgId = parts[0];
-        fileLog.info("🏢 Extracted org ID from entity type", { entityType, orgId });
-      }
-    }
-    if (orgId) {
-      try {
-        fileLog.info('📡 Fetching schema directly from API', { entityType, orgId });
-        const response = await fetch(`/api/dataforge/orgs/${orgId}/schema`);
-        if (response.ok) {
-          const apiSchema = await response.json();
-          // Extract base entity name from potentially prefixed entityType
-          const baseEntityName = entityType.includes("_") ? entityType.split("_").pop() : entityType;
-          entitySchema = apiSchema.schema?.find((entity: any) => entity.entityName === baseEntityName);
-          fileLog.info("🔧 Entity name extraction", {
-            originalEntityType: entityType,
-            baseEntityName: baseEntityName,
-            foundEntity: !!entitySchema
-          });
-          fileLog.info('✅ Fetched entity schema from API', {
-            entityType,
-            hasSchema: !!entitySchema,
-            fieldCount: entitySchema ? entitySchema.fields?.length || 0 : 0
-          });
-        }
-      } catch (error) {
-        fileLog.error('❌ Failed to fetch schema from API', { entityType, error });
-      }
-    }
-  }
 
   if (!entitySchema) {
     fileLog.warn('❌ No schema found for entity (tried both observables and API)', { entityType });
