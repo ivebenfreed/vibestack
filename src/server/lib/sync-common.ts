@@ -273,13 +273,16 @@ export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
  */
 export async function getLatestChangeHistoryLSN(context: MinimalContext): Promise<string> {
   try {
-    // Get LSN from replication slot only
+    // Get LSN from replication slot only - using dynamic slot name
+    const { getReplicationSlotName } = await import('../replication/types');
+    const slotName = getReplicationSlotName();
     const slotResult = await sql<{ slot_name: string; confirmed_flush_lsn: string }>(
       context,
-      `SELECT slot_name, confirmed_flush_lsn 
-       FROM pg_replication_slots 
-       WHERE slot_name = 'vibestack_replication_slot'
-       LIMIT 1;`
+      `SELECT slot_name, confirmed_flush_lsn
+       FROM pg_replication_slots
+       WHERE slot_name = $1
+       LIMIT 1;`,
+      [slotName]
     );
     
     if (slotResult[0]?.confirmed_flush_lsn) {

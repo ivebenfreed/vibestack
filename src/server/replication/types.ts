@@ -70,9 +70,18 @@ export interface ReplicationConfig {
   skipWALConsumption?: boolean;
 }
 
+/**
+ * Generate a unique replication slot name based on the current dev server port
+ * This prevents slot conflicts when multiple dev servers are running
+ */
+export function getReplicationSlotName(): string {
+  const port = process.env.DEV_PORT || process.env.PORT || '4000';
+  return `elevra_port_${port}`;
+}
+
 export const DEFAULT_REPLICATION_CONFIG: ReplicationConfig = {
-  slot: 'vibestack',
-  publication: 'vibestack_pub',
+  slot: getReplicationSlotName(),
+  publication: 'elevra_pub',
   walBatchSize: 2000,      // Increased from 1000 - maximum changes to peek at once
   walConsumeSize: 2000,    // Increased from 1000 - maximum changes to consume at once
   walBatchThreshold: 0.5,  // Re-poll immediately if batch is 50% full
