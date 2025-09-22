@@ -1305,7 +1305,10 @@ export function createVisibleColumns$(visualInputs$: any) {
   return computed(() => {
     const { columns, columnVisibility, columnOrder } = visualInputs$.get();
 
-    return columnOrder
+    // Safety check: If columnOrder is empty but columns exist, use columns order
+    const orderToUse = columnOrder.length > 0 ? columnOrder : columns.map(col => col.id);
+
+    return orderToUse
       .map(id => columns.find(col => col.id === id))
       .filter((col): col is Column => col !== undefined && columnVisibility[col.id] !== false);
   });

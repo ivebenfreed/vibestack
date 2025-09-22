@@ -32,114 +32,103 @@ interface EntityField {
 }
 
 /**
- * Generate VibeGrid columns from entity schema with unified field type processing
+ * Generate VibeGrid columns from entity schema using universe schema system
  */
 export async function generateColumnsFromEntitySchema<T = any>(entityType: string): Promise<Column<T>[]> {
   fileLog.info('🎯 Generating columns from entity schema', { entityType });
 
-  let schema;
-  let isLoading = false;
-
-  try {
-    // Try to check if schema system is still loading
-    isLoading = universeLoading$.get();
-    fileLog.info("🚨 [DEBUG] Universe loading state", { entityType, isLoading });
-  } catch (loadingError) {
-    fileLog.info("🚨 [DEBUG] Cannot check loading state, universe not ready", { entityType, error: loadingError.message });
-    throw new Error(`Universe schema system not ready for entity: ${entityType}`);
-  }
-
+  // Check if universe schema system is ready
+  const isLoading = universeLoading$.get();
   if (isLoading) {
-    fileLog.info("🚨 [DEBUG] Universe schema still loading, retrying later", { entityType });
+    fileLog.info("⏳ Universe schema still loading", { entityType });
     throw new Error(`Universe schema still loading for entity: ${entityType}`);
   }
 
-  // Get organization ID for direct API call
-  let orgId = universeOrgId$.get();
-  if (!orgId && entityType.includes("_")) {
-    const parts = entityType.split("_");
-    if (parts.length >= 2 && parts[0].match(/^[0-9a-fA-F-]+$/)) {
-      orgId = parts[0];
-    }
+  // Get schema from universe schema system (no API calls)
+  const universeSchema = universeSchema$.get();
+  if (!universeSchema?.entities) {
+    fileLog.warn("❌ Universe schema not available", { entityType });
+    throw new Error(`Universe schema not available for entity: ${entityType}`);
   }
 
-  if (!orgId) {
-    throw new Error(`Cannot determine org ID for entity: ${entityType}`);
-  }
-
-  // Direct API call to get schema since universe schema isn't working
-  try {
-    fileLog.info('📡 Fetching schema directly from API', { entityType, orgId });
-    const response = await fetch(`/api/dataforge/orgs/${orgId}/schema`);
-    if (!response.ok) {
-      throw new Error(`Schema API returned ${response.status}: ${response.statusText}`);
-    }
-    const apiSchema = await response.json();
-    const baseEntityName = entityType.includes("_") ? entityType.split("_").pop() : entityType;
-    const entitySchema = apiSchema.schema?.find((entity: any) => entity.entityName === baseEntityName);
-
-    if (!entitySchema) {
-      throw new Error(`Entity ${baseEntityName} not found in schema`);
-    }
-
-    fileLog.info('✅ Fetched entity schema from API', {
-      entityType,
-      baseEntityName,
-      hasSchema: !!entitySchema,
-      fieldCount: entitySchema.fields?.length || 0
-    });
-
-    schema = { entities: [entitySchema] };
-  } catch (schemaError) {
-    fileLog.error("❌ Direct API schema fetch failed", { entityType, orgId, error: schemaError.message });
-    throw schemaError;
-  }
-
-  // Try to get schema from Legend State observables first
-  const baseEntityName = entityType.includes("_") ? entityType.split("_").pop() : entityType;
-  fileLog.info("🚨 [DEBUG] Entity name extraction", {
-    originalEntityType: entityType,
-    baseEntityName,
-    hasSchema: !!schema,
-    hasEntities: !!schema?.entities,
-    entitiesCount: schema?.entities?.length || 0,
-    availableEntities: schema?.entities?.map((e: any) => e.entityName) || []
-  });
-
-  let entitySchema = schema?.entities?.find((entity: any) => {
-    return entity.entityName === baseEntityName;
-  });
-
-  fileLog.info("🚨 [DEBUG] Looking for entitySchema", {
-    entityType,
-    baseEntityName,
-    hasEntities: !!schema?.entities,
-    entitySchema: !!entitySchema,
-    searchResult: entitySchema ? 'FOUND' : 'NOT_FOUND'
-  });
-  if (entitySchema) {
-    fileLog.info("🚨 [DEBUG] Found entitySchema from universe", {
-      entityType,
-      entitySchemaKeys: Object.keys(entitySchema),
-      fieldsType: typeof entitySchema.fields,
-      fieldsIsArray: Array.isArray(entitySchema.fields),
-      fieldsLength: entitySchema.fields?.length,
-      fieldsKeys: entitySchema.fields && typeof entitySchema.fields === "object" ? Object.keys(entitySchema.fields) : null
-    });
-  }
-
+  // Look up entity schema using org-prefixed entityType
+  // The entityType should already be org-prefixed (e.g., "01920000-1000-7000-8000-000000000001_Task")
+  const entitySchema = universeSchema.entities[entityType];
 
   if (!entitySchema) {
-    fileLog.warn('❌ No schema found for entity (tried both observables and API)', { entityType });
+    // Fallback: try to find by clean entity name if org-prefixed lookup fails
+    const baseEntityName = entityType.includes("_") ? entityType.split("_").pop() : entityType;
+    const alternativeSchema = Object.values(universeSchema.entities).find(
+      (entity: any) => entity.entityName === baseEntityName
+    );
+
+    if (alternativeSchema) {
+      fileLog.info('✅ Found entity schema using fallback lookup', {
+        entityType,
+        baseEntityName,
+        fieldCount: alternativeSchema.fields?.length || 0
+      });
+      return generateColumnsFromEntity(alternativeSchema, baseEntityName);
+    }
+
+    fileLog.error("❌ Entity not found in universe schema", {
+      entityType,
+      baseEntityName,
+      availableEntities: Object.keys(universeSchema.entities)
+    });
+    throw new Error(`Entity ${entityType} not found in universe schema`);
+  }
+
+  fileLog.info('✅ Found entity schema in universe', {
+    entityType,
+    fieldCount: entitySchema.fields?.length || 0
+  });
+
+  return generateColumnsFromEntity(entitySchema, entityType);
+}
+
+/**
+ * Generate columns from entity schema object
+ */
+function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: string): Column<T>[] {
+  if (!entitySchema) {
+    fileLog.warn('❌ No schema provided for column generation', { entityType });
     return getBasicColumns<T>();
   }
 
-  // Extract fields from schema (fields is the standard property)
-  // Extract fields from schema - API returns fields as an array, not object
-  const schemaFields = entitySchema.fields || [];
+  // Extract fields from schema - Universe schema uses 'allFields' as an object, not array
+  let schemaFields = entitySchema.allFields || entitySchema.fields || [];
+
+  // Convert allFields object to array if needed
+  if (schemaFields && typeof schemaFields === 'object' && !Array.isArray(schemaFields)) {
+    schemaFields = Object.values(schemaFields);
+  }
+
+  // DEBUG: Log the actual entity schema structure to understand the issue
+  fileLog.info("🔍 [SCHEMA-DEBUG] Entity schema fields found", {
+    entityType,
+    hasAllFields: !!entitySchema.allFields,
+    allFieldsLength: entitySchema.allFields?.length,
+    hasFields: !!entitySchema.fields,
+    fieldsLength: entitySchema.fields?.length,
+    usingAllFields: !!entitySchema.allFields,
+    schemaFieldsLength: schemaFields?.length,
+    allSchemaKeys: Object.keys(entitySchema || {})
+  });
 
   if (!Array.isArray(schemaFields) || schemaFields.length === 0) {
-    fileLog.warn("❌ No fields found in entity schema", { entityType });
+    // ENHANCED DEBUG: Show what we actually got
+    fileLog.warn("❌ No fields found in entity schema - Enhanced Debug", {
+      entityType,
+      schemaFields,
+      schemaFieldsType: typeof schemaFields,
+      schemaFieldsIsArray: Array.isArray(schemaFields),
+      schemaFieldsLength: schemaFields?.length,
+      entitySchemaKeys: Object.keys(entitySchema || {}),
+      allFieldsRaw: entitySchema.allFields,
+      allFieldsType: typeof entitySchema.allFields,
+      allFieldsKeys: entitySchema.allFields ? Object.keys(entitySchema.allFields) : 'no allFields'
+    });
     return getBasicColumns<T>();
   }
 

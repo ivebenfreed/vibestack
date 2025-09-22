@@ -78,6 +78,17 @@ export class BodyRenderer {
   // Observer cleanup
   private selectionObserverDisposer?: () => void;
 
+  // Cell rendering tracking for debugging invisible cells
+  private cellRenderingStats = {
+    rowsRequested: 0,
+    rowsCreated: 0,
+    cellsRequested: 0,
+    cellsCreated: 0,
+    lastRenderTime: 0,
+    renderErrors: [] as string[]
+  };
+  private renderTimeoutId?: number;
+
   // NEW: Modular cell system support
   private modularCellBridge: any = null;
 
@@ -171,6 +182,24 @@ export class BodyRenderer {
     columnVisibility: Record<string, boolean>,
     startX: number = GRID_DIMENSIONS.CONTENT_OFFSET_X  // Use constant from centralized dimensions
   ): HTMLElement {
+    // Track row rendering for debugging invisible cells
+    this.cellRenderingStats.rowsRequested++;
+    this.cellRenderingStats.lastRenderTime = Date.now();
+
+    fileLog.info('🔧 [CELL-DEBUG] Creating row element', {
+      rowId: row.id,
+      rowIndex,
+      rowType: row.type,
+      columnsCount: columns.length,
+      visibleColumns: Object.values(columnVisibility).filter(Boolean).length,
+      startX,
+      stats: this.cellRenderingStats
+    });
+
+    // Schedule render health check with manual timeout for now
+    setTimeout(() => {
+      this.performRenderHealthCheck();
+    }, 2000);
     // Update grouped mode status
     this.updateGroupedModeStatus();
     const rowElement = this.createElement('div', 'vibegridx-row');
@@ -214,13 +243,33 @@ export class BodyRenderer {
     const columnLayouts = visualStateData.visibleColumns;
 
     columns.forEach((column, colIndex) => {
+      this.cellRenderingStats.cellsRequested++;
+
       // Find the corresponding column layout with actual width and x-offset
       const layout = columnLayouts.find(l => l.id === column.id);
-      if (!layout) return;
+      if (!layout) {
+        fileLog.warn('🚨 [CELL-DEBUG] No layout found for column', {
+          columnId: column.id,
+          columnField: column.field,
+          availableLayouts: columnLayouts.map(l => l.id)
+        });
+        return;
+      }
+
+      fileLog.debug('🔧 [CELL-DEBUG] Creating cell', {
+        rowId: row.id,
+        columnId: column.id,
+        columnField: column.field,
+        colIndex,
+        xOffset: layout.xOffset,
+        cellType: column.cellType
+      });
 
       // Use the layout's xOffset for absolute positioning (already includes cumulative positioning)
       const cell = this.createCellElement(row, column, colIndex, layout.xOffset);
       rowElement.appendChild(cell);
+
+      this.cellRenderingStats.cellsCreated++;
     });
 
     // Use UNIFIED visual state's totalWidth - no duplicate calculation
@@ -241,6 +290,16 @@ export class BodyRenderer {
         row.groupId
       );
     }
+
+    // Track successful row creation
+    this.cellRenderingStats.rowsCreated++;
+
+    fileLog.info('✅ [CELL-DEBUG] Row element created successfully', {
+      rowId: row.id,
+      cellsInRow: this.cellRenderingStats.cellsCreated - (this.cellRenderingStats.cellsCreated - columns.length),
+      totalWidth: totalRowWidth,
+      activeRowsCount: this.activeRows.size
+    });
 
     return rowElement;
   }
@@ -1359,5 +1418,87 @@ export class CellFormatter {
 
     // Clean up context since interaction is complete
     this.lastClickedCell = null;
+  }
+
+  // ====================================
+  // CELL RENDERING DEBUG METHODS
+  // ====================================
+
+  /**
+   * Schedule a health check to detect if cell rendering stalls
+   */
+  private scheduleRenderHealthCheck(): void {
+    // Clear any existing timeout
+    if (this.renderTimeoutId) {
+      clearTimeout(this.renderTimeoutId);
+    }
+
+    // Schedule new health check in 2 seconds
+    this.renderTimeoutId = window.setTimeout(() => {
+      this.performRenderHealthCheck();
+    }, 2000);
+  }
+
+  /**
+   * Perform health check and log errors if rendering appears stalled
+   */
+  private performRenderHealthCheck(): void {
+    const stats = this.cellRenderingStats;
+    const timeSinceLastRender = Date.now() - stats.lastRenderTime;
+
+    // Check for rendering issues
+    const issues: string[] = [];
+
+    if (stats.rowsRequested > 0 && stats.rowsCreated === 0) {
+      issues.push('No rows created despite requests');
+    }
+
+    if (stats.cellsRequested > 0 && stats.cellsCreated === 0) {
+      issues.push('No cells created despite requests');
+    }
+
+    if (stats.rowsRequested > stats.rowsCreated) {
+      issues.push(`Row creation incomplete: ${stats.rowsCreated}/${stats.rowsRequested}`);
+    }
+
+    if (stats.cellsRequested > stats.cellsCreated) {
+      issues.push(`Cell creation incomplete: ${stats.cellsCreated}/${stats.cellsRequested}`);
+    }
+
+    if (timeSinceLastRender > 5000) {
+      issues.push(`No rendering activity for ${Math.round(timeSinceLastRender / 1000)}s`);
+    }
+
+    // Log results
+    if (issues.length > 0) {
+      fileLog.error('🚨 [CELL-DEBUG] CELL RENDERING HEALTH CHECK FAILED', {
+        issues,
+        stats,
+        timeSinceLastRender,
+        activeRowsCount: this.activeRows.size,
+        containerChildren: this.container.children.length
+      });
+
+      // Add to error list
+      stats.renderErrors.push(`Health check failed: ${issues.join(', ')}`);
+    } else {
+      fileLog.info('✅ [CELL-DEBUG] Cell rendering health check passed', {
+        stats,
+        activeRowsCount: this.activeRows.size,
+        containerChildren: this.container.children.length
+      });
+    }
+  }
+
+  /**
+   * Get current cell rendering statistics for debugging
+   */
+  getRenderingStats() {
+    return {
+      ...this.cellRenderingStats,
+      activeRowsCount: this.activeRows.size,
+      containerChildren: this.container.children.length,
+      timeSinceLastRender: Date.now() - this.cellRenderingStats.lastRenderTime
+    };
   }
 }
