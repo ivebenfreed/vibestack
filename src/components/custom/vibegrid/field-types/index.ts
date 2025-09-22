@@ -8,6 +8,38 @@
 // Import registry first before any field type implementations
 import { fieldTypeRegistry } from './FieldTypeRegistry';
 
+// Import all field type implementations to register them early
+// Basic types
+import './implementations/basic/TextFieldType';
+import './implementations/basic/TextAreaFieldType';
+import './implementations/basic/NumberFieldType';
+import './implementations/basic/DateFieldType';
+import './implementations/basic/BooleanFieldType';
+import './implementations/basic/SelectFieldType';
+import './implementations/basic/EmailFieldType';
+import './implementations/basic/UrlFieldType';
+import './implementations/basic/PhoneFieldType';
+import './implementations/basic/ColorFieldType';
+import './implementations/basic/CurrencyFieldType';
+import './implementations/basic/FileFieldType';
+import './implementations/basic/RatingFieldType';
+import './implementations/basic/SliderFieldType';
+import './implementations/basic/ImageFieldType';
+import './implementations/basic/MarkdownFieldType';
+
+// Relationship types
+import './implementations/relationship/UserReferenceFieldType';
+import './implementations/relationship/EntityReferenceFieldType';
+
+// Rollup types
+import './implementations/rollup/RollupCountFieldType';
+import './implementations/rollup/RollupSumFieldType';
+import './implementations/rollup/RollupAverageFieldType';
+import './implementations/rollup/RollupConcatFieldType';
+
+// Computed types
+import './implementations/computed/ComputedFieldTypes';
+
 // Core system exports
 export { FieldTypeRegistry, fieldTypeRegistry } from './FieldTypeRegistry';
 export { SchemaAdapter } from '../schema/SchemaAdapter';

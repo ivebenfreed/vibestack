@@ -13,15 +13,7 @@ import { RelationshipDataManager } from '../managers/RelationshipDataManager';
 import { RollupCalculationManager } from '../managers/RollupCalculationManager';
 import { log } from '@/logger';
 
-// Import all field type implementations to register them
-import './implementations/basic/TextFieldType';
-import './implementations/basic/NumberFieldType';
-import './implementations/basic/DateFieldType';
-import './implementations/basic/BooleanFieldType';
-import './implementations/basic/SelectFieldType';
-import './implementations/basic/EmailFieldType';
-import './implementations/relationship/UserReferenceFieldType';
-import './implementations/rollup/RollupCountFieldType';
+// Field type implementations are now imported in the main index.ts
 
 const fileLog = log('components/custom/vibegrid/field-types/ModularCellBridge.ts');
 

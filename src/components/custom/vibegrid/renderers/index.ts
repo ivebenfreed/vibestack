@@ -46,11 +46,10 @@ export { PerformanceSystem } from './systems/PerformanceSystem';
 export { RowEngine } from './engines/RowEngine';
 export { CellPipeline } from './engines/CellPipeline';
 
-// Cell Renderers - Type-specific cell rendering
-export * from './cell-renderers';
+// Note: Old cell-renderers removed - now handled by field-types/implementations
 
 // Utils - Helper functions
-export * from './utils/cell-rendering';
+// Note: cell-rendering utils removed - now handled by unified CellFactory
 export * from './utils/group-behaviors';
 export * from './utils/interaction-handlers';
 export * from './utils/row-rendering';

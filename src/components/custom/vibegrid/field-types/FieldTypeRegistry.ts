@@ -230,9 +230,9 @@ export class FieldTypeRegistry {
   getFieldType(column: EnhancedColumn): VibeGridFieldType {
     const type = this.resolveFieldType(column);
 
-    // Debug for priority
+    // Debug for priority field resolution
     if (column.id === 'priority' || column.field === 'priority') {
-      fieldLog.warn('🔎 [FIELD-REGISTRY] Getting field type for priority', {
+      fieldLog.debug('🔎 [FIELD-REGISTRY] Getting field type for priority', {
         resolvedType: type,
         registeredTypes: Array.from(this.types.keys()),
         isSelectRegistered: this.types.has('select'),
@@ -243,16 +243,12 @@ export class FieldTypeRegistry {
     const fieldType = this.types.get(type);
 
     if (!fieldType) {
-      fieldLog.warn('⚠️ [FIELD-REGISTRY] Unknown field type, falling back to text', {
+      fieldLog.error('❌ [FIELD-REGISTRY] Unknown field type - FAIL FAST', {
         unknownType: type,
         columnId: column.id,
         availableTypes: Array.from(this.types.keys())
       });
-      const textType = this.types.get('text');
-      if (!textType) {
-        throw new Error(`Field type registry not properly initialized - 'text' type not found. Available types: ${Array.from(this.types.keys()).join(', ')}`);
-      }
-      return textType;
+      throw new Error(`Unknown field type '${type}' for column '${column.id}'. Available types: ${Array.from(this.types.keys()).join(', ')}`);
     }
 
     fieldLog.debug('✅ [FIELD-REGISTRY] Field type resolved', {
@@ -273,7 +269,7 @@ export class FieldTypeRegistry {
 
     // Debug logging for priority field
     if (column.id === 'priority' || column.field === 'priority') {
-      fieldLog.warn('🔍 [FIELD-REGISTRY] Resolving priority field type', {
+      fieldLog.debug('🔍 [FIELD-REGISTRY] Resolving priority field type', {
         columnId: column.id,
         field: column.field,
         cellType: column.cellType,

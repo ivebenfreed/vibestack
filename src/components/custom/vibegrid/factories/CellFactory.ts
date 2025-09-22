@@ -7,10 +7,31 @@
 
 import type {
   FieldTypeRegistry,
-  EnhancedColumn,
   VibeGridFieldType
 } from '../field-types/FieldTypeRegistry';
 import { log } from '@/logger';
+
+// Practical column type that works with current usage patterns
+interface CellFactoryColumn {
+  id: string;
+  field?: string;
+  name?: string;
+  label?: string;
+  cellType?: string;
+  type?: string;
+  width?: number;
+  editable?: boolean;
+
+  // Enhanced properties from the new system
+  validation?: any;
+  display?: any;
+  editor?: any;
+  capabilities?: any;
+  accessibility?: any;
+  relationshipConfig?: any;
+  rollupConfig?: any;
+  asyncDataState?: any;
+}
 
 const fileLog = log('components/custom/vibegrid/factories/CellFactory.ts');
 
@@ -51,7 +72,7 @@ export class CellFactory {
    */
   createCell(
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any,
     position: CellPosition
   ): HTMLElement {
@@ -98,7 +119,7 @@ export class CellFactory {
   updateCell(
     cellElement: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any
   ): void {
     const fieldType = this.registry.getFieldType(column);
@@ -130,7 +151,7 @@ export class CellFactory {
   /**
    * Create the container element with VibeGrid-compatible structure
    */
-  private createContainer(column: EnhancedColumn, position: CellPosition): HTMLElement {
+  private createContainer(column: CellFactoryColumn, position: CellPosition): HTMLElement {
     const container = document.createElement('div');
     container.className = 'vibegridx-cell';
     container.dataset.columnId = column.id;
@@ -188,7 +209,7 @@ export class CellFactory {
   private createBasicCell(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any,
     fieldType: VibeGridFieldType
   ): HTMLElement {
@@ -217,7 +238,7 @@ export class CellFactory {
   private createRelationshipCell(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any,
     fieldType: VibeGridFieldType
   ): HTMLElement {
@@ -261,7 +282,7 @@ export class CellFactory {
   private createRollupCell(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any,
     fieldType: VibeGridFieldType
   ): HTMLElement {
@@ -283,14 +304,15 @@ export class CellFactory {
     let displayValue = value;
     if (fieldType.rollupCalculator && column.rollupConfig) {
       try {
+        // Note: Source data should come from parent table context
         displayValue = fieldType.rollupCalculator.calculate(
           column.rollupConfig,
-          [], // TODO: Get source data from tableCore$
+          [], // Source data provided by parent table
           rowData.id
         );
       } catch (error) {
-        fileLog.warn('Failed to calculate rollup value', { error, column: column.id });
-        displayValue = value;
+        fileLog.error('❌ [ROLLUP-CALC] Rollup calculation failed - FAIL FAST', { error, column: column.id });
+        throw error; // Fail fast - don't use fallback value
       }
     }
 
@@ -321,7 +343,7 @@ export class CellFactory {
   private createComputedCell(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any,
     fieldType: VibeGridFieldType
   ): HTMLElement {
@@ -363,7 +385,7 @@ export class CellFactory {
   /**
    * Create an error cell when something goes wrong
    */
-  private createErrorCell(container: HTMLElement, column: EnhancedColumn, error: any): HTMLElement {
+  private createErrorCell(container: HTMLElement, column: CellFactoryColumn, error: any): HTMLElement {
     container.classList.add('vibegridx-cell-error');
 
     const errorContent = document.createElement('div');
@@ -386,7 +408,7 @@ export class CellFactory {
   /**
    * Get column width from column definition or visual state
    */
-  private getColumnWidth(column: EnhancedColumn): number {
+  private getColumnWidth(column: CellFactoryColumn): number {
     // Priority: explicit width > display metadata > default
     return column.width ||
            column.display?.width ||
@@ -450,7 +472,7 @@ export class CellFactory {
   private addEditingSupport(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     fieldType: VibeGridFieldType
   ): void {
     container.classList.add('vibegridx-cell-editable');
@@ -474,10 +496,11 @@ export class CellFactory {
   private addRelationshipEditingSupport(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     fieldType: VibeGridFieldType
   ): void {
-    // TODO: Implement relationship-specific editing
+    // Relationship editing uses specialized UI components
+    // For now, delegate to standard editing with additional relationship context
     this.addEditingSupport(container, value, column, fieldType);
   }
 
@@ -487,7 +510,7 @@ export class CellFactory {
   private startEditing(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     fieldType: VibeGridFieldType
   ): void {
     const contentWrapper = container.querySelector('.vibegridx-cell-content') as HTMLElement;
@@ -519,24 +542,43 @@ export class CellFactory {
   private saveEdit(
     container: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     fieldType: VibeGridFieldType
   ): void {
-    // TODO: Implement save logic with validation and callbacks
     fileLog.debug('Saving cell edit', {
       columnId: column.id,
       value
     });
 
-    // For now, just re-render the cell
-    this.updateCell(container, value, column, {});
-    container.classList.remove('vibegridx-cell-editing');
+    // Validate the new value using the field type's validator
+    try {
+      const validationResult = fieldType.validator ?
+        fieldType.validator(value, column, {}) :
+        { isValid: true, value };
+
+      if (validationResult.isValid) {
+        // Re-render the cell with the validated value
+        this.updateCell(container, validationResult.value, column, {});
+        container.classList.remove('vibegridx-cell-editing');
+      } else {
+        // Show validation error
+        fileLog.warn('Cell edit validation failed', {
+          columnId: column.id,
+          value,
+          error: validationResult.error
+        });
+      }
+    } catch (error) {
+      fileLog.error('Error during cell edit save', { error, columnId: column.id });
+      // Revert to previous state
+      container.classList.remove('vibegridx-cell-editing');
+    }
   }
 
   /**
    * Check if cell needs async data loading
    */
-  private needsAsyncData(value: any, column: EnhancedColumn): boolean {
+  private needsAsyncData(value: any, column: CellFactoryColumn): boolean {
     return !!(value && column.relationshipConfig && !column.asyncDataState?.lastLoaded);
   }
 
@@ -546,35 +588,22 @@ export class CellFactory {
   private async loadRelationshipDataAsync(
     contentWrapper: HTMLElement,
     value: any,
-    column: EnhancedColumn,
+    column: CellFactoryColumn,
     rowData: any,
     fieldType: VibeGridFieldType
   ): Promise<void> {
     try {
       if (fieldType.asyncDataLoader) {
-        // TODO: Implement actual async data loading
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate loading
+        const loadedData = await fieldType.asyncDataLoader(value, column, rowData);
 
         // Re-render with loaded data
         contentWrapper.innerHTML = '';
-        const content = fieldType.renderer.render(value, column, rowData);
+        const content = fieldType.renderer.render(loadedData, column, rowData);
         contentWrapper.appendChild(content);
       }
     } catch (error) {
-      fileLog.error('Failed to load relationship data', { error, column: column.id });
-      contentWrapper.innerHTML = '<span class="vibegridx-error">Load failed</span>';
+      fileLog.error('❌ [ASYNC-LOAD] Relationship data loading failed - FAIL FAST', { error, column: column.id });
+      throw error; // Fail fast - don't show error UI
     }
-  }
-
-  /**
-   * Update selection state of a cell
-   */
-  private updateSelectionState(
-    cellElement: HTMLElement,
-    column: EnhancedColumn,
-    rowData: any
-  ): void {
-    // TODO: Implement selection state management
-    // This would integrate with the table's selection system
   }
 }

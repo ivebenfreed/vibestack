@@ -21,17 +21,9 @@ export function applyColumnDefaults<T>(columns: Column<T>[]): Column<T>[] {
   return columns.map(col => {
     const defaults = COLUMN_DEFAULTS[col.cellType as CellType];
     
-    // Fallback to text defaults if cellType is not recognized
+    // No fallback - cellType must be valid
     if (!defaults) {
-      console.warn(`[applyColumnDefaults] Unknown cellType '${col.cellType}', using text defaults`);
-      const textDefaults = COLUMN_DEFAULTS.text;
-      return {
-        ...col,
-        width: col.width ?? textDefaults.width,
-        minWidth: col.minWidth ?? textDefaults.minWidth,
-        maxWidth: col.maxWidth ?? textDefaults.maxWidth,
-        editable: col.editable ?? true
-      };
+      throw new Error(`Unknown cellType '${col.cellType}' for column '${col.id}'. Available types: ${Object.keys(COLUMN_DEFAULTS).join(', ')}`);
     }
     
     return {

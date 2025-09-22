@@ -11,7 +11,6 @@
  */
 
 import { log } from '@/logger';
-import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
@@ -19,10 +18,8 @@ import type { createVibeGridVisualState } from '../../stores/visual-state';
 import { GRID_DIMENSIONS } from '../../constants/grid-dimensions';
 import type { DOMElementFactory } from '../factories/DOMElementFactory';
 import type { SelectionController } from '../modules/SelectionController';
-import { BadgeRenderer } from '../modules/BadgeRenderer';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
 import { DragDropManager } from '../../utils/drag-drop-handlers';
-import { isSelectType, SELECT_CELL_TYPES } from '../../column-types';
 
 const fileLog = log('components/custom/vibegrid/renderers/components/BodyRenderer.ts');
 
@@ -553,7 +550,7 @@ export class BodyRenderer {
   // ====================================
 
   /**
-   * Create a cell element with full interaction and content handling
+   * Create a cell element using the unified CellFactory
    */
   createCellElement(
     row: any,
@@ -561,334 +558,97 @@ export class BodyRenderer {
     colIndex: number,
     xPosition?: number
   ): HTMLElement {
-    // TODO: Integrate modular system once import issues are resolved
-    // For now, use legacy rendering for all cells
-    const cellType = column.cellType || column.type || 'text';
-    const cellElement = this.domFactory.createElement('div', 'vibegridx-cell');
-    cellElement.dataset.rowId = row.id;
-    cellElement.dataset.columnId = column.id;
-
-    // Check if this cell is selected
-    const cellId = `${row.id}:${column.id}`;
-    const isSelected = this.tableInteraction$.selectedCells.get().has(cellId);
-
-    // Use centralized visual state for column width
-    const actualWidth = this.visualState.visualOperations.getColumnWidth(column.id);
-
-    // Use absolute positioning if xPosition is provided
-    if (xPosition !== undefined) {
-      cellElement.style.cssText = `
-        position: absolute;
-        left: ${xPosition}px;
-        top: 0;
-        width: ${actualWidth}px;
-        height: 100%;
-        padding: 0 12px;
-        display: flex;
-        align-items: center;
-        font-size: 14px;
-        border-right: 1px solid #f1f3f5;
-        overflow: hidden;
-        cursor: default;
-      `;
-    } else {
-      // Fallback to flex layout for compatibility
-      cellElement.style.cssText = `
-        flex: 0 0 ${actualWidth}px;
-        height: 100%;
-        padding: 0 12px;
-        display: flex;
-        align-items: center;
-        font-size: 14px;
-        border-right: 1px solid #f1f3f5;
-        overflow: hidden;
-        position: relative;
-        cursor: default;
-      `;
-    }
-
-    // Apply selection class if selected
-    if (isSelected) {
-      cellElement.classList.add('vibegridx-selected');
-    }
-
-    // Get cell value and determine content type for proper CSS classes
-    // Handle virtual row structure: row.data contains the actual data
-    const rowData = row.data || row;
-    const value = rowData[column.id];
-
-    // Create content element with proper CSS classes based on type
-    // The content element should only take up the space it needs, not flex: 1
-    let contentElement: HTMLElement;
-
-    if (isSelectType(cellType) || cellType === 'tags') {
-      // Badge/enum content - use centralized formatter for schema-based styling
-      contentElement = this.domFactory.createElement('span', 'vibegridx-enum-badge vibegridx-cell-badge-editable');
-      const displayValue = this.formatCellValue(value, cellType, column);
-
-      // Check if the formatter returned HTML (with styling)
-      if (displayValue.includes('<span')) {
-        contentElement.innerHTML = displayValue;
-      } else {
-        contentElement.textContent = displayValue;
-
-        // Apply default styling if no schema-based styling was applied
-        contentElement.style.cssText = `
-          background-color: rgb(243, 244, 246);
-          color: rgb(75, 85, 99);
-          border: 1px solid rgb(209, 213, 219);
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          font-weight: 500;
-          white-space: nowrap;
-        `;
-      }
-    } else if (this.isTagsField(column.id, value)) {
-      // Tags field with comma-separated values - create multiple badges
-      contentElement = this.createTagsElement(value, rowData, column);
-    } else if (['number', 'integer', 'float'].includes(cellType)) {
-      // Number content - use editable class only if column is editable
-      const editableClass = column.editable === false ? '' : 'vibegridx-cell-number-editable';
-      contentElement = this.domFactory.createElement('span', `vibegridx-number-content ${editableClass}`.trim());
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else if (cellType === 'boolean') {
-      // Boolean content - use editable class only if column is editable
-      const editableClass = column.editable === false ? '' : 'vibegridx-cell-boolean-editable';
-      contentElement = this.domFactory.createElement('span', `vibegridx-boolean-text ${editableClass}`.trim());
-      contentElement.textContent = this.formatCellValue(value, cellType, column);
-    } else {
-      // NEW: Try modular system for all supported field types
-      if (this.modularCellBridge && this.modularCellBridge.isSupported(column)) {
-        try {
-          fileLog.debug('🎯 [FIELD-BRIDGE] Using modular system for text field', {
-            columnId: column.id,
-            fieldType: cellType,
-            value: value
-          });
-
-          // Use modular system - it will return content element directly
-          const modularContent = this.modularCellBridge.createCell(
-            value,
-            column,
-            rowData,
-            { rowIndex: 0, columnIndex: colIndex, xPosition }
-          );
-
-          // Extract the inner content from modular cell (skip the outer container)
-          const innerContent = modularContent.querySelector('span') || modularContent.firstChild;
-          if (innerContent) {
-            contentElement = innerContent.cloneNode(true) as HTMLElement;
-
-            // PRESERVE SelectRenderer styling for colored badges
-            // Only add base classes if the renderer hasn't already styled the element
-            const hasSelectStyling = contentElement.style.backgroundColor ||
-                                    contentElement.className.includes('vibegridx-select-badge');
-
-            if (!hasSelectStyling && !contentElement.className.includes('vibegridx-cell-text')) {
-              contentElement.className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
-            }
-          } else {
-            throw new Error('No content found in modular cell');
-          }
-
-        } catch (error) {
-          fileLog.error('❌ [FIELD-BRIDGE] Modular system failed for text field - NO FALLBACK', {
-            error,
-            columnId: column.id,
-            fieldType: cellType
-          });
-          // FAIL FAST - Don't fallback, throw the error to surface issues
-          throw error;
-        }
-      } else {
-        // FAIL FAST - No fallback allowed, modular system must work
-        fileLog.error('❌ [FIELD-BRIDGE] Text field MUST use modular system - FAIL FAST', {
-          columnId: column.id,
-          cellType,
-          modularBridgeAvailable: !!this.modularCellBridge,
-          isSupported: this.modularCellBridge ? this.modularCellBridge.isSupported(column) : false
-        });
-        throw new Error(`Text field ${column.id} must use modular system - field type registry not initialized`);
-      }
-    }
-
-    // Ensure all content elements have proper overflow handling
-    if (contentElement && !contentElement.style.overflow) {
-      contentElement.style.overflow = 'hidden';
-      contentElement.style.textOverflow = 'ellipsis';
-      contentElement.style.whiteSpace = 'nowrap';
-    }
-
-    // Add click handler for content area - immediate edit mode (only for editable columns)
-    if (column.editable !== false) {
-      contentElement.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const cellId = `${row.id}:${column.id}`;
-
-        fileLog.info('📝 Content clicked - entering edit mode', {
-          rowId: row.id,
-          columnId: column.id,
-          value,
-          cellType
-        });
-
-        // Start edit immediately
-        this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
-      });
-    }
-    // For non-editable columns, don't add click handler - let clicks bubble up for cell selection
-
-    cellElement.appendChild(contentElement);
-
-    return cellElement;
-  }
-
-  // ====================================
-  // CELL FORMATTING METHODS (from CellFormatter)
-  // ====================================
-
-  /**
-   * Format a cell value for display based on its type and column configuration
-   */
-  private formatCellValue(value: any, type?: string, column?: any): string {
-    if (value === null || value === undefined) return '';
-
-    // Use the DataForge formatter if type is provided
-    if (type) {
+    // Use the modular CellFactory if available, otherwise use basic cell creation
+    if (this.modularCellBridge) {
       try {
-        const formatted = formatFieldForDisplay(value, type, column);
-        if (formatted !== null && formatted !== undefined) {
-          return String(formatted);
+        // Handle virtual row structure: row.data contains the actual data
+        const rowData = row.data || row;
+        const value = rowData[column.id];
+
+        fileLog.debug('🎯 [BODY-RENDERER] Using CellFactory for cell creation', {
+          columnId: column.id,
+          fieldType: column.cellType || column.type || 'text',
+          value: value,
+          hasXPosition: xPosition !== undefined
+        });
+
+        // Use the unified CellFactory
+        const cellElement = this.modularCellBridge.createCell(
+          value,
+          column,
+          rowData,
+          {
+            rowIndex: 0,
+            columnIndex: colIndex,
+            xPosition
+          }
+        );
+
+        // Check if this cell is selected and apply selection class
+        const cellId = `${row.id}:${column.id}`;
+        const isSelected = this.tableInteraction$.selectedCells.get().has(cellId);
+        if (isSelected) {
+          cellElement.classList.add('vibegridx-selected');
         }
+
+        // Add interaction handlers that the CellFactory doesn't handle
+        this.addCellInteractionHandlers(cellElement, row, column, rowData[column.id]);
+
+        return cellElement;
+
       } catch (error) {
-        // Fall back to simple formatting if DataForge formatter fails
-        console.warn('DataForge formatter failed, using fallback', error);
+        fileLog.error('❌ [BODY-RENDERER] CellFactory failed - FAIL FAST', {
+          error,
+          columnId: column.id,
+          fieldType: column.cellType || column.type
+        });
+        throw error; // Fail fast - don't use fallback
       }
     }
 
-    // Fallback formatting based on type
-    switch (type) {
-      case 'boolean':
-        return value ? 'True' : 'False';
-
-      case 'date':
-        if (value instanceof Date) {
-          return value.toLocaleDateString();
-        }
-        return String(value);
-
-      case 'datetime':
-        if (value instanceof Date) {
-          return value.toLocaleString();
-        }
-        return String(value);
-
-      case 'number':
-      case 'integer':
-        return Number(value).toLocaleString();
-
-      case 'float':
-      case 'decimal':
-        return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-      case 'currency':
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: column?.currency || 'USD'
-        }).format(Number(value));
-
-      case 'percentage':
-        return `${(Number(value) * 100).toFixed(2)}%`;
-
-      case 'email':
-        return String(value).toLowerCase();
-
-      case 'url':
-        return String(value);
-
-      case 'phone':
-        return this.formatPhoneNumber(String(value));
-
-      case 'tags':
-        if (Array.isArray(value)) {
-          return value.join(', ');
-        }
-        return String(value);
-
-      case 'json':
-        if (typeof value === 'object') {
-          return JSON.stringify(value, null, 2);
-        }
-        return String(value);
-
-      default:
-        // Optimized: Handle all select types uniformly
-        if (SELECT_CELL_TYPES.has(type as any)) {
-          return String(value);
-        }
-        return String(value);
-    }
+    // CellFactory must be available - no fallback allowed
+    throw new Error('ModularCellBridge not available - field type system not initialized');
   }
 
-  /**
-   * Format phone number for display
-   */
-  private formatPhoneNumber(phone: string): string {
-    // Remove all non-numeric characters
-    const cleaned = phone.replace(/\D/g, '');
+  // Note: Basic cell fallback removed - CellFactory must work
 
-    // Format US phone numbers
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-    } else if (cleaned.length === 11 && cleaned[0] === '1') {
-      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  /**
+   * Add interaction handlers to cell elements
+   */
+  private addCellInteractionHandlers(
+    cellElement: HTMLElement,
+    row: any,
+    column: any,
+    value: any
+  ): void {
+    // Add click handler for edit mode (only for editable columns)
+    if (column.editable !== false) {
+      const contentElement = cellElement.querySelector('span') || cellElement.firstElementChild;
+      if (contentElement) {
+        contentElement.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cellId = `${row.id}:${column.id}`;
+
+          fileLog.info('📝 Content clicked - entering edit mode', {
+            rowId: row.id,
+            columnId: column.id,
+            value,
+            cellType: column.cellType || column.type
+          });
+
+          // Start edit immediately
+          this.tableInteraction$.startEdit(cellId, value ? String(value) : '');
+        });
+      }
     }
 
-    // Return original if not a standard format
-    return phone;
+    // Mouse down handler for cell selection will be handled by event delegation
+    // Just ensure proper data attributes are set
+    cellElement.setAttribute('data-row-id', row.id);
+    cellElement.setAttribute('data-column-id', column.id);
   }
 
-
-  /**
-   * Check if a column should use tags field rendering
-   */
-  private isTagsField(columnId: string, value: any): boolean {
-    return BadgeRenderer.isTagsField(columnId, value);
-  }
-
-  /**
-   * Create legacy text content element (fallback for modular system)
-   */
-  private createLegacyTextContent(value: any, column: any, cellType: string): HTMLElement {
-    const className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
-    const contentElement = this.domFactory.createElement('span', className);
-    contentElement.textContent = this.formatCellValue(value, cellType, column);
-
-    // Add proper text overflow handling for long text
-    contentElement.style.maxWidth = '100%';
-    contentElement.style.overflow = 'hidden';
-    contentElement.style.textOverflow = 'ellipsis';
-    contentElement.style.whiteSpace = 'nowrap';
-    contentElement.style.display = 'block';
-
-    return contentElement;
-  }
-
-  /**
-   * Create tags element with multiple badges
-   */
-  private createTagsElement(value: string, row: any, column: any): HTMLElement {
-    return BadgeRenderer.createTagsElement(
-      value,
-      row,
-      column,
-      this.onEntityUpdate
-    );
-  }
+  // Note: Cell formatting methods removed - now handled by unified CellFactory
 
   // ====================================
   // ROW MANAGEMENT METHODS
