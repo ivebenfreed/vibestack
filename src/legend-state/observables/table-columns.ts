@@ -174,8 +174,8 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
           fieldName: field.name
         });
 
-        // Get users from the entity data for now (should ideally load from users table)
-        const users$ = getEntity$('User');
+        // Use org-prefixed User entity (hardcoded in every org schema)
+        const users$ = getEntity$(`${universeOrgId$.get()}_User`);
 
         fileLog.info(`🔍 User entity check`, {
           hasUsersObservable: !!users$
@@ -227,12 +227,15 @@ export const getEntityColumns$ = (entityName: string) => computed(() => {
 
       // Infer target entity for entity_reference and load options
       if (field.type === 'entity_reference' || field.type === 'custom_entity_reference') {
-        const targetEntity = inferTargetEntity(field.name, entity.archetype);
-        column.referenceEntity = targetEntity;
+        const baseTargetEntity = inferTargetEntity(field.name, entity.archetype);
+        column.referenceEntity = baseTargetEntity;
 
-        // Load options from the target entity
-        if (targetEntity) {
-          const targetEntity$ = getEntity$(targetEntity);
+        // Load options from the target entity using org-prefixed name
+        if (baseTargetEntity) {
+          // Map base entity names to actual org-prefixed entity names
+          const orgId = universeOrgId$.get();
+          const orgPrefixedTargetEntity = mapToOrgPrefixedEntity(baseTargetEntity, orgId);
+          const targetEntity$ = getEntity$(orgPrefixedTargetEntity);
           if (targetEntity$) {
             const targetData = targetEntity$.peek();
             if (targetData && typeof targetData === 'object') {
@@ -461,6 +464,29 @@ function isReferenceField(fieldType: string): boolean {
   ].includes(fieldType);
 }
 
+/**
+ * Map base entity names to org-prefixed entity names based on available entities
+ */
+function mapToOrgPrefixedEntity(baseEntityName: string, orgId: string): string {
+  // Create mapping based on known entity patterns
+  const entityMappings: Record<string, string> = {
+    'Portfolio': 'ProjectPortfolio',
+    'Milestone': 'ProjectMilestone',
+    'Assigned_developer': 'TeamMember',
+    'Developer': 'TeamMember',
+    'User': 'TeamMember',
+    'Client': 'Client',
+    'Document': 'Document',
+    'Task': 'WorkTask',
+    'Collection': 'Collection',
+    'Invoice': 'Invoice',
+    'Deliverable': 'Deliverable'
+  };
+
+  const mappedName = entityMappings[baseEntityName] || baseEntityName;
+  return `${orgId}_${mappedName}`;
+}
+
 function inferTargetEntity(fieldName: string, archetype?: string): string | undefined {
   // Handle self-references first (parent relationships)
   if (fieldName.startsWith('parent_') && archetype) {
@@ -477,6 +503,9 @@ function inferTargetEntity(fieldName: string, archetype?: string): string | unde
   if (fieldName === 'collection_id') return 'Collection';
   if (fieldName === 'record_id') return 'Record';
   if (fieldName === 'activity_id') return 'Activity';
+  if (fieldName === 'portfolio_id') return 'Portfolio';
+  if (fieldName === 'milestone_id') return 'Milestone';
+  if (fieldName === 'assigned_developer_id' || fieldName === 'reviewer_id') return 'User';
   
   // Generic pattern: remove _id suffix and capitalize
   if (fieldName.endsWith('_id')) {

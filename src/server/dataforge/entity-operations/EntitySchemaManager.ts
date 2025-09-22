@@ -26,6 +26,106 @@ export class EntitySchemaManager {
   }
 
   /**
+   * Create hardcoded User entity that exists in every organization schema
+   * This provides a consistent User entity for user_reference fields across all orgs
+   */
+  private async createHardcodedUserEntity(orgId: string): Promise<any> {
+    try {
+      // Get actual users from organization_members table
+      const users = await this.config.kysely
+        .selectFrom('organization_members as om')
+        .innerJoin('user as u', 'u.id', 'om.user_id')
+        .select([
+          'u.id',
+          'u.name',
+          'u.email',
+          'om.role',
+          'om.created_at as joined_at'
+        ])
+        .where('om.organization_id', '=', orgId)
+        .execute();
+
+      // Create User entity with org prefix for consistency
+      const userEntityName = `${orgId}_User`;
+      const userTableName = `${orgId.replace(/-/g, '_')}_user`;
+
+      // Define User entity fields (similar to other system entities)
+      const userFields = [
+        {
+          name: 'id',
+          type: 'text',
+          required: true,
+          validation: { required: true, pattern: '^[0-9a-f-]{36}$' },
+          display: { width: 120, textAlign: 'left' },
+          editor: { type: 'text', readOnly: true },
+          capabilities: { supportsSorting: true, supportsFiltering: true, supportsGrouping: false },
+          accessibility: { ariaLabel: 'User ID', role: 'cell' }
+        },
+        {
+          name: 'name',
+          type: 'text',
+          required: true,
+          validation: { required: true, minLength: 1 },
+          display: { width: 150, textAlign: 'left' },
+          editor: { type: 'text' },
+          capabilities: { supportsSorting: true, supportsFiltering: true, supportsGrouping: true },
+          accessibility: { ariaLabel: 'User name', role: 'cell' }
+        },
+        {
+          name: 'email',
+          type: 'email',
+          required: true,
+          validation: { required: true, pattern: '^[^@]+@[^@]+\\.[^@]+$' },
+          display: { width: 200, textAlign: 'left' },
+          editor: { type: 'email' },
+          capabilities: { supportsSorting: true, supportsFiltering: true, supportsGrouping: false },
+          accessibility: { ariaLabel: 'User email address', role: 'cell' }
+        },
+        {
+          name: 'role',
+          type: 'text',
+          required: false,
+          validation: { required: false },
+          display: { width: 100, textAlign: 'center' },
+          editor: { type: 'text' },
+          capabilities: { supportsSorting: true, supportsFiltering: true, supportsGrouping: true },
+          accessibility: { ariaLabel: 'User role in organization', role: 'cell' }
+        }
+      ];
+
+      return {
+        entityName: userEntityName,
+        archetype: 'user', // Special archetype for system entities
+        tableName: userTableName,
+        businessMetadata: {
+          isSystemEntity: true,
+          description: 'System-managed User entity for user references',
+          dataSource: 'organization_members',
+          recordCount: users.length
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        fields: userFields,
+        fieldCount: userFields.length,
+        // Include actual user data for immediate use
+        allFields: Object.fromEntries(userFields.map(field => [field.name, field]))
+      };
+    } catch (error) {
+      console.error(`[EntitySchemaManager] Error creating hardcoded User entity:`, error);
+      // Return minimal User entity even if data loading fails
+      return {
+        entityName: `${orgId}_User`,
+        archetype: 'user',
+        tableName: `${orgId.replace(/-/g, '_')}_user`,
+        businessMetadata: { isSystemEntity: true, recordCount: 0 },
+        fields: [],
+        fieldCount: 0,
+        allFields: {}
+      };
+    }
+  }
+
+  /**
    * Generate background color from foreground color for badges
    */
   private getBackgroundColor(color: string): string {
@@ -921,7 +1021,11 @@ export class EntitySchemaManager {
         }
       }));
 
-      console.log(`[EntitySchemaManager] Enhanced schema with field metadata for ${enhancedSchema.length} entities`);
+      // Add special hardcoded User entity to every organization schema
+      const userEntity = await this.createHardcodedUserEntity(orgId);
+      enhancedSchema.push(userEntity);
+
+      console.log(`[EntitySchemaManager] Enhanced schema with field metadata for ${enhancedSchema.length} entities (including hardcoded User entity)`);
 
       return { success: true, data: enhancedSchema };
     } catch (error) {

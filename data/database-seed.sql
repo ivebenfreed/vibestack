@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HRW4XYbSwv4NzQkX4Yb6NyGcHUuy5PMmkXh4p6KIxCiVYNc2d2WSnMNLhyWwecB
+\restrict 3emRNbHwj2RIs4yNTXhi2vTI5TjTDfHlfZt2FGPTmnLw6HRlrPLbbIDeOwrIf8R
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -887,8 +887,6 @@ a99c7666-08d4-45e8-bde7-7a1c454a7d9d	01920000-1000-7000-8000-000000000001	2025-0
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_worktask (id, organization_id, created_at, updated_at, title, description, priority, status, due_date, task_type, estimated_hours, actual_hours, complexity, billable, hourly_rate, blocking_issues, code_review_required) FROM stdin;
-8ed846ab-5137-4a6b-8176-857cd3661c7f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.571	2025-09-12 01:53:37.571	Employee Training Program Development	Create comprehensive training curriculum for digital tools and new processes	medium	not_started	2025-03-15 00:00:00	documentation	35	\N	2	t	\N	\N	f
-a880b054-1c80-443a-a613-e60c33ba8ccb	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.866	2025-09-12 01:53:37.866	Security Audit and Compliance Review	Comprehensive security assessment and compliance verification for new systems	high	not_started	2025-04-01 00:00:00	testing	45	\N	4	t	\N	\N	f
 26b282d1-820a-497c-b8dc-d7675d12ff9c	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:59.898	2025-09-12 01:53:59.898	Real-time Analytics Dashboard	Build interactive dashboard for healthcare analytics with real-time patient monitoring and reporting	high	not_started	2025-04-15 00:00:00	development	65	\N	4	t	\N	\N	t
 f98ab62c-724c-4b91-95ef-92ec6c19a0f3	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.45	2025-09-12 01:54:00.45	Integration with EHR Systems	Develop integrations with major Electronic Health Record systems for seamless data exchange	medium	not_started	2025-06-01 00:00:00	development	55	\N	4	t	\N	\N	t
 b814d501-69ad-40ee-a7b5-6c99a399f9d6	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.592	2025-09-12 01:54:22.592	Inventory Management System	Develop real-time inventory tracking system with automated reorder points and supplier integration	high	not_started	2025-04-30 00:00:00	development	60	\N	4	t	\N	\N	t
@@ -906,8 +904,10 @@ c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-0
 e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:49.298	2025-09-19 17:08:26.83	Mobile-First Frontend Architecture Design	Design responsive mobile-first architecture using React Native and Progressive Web App technologies. Create component library and design system.	high	done	2025-04-16 01:00:00	design	36	12	4	t	\N	\N	t
 7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-19 17:08:29.243	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	done	2025-03-15 12:00:00	deployment	35	\N	3	t	\N	\N	f
 395471fd-bb87-4a4c-ab65-1772ec1561f6	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:33.791	2025-09-19 21:35:21.758	Patient Data Encryption Implementation	Implement end-to-end encryption for PHI data at rest and in transit. Configure AES-256 encryption, key management system, and secure data access layers	high	done	2025-03-21 05:00:00	development	48	22	5	t	\N	Pending approval of encryption key management approach by HealthFirst security team. AWS KMS configuration requires additional security clearance.	t
+a880b054-1c80-443a-a613-e60c33ba8ccb	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.866	2025-09-22 18:05:58.389	Security Audit and Compliance Review	Comprehensive security assessment and compliance verification for new systems	high	not_started	2025-04-01 04:00:00	testing	45	\N	4	t	\N	\N	f
 1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-21 18:24:45.417	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-21 03:00:00	deployment	12	14	3	t	\N	\N	f
 85566e0d-4fd8-44e5-97a1-aa71e5024750	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.082	2025-09-21 21:55:04.055	API Security T1234	Comprehensive security testing of healthcare APIs including penetration testing and vulnerability assessment 1234	high	done_group_priority_critical	2025-05-01 16:00:00	testing	40	\N	3	t	\N	\N	f
+8ed846ab-5137-4a6b-8176-857cd3661c7f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.571	2025-09-22 18:05:30.251	Employee Training Program Development	Create comprehensive training curriculum for digital tools and new processes	low	not_started	2025-03-15 04:00:00	documentation	35	\N	2	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-12 01:54:48.69	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	not_started	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-19 17:08:31.596	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	done	2025-03-16 05:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
@@ -1285,5 +1285,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HRW4XYbSwv4NzQkX4Yb6NyGcHUuy5PMmkXh4p6KIxCiVYNc2d2WSnMNLhyWwecB
+\unrestrict 3emRNbHwj2RIs4yNTXhi2vTI5TjTDfHlfZt2FGPTmnLw6HRlrPLbbIDeOwrIf8R
 
