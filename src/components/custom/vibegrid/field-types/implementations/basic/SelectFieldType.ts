@@ -5,6 +5,7 @@
  * formatting, and editing. Integrates with backend Enhanced Field Handler metadata.
  */
 
+import { log } from '@/logger';
 import type {
   VibeGridFieldType,
   CellRenderer,
@@ -18,6 +19,8 @@ import type {
 } from '../../FieldTypeRegistry';
 import { fieldTypeRegistry } from '../../FieldTypeRegistry';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
+
+const fileLog = log('components/custom/vibegrid/field-types/implementations/basic/SelectFieldType');
 
 interface SelectOption {
   value: string;
@@ -34,15 +37,23 @@ interface SelectOption {
  */
 export class SelectRenderer implements CellRenderer {
   render(value: any, column: EnhancedColumn, rowData: any): HTMLElement {
+    fileLog.info('[SelectRenderer] render called', {
+      columnId: column.id,
+      field: column.field,
+      value,
+      hasOptions: !!(column.options && column.options.length > 0),
+      optionsCount: column.options?.length || 0,
+      cellType: column.cellType
+    });
+
     const container = document.createElement('span');
-    container.className = column.editable === false
-      ? 'vibegridx-enum-badge'
-      : 'vibegridx-enum-badge vibegridx-cell-badge-editable';
+    // Don't set classes here - let BodyRenderer handle the base classes
+    // Only add styling that's specific to the badge display
 
     // Handle null/undefined values
     if (value == null || value === '') {
-      container.className += ' vibegridx-cell-empty';
-      container.textContent = column.editable === false ? '' : 'Click to edit';
+      container.className = 'vibegridx-cell-empty';
+      container.textContent = column.editable === false ? '' : 'Select option';
       container.style.opacity = '0.6';
       container.style.fontSize = '12px';
       return container;
@@ -61,14 +72,12 @@ export class SelectRenderer implements CellRenderer {
   update(element: HTMLElement, value: any, column: EnhancedColumn): void {
     // Clear existing content
     element.innerHTML = '';
-    element.className = column.editable === false
-      ? 'vibegridx-cell-select'
-      : 'vibegridx-cell-select-editable';
+    // Don't override classes - preserve what BodyRenderer set
 
     // Handle empty values
     if (value == null || value === '') {
-      element.className += ' vibegridx-cell-empty';
-      element.textContent = column.editable === false ? '' : 'Click to edit';
+      element.classList.add('vibegridx-cell-empty');
+      element.textContent = column.editable === false ? '' : 'Select option';
       element.style.opacity = '0.6';
       return;
     }
@@ -93,8 +102,28 @@ export class SelectRenderer implements CellRenderer {
     const option = this.findOption(value, column);
 
     if (option) {
-      const badge = this.createOptionBadge(option);
-      container.appendChild(badge);
+      // Apply badge styling directly to container instead of creating nested element
+      container.textContent = option.label;
+      container.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        white-space: nowrap;
+        background-color: ${option.backgroundColor || '#f3f4f6'};
+        color: ${option.color || '#374151'};
+        border: 1px solid ${option.backgroundColor ? 'transparent' : '#d1d5db'};
+      `;
+
+      if (option.icon) {
+        const icon = document.createElement('span');
+        icon.textContent = option.icon;
+        icon.style.fontSize = '10px';
+        container.insertBefore(icon, container.firstChild);
+      }
     } else {
       // Unknown value
       container.textContent = String(value);

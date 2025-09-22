@@ -84,9 +84,13 @@ export class ModularCellBridge {
       // Ensure cell factory is initialized
       this.ensureCellFactory();
 
-      fileLog.debug('🎯 [FIELD-BRIDGE] Creating cell with modular system', {
+      fileLog.info('🎯 [FIELD-BRIDGE] Creating cell with modular system', {
         columnId: column.id,
         fieldType: column.cellType || column.type,
+        cellType: column.cellType,
+        type: column.type,
+        hasOptions: !!(column.options && column.options.length > 0),
+        optionsCount: column.options?.length || 0,
         value: value,
         position
       });

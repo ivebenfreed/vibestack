@@ -76,19 +76,19 @@ function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[]
       // Add field-specific options for select fields
       if (fieldName === 'status' && !options) {
         options = [
-          { value: 'not_started', label: 'Not Started', color: '#6B7280' },
-          { value: 'active', label: 'Active', color: '#10B981' },
-          { value: 'in_progress', label: 'In Progress', color: '#F59E0B' },
-          { value: 'done', label: 'Done', color: '#10B981' },
-          { value: 'completed', label: 'Completed', color: '#10B981' },
-          { value: 'archived', label: 'Archived', color: '#6B7280' }
+          { value: 'not_started', label: 'Not Started', color: '#6B7280', backgroundColor: '#F3F4F6' },
+          { value: 'active', label: 'Active', color: '#065F46', backgroundColor: '#D1FAE5' },
+          { value: 'in_progress', label: 'In Progress', color: '#92400E', backgroundColor: '#FEF3C7' },
+          { value: 'done', label: 'Done', color: '#065F46', backgroundColor: '#D1FAE5' },
+          { value: 'completed', label: 'Completed', color: '#065F46', backgroundColor: '#D1FAE5' },
+          { value: 'archived', label: 'Archived', color: '#6B7280', backgroundColor: '#F3F4F6' }
         ]
       } else if (fieldName === 'priority' && !options) {
         options = [
-          { value: 'low', label: 'Low', color: '#10B981' },
-          { value: 'medium', label: 'Medium', color: '#F59E0B' },
-          { value: 'high', label: 'High', color: '#F97316' },
-          { value: 'critical', label: 'Critical', color: '#EF4444' }
+          { value: 'low', label: 'Low', color: '#4B5563', backgroundColor: '#F3F4F6' },
+          { value: 'medium', label: 'Medium', color: '#92400E', backgroundColor: '#FEF3C7' },
+          { value: 'high', label: 'High', color: '#991B1B', backgroundColor: '#FEE2E2' },
+          { value: 'critical', label: 'Critical', color: '#7F1D1D', backgroundColor: '#FEE2E2' }
         ]
       }
       
@@ -101,6 +101,12 @@ function getSchemaBasedColumns<T>(entityName: string, schema?: any): Column<T>[]
       else if (fieldName.includes('phone')) width = 150
       else if (fieldName.includes('company')) width = 200
       
+      // If we have options, ensure cellType is 'select'
+      if (options && options.length > 0) {
+        cellType = 'select'
+        fileLog.info(`[use-precomputed-entity-columns] Setting cellType to 'select' for field ${fieldName} with ${options.length} options`)
+      }
+
       columns.push({
         id: fieldName,
         field: fieldName as keyof T & string,

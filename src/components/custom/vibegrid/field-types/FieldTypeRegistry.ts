@@ -229,6 +229,17 @@ export class FieldTypeRegistry {
    */
   getFieldType(column: EnhancedColumn): VibeGridFieldType {
     const type = this.resolveFieldType(column);
+
+    // Debug for priority
+    if (column.id === 'priority' || column.field === 'priority') {
+      fieldLog.warn('🔎 [FIELD-REGISTRY] Getting field type for priority', {
+        resolvedType: type,
+        registeredTypes: Array.from(this.types.keys()),
+        isSelectRegistered: this.types.has('select'),
+        willUseSelect: this.types.has(type)
+      });
+    }
+
     const fieldType = this.types.get(type);
 
     if (!fieldType) {
@@ -258,7 +269,22 @@ export class FieldTypeRegistry {
    */
   private resolveFieldType(column: EnhancedColumn): string {
     // Priority: cellType > type > 'text'
-    return column.cellType || column.type || 'text';
+    const resolvedType = column.cellType || column.type || 'text';
+
+    // Debug logging for priority field
+    if (column.id === 'priority' || column.field === 'priority') {
+      fieldLog.warn('🔍 [FIELD-REGISTRY] Resolving priority field type', {
+        columnId: column.id,
+        field: column.field,
+        cellType: column.cellType,
+        type: column.type,
+        resolvedType,
+        hasOptions: !!(column.options && column.options.length > 0),
+        optionsCount: column.options?.length || 0
+      });
+    }
+
+    return resolvedType;
   }
 
   /**

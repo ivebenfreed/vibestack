@@ -180,6 +180,25 @@
   transition: all 0.2s ease;
 }
 
+/* Editable enum badge shows pointer cursor and hover effect */
+.vibegridx-cell-badge-editable {
+  cursor: pointer;
+  position: relative;
+}
+
+.vibegridx-cell-badge-editable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Add dropdown indicator for editable select badges */
+.vibegridx-cell-badge-editable::after {
+  content: '▼';
+  margin-left: 6px;
+  font-size: 0.5rem;
+  opacity: 0.6;
+}
+
 .vibegridx-enum-tag {
   display: inline-block;
   padding: 4px 12px;

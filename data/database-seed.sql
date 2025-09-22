@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict roDi5Y4toRqet9LTsOualMHk0RgwFDIWl7qfYTubq8J66kafUTlQbuDmzkYl8YR
+\restrict vElQ7ZlwPLRpMNrreBHOjvWB5gaVmnm28HSxEKOFEMYP3kVBxow1L4SxYNlpn7k
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -912,7 +912,7 @@ e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-0
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-19 17:08:31.596	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	done	2025-03-16 05:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
 b2cf0a74-01e5-4d21-ba04-288186ac692e	01920000-1000-7000-8000-000000000001	2025-09-21 16:26:07.597	2025-09-21 16:26:07.597	Live Sync Test Task - REAL TIME	Testing the live sync functionality with VibeGrid - this should appear immediately!	high	todo	\N	development	2.5	\N	3	t	\N	\N	f
-291a87b3-3107-4acb-9d64-2813f8c65ded	01920000-1000-7000-8000-000000000001	2025-09-21 16:56:55.607	2025-09-21 21:44:45.597	🎉 FINAL SYNC TEST - Working at 17:36!	This is the final test of the reactive sync system - it should appear instantly in VibeGrid!	critical	done	\N	testing	1	\N	2	f	\N	\N	f
+291a87b3-3107-4acb-9d64-2813f8c65ded	01920000-1000-7000-8000-000000000001	2025-09-21 16:56:55.607	2025-09-22 11:29:17.406	🎉 FINAL SYNC TEST - Working at 17:36!	This is the final test of the reactive sync system - it should appear instantly in VibeGrid!	critical	done	\N	testing	1	\N	2	f	\N	\N	f
 \.
 
 
@@ -1285,5 +1285,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict roDi5Y4toRqet9LTsOualMHk0RgwFDIWl7qfYTubq8J66kafUTlQbuDmzkYl8YR
+\unrestrict vElQ7ZlwPLRpMNrreBHOjvWB5gaVmnm28HSxEKOFEMYP3kVBxow1L4SxYNlpn7k
 
