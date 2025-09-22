@@ -44,14 +44,14 @@ function isTagsLikeField(column: Column, initialValue: any): boolean {
 }
 
 // Export all editor components
-export { 
-  TextEditor, 
-  NumberEditor, 
+export {
+  TextEditor,
+  NumberEditor,
   SelectEditor,
   MultiSelectEditor,
-  BooleanEditor, 
-  DateEditor, 
-  SingleRelationshipEditor, 
+  BooleanEditor,
+  DateEditor,
+  SingleRelationshipEditor,
   MultiRelationshipEditor,
   ReferenceSelectEditor,
   ReferenceMultiEditor

@@ -6,36 +6,55 @@ import type { VibeGridFieldType, CellRenderer, CellEditor, EnhancedColumn } from
 
 export class TextAreaRenderer implements CellRenderer {
   render(value: any, column: EnhancedColumn): HTMLElement {
-    const container = document.createElement('div');
+    const container = document.createElement('span');
     container.className = 'vibegridx-cell-textarea';
-    container.style.cssText = 'padding: 4px; max-height: 60px; overflow: hidden;';
+    container.style.cssText = `
+      padding: 4px;
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      cursor: pointer;
+    `;
 
     if (!value) {
-      container.innerHTML = '<span style="opacity: 0.6; font-size: 12px;">Click to edit</span>';
+      container.style.opacity = '0.6';
+      container.style.fontSize = '12px';
+      container.textContent = 'Click to edit...';
       return container;
     }
 
     const text = String(value);
-    const maxLength = column.display?.truncateAt || 100;
-    const displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    // Convert newlines to spaces for single-line display
+    const singleLineText = text.replace(/\s+/g, ' ').trim();
 
-    container.textContent = displayText;
-    container.title = text; // Full text on hover
-    container.style.cssText += 'font-size: 12px; line-height: 1.3; white-space: pre-wrap;';
+    container.textContent = singleLineText;
+    container.title = text; // Full text on hover (preserves original formatting)
 
     return container;
   }
 
   update(element: HTMLElement, value: any): void {
     if (!value) {
-      element.innerHTML = '<span style="opacity: 0.6; font-size: 12px;">Click to edit</span>';
+      element.style.opacity = '0.6';
+      element.style.fontSize = '12px';
+      element.textContent = 'Click to edit...';
     } else {
-      element.textContent = String(value);
+      element.style.opacity = '1';
+      element.style.fontSize = '13px';
+      const text = String(value);
+      // Convert newlines to spaces for single-line display
+      const singleLineText = text.replace(/\s+/g, ' ').trim();
+      element.textContent = singleLineText;
+      element.title = text; // Full text on hover (preserves original formatting)
     }
   }
 
   canHandle(column: EnhancedColumn): boolean {
-    return (column.cellType || column.type) === 'textarea';
+    const type = column.cellType || column.type || '';
+    return ['textarea', 'longtext'].includes(type);
   }
 }
 
@@ -110,3 +129,4 @@ export const TextAreaFieldType: VibeGridFieldType = {
 
 import { fieldTypeRegistry } from '../../FieldTypeRegistry';
 fieldTypeRegistry.register('textarea', TextAreaFieldType);
+fieldTypeRegistry.register('longtext', TextAreaFieldType);

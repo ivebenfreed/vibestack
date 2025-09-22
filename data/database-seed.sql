@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict B44ib23EJWWN12t1BWeQZ87y4oP2VOkmfNjudFGQR9QZnrOxUqe5EYYfJD5nci2
+\restrict roDi5Y4toRqet9LTsOualMHk0RgwFDIWl7qfYTubq8J66kafUTlQbuDmzkYl8YR
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -896,6 +896,7 @@ b814d501-69ad-40ee-a7b5-6c99a399f9d6	01920000-1000-7000-8000-000000000001	2025-0
 eb6d8755-c903-4d03-9e67-0abc07fcca89	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.001	2025-09-12 01:54:23.001	Search and Recommendation Engine	Implement AI-powered search functionality with personalized product recommendations	medium	not_started	2025-07-01 00:00:00	development	55	\N	5	t	\N	\N	t
 394e27f2-0fc1-469f-ba73-bdb02d868817	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:23.121	2025-09-12 01:54:23.121	Multi-Platform Testing	Comprehensive testing across web, mobile, and tablet platforms with automated test suites	high	not_started	2025-08-15 00:00:00	testing	42	\N	3	t	\N	\N	f
 0d2977b2-fe23-4f18-9cc2-d17a4934f03d	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:03.332	2025-09-21 16:44:26.801	Network Security & SSL Certificate Setup - SYNC NOW WORKING	Configure network security groups, WAF rules, and SSL certificates for secure HTTPS traffic. Set up CloudFront CDN with proper security headers.	high	not_started	2025-03-25 21:00:00	deployment	24	0	4	t	\N	Cannot proceed until AWS VPC setup is completed and approved by security team.	f
+00aa5ef7-d224-4738-8f8e-9f4878ac5208	01920000-1000-7000-8000-000000000001	2025-09-11 14:41:00.334	2025-09-22 02:22:44.824	🎯 END-TO-END SYNC TEST - Updated at 17:40	This change was made via curl - watch it appear instantly in your VibeGrid!long	critical	in-progress	2025-05-31 01:00:00	development	44	0	5	t	\N	Waiting for RetailMax to finalize inventory data schema and provide sample data. Third-party integration specs still being negotiated with suppliers.	t
 01d55ead-3b1d-478e-a379-22322f32dc0f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.423	2025-09-15 00:46:23.947	Process Automation Framework Design	Design automation framework for business processes using RPA and workflow tools	high	done	2025-02-01 05:00:00	development	60	\N	5	t	\N	\N	f
 a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-13 16:38:49.773	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-02-28 22:00:00	documentation	32	35	4	t	\N	\N	f
 3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-15 00:46:13.035	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
@@ -905,14 +906,13 @@ c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-0
 e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:49.298	2025-09-19 17:08:26.83	Mobile-First Frontend Architecture Design	Design responsive mobile-first architecture using React Native and Progressive Web App technologies. Create component library and design system.	high	done	2025-04-16 01:00:00	design	36	12	4	t	\N	\N	t
 7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-19 17:08:29.243	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	done	2025-03-15 12:00:00	deployment	35	\N	3	t	\N	\N	f
 395471fd-bb87-4a4c-ab65-1772ec1561f6	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:33.791	2025-09-19 21:35:21.758	Patient Data Encryption Implementation	Implement end-to-end encryption for PHI data at rest and in transit. Configure AES-256 encryption, key management system, and secure data access layers	high	done	2025-03-21 05:00:00	development	48	22	5	t	\N	Pending approval of encryption key management approach by HealthFirst security team. AWS KMS configuration requires additional security clearance.	t
-85566e0d-4fd8-44e5-97a1-aa71e5024750	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.082	2025-09-21 18:05:59.302	API Security T1234	Comprehensive security testing of healthcare APIs including penetration testing and vulnerability assessment 1234	high	done_group_priority_critical	2025-05-01 12:00:00	testing	40	\N	3	t	\N	\N	f
 1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-21 18:24:45.417	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-21 03:00:00	deployment	12	14	3	t	\N	\N	f
-00aa5ef7-d224-4738-8f8e-9f4878ac5208	01920000-1000-7000-8000-000000000001	2025-09-11 14:41:00.334	2025-09-21 17:41:38.807	🎯 END-TO-END SYNC TEST - Updated at 17:40	This change was made via curl - watch it appear instantly in your VibeGrid!	critical	in-progress	2025-05-30 21:00:00	development	44	0	5	t	\N	Waiting for RetailMax to finalize inventory data schema and provide sample data. Third-party integration specs still being negotiated with suppliers.	t
+85566e0d-4fd8-44e5-97a1-aa71e5024750	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.082	2025-09-21 21:55:04.055	API Security T1234	Comprehensive security testing of healthcare APIs including penetration testing and vulnerability assessment 1234	high	done_group_priority_critical	2025-05-01 16:00:00	testing	40	\N	3	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-12 01:54:48.69	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	not_started	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-19 17:08:31.596	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	done	2025-03-16 05:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
 b2cf0a74-01e5-4d21-ba04-288186ac692e	01920000-1000-7000-8000-000000000001	2025-09-21 16:26:07.597	2025-09-21 16:26:07.597	Live Sync Test Task - REAL TIME	Testing the live sync functionality with VibeGrid - this should appear immediately!	high	todo	\N	development	2.5	\N	3	t	\N	\N	f
-291a87b3-3107-4acb-9d64-2813f8c65ded	01920000-1000-7000-8000-000000000001	2025-09-21 16:56:55.607	2025-09-21 21:11:34.66	🎉 FINAL SYNC TEST - Working at 17:36!	This is the final test of the reactive sync system - it should appear instantly in VibeGrid!	critical	done	\N	testing	1	\N	2	f	\N	\N	f
+291a87b3-3107-4acb-9d64-2813f8c65ded	01920000-1000-7000-8000-000000000001	2025-09-21 16:56:55.607	2025-09-21 21:44:45.597	🎉 FINAL SYNC TEST - Working at 17:36!	This is the final test of the reactive sync system - it should appear instantly in VibeGrid!	critical	done	\N	testing	1	\N	2	f	\N	\N	f
 \.
 
 
@@ -1285,5 +1285,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict B44ib23EJWWN12t1BWeQZ87y4oP2VOkmfNjudFGQR9QZnrOxUqe5EYYfJD5nci2
+\unrestrict roDi5Y4toRqet9LTsOualMHk0RgwFDIWl7qfYTubq8J66kafUTlQbuDmzkYl8YR
 

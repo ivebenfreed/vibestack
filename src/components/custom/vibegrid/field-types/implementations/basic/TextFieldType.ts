@@ -28,34 +28,42 @@ export class TextRenderer implements CellRenderer {
   render(value: any, column: EnhancedColumn, rowData: any): HTMLElement {
     fieldLog.debug('📝 [FIELD-TEXT] Rendering text field', {
       columnId: column.id,
+      fieldType: column.cellType || column.type,
       value: value,
       editable: column.editable !== false
     });
 
     const container = document.createElement('span');
+    const fieldType = column.cellType || column.type || 'text';
+
+    // Set appropriate CSS class based on field type
     container.className = column.editable === false
-      ? 'vibegridx-cell-text'
-      : 'vibegridx-cell-text-editable';
+      ? `vibegridx-cell-${fieldType}`
+      : `vibegridx-cell-${fieldType}-editable`;
 
     // Handle null/undefined values
     if (value == null || value === '') {
       container.className += ' vibegridx-cell-empty';
-      container.textContent = column.editable === false ? '' : 'Click to edit';
+      container.textContent = column.editable === false ? '' : 'Click to edit...';
       container.style.opacity = '0.6';
       container.style.fontSize = '12px';
       return container;
     }
 
-    // Format value for display
-    const displayValue = this.formatValue(value, column);
+    // Format value for display based on field type
+    const displayValue = this.formatValueByType(value, column);
     container.textContent = displayValue;
 
-    // Apply text overflow handling
+    // Apply common text overflow handling
     container.style.maxWidth = '100%';
     container.style.overflow = 'hidden';
     container.style.textOverflow = 'ellipsis';
     container.style.whiteSpace = 'nowrap';
     container.style.display = 'block';
+    container.style.cursor = 'pointer';
+
+    // Apply field-specific styling
+    this.applyFieldTypeSpecificStyling(container, fieldType);
 
     // Apply backend display metadata if available
     if (column.display) {
@@ -84,20 +92,71 @@ export class TextRenderer implements CellRenderer {
 
   canHandle(column: EnhancedColumn): boolean {
     const type = column.cellType || column.type || '';
-    return ['text', 'longtext', 'textarea'].includes(type);
+    return ['text', 'string', 'email', 'url', 'phone', 'longtext', 'textarea', 'markdown', 'html', 'richtext'].includes(type);
   }
 
-  private formatValue(value: any, column: EnhancedColumn): string {
+  private formatValueByType(value: any, column: EnhancedColumn): string {
     if (value == null) return '';
 
-    const strValue = String(value);
+    const fieldType = column.cellType || column.type || 'text';
+    let strValue = String(value);
+
+    // For multi-line fields, convert to single line for display
+    if (['longtext', 'textarea', 'markdown', 'html', 'richtext'].includes(fieldType)) {
+      strValue = strValue.replace(/\s+/g, ' ').trim();
+    }
+
+    // Apply field-specific formatting
+    switch (fieldType) {
+      case 'email':
+        strValue = strValue.toLowerCase();
+        break;
+      case 'url':
+        if (strValue && !strValue.match(/^https?:\/\//)) {
+          strValue = `${strValue}`;
+        }
+        break;
+      case 'phone':
+        // Basic phone formatting could go here
+        break;
+    }
 
     // Apply length limits from backend metadata if available
     if (column.validation?.maxLength && strValue.length > column.validation.maxLength) {
       return strValue.substring(0, column.validation.maxLength) + '...';
     }
 
+    // Apply display truncation
+    const maxDisplayLength = column.display?.truncateAt || 100;
+    if (strValue.length > maxDisplayLength) {
+      return strValue.substring(0, maxDisplayLength) + '...';
+    }
+
     return strValue;
+  }
+
+  private applyFieldTypeSpecificStyling(element: HTMLElement, fieldType: string): void {
+    switch (fieldType) {
+      case 'email':
+        element.style.fontFamily = 'monospace';
+        element.style.fontSize = '12px';
+        break;
+      case 'url':
+        element.style.color = '#2563eb';
+        element.style.textDecoration = 'underline';
+        break;
+      case 'phone':
+        element.style.fontFamily = 'monospace';
+        break;
+      case 'longtext':
+      case 'textarea':
+      case 'markdown':
+      case 'html':
+      case 'richtext':
+        element.style.fontStyle = 'italic';
+        element.style.color = '#6b7280';
+        break;
+    }
   }
 
   private applyDisplayMetadata(element: HTMLElement, displayMetadata: any): void {
@@ -394,6 +453,4 @@ export const TextFieldType: VibeGridFieldType = {
 // Register immediately
 fieldLog.info('📝 [FIELD-TEXT] Registering TextFieldType');
 fieldTypeRegistry.register('text', TextFieldType);
-fieldTypeRegistry.register('longtext', TextFieldType);
-fieldTypeRegistry.register('textarea', TextFieldType);
-fieldLog.info('✅ [FIELD-TEXT] TextFieldType registered for: text, longtext, textarea');
+fieldLog.info('✅ [FIELD-TEXT] TextFieldType registered for: text');
