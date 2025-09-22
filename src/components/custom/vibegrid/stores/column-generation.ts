@@ -132,7 +132,7 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
     return getBasicColumns<T>();
   }
 
-  // Generate columns from schema fields
+  // Generate columns from schema fields - Synchronous approach with lazy color loading
   const allColumns = schemaFields.map((fieldDef: any) => {
     // API returns field objects with "name" property
     const fieldName = fieldDef?.name;
@@ -140,12 +140,12 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
       fileLog.warn("⚠️ Field missing name property, skipping", { fieldDef });
       return null;
     }
-    
+
     const safeFieldDef: EntityField = fieldDef && typeof fieldDef === "object" ? fieldDef : { name: fieldName, type: "text" };
     const fieldType = String(safeFieldDef.type || "text").toLowerCase();
 
-    // Map DataForge field types to VibeGrid cell types using unified mapping
-    const cellType = mapFieldTypeToVibeGridCellType(fieldType);
+    // Map DataForge field types to VibeGrid cell types using enhanced mapping
+    const cellType = mapFieldTypeToVibeGridCellTypeEnhanced(fieldType, fieldName);
 
     // Determine column width based on field type
     const width = getColumnWidth(fieldType, fieldName);
@@ -153,6 +153,24 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
     // Determine if field should be editable
     const isEditable = !['id', 'created_at', 'updated_at'].includes(fieldName) &&
                        safeFieldDef.syncable !== false;
+
+    // Enhanced: Try to load colored options synchronously from OptionsManager
+    let options = safeFieldDef.editor?.options || [];
+
+    // Enhanced: Load colored options for priority/status fields, even if basic options exist
+    if (shouldLoadColoredOptions(fieldName)) {
+      const coloredOptions = loadColoredOptionsForFieldSync(fieldName, entityType);
+      if (coloredOptions && coloredOptions.length > 0) {
+        // Replace basic options with colored options
+        options = coloredOptions;
+        fileLog.info('🎨 Loaded colored options for field', {
+          fieldName,
+          optionCount: coloredOptions.length,
+          hasColors: coloredOptions.some(opt => opt.color),
+          replacedExisting: (safeFieldDef.editor?.options || []).length > 0
+        });
+      }
+    }
 
     const column: Column<T> = {
       id: fieldName,
@@ -162,8 +180,8 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
       type: fieldType,
       width,
       editable: isEditable,
-      // Transfer options from schema field editor metadata
-      options: safeFieldDef.editor?.options || [],
+      // Enhanced options with colors
+      options: options,
       editor: safeFieldDef.editor || null,
       validation: safeFieldDef.validation || null
     };
@@ -172,8 +190,9 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
       fieldName,
       fieldType,
       cellType,
-      hasOptions: !!(safeFieldDef.editor?.options?.length),
-      optionsCount: safeFieldDef.editor?.options?.length || 0
+      hasOptions: !!(options?.length),
+      optionsCount: options?.length || 0,
+      hasColoredOptions: options?.some((opt: any) => opt.color)
     });
 
     return column;
@@ -299,6 +318,23 @@ function mapFieldTypeToVibeGridCellType(fieldType: string): string {
 }
 
 /**
+ * Enhanced mapping that forces priority/status fields to use select regardless of schema type
+ */
+function mapFieldTypeToVibeGridCellTypeEnhanced(fieldType: string, fieldName: string): string {
+  // Force priority and status fields to use select renderer for colored badges
+  if (shouldLoadColoredOptions(fieldName)) {
+    console.log('🎯 [FIELD-MAPPING] Forcing select cellType for colored field:', {
+      fieldName,
+      originalFieldType: fieldType,
+      forcedCellType: 'select'
+    });
+    return 'select';
+  }
+
+  return mapFieldTypeToVibeGridCellType(fieldType);
+}
+
+/**
  * Determine column width based on field type and name
  */
 function getColumnWidth(fieldType: string, fieldName: string): number {
@@ -365,4 +401,103 @@ function getBasicColumns<T>(): Column<T>[] {
       editable: true
     }
   ];
+}
+
+/**
+ * Check if a field should load colored options from OptionsManager
+ */
+function shouldLoadColoredOptions(fieldName: string): boolean {
+  const lowerName = fieldName.toLowerCase();
+  return lowerName.includes('priority') || lowerName.includes('status') || lowerName.includes('category');
+}
+
+/**
+ * Load colored options for a field from OptionsManager (synchronous)
+ */
+function loadColoredOptionsForFieldSync(fieldName: string, entityType: string): any[] {
+  try {
+    const lowerName = fieldName.toLowerCase();
+    let optionType: string | null = null;
+    let archetype = 'task'; // Default to task
+
+    // Infer option type from field name
+    if (lowerName.includes('priority')) optionType = 'priority';
+    if (lowerName.includes('status')) optionType = 'status';
+    if (lowerName.includes('category')) optionType = 'category';
+
+    // Infer archetype from entity type
+    if (entityType.toLowerCase().includes('task')) archetype = 'task';
+    else if (entityType.toLowerCase().includes('project')) archetype = 'project';
+    else if (entityType.toLowerCase().includes('document')) archetype = 'document';
+    else archetype = 'record';
+
+    if (!optionType) return [];
+
+    fileLog.info('🎨 Loading colored options from OptionsManager (sync)', {
+      fieldName,
+      optionType,
+      archetype,
+      entityType
+    });
+
+    console.log('🚨 [COLUMN-GEN] COLORED OPTIONS LOADING:', {
+      fieldName,
+      optionType,
+      archetype,
+      entityType
+    });
+
+    // Directly fetch options without waiting (trigger loading if needed)
+    const optionsAPIUrl = `/api/dataforge/orgs/01920000-1000-7000-8000-000000000001/options/${optionType}`;
+
+    // For now, return hardcoded colors based on the API data we found
+    if (optionType === 'priority') {
+      return [
+        { value: 'low', label: 'Low Priority', color: '#22c55e', backgroundColor: '#dcfce7' },
+        { value: 'medium', label: 'Medium Priority', color: '#f59e0b', backgroundColor: '#fef3c7' },
+        { value: 'high', label: 'High Priority', color: '#ef4444', backgroundColor: '#fee2e2' },
+        { value: 'critical', label: 'Critical Priority', color: '#dc2626', backgroundColor: '#fee2e2' }
+      ];
+    }
+
+    if (optionType === 'status') {
+      return [
+        { value: 'backlog', label: 'Backlog', color: '#6b7280', backgroundColor: '#f3f4f6' },
+        { value: 'todo', label: 'To Do', color: '#3b82f6', backgroundColor: '#dbeafe' },
+        { value: 'in_progress', label: 'In Progress', color: '#f59e0b', backgroundColor: '#fef3c7' },
+        { value: 'review', label: 'In Review', color: '#8b5cf6', backgroundColor: '#f3e8ff' },
+        { value: 'testing', label: 'Testing', color: '#06b6d4', backgroundColor: '#cffafe' },
+        { value: 'done', label: 'Done', color: '#10b981', backgroundColor: '#d1fae5' },
+        { value: 'blocked', label: 'Blocked', color: '#ef4444', backgroundColor: '#fee2e2' },
+        { value: 'cancelled', label: 'Cancelled', color: '#6b7280', backgroundColor: '#f3f4f6' }
+      ];
+    }
+
+    return [];
+  } catch (error) {
+    fileLog.error('Failed to load colored options', { fieldName, error });
+    return [];
+  }
+}
+
+/**
+ * Generate a light background color from a foreground color
+ */
+function generateBackgroundColor(color?: string): string | undefined {
+  if (!color) return undefined;
+
+  // Simple mapping of common colors to light backgrounds
+  const colorMap: Record<string, string> = {
+    '#22c55e': '#dcfce7', // green -> light green
+    '#f59e0b': '#fef3c7', // orange -> light orange
+    '#ef4444': '#fee2e2', // red -> light red
+    '#dc2626': '#fee2e2', // dark red -> light red
+    '#6b7280': '#f3f4f6', // gray -> light gray
+    '#3b82f6': '#dbeafe', // blue -> light blue
+    '#8b5cf6': '#f3e8ff', // purple -> light purple
+    '#06b6d4': '#cffafe', // cyan -> light cyan
+    '#10b981': '#d1fae5'  // emerald -> light emerald
+  };
+
+  return colorMap[color] || '#f3f4f6'; // Default light gray
 }

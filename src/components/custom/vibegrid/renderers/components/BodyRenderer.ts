@@ -682,8 +682,13 @@ export class BodyRenderer {
           const innerContent = modularContent.querySelector('span') || modularContent.firstChild;
           if (innerContent) {
             contentElement = innerContent.cloneNode(true) as HTMLElement;
-            // Ensure proper VibeGrid classes
-            if (!contentElement.className.includes('vibegridx-cell-text')) {
+
+            // PRESERVE SelectRenderer styling for colored badges
+            // Only add base classes if the renderer hasn't already styled the element
+            const hasSelectStyling = contentElement.style.backgroundColor ||
+                                    contentElement.className.includes('vibegridx-select-badge');
+
+            if (!hasSelectStyling && !contentElement.className.includes('vibegridx-cell-text')) {
               contentElement.className = column.editable === false ? 'vibegridx-cell-text' : 'vibegridx-cell-text-editable';
             }
           } else {

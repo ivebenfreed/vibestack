@@ -198,8 +198,52 @@ export class SelectRenderer implements CellRenderer {
   }
 
   private findOption(value: any, column: EnhancedColumn): SelectOption | null {
+    const stringValue = String(value);
+    const fieldName = column.field?.toLowerCase() || '';
+
+    // Enhanced: ALWAYS check for hardcoded colors first for priority/status fields
+    if (fieldName.includes('priority')) {
+      const priorityColors: Record<string, SelectOption> = {
+        'low': { value: stringValue, label: 'Low Priority', color: '#ffffff', backgroundColor: '#15803d' },
+        'medium': { value: stringValue, label: 'Medium Priority', color: '#ffffff', backgroundColor: '#ea580c' },
+        'high': { value: stringValue, label: 'High Priority', color: '#ffffff', backgroundColor: '#dc2626' },
+        'critical': { value: stringValue, label: 'Critical Priority', color: '#ffffff', backgroundColor: '#991b1b' }
+      };
+
+      if (priorityColors[stringValue]) {
+        console.log('🎨 [SELECT-RENDERER] Using DARK priority color for:', stringValue);
+        return priorityColors[stringValue];
+      }
+    }
+
+    if (fieldName.includes('status')) {
+      const statusColors: Record<string, SelectOption> = {
+        'backlog': { value: stringValue, label: 'Backlog', color: '#ffffff', backgroundColor: '#4b5563' },
+        'todo': { value: stringValue, label: 'To Do', color: '#ffffff', backgroundColor: '#2563eb' },
+        'in_progress': { value: stringValue, label: 'In Progress', color: '#ffffff', backgroundColor: '#d97706' },
+        'in-progress': { value: stringValue, label: 'In Progress', color: '#ffffff', backgroundColor: '#d97706' },
+        'review': { value: stringValue, label: 'In Review', color: '#ffffff', backgroundColor: '#7c3aed' },
+        'testing': { value: stringValue, label: 'Testing', color: '#ffffff', backgroundColor: '#0891b2' },
+        'done': { value: stringValue, label: 'Done', color: '#ffffff', backgroundColor: '#059669' },
+        'blocked': { value: stringValue, label: 'Blocked', color: '#ffffff', backgroundColor: '#dc2626' },
+        'cancelled': { value: stringValue, label: 'Cancelled', color: '#ffffff', backgroundColor: '#6b7280' }
+      };
+
+      if (statusColors[stringValue]) {
+        console.log('🎨 [SELECT-RENDERER] Using DARK status color for:', stringValue);
+        return statusColors[stringValue];
+      }
+    }
+
+    // Fallback to regular options if no hardcoded color match
     const options = this.getOptions(column);
-    return options.find(opt => opt.value === String(value)) || null;
+    const found = options.find(opt => opt.value === stringValue);
+
+    if (found) {
+      return found;
+    }
+
+    return null;
   }
 
   private getOptions(column: EnhancedColumn): SelectOption[] {

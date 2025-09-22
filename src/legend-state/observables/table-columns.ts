@@ -547,8 +547,9 @@ function isTagsFieldName(fieldName: string): boolean {
 
 /**
  * Detect select options by analyzing actual data values
+ * Enhanced to use OptionsManager for colored options when available
  */
-function detectColumnOptions(entityName: string, fieldName: string): Array<{ value: string; label: string }> | null {
+function detectColumnOptions(entityName: string, fieldName: string): Array<{ value: string; label: string; color?: string; backgroundColor?: string }> | null {
   try {
     fileLog.info(`🔍 DETECTION DEBUG: Starting detectColumnOptions for entity: ${entityName}, field: ${fieldName}`);
 
@@ -558,17 +559,17 @@ function detectColumnOptions(entityName: string, fieldName: string): Array<{ val
       fileLog.warn(`❌ DETECTION DEBUG: Entity observable not available for ${entityName}`);
       return null;
     }
-    
+
     const entityData = entityObs.peek();
     if (!entityData || typeof entityData !== 'object') {
       fileLog.debug(`No data available for ${entityName}`);
       return null;
     }
-    
+
     // Extract unique values from the field
     const uniqueValues = new Set<string>();
     const records = Object.values(entityData);
-    
+
     for (const record of records) {
       if (record && typeof record === 'object' && fieldName in record) {
         const value = record[fieldName as keyof typeof record];
@@ -577,21 +578,120 @@ function detectColumnOptions(entityName: string, fieldName: string): Array<{ val
         }
       }
     }
-    
+
     // Convert to options if we have reasonable values (2-20 unique options)
     const values = Array.from(uniqueValues).sort();
     if (values.length >= 2 && values.length <= 20) {
+      // Enhanced: Check if this is a known option type that has colored options
+      const optionType = inferOptionType(fieldName);
+      const archetype = inferArchetype(entityName);
+
+      if (optionType && archetype) {
+        fileLog.info(`🎨 ENHANCED DETECTION: Checking OptionsManager for colored options`, {
+          fieldName,
+          optionType,
+          archetype,
+          values
+        });
+
+        // Try to get colored options from OptionsManager
+        try {
+          const optionSet$ = OptionsManager.getSystemOptions(optionType, archetype);
+          const optionSet = optionSet$.peek();
+
+          if (optionSet && optionSet.options && optionSet.options.length > 0) {
+            // Map detected values to colored options where available
+            const coloredOptions = values.map(value => {
+              const coloredOption = optionSet.options.find((opt: any) => opt.value === value);
+              if (coloredOption) {
+                return {
+                  value,
+                  label: coloredOption.label,
+                  color: coloredOption.color,
+                  backgroundColor: generateBackgroundColor(coloredOption.color)
+                };
+              } else {
+                // Fallback for values not in options API
+                return {
+                  value,
+                  label: formatValueAsLabel(value)
+                };
+              }
+            });
+
+            fileLog.info(`✅ ENHANCED DETECTION: Created colored options for ${fieldName}`, {
+              fieldName,
+              optionType,
+              archetype,
+              coloredCount: coloredOptions.filter(opt => opt.color).length,
+              totalCount: coloredOptions.length,
+              options: coloredOptions
+            });
+
+            return coloredOptions;
+          }
+        } catch (error) {
+          fileLog.warn(`OptionsManager lookup failed for ${fieldName}:`, error);
+        }
+      }
+
+      // Fallback: basic options without colors
       return values.map(value => ({
         value,
         label: formatValueAsLabel(value) // Convert to user-friendly format
       }));
     }
-    
+
     return null;
   } catch (error) {
     fileLog.warn(`Failed to detect options for ${entityName}.${fieldName}:`, error);
     return null;
   }
+}
+
+/**
+ * Infer option type from field name
+ */
+function inferOptionType(fieldName: string): string | null {
+  const lowerName = fieldName.toLowerCase();
+  if (lowerName.includes('priority')) return 'priority';
+  if (lowerName.includes('status')) return 'status';
+  if (lowerName.includes('category')) return 'category';
+  if (lowerName.includes('type')) return 'task_type';
+  return null;
+}
+
+/**
+ * Infer archetype from entity name
+ */
+function inferArchetype(entityName: string): string | null {
+  const lowerName = entityName.toLowerCase();
+  if (lowerName.includes('task')) return 'task';
+  if (lowerName.includes('project')) return 'project';
+  if (lowerName.includes('document')) return 'document';
+  return 'record'; // Default archetype
+}
+
+/**
+ * Generate a light background color from a foreground color
+ */
+function generateBackgroundColor(color?: string): string | undefined {
+  if (!color) return undefined;
+
+  // Simple mapping of common colors to light backgrounds
+  const colorMap: Record<string, string> = {
+    '#22c55e': '#dcfce7', // green -> light green
+    '#f59e0b': '#fef3c7', // orange -> light orange
+    '#ef4444': '#fee2e2', // red -> light red
+    '#dc2626': '#fee2e2', // dark red -> light red
+    '#6b7280': '#f3f4f6', // gray -> light gray
+    '#3b82f6': '#dbeafe', // blue -> light blue
+    '#8b5cf6': '#f3e8ff', // purple -> light purple
+    '#06b6d4': '#cffafe', // cyan -> light cyan
+    '#10b981': '#d1fae5'  // emerald -> light emerald
+  };
+
+  return colorMap[color] || '#f3f4f6'; // Default light gray
 }
 
 // Export helper for backward compatibility
