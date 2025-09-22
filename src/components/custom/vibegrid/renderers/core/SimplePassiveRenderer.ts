@@ -22,7 +22,6 @@ import { EventManager } from '../managers/EventManager';
 
 // Existing modular components
 import { OverlayManager, type CoordinateMapping } from '../modules/OverlayManager';
-import { BadgeRenderer } from '../modules/BadgeRenderer';
 import { CellFormatter } from '../components/BodyRenderer';
 import { SelectionController } from '../modules/SelectionController';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
@@ -1746,64 +1745,5 @@ export class SimplePassiveRenderer {
 
   // REMOVED: updateHeaderCellWidth() and updateBodyCellWidths() - Now handled by ColumnWidthManager
 
-  /**
-   * Determine if a field should be treated as a tags field
-   */
-  private isTagsField(columnId: string, value: any): boolean {
-    // Delegate to the modular BadgeRenderer
-    return BadgeRenderer.isTagsField(columnId, value);
-  }
-
-  /**
-   * Create a container element with multiple tag badges
-   */
-  private createTagsElement(value: string, row: any, column: any): HTMLElement {
-    // Delegate to the modular BadgeRenderer
-    return BadgeRenderer.createTagsElement(
-      value,
-      row,
-      column,
-      this.createElement.bind(this),
-      (val, r, c) => this.editTagsField(val, r, c)
-    );
-  }
-
-  /**
-   * Trigger editing mode for tags fields
-   */
-  private editTagsField(currentValue: string, row: any, column: any): void {
-    const cellId = `${row.id}:${column.id}`;
-
-    // Check if column is editable before starting edit mode
-    if (column.editable === false) {
-      fileLog.info('🏷️ Tags field clicked - but column is not editable', {
-        cellId,
-        rowId: row.id,
-        columnId: column.id,
-        editable: column.editable
-      });
-      return;
-    }
-
-    fileLog.info('🏷️ Starting tags field edit mode', {
-      cellId,
-      currentValue,
-      rowId: row.id,
-      columnId: column.id,
-      currentTags: currentValue.split(',').map(t => t.trim()).filter(t => t.length > 0)
-    });
-
-    // Trigger the standard VibeGrid edit mode - the editor selection system
-    // will automatically choose MultiSelectEditor for tags fields
-    this.tableInteraction$.startEdit(cellId, currentValue);
-  }
-
-  /**
-   * Get the appropriate CSS badge color class for a given value and column
-   */
-  private getBadgeColorClass(value: string, columnId: string): string | null {
-    // Delegate to the modular BadgeRenderer
-    return BadgeRenderer.getBadgeColorClass(value, columnId);
-  }
 
 }

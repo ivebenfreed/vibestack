@@ -129,43 +129,35 @@ export function getDisplayMetadata(definition: FieldDefinition): DisplayMetadata
     format: 'status',
     showTooltip: true,
     placeholder: 'Select status',
-    // Status-specific styling
-    conditionalFormatting: [
-      // Active/Success states
-      { condition: 'value === "active"', className: 'status-active', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      { condition: 'value === "done"', className: 'status-done', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      { condition: 'value === "completed"', className: 'status-completed', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      { condition: 'value === "published"', className: 'status-published', style: { color: '#059669', backgroundColor: '#d1fae5' } },
-      
-      // Warning/Progress states
-      { condition: 'value === "review"', className: 'status-review', style: { color: '#d97706', backgroundColor: '#fef3c7' } },
-      { condition: 'value === "paused"', className: 'status-paused', style: { color: '#d97706', backgroundColor: '#fef3c7' } },
-      { condition: 'value === "blocked"', className: 'status-blocked', style: { color: '#dc2626', backgroundColor: '#fee2e2' } },
-      
-      // Inactive/Draft states
-      { condition: 'value === "draft"', className: 'status-draft', style: { color: '#6b7280', backgroundColor: '#f3f4f6' } },
-      { condition: 'value === "inactive"', className: 'status-inactive', style: { color: '#6b7280', backgroundColor: '#f3f4f6' } },
-      { condition: 'value === "not_started"', className: 'status-not-started', style: { color: '#6b7280', backgroundColor: '#f3f4f6' } },
-      
-      // End states
-      { condition: 'value === "archived"', className: 'status-archived', style: { color: '#4b5563', backgroundColor: '#e5e7eb' } },
-      { condition: 'value === "cancelled"', className: 'status-cancelled', style: { color: '#6b7280', backgroundColor: '#f9fafb' } }
-    ]
+    // Note: Status styling comes from status set data in database, not hardcoded here
   };
 }
 
+// Workflow category color mappings - defines visual semantics
+const WORKFLOW_COLORS = {
+  not_active: { color: '#6b7280', backgroundColor: '#f3f4f6', icon: 'circle' },
+  in_progress: { color: '#d97706', backgroundColor: '#fef3c7', icon: 'arrow-right' },
+  done: { color: '#059669', backgroundColor: '#d1fae5', icon: 'check-circle' },
+  closed: { color: '#dc2626', backgroundColor: '#fee2e2', icon: 'x-circle' }
+};
+
 export function getEditorMetadata(definition: FieldDefinition, context?: any): EditorMetadata {
-  // Status fields require status sets - generate options from status set values only
-  const statusOptions = context?.statusSetValues ? 
-    context.statusSetValues.map((sv: any) => ({
-      value: sv.value,
-      label: sv.label,
-      color: sv.color,
-      backgroundColor: sv.backgroundColor,
-      icon: sv.icon,
-      workflowCategory: sv.workflowCategory
-    })) : [];
-  
+  // Status fields require status sets - generate options from status set values with workflow colors
+  const statusOptions = context?.statusSetValues ?
+    context.statusSetValues.map((sv: any) => {
+      // Apply workflow category colors if not explicitly set
+      const workflowColors = WORKFLOW_COLORS[sv.workflowCategory] || WORKFLOW_COLORS.not_active;
+
+      return {
+        value: sv.value,
+        label: sv.label,
+        color: sv.color || workflowColors.color,
+        backgroundColor: sv.backgroundColor || workflowColors.backgroundColor,
+        icon: sv.icon || workflowColors.icon,
+        workflowCategory: sv.workflowCategory
+      };
+    }) : [];
+
   return {
     type: 'status-select',
     searchable: false,

@@ -958,22 +958,48 @@ export class EntitySchemaManager {
                   const statusSet = await statusSetManager.getStatusSet(orgId, field.statusSetId);
                   
                   if (statusSet && statusSet.status_values) {
-                    // Create context with status set values for field handlers
+                    // Apply workflow category colors to ensure consistent business logic
+                    const statusValuesWithWorkflowColors = statusSet.status_values.map((sv: any) => {
+                      // Workflow category color mappings - defines visual semantics
+                      const WORKFLOW_COLORS: Record<string, any> = {
+                        not_active: { color: '#6b7280', backgroundColor: '#f3f4f6', icon: 'circle' },
+                        in_progress: { color: '#d97706', backgroundColor: '#fef3c7', icon: 'arrow-right' },
+                        done: { color: '#059669', backgroundColor: '#d1fae5', icon: 'check-circle' },
+                        closed: { color: '#dc2626', backgroundColor: '#fee2e2', icon: 'x-circle' }
+                      };
+
+                      const workflowColors = WORKFLOW_COLORS[sv.workflowCategory] || WORKFLOW_COLORS.not_active;
+
+                      return {
+                        ...sv,
+                        color: sv.color || workflowColors.color,
+                        backgroundColor: sv.backgroundColor || workflowColors.backgroundColor,
+                        icon: sv.icon || workflowColors.icon
+                      };
+                    });
+
+                    // Create context with enhanced status set values for field handlers
                     const statusSetContext = {
-                      statusSetValues: statusSet.status_values
+                      statusSetValues: statusValuesWithWorkflowColors
                     };
                     
                     // Re-generate metadata with status set context
                     enhancedField.validation = handler.getValidationMetadata ? handler.getValidationMetadata(field, statusSetContext) : {};
                     enhancedField.editor = handler.getEditorMetadata ? handler.getEditorMetadata(field, statusSetContext) : {};
-                    
+
+                    // CRITICAL: Also populate root options array for frontend field registry
+                    if (enhancedField.editor?.options) {
+                      enhancedField.options = enhancedField.editor.options;
+                      console.log(`[EntitySchemaManager] Populated root options for status field ${field.name}:`, enhancedField.options.length);
+                    }
+
                     // Add status set metadata for frontend
                     enhancedField.statusSet = {
                       id: statusSet.id,
                       name: statusSet.name,
                       description: statusSet.description,
                       entityType: statusSet.entity_type,
-                      values: statusSet.status_values
+                      values: statusValuesWithWorkflowColors
                     };
                     
                     console.log(`[EntitySchemaManager] Loaded status set ${statusSet.name} for field ${field.name}`);
@@ -982,6 +1008,56 @@ export class EntitySchemaManager {
                   }
                 } catch (statusSetError) {
                   console.warn(`[EntitySchemaManager] Failed to load status set for field ${field.name}:`, statusSetError);
+                }
+              }
+
+              // Special handling for custom_option_reference fields
+              if (field.type === 'custom_option_reference' && field.optionSetType) {
+                try {
+                  console.log(`[EntitySchemaManager] Loading custom options for field ${field.name}, optionSetType: ${field.optionSetType}`);
+
+                  // Use the existing options API endpoint pattern
+                  const optionsQuery = await this.config.kysely
+                    .selectFrom('custom_options')
+                    .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+                    .select([
+                      'custom_options.value as option_key',
+                      'custom_options.label',
+                      'custom_options.description',
+                      'custom_options.color',
+                      'custom_options.icon',
+                      'custom_options.sort_order',
+                      'custom_options.is_active'
+                    ])
+                    .where('custom_option_sets.org_id', '=', orgId)
+                    .where('custom_option_sets.option_set_type', '=', field.optionSetType)
+                    .where('custom_options.is_active', '=', true)
+                    .orderBy('custom_options.sort_order', 'asc')
+                    .orderBy('custom_options.label', 'asc')
+                    .execute();
+
+                  if (optionsQuery.length > 0) {
+                    // Convert to frontend format
+                    const customOptions = optionsQuery.map(opt => ({
+                      value: opt.option_key,
+                      label: opt.label,
+                      description: opt.description,
+                      color: opt.color,
+                      icon: opt.icon,
+                      sortOrder: opt.sort_order
+                    }));
+
+                    // Populate both root and editor options
+                    enhancedField.options = customOptions;
+                    if (!enhancedField.editor) enhancedField.editor = {};
+                    enhancedField.editor.options = customOptions;
+
+                    console.log(`[EntitySchemaManager] Loaded ${customOptions.length} custom options for field ${field.name}`);
+                  } else {
+                    console.warn(`[EntitySchemaManager] No custom options found for field ${field.name} with optionSetType ${field.optionSetType}`);
+                  }
+                } catch (customOptionsError) {
+                  console.warn(`[EntitySchemaManager] Failed to load custom options for field ${field.name}:`, customOptionsError);
                 }
               }
 

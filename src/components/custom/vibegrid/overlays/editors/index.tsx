@@ -106,6 +106,8 @@ export function createEditor(props: EditorProps): React.ReactElement {
       return <ModalTextEditor {...props} editorType="longtext" />;
 
     case 'richtext':
+    case 'rich-text':
+    case 'rich_text':
       // For richtext, use ModalTextEditor which opens the rich text overlay
       console.log('🎨 createEditor: Using ModalTextEditor for richtext');
       return <ModalTextEditor {...props} editorType="richtext" />;

@@ -19,6 +19,7 @@ import type {
 } from '../../FieldTypeRegistry';
 import { fieldTypeRegistry } from '../../FieldTypeRegistry';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
+import { getOptionIconDisplay } from '../../../utils/icon-mapping';
 
 const fileLog = log('components/custom/vibegrid/field-types/implementations/basic/SelectFieldType');
 
@@ -95,7 +96,7 @@ export class SelectRenderer implements CellRenderer {
 
   canHandle(column: EnhancedColumn): boolean {
     const type = column.cellType || column.type || '';
-    return ['select', 'single-select', 'multi-select', 'enum', 'custom_option_reference'].includes(type);
+    return ['select', 'single-select', 'multi-select', 'enum', 'custom_option_reference', 'status'].includes(type);
   }
 
   private renderSingleSelectValue(container: HTMLElement, value: any, column: EnhancedColumn): HTMLElement {
@@ -119,10 +120,13 @@ export class SelectRenderer implements CellRenderer {
       `;
 
       if (option.icon) {
-        const icon = document.createElement('span');
-        icon.textContent = option.icon;
-        icon.style.fontSize = '10px';
-        container.insertBefore(icon, container.firstChild);
+        const iconSymbol = getOptionIconDisplay(option.icon);
+        if (iconSymbol) {
+          const icon = document.createElement('span');
+          icon.textContent = iconSymbol;
+          icon.style.fontSize = '10px';
+          container.insertBefore(icon, container.firstChild);
+        }
       }
     } else {
       // Unknown value
@@ -188,10 +192,13 @@ export class SelectRenderer implements CellRenderer {
     `;
 
     if (option.icon) {
-      const icon = document.createElement('span');
-      icon.textContent = option.icon;
-      icon.style.fontSize = '10px';
-      badge.insertBefore(icon, badge.firstChild);
+      const iconSymbol = getOptionIconDisplay(option.icon);
+      if (iconSymbol) {
+        const icon = document.createElement('span');
+        icon.textContent = iconSymbol;
+        icon.style.fontSize = '10px';
+        badge.insertBefore(icon, badge.firstChild);
+      }
     }
 
     return badge;
@@ -201,48 +208,32 @@ export class SelectRenderer implements CellRenderer {
     const stringValue = String(value);
     const fieldName = column.field?.toLowerCase() || '';
 
-    // Enhanced: ALWAYS check for hardcoded colors first for priority/status fields
-    if (fieldName.includes('priority')) {
-      const priorityColors: Record<string, SelectOption> = {
-        'low': { value: stringValue, label: 'Low Priority', color: '#ffffff', backgroundColor: '#15803d' },
-        'medium': { value: stringValue, label: 'Medium Priority', color: '#ffffff', backgroundColor: '#ea580c' },
-        'high': { value: stringValue, label: 'High Priority', color: '#ffffff', backgroundColor: '#dc2626' },
-        'critical': { value: stringValue, label: 'Critical Priority', color: '#ffffff', backgroundColor: '#991b1b' }
-      };
+    console.log('🔍 [SELECT-RENDERER] Finding option', {
+      value,
+      stringValue,
+      fieldName,
+      columnId: column.id,
+      columnType: column.cellType || column.type,
+      hasOptions: !!(column.options && column.options.length > 0),
+      optionsCount: (column.options || []).length
+    });
 
-      if (priorityColors[stringValue]) {
-        console.log('🎨 [SELECT-RENDERER] Using DARK priority color for:', stringValue);
-        return priorityColors[stringValue];
-      }
-    }
-
-    if (fieldName.includes('status')) {
-      const statusColors: Record<string, SelectOption> = {
-        'backlog': { value: stringValue, label: 'Backlog', color: '#ffffff', backgroundColor: '#4b5563' },
-        'todo': { value: stringValue, label: 'To Do', color: '#ffffff', backgroundColor: '#2563eb' },
-        'in_progress': { value: stringValue, label: 'In Progress', color: '#ffffff', backgroundColor: '#d97706' },
-        'in-progress': { value: stringValue, label: 'In Progress', color: '#ffffff', backgroundColor: '#d97706' },
-        'review': { value: stringValue, label: 'In Review', color: '#ffffff', backgroundColor: '#7c3aed' },
-        'testing': { value: stringValue, label: 'Testing', color: '#ffffff', backgroundColor: '#0891b2' },
-        'done': { value: stringValue, label: 'Done', color: '#ffffff', backgroundColor: '#059669' },
-        'blocked': { value: stringValue, label: 'Blocked', color: '#ffffff', backgroundColor: '#dc2626' },
-        'cancelled': { value: stringValue, label: 'Cancelled', color: '#ffffff', backgroundColor: '#6b7280' }
-      };
-
-      if (statusColors[stringValue]) {
-        console.log('🎨 [SELECT-RENDERER] Using DARK status color for:', stringValue);
-        return statusColors[stringValue];
-      }
-    }
-
-    // Fallback to regular options if no hardcoded color match
+    // Use schema data
     const options = this.getOptions(column);
+    console.log('🔍 [SELECT-RENDERER] Available options', {
+      optionsCount: options.length,
+      optionValues: options.map(opt => opt.value),
+      searchingFor: stringValue
+    });
+
     const found = options.find(opt => opt.value === stringValue);
 
     if (found) {
+      console.log('🎯 [SELECT-RENDERER] Found option', found);
       return found;
     }
 
+    console.log('❌ [SELECT-RENDERER] Option not found for value:', stringValue);
     return null;
   }
 
@@ -263,6 +254,7 @@ export class SelectRenderer implements CellRenderer {
         typeof opt === 'string' ? { value: opt, label: opt } : opt
       );
     }
+
 
     return [];
   }
@@ -668,3 +660,4 @@ fieldTypeRegistry.register('multi-select', SelectFieldType);
 fieldTypeRegistry.register('enum', SelectFieldType);
 fieldTypeRegistry.register('custom_select', SelectFieldType);
 fieldTypeRegistry.register('custom_option_reference', SelectFieldType);
+fieldTypeRegistry.register('status', SelectFieldType);

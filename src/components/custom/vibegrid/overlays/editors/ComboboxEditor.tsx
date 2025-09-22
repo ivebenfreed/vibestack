@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Check } from 'lucide-react'
 import type { CellRef, Column, RelationshipContext, EnumOption } from '../../types'
+import { getOptionIconDisplay } from '../../utils/icon-mapping'
 
 export interface ComboboxEditorProps {
   cell: CellRef
@@ -28,7 +29,8 @@ export interface ComboboxEditorProps {
   relationshipContext?: RelationshipContext
 }
 
-export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({ 
+
+export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
   cell,
   column,
   initialValue,
@@ -114,12 +116,18 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
       rawOptionsCount: rawOptions.length
     });
     
-    // Convert to standard format
+    // Convert to standard format and apply hardcoded styling
     const standardOptions = rawOptions.map(option => {
+      let optionData;
       if (typeof option === 'string') {
-        return { value: option, label: option }
+        optionData = { value: option, label: option };
+      } else {
+        optionData = { value: option.value, label: option.label, color: option.color, backgroundColor: option.backgroundColor, icon: option.icon };
       }
-      return { value: option.value, label: option.label }
+
+      // Note: Removed hardcoded styling - now uses schema data verbatim
+
+      return optionData;
     })
 
     // Add null option for nullable fields
@@ -301,18 +309,40 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
                         >
                           <Check
                             className={cn(
-                              "mr-2 h-4 w-4",
-                              isMultiSelect 
+                              "mr-2 h-4 w-4 flex-shrink-0",
+                              isMultiSelect
                                 ? (selectedValues.includes(option.value) ? "opacity-100" : "opacity-0")
                                 : (initialValue === option.value || (initialValue === null && option.value === '__null__') ? "opacity-100" : "opacity-0")
                             )}
                           />
-                          <span 
-                            className={option.value === '__null__' ? 'text-muted-foreground italic' : ''}
-                            style={option.color ? { color: option.color } : undefined}
-                          >
-                            {option.label}
-                          </span>
+                          {option.value === '__null__' ? (
+                            <span className="text-muted-foreground italic">
+                              {option.label}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                whiteSpace: 'nowrap',
+                                backgroundColor: option.backgroundColor || '#f3f4f6',
+                                color: option.color || '#374151',
+                                border: `1px solid ${option.backgroundColor ? 'transparent' : '#d1d5db'}`
+                              }}
+                            >
+                              {option.icon && (
+                                <span style={{ fontSize: '10px' }}>
+                                  {getOptionIconDisplay(option.icon)}
+                                </span>
+                              )}
+                              {option.label}
+                            </span>
+                          )}
                         </CommandItem>
                       );
                     })}

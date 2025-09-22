@@ -27,7 +27,6 @@ export { OverlayManager } from './modules/OverlayManager';
 export { SelectionController } from './modules/SelectionController';
 export { KeyboardNavigationController } from './modules/KeyboardNavigationController';
 export { ScrollController } from './modules/ScrollController';
-export { BadgeRenderer } from './modules/BadgeRenderer';
 // CellFormatter moved to components/BodyRenderer.ts
 
 // Managers - State and lifecycle management
