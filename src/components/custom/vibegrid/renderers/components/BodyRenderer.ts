@@ -196,10 +196,6 @@ export class BodyRenderer {
       stats: this.cellRenderingStats
     });
 
-    // Schedule render health check with manual timeout for now
-    setTimeout(() => {
-      this.performRenderHealthCheck();
-    }, 2000);
     // Update grouped mode status
     this.updateGroupedModeStatus();
     const rowElement = this.createElement('div', 'vibegridx-row');
@@ -1435,60 +1431,9 @@ export class CellFormatter {
 
     // Schedule new health check in 2 seconds
     this.renderTimeoutId = window.setTimeout(() => {
-      this.performRenderHealthCheck();
     }, 2000);
   }
 
-  /**
-   * Perform health check and log errors if rendering appears stalled
-   */
-  private performRenderHealthCheck(): void {
-    const stats = this.cellRenderingStats;
-    const timeSinceLastRender = Date.now() - stats.lastRenderTime;
-
-    // Check for rendering issues
-    const issues: string[] = [];
-
-    if (stats.rowsRequested > 0 && stats.rowsCreated === 0) {
-      issues.push('No rows created despite requests');
-    }
-
-    if (stats.cellsRequested > 0 && stats.cellsCreated === 0) {
-      issues.push('No cells created despite requests');
-    }
-
-    if (stats.rowsRequested > stats.rowsCreated) {
-      issues.push(`Row creation incomplete: ${stats.rowsCreated}/${stats.rowsRequested}`);
-    }
-
-    if (stats.cellsRequested > stats.cellsCreated) {
-      issues.push(`Cell creation incomplete: ${stats.cellsCreated}/${stats.cellsRequested}`);
-    }
-
-    if (timeSinceLastRender > 5000) {
-      issues.push(`No rendering activity for ${Math.round(timeSinceLastRender / 1000)}s`);
-    }
-
-    // Log results
-    if (issues.length > 0) {
-      fileLog.error('🚨 [CELL-DEBUG] CELL RENDERING HEALTH CHECK FAILED', {
-        issues,
-        stats,
-        timeSinceLastRender,
-        activeRowsCount: this.activeRows.size,
-        containerChildren: this.container.children.length
-      });
-
-      // Add to error list
-      stats.renderErrors.push(`Health check failed: ${issues.join(', ')}`);
-    } else {
-      fileLog.info('✅ [CELL-DEBUG] Cell rendering health check passed', {
-        stats,
-        activeRowsCount: this.activeRows.size,
-        containerChildren: this.container.children.length
-      });
-    }
-  }
 
   /**
    * Get current cell rendering statistics for debugging
