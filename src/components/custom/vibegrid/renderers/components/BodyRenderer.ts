@@ -108,10 +108,8 @@ export class BodyRenderer {
     // Setup observer for selection changes to update checkboxes
     this.setupSelectionObserver();
 
-    // NEW: Initialize modular cell system via hydration manager
-    this.initializeModularCellSystem().catch(error => {
-      fileLog.error('❌ [FIELD-BRIDGE] Failed to initialize modular system in constructor', { error });
-    });
+    // Initialize modular cell system synchronously
+    this.initializeModularCellSystem();
 
     fileLog.info('🏗️ BodyRenderer initialized (Phase 2.1 consolidated)');
   }
