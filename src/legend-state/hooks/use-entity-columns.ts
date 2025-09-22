@@ -213,6 +213,8 @@ function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: s
         case 'multi-select':
         case 'multi_select':
           return 'multi-select'
+        case 'custom_option_reference':
+          return 'select'
         
         // Reference types (stored as relationships)
         case 'user_reference':
@@ -305,7 +307,9 @@ function generateColumnsFromSyncableFields<T>(syncableFields: any, entityName: s
       cellType: getCellType(fieldType) as any,
       width: getWidth(fieldType, fieldName),
       editable: isEditable,
-      isSystemField: ['created_at', 'updated_at'].includes(fieldName)
+      isSystemField: ['created_at', 'updated_at'].includes(fieldName),
+      options: safeFieldDef.editor?.options || [],
+      editor: safeFieldDef.editor || null
     }
   })
   

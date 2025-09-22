@@ -801,11 +801,10 @@ export class EntitySchemaManager {
                     .selectFrom('custom_options')
                     .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
                     .select([
-                      'custom_options.value as option_key', 
-                      'custom_options.label', 
-                      'custom_options.description', 
-                      'custom_options.color', 
-                      'custom_options.icon', 
+                      'custom_options.value as option_key',
+                      'custom_options.label',
+                      'custom_options.description',
+                      'custom_options.metadata',
                       'custom_options.sort_order'
                     ])
                     .where('custom_option_sets.org_id', '=', orgId)
@@ -822,14 +821,17 @@ export class EntitySchemaManager {
                       searchable: false,
                       clearable: false,
                       showValidationOnBlur: true,
-                      options: options.map((opt: any) => ({
-                        value: opt.option_key,
-                        label: opt.label,
-                        color: opt.color,
-                        backgroundColor: this.getBackgroundColor(opt.color),
-                        icon: opt.icon,
-                        description: opt.description
-                      }))
+                      options: options.map((opt: any) => {
+                        const metadata = opt.metadata || {};
+                        return {
+                          value: opt.option_key,
+                          label: opt.label,
+                          color: metadata.color || opt.color,
+                          backgroundColor: metadata.backgroundColor || this.getBackgroundColor(metadata.color || opt.color),
+                          icon: metadata.icon || opt.icon,
+                          description: opt.description
+                        };
+                      })
                     };
 
                     // Also populate validation enum values

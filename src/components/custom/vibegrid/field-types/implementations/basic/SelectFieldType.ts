@@ -95,7 +95,7 @@ export class SelectRenderer implements CellRenderer {
 
   canHandle(column: EnhancedColumn): boolean {
     const type = column.cellType || column.type || '';
-    return ['select', 'single-select', 'multi-select', 'enum'].includes(type);
+    return ['select', 'single-select', 'multi-select', 'enum', 'custom_option_reference'].includes(type);
   }
 
   private renderSingleSelectValue(container: HTMLElement, value: any, column: EnhancedColumn): HTMLElement {

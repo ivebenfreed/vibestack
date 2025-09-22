@@ -14,6 +14,37 @@ import { log } from '@/logger';
 import type { Column, SortConfig, FilterConfig, GroupConfig } from '../types';
 // Import moved to visual-state.ts as part of Phase 1 consolidation
 import { GroupProcessor } from '../processors/GroupProcessor';
+import { generateColumnsFromEntitySchema } from './column-generation';
+
+// Basic columns function for fallback
+function getBasicColumns<T>(): Column<T>[] {
+  return [
+    {
+      id: 'id',
+      field: 'id' as keyof T & string,
+      name: 'ID',
+      cellType: 'text',
+      width: 120,
+      editable: false
+    },
+    {
+      id: 'created_at',
+      field: 'created_at' as keyof T & string,
+      name: 'Created At',
+      cellType: 'date',
+      width: 140,
+      editable: false
+    },
+    {
+      id: 'updated_at',
+      field: 'updated_at' as keyof T & string,
+      name: 'Updated At',
+      cellType: 'date',
+      width: 140,
+      editable: false
+    }
+  ];
+}
 
 const fileLog = log('components/custom/vibegrid/stores/data-state.ts');
 
@@ -150,8 +181,11 @@ function applyFlatRowOrdering(rows: any[], flatRowOrder: string[]): any[] {
 // DATA STATE CORE OBSERVABLE FACTORY
 // ====================================
 
-export function createTableCore$(entityType: string, columns: Column[], visualInputs$?: any) {
-  fileLog.info('🎯 Creating tableCore$ observable (no persistence)', { entityType, columnCount: columns.length });
+export function createTableCore$(entityType: string, visualInputs$?: any, initManager?: any) {
+  fileLog.info('🎯 Creating tableCore$ observable (schema loading managed by init manager)', { entityType });
+
+  // Columns will be loaded by init manager - no fallback allowed
+  let columns: Column[] = [];
 
   // Create the core observable with default values
   const tableCore$ = observable({
@@ -673,17 +707,48 @@ export function createTableCore$(entityType: string, columns: Column[], visualIn
   }
 
   // No persistence - simple data-only state
-  fileLog.info('✅ TableCore$ created without persistence', { entityType });
+  // Schema loading method for init manager - NO FALLBACKS
+  const loadSchemaAndColumns = async () => {
+    if (!initManager) {
+      throw new Error('Init manager required for schema loading');
+    }
 
-  // Return the observable without sync
+    try {
+      fileLog.info('📡 Starting schema loading for entity', { entityType });
+      const generatedColumns = await generateColumnsFromEntitySchema(entityType);
+
+      if (generatedColumns.length === 0) {
+        throw new Error(`No columns generated for entity: ${entityType}`);
+      }
+
+      fileLog.info('✅ Schema loaded successfully', {
+        entityType,
+        columnCount: generatedColumns.length,
+        hasCustomOptionReference: generatedColumns.some(col => col.type === 'custom_option_reference')
+      });
+
+      tableCore$.columns.set(generatedColumns);
+      columns = generatedColumns;
+      initManager.markReady('schemaLoaded');
+    } catch (error) {
+      fileLog.error('💥 Schema loading failed - NO FALLBACK', { entityType, error });
+      initManager.markError('schemaLoaded', `Schema loading failed: ${error.message}`, true);
+      throw error; // Fail fast - no fallbacks allowed
+    }
+  };
+
+  fileLog.info('✅ TableCore$ created, waiting for init manager to trigger schema loading', { entityType });
+
+  // Return the observable with schema loading method
   return {
     tableCore$,
-    tableCoreSync$: tableCore$ // No sync, just return the same observable for compatibility
+    tableCoreSync$: tableCore$, // No sync, just return the same observable for compatibility
+    loadSchemaAndColumns // Expose for init manager to trigger
   };
 }
 
-export function createTableCoreSync$(entityType: string, columns: Column[]) {
+export function createTableCoreSync$(entityType: string) {
   // This function is kept for API compatibility - actual sync is handled in createTableCore$
-  const { tableCoreSync$ } = createTableCore$(entityType, columns);
+  const { tableCoreSync$ } = createTableCore$(entityType);
   return tableCoreSync$;
 }

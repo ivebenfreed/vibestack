@@ -15,6 +15,9 @@ const fileLog = log('components/custom/vibegrid/stores/init-state');
 // ====================================
 
 export interface VibeGridHydrationState {
+  // Schema must be loaded first - fundamental dependency
+  schemaLoaded: boolean;  // Schema and column generation completed
+
   // Core data dependencies
   entityDataLoaded: boolean;
   entityObservableReady: boolean;
@@ -71,6 +74,9 @@ export class VibeGridHydrationManager {
 
   // Core observables
   public hydrationState$ = observable<VibeGridHydrationState>({
+    // Schema must be loaded first - fundamental dependency
+    schemaLoaded: false,
+
     // Core data dependencies
     entityDataLoaded: false,
     entityObservableReady: false,

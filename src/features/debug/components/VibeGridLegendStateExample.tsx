@@ -73,7 +73,6 @@ export function VibeGridLegendStateExample() {
             <VibeGrid
               tableId="legend-state-tasks"
               entityType="task"
-              columns={taskColumns}
               height={400}
               useLegendState={true}
               enableSorting={true}

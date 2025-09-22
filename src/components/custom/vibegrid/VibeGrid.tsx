@@ -27,10 +27,7 @@ const fileLog = log('components/VibeGrid');
 
 interface VibeGridProps<T = any> {
   tableId: string;  // Unique identifier for this table instance (required for persistence)
-  entityType: string;  // Entity type (required - determines data source)
-  
-  // Column configuration (required - no more auto-generation)
-  columns: Column<T>[];  // Explicit columns with type checking
+  entityType: string;  // Entity type (required - determines data source and generates columns internally)
   
   // Common options
   className?: string;
@@ -69,7 +66,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
   const {
     tableId,
     entityType,
-    columns,
     className = '',
     height = 600,
     width = '100%',
@@ -138,7 +134,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         fileLog.info('🚀 Initializing VibeGrid', {
           tableId,
           entityType,
-          columnCount: columns.length
+          columnCount: "unknown (will be available after tableCore$ creation)"
         });
 
         // Mark CSS and basic dependencies as ready immediately
@@ -147,7 +143,12 @@ export function VibeGrid<T extends Record<string, any> = any>(
         initManager.markReady('entityObservableReady');
 
         // Create the three-layer observables directly with visual state connection
-        const { tableCore$, tableCoreSync$ } = createTableCore$(entityType, columns, visualState.visualInputs$);
+        const { tableCore$, tableCoreSync$, loadSchemaAndColumns } = createTableCore$(entityType, visualState.visualInputs$, initManager);
+
+        // Trigger schema loading as first dependency
+        loadSchemaAndColumns().catch(error => {
+          fileLog.error('💥 Critical: Schema loading failed in VibeGrid initialization', { entityType, error });
+        });
         const tableInteraction$ = createTableInteraction$(tableCore$);
 
         // Create a proper viewport observable with Legend State observables for each property
@@ -174,7 +175,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
         };
         observablesRef.current = observables;
 
-        fileLog.debug('✅ Created pure observables', { entityType, columnCount: columns.length });
+        fileLog.debug('✅ Created pure observables', { entityType, columnCount: "available after generatedColumns extraction" });
 
         // Mark data state dependencies as ready
         initManager.markReady('dataStateReady');
@@ -188,14 +189,15 @@ export function VibeGrid<T extends Record<string, any> = any>(
         const orgId = universeOrgId$.get();
         const userId = universeUserId$.get();
         if (orgId && userId) {
-        // Initialize visual state columns first
-        const defaultState = visualState.visualOperations.initializeColumns(columns, entityType, orgId, userId);
+        // Initialize visual state columns using generated columns from tableCore$
+        const generatedColumns = tableCore$.columns.get();
+        const defaultState = visualState.visualOperations.initializeColumns(generatedColumns, entityType, orgId, userId);
 
         // Apply loaded preferences to visual inputs (this is where sortBy gets applied!)
         visualState.visualOperations.applyLoadedPreferencesToVisualInputs(visualState.visualInputs$, defaultState);
 
         // Set columns in visual state - preferences are already loaded and applied above
-        visualState.visualInputs$.columns.set(columns);
+        visualState.visualInputs$.columns.set(generatedColumns);
 
 
         // Note: Emergency clear was successful, removing for normal operation
@@ -461,10 +463,10 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         fileLog.info('🎯 Visual state initialized', {
           entityType, orgId, userId,
-          columnsCount: columns.length
+          columnsCount: generatedColumns.length
         });
         initManager.markReady('visualStateReady');
-        } else {
+      } else {
           fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
           initManager.markError('visualStateReady', 'Missing orgId or userId', true);
         }
@@ -682,7 +684,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
   // RENDER
   // ====================================
 
-  if (columns.length === 0) {
+  if (!observablesRef.current || !visualState.visualInputs$.columns.get() || visualState.visualInputs$.columns.get().length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <div className="text-center">

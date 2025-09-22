@@ -458,7 +458,6 @@ export function UniversalEntityPage({
             return (
               <VibeGrid
                 entityType={fullEntityName}
-                columns={columns}
                 tableId={`${entityName}-entity-table`}
                 className="h-full"
                 height="100%"

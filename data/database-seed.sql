@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vElQ7ZlwPLRpMNrreBHOjvWB5gaVmnm28HSxEKOFEMYP3kVBxow1L4SxYNlpn7k
+\restrict vwHxtPTkFaMhMQrgoSKrhbFBHOl4cdUJCqQdiVGHXPjjhSK0kTiys2Fa96VLadi
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -192,10 +192,6 @@ c6641081-0e59-4bde-a59f-a51db9971daf	01920000-1000-7000-8000-000000000001	risk_l
 --
 
 COPY public.custom_options (id, option_set_id, value, label, description, color, icon, is_active, sort_order, metadata, created_at, updated_at) FROM stdin;
-b27686eb-adf4-4957-88cf-4f9e7ec9626a	9c2d710c-796c-4a20-a790-7015e0cc8608	low	Low Priority	Low priority tasks	#22c55e	\N	t	1	{}	2025-09-11 00:28:10.984	2025-09-11 00:28:10.984
-c86801dd-5082-476f-a0c0-13479897674c	9c2d710c-796c-4a20-a790-7015e0cc8608	medium	Medium Priority	Medium priority tasks	#f59e0b	\N	t	2	{}	2025-09-11 00:28:10.986	2025-09-11 00:28:10.986
-04a9f56c-4f44-4cca-9e7b-c065b75f381b	9c2d710c-796c-4a20-a790-7015e0cc8608	high	High Priority	High priority tasks	#ef4444	\N	t	3	{}	2025-09-11 00:28:10.988	2025-09-11 00:28:10.988
-4f5261fc-1712-495d-9cc7-03a745bcafb9	9c2d710c-796c-4a20-a790-7015e0cc8608	critical	Critical Priority	Critical priority tasks	#dc2626	\N	t	4	{}	2025-09-11 00:28:10.99	2025-09-11 00:28:10.99
 90842b68-bf68-4370-9b9a-2a723162e677	b0bb70e1-86e9-4820-aa0b-e1857a377403	backlog	Backlog	Task is in backlog	#6b7280	\N	t	1	{}	2025-09-11 00:28:11.003	2025-09-11 00:28:11.003
 72e66f8d-8aeb-433a-b257-2f116728999c	b0bb70e1-86e9-4820-aa0b-e1857a377403	todo	To Do	Task is ready to start	#3b82f6	\N	t	2	{}	2025-09-11 00:28:11.006	2025-09-11 00:28:11.006
 3430aa28-c017-4229-920f-6c25e2abb6e8	b0bb70e1-86e9-4820-aa0b-e1857a377403	in_progress	In Progress	Task is being worked on	#f59e0b	\N	t	3	{}	2025-09-11 00:28:11.008	2025-09-11 00:28:11.008
@@ -229,6 +225,10 @@ e476e969-d1f9-489c-88b0-1b7f9796b61b	12d34121-74b5-402a-ab3e-12d98029876e	resear
 777d842b-112a-4c88-ae57-132d3a0ec2e3	12d34121-74b5-402a-ab3e-12d98029876e	marketing	Marketing	Marketing and promotional projects	\N	\N	t	3	{}	2025-09-11 21:57:45.198	2025-09-11 21:57:45.198
 bddf3def-5a6e-4e65-be4c-3f18613e38e9	12d34121-74b5-402a-ab3e-12d98029876e	operational	Operational	Operational improvement projects	\N	\N	t	4	{}	2025-09-11 21:57:45.199	2025-09-11 21:57:45.199
 196c6952-be74-4862-aaeb-fa5fb2c56cda	12d34121-74b5-402a-ab3e-12d98029876e	strategic	Strategic	Strategic business projects	\N	\N	t	5	{}	2025-09-11 21:57:45.203	2025-09-11 21:57:45.203
+b27686eb-adf4-4957-88cf-4f9e7ec9626a	9c2d710c-796c-4a20-a790-7015e0cc8608	low	Low Priority	Low priority tasks	#22c55e	\N	t	1	{"icon": "chevron-down", "color": "#10B981", "backgroundColor": "#D1FAE5"}	2025-09-11 00:28:10.984	2025-09-11 00:28:10.984
+c86801dd-5082-476f-a0c0-13479897674c	9c2d710c-796c-4a20-a790-7015e0cc8608	medium	Medium Priority	Medium priority tasks	#f59e0b	\N	t	2	{"icon": "minus", "color": "#F59E0B", "backgroundColor": "#FEF3C7"}	2025-09-11 00:28:10.986	2025-09-11 00:28:10.986
+04a9f56c-4f44-4cca-9e7b-c065b75f381b	9c2d710c-796c-4a20-a790-7015e0cc8608	high	High Priority	High priority tasks	#ef4444	\N	t	3	{"icon": "chevron-up", "color": "#EF4444", "backgroundColor": "#FEE2E2"}	2025-09-11 00:28:10.988	2025-09-11 00:28:10.988
+4f5261fc-1712-495d-9cc7-03a745bcafb9	9c2d710c-796c-4a20-a790-7015e0cc8608	critical	Critical Priority	Critical priority tasks	#dc2626	\N	t	4	{"icon": "alert-triangle", "color": "#DC2626", "backgroundColor": "#FEE2E2"}	2025-09-11 00:28:10.99	2025-09-11 00:28:10.99
 \.
 
 
@@ -1184,10 +1184,6 @@ d2edddeb-8b31-45d7-8552-0513061d6cd9	12f64f25-9e2e-4666-ac38-73ec7498697d	resear
 e1f8eee6-b3fc-4455-b083-75d263de715a	12f64f25-9e2e-4666-ac38-73ec7498697d	marketing	Marketing	Marketing and promotional projects	\N	\N	t	3	{}	2025-08-25 15:11:17.027871	2025-08-25 15:11:17.027871
 818d340b-3a4a-4381-addc-cb25a1697ae0	12f64f25-9e2e-4666-ac38-73ec7498697d	operational	Operational	Operational improvement projects	\N	\N	t	4	{}	2025-08-25 15:11:17.027871	2025-08-25 15:11:17.027871
 6e01fbf6-ceb8-497f-b114-dec663895660	12f64f25-9e2e-4666-ac38-73ec7498697d	strategic	Strategic	Strategic business projects	\N	\N	t	5	{}	2025-08-25 15:11:17.027871	2025-08-25 15:11:17.027871
-46898393-ef95-4054-8831-77bae57047a1	7fca52f5-5cc0-49c8-9469-d913616136d1	low	Low Priority	Low priority tasks	#22c55e	\N	t	1	{}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
-df37281e-292d-440c-bed7-8133660e9088	7fca52f5-5cc0-49c8-9469-d913616136d1	medium	Medium Priority	Medium priority tasks	#f59e0b	\N	t	2	{}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
-917ee647-3c9a-490c-b87c-fcf9b9ecc59c	7fca52f5-5cc0-49c8-9469-d913616136d1	high	High Priority	High priority tasks	#ef4444	\N	t	3	{}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
-8a26d182-9002-4a17-87ac-d5976803bb8d	7fca52f5-5cc0-49c8-9469-d913616136d1	critical	Critical Priority	Critical priority tasks	#dc2626	\N	t	4	{}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
 d4df2550-2a39-47c7-b19f-069e8b14a59d	56a6b735-184a-4dc3-8f0b-9d0bfe6ad152	backlog	Backlog	Task is in backlog	#6b7280	\N	t	1	{}	2025-08-25 15:11:17.03121	2025-08-25 15:11:17.03121
 abebc6aa-2893-43c5-a680-e42ecd2fd1c8	56a6b735-184a-4dc3-8f0b-9d0bfe6ad152	todo	To Do	Task is ready to start	#3b82f6	\N	t	2	{}	2025-08-25 15:11:17.03121	2025-08-25 15:11:17.03121
 e08f20b3-b46a-48eb-bdcc-b39e4d60d2c3	56a6b735-184a-4dc3-8f0b-9d0bfe6ad152	in_progress	In Progress	Task is being worked on	#f59e0b	\N	t	3	{}	2025-08-25 15:11:17.03121	2025-08-25 15:11:17.03121
@@ -1212,6 +1208,10 @@ d58c60b6-e255-40da-a21d-cfb4d538fe89	fbd8b275-069e-4d93-843f-ac60c8c381f8	low	Lo
 3083ae21-a3d1-4abc-a158-b4a55c426dd8	48a46dd2-4dc0-4336-8a1b-339b12002cf1	on_hold	On Hold	Temporarily on hold	#8B5CF6	\N	t	40	{}	2025-08-25 18:52:57.062386	2025-08-25 18:52:57.062386
 af61b385-a09a-4f8d-83d7-1e9e285ab9e0	48a46dd2-4dc0-4336-8a1b-339b12002cf1	archived	Archived	Archived for reference	#6B7280	\N	t	50	{}	2025-08-25 18:52:57.062386	2025-08-25 18:52:57.062386
 3ddcc765-046f-4266-94eb-15b2e208ce1f	48a46dd2-4dc0-4336-8a1b-339b12002cf1	deleted	Deleted	Marked for deletion	#EF4444	\N	t	60	{}	2025-08-25 18:52:57.062386	2025-08-25 18:52:57.062386
+46898393-ef95-4054-8831-77bae57047a1	7fca52f5-5cc0-49c8-9469-d913616136d1	low	Low Priority	Low priority tasks	#22c55e	\N	t	1	{"icon": "chevron-down", "color": "#10B981", "backgroundColor": "#D1FAE5"}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
+df37281e-292d-440c-bed7-8133660e9088	7fca52f5-5cc0-49c8-9469-d913616136d1	medium	Medium Priority	Medium priority tasks	#f59e0b	\N	t	2	{"icon": "minus", "color": "#F59E0B", "backgroundColor": "#FEF3C7"}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
+917ee647-3c9a-490c-b87c-fcf9b9ecc59c	7fca52f5-5cc0-49c8-9469-d913616136d1	high	High Priority	High priority tasks	#ef4444	\N	t	3	{"icon": "chevron-up", "color": "#EF4444", "backgroundColor": "#FEE2E2"}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
+8a26d182-9002-4a17-87ac-d5976803bb8d	7fca52f5-5cc0-49c8-9469-d913616136d1	critical	Critical Priority	Critical priority tasks	#dc2626	\N	t	4	{"icon": "alert-triangle", "color": "#DC2626", "backgroundColor": "#FEE2E2"}	2025-08-25 15:11:17.029451	2025-08-25 15:11:17.029451
 \.
 
 
@@ -1285,5 +1285,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vElQ7ZlwPLRpMNrreBHOjvWB5gaVmnm28HSxEKOFEMYP3kVBxow1L4SxYNlpn7k
+\unrestrict vwHxtPTkFaMhMQrgoSKrhbFBHOl4cdUJCqQdiVGHXPjjhSK0kTiys2Fa96VLadi
 
