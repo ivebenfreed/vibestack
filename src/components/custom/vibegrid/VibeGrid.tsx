@@ -145,10 +145,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
         // Create the three-layer observables directly with visual state connection
         const { tableCore$, tableCoreSync$, loadSchemaAndColumns } = createTableCore$(entityType, visualState.visualInputs$, initManager);
 
-        // Trigger schema loading as first dependency
-        loadSchemaAndColumns().catch(error => {
-          fileLog.error('💥 Critical: Schema loading failed in VibeGrid initialization', { entityType, error });
-        });
         const tableInteraction$ = createTableInteraction$(tableCore$);
 
         // Create a proper viewport observable with Legend State observables for each property
@@ -185,19 +181,35 @@ export function VibeGrid<T extends Record<string, any> = any>(
         initManager.markReady('dataPersistenceLoaded');
         initManager.markReady('visualPersistenceLoaded');
 
-        // Initialize isolated visual state for this VibeGrid instance
-        const orgId = universeOrgId$.get();
-        const userId = universeUserId$.get();
-        if (orgId && userId) {
-        // Initialize visual state columns using generated columns from tableCore$
-        const generatedColumns = tableCore$.columns.get();
-        const defaultState = visualState.visualOperations.initializeColumns(generatedColumns, entityType, orgId, userId);
+        // Trigger schema loading (async)
+        loadSchemaAndColumns().catch(error => {
+          fileLog.error('💥 Critical: Schema loading failed in VibeGrid initialization', { entityType, error });
+          initManager.markError('schemaLoaded', `Schema loading failed: ${error.message}`, true);
+        });
 
-        // Apply loaded preferences to visual inputs (this is where sortBy gets applied!)
-        visualState.visualOperations.applyLoadedPreferencesToVisualInputs(visualState.visualInputs$, defaultState);
+        // Use init manager dependency system to initialize visual state when schema is ready
+        when(() => initManager.hydrationState$.schemaLoaded.get(), () => {
+          // Initialize isolated visual state for this VibeGrid instance AFTER columns are loaded
+          const orgId = universeOrgId$.get();
+          const userId = universeUserId$.get();
+          if (orgId && userId) {
+            // Initialize visual state columns using generated columns from tableCore$ (now available)
+            const generatedColumns = tableCore$.columns.get();
+            const defaultState = visualState.visualOperations.initializeColumns(generatedColumns, entityType, orgId, userId);
 
-        // Set columns in visual state - preferences are already loaded and applied above
-        visualState.visualInputs$.columns.set(generatedColumns);
+            // Apply loaded preferences to visual inputs (this is where sortBy gets applied!)
+            visualState.visualOperations.applyLoadedPreferencesToVisualInputs(visualState.visualInputs$, defaultState);
+
+            // Set columns in visual state - preferences are already loaded and applied above
+            visualState.visualInputs$.columns.set(generatedColumns);
+
+            fileLog.info('🎯 Visual state initialized with loaded columns', { entityType, orgId, userId, columnsCount: generatedColumns.length });
+            initManager.markReady('visualStateReady');
+          } else {
+            fileLog.warn('⚠️ Missing orgId or userId for visual state initialization', { orgId, userId });
+            initManager.markError('visualStateReady', 'Missing orgId or userId', true);
+          }
+        });
 
 
         // Note: Emergency clear was successful, removing for normal operation
@@ -461,16 +473,6 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         // Group config persistence is now handled by reactive persistence wrapper
 
-        fileLog.info('🎯 Visual state initialized', {
-          entityType, orgId, userId,
-          columnsCount: generatedColumns.length
-        });
-        initManager.markReady('visualStateReady');
-      } else {
-          fileLog.warn('⚠️ Cannot initialize visual state - missing orgId or userId', { orgId, userId });
-          initManager.markError('visualStateReady', 'Missing orgId or userId', true);
-        }
-
         // Wait for container ref to be available for renderer initialization (optimized)
         let retryCount = 0;
         const maxRetries = 30; // Reduced max retries since we're using RAF
@@ -579,7 +581,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
             });
           }
         });
-        };
+        }; // Close checkReadyToInitializeRenderer function
 
         // Start checking for container readiness after a small delay to allow React to render
         // Use RAF instead of setTimeout for better performance

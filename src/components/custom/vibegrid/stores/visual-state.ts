@@ -967,6 +967,7 @@ export function createVisualOperations(visualInputs$: any, visualState$: any) {
     const savedPrefs = this.loadAllSavedPreferences(columns, entityType, orgId);
 
     // Calculate final values with detailed logging
+    // CRITICAL FIX: If savedPrefs.columnOrder exists but is empty, use default columns order
     const finalColumnOrder = (savedPrefs.columnOrder && savedPrefs.columnOrder.length > 0)
       ? savedPrefs.columnOrder
       : columns.map(col => col.id);
