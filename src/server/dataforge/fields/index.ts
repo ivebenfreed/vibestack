@@ -60,7 +60,7 @@ import type { EnhancedFieldHandler } from './types';
 
 export const fieldTypes = {
   text,
-  longtext: text,  // alias
+  // longtext: text,  // alias - REMOVED: Duplicate key, keeping textarea version below (fixed)
   'rich-text': richText,
   'rich_text': richText,  // alias
   date,

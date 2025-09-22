@@ -8,11 +8,10 @@ import { uuidv7 } from 'uuidv7';
  * while keeping other data in PostgreSQL
  */
 export function createKVSessionInterceptor(env: Env) {
-  // Database connection already established by middleware
   const kyselyInstance = createKyselyForPersistentUse();
   
   // Create a proxy that intercepts session operations
-  return new Proxy(kyselyInstance, {
+  const interceptor = new Proxy(kyselyInstance, {
     get(target, prop, receiver) {
       // Intercept database query methods
       if (prop === 'selectFrom' || prop === 'insertInto' || prop === 'updateTable' || prop === 'deleteFrom') {
@@ -20,20 +19,22 @@ export function createKVSessionInterceptor(env: Env) {
           // Handle session table operations via KV
           if (tableName === 'session' && env.SESSIONS) {
             dbLogger.debug('Intercepting session operation', { operation: prop, table: tableName }, 'kv-adapter');
-            
+
             // Return a mock query builder for session operations
             return createKVSessionQueryBuilder(env.SESSIONS, tableName, prop as string);
           }
-          
+
           // For non-session tables, use the original Kysely
           const originalMethod = Reflect.get(target, prop, receiver);
           return originalMethod.call(target, tableName);
         };
       }
-      
+
       return Reflect.get(target, prop, receiver);
     }
   });
+
+  return interceptor;
 }
 
 function createKVSessionQueryBuilder(kv: KVNamespace, tableName: string, operation: string) {

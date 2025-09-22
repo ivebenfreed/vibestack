@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict a3wrcCSDjAw7wzH4ehNeUkffnLpqHztTBy1zCevXymafYtjWAcnEjrAHKK1uxHj
+\restrict e3v7ug3DOJNofGzp3M21cY4XyE39oeh5AcAUzpOHeq5B4WtCeQbntVmII4DUGAk
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict a3wrcCSDjAw7wzH4ehNeUkffnLpqHztTBy1zCevXymafYtjWAcnEjrAHKK1uxHj
+\unrestrict e3v7ug3DOJNofGzp3M21cY4XyE39oeh5AcAUzpOHeq5B4WtCeQbntVmII4DUGAk
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict Rof7aXkuaZgLv686qpqQCjilrlKKFu7Gd1lXCzR68v3IPJ70ezhVFTZVZToKLuN
+\restrict kAhEfpXTradqbeZsg7drkggGTNff2UfRGhoJeGjPFciJFqHgMXpQQhaR6JKgceh
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Rof7aXkuaZgLv686qpqQCjilrlKKFu7Gd1lXCzR68v3IPJ70ezhVFTZVZToKLuN
+\unrestrict kAhEfpXTradqbeZsg7drkggGTNff2UfRGhoJeGjPFciJFqHgMXpQQhaR6JKgceh
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict V7TrQv0VhgrAroJD76nVtsC8ny9Ow1NVYsm3ZeHfvtbDYFcEHJ4xHfe4V1ys3SQ
+\restrict FvwQqSQ8inGaITKTj4f5fddhnLKQPlNccIUFPoVFITOKnuSLb1bIxeJXFZ22wRp
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict V7TrQv0VhgrAroJD76nVtsC8ny9Ow1NVYsm3ZeHfvtbDYFcEHJ4xHfe4V1ys3SQ
+\unrestrict FvwQqSQ8inGaITKTj4f5fddhnLKQPlNccIUFPoVFITOKnuSLb1bIxeJXFZ22wRp
 \connect elevra_dev
-\restrict V7TrQv0VhgrAroJD76nVtsC8ny9Ow1NVYsm3ZeHfvtbDYFcEHJ4xHfe4V1ys3SQ
+\restrict FvwQqSQ8inGaITKTj4f5fddhnLKQPlNccIUFPoVFITOKnuSLb1bIxeJXFZ22wRp
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2750,6 +2750,27 @@ CREATE TABLE public.lore (
 ALTER TABLE public.lore OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_apitestentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_apitestentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    test_number integer NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_apitestentity REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_apitestentity OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_client; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3090,6 +3111,27 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_teammember REPL
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_teammember OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_testconnectioncleanup; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    test_field text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_worktask; Type: TABLE; Schema: public; Owner: postgres
@@ -5309,7 +5351,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict V7TrQv0VhgrAroJD76nVtsC8ny9Ow1NVYsm3ZeHfvtbDYFcEHJ4xHfe4V1ys3SQ
+\unrestrict FvwQqSQ8inGaITKTj4f5fddhnLKQPlNccIUFPoVFITOKnuSLb1bIxeJXFZ22wRp
 
 --
 -- Database "postgres" dump
@@ -5321,7 +5363,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict E0GZQjlHrDLFoE8U3MpZIwOJ5OsENIoe6PatXcxeIeaKfjzxHHOmavUYaazmWg5
+\restrict gmWf5BDd1fOQiJkydoNvrJNifGMk4TxyYRBGzcvSbDiZd0jJF9tF9vIz70hT9ll
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5342,7 +5384,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict E0GZQjlHrDLFoE8U3MpZIwOJ5OsENIoe6PatXcxeIeaKfjzxHHOmavUYaazmWg5
+\unrestrict gmWf5BDd1fOQiJkydoNvrJNifGMk4TxyYRBGzcvSbDiZd0jJF9tF9vIz70hT9ll
 
 --
 -- PostgreSQL database cluster dump complete

@@ -11,7 +11,7 @@ import { createEmailService } from '../services/EmailService';
 import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
-import { createKyselyForPersistentUse } from './database-manager';
+import { createKyselyForPersistentUse, withKysely } from './database-manager';
 // import { createKVSessionInterceptor } from './kv-session-adapter'; // Replaced with Better Auth native secondaryStorage
 
 // Helper function to get allowed origins for unified worker
@@ -225,7 +225,7 @@ export const auth = betterAuth({
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
-  // Get configured Kysely instance
+  console.log('[Auth Init] Creating Better Auth instance with org plugin...');
   const kyselyInstance = createKyselyForPersistentUse();
   
   // Database connection is already established by middleware
@@ -798,6 +798,8 @@ export function initializeAuth(env: Env, request?: Request) {
       }
     };
     
+    console.log('[Auth Init] Better Auth instance created successfully');
+
     return authInstance;
   } catch (error) {
     console.error('[Auth Init] Better Auth initialization failed:', error);
