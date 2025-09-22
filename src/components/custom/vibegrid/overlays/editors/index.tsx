@@ -9,6 +9,7 @@ import { SingleRelationshipEditor } from './SingleRelationshipEditor';
 import { MultiRelationshipEditor } from './MultiRelationshipEditor';
 import { ReferenceSelectEditor } from './ReferenceSelectEditor';
 import { ReferenceMultiEditor } from './ReferenceMultiEditor';
+import { ModalTextEditor } from './ModalTextEditor';
 import type { CellRef, Column } from '../../types';
 
 // Helper function to detect if a field should be treated as tags
@@ -54,7 +55,8 @@ export {
   SingleRelationshipEditor,
   MultiRelationshipEditor,
   ReferenceSelectEditor,
-  ReferenceMultiEditor
+  ReferenceMultiEditor,
+  ModalTextEditor
 };
 
 // Editor props interface
@@ -96,8 +98,17 @@ export function createEditor(props: EditorProps): React.ReactElement {
       return <TextEditor {...props} />;
       
     case 'textarea':
-    case 'longtext':
       return <TextEditor {...props} multiline />;
+
+    case 'longtext':
+      // For longtext, use ModalTextEditor which opens the long text overlay
+      console.log('📝 createEditor: Using ModalTextEditor for longtext');
+      return <ModalTextEditor {...props} editorType="longtext" />;
+
+    case 'richtext':
+      // For richtext, use ModalTextEditor which opens the rich text overlay
+      console.log('🎨 createEditor: Using ModalTextEditor for richtext');
+      return <ModalTextEditor {...props} editorType="richtext" />;
       
     case 'number':
     case 'integer':

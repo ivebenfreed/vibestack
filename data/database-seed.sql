@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FihDbtXWzFs9aL3P44zZyrxVVbgGfpr3pe0cCYkiUgaeBd5QaKbI4XRMJkkcFSs
+\restrict uf5u69QwIF6ei4UriWR8yevL0mINsCtdJO4YmeNBqDfBgGKkSTtMfbaFWzW5Bhq
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -916,9 +916,6 @@ COPY public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup (id, 
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_worktask (id, organization_id, created_at, updated_at, title, description, priority, status, due_date, task_type, estimated_hours, actual_hours, complexity, billable, hourly_rate, blocking_issues, code_review_required) FROM stdin;
-a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-13 16:38:49.773	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-02-28 22:00:00	documentation	32	35	4	t	\N	\N	f
-3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-15 00:46:13.035	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
-e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-15 18:04:58.211	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	done	2025-04-01 04:00:00	development	40	\N	4	t	\N	\N	t
 08a79a18-55a1-4d36-b094-4fb3f9ddf70e	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.721	2025-09-19 14:07:08.173	Legacy System Integration	Integrate existing legacy systems with new cloud-native architecture	critical	done	2025-02-28 05:00:00	development	80	\N	5	t	\N	\N	t
 c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-17 20:04:42.881	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	high	done	2025-03-20 08:00:00	design	45	\N	3	t	\N	\N	f
 e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:49.298	2025-09-19 17:08:26.83	Mobile-First Frontend Architecture Design	Design responsive mobile-first architecture using React Native and Progressive Web App technologies. Create component library and design system.	high	done	2025-04-16 01:00:00	design	36	12	4	t	\N	\N	t
@@ -927,9 +924,12 @@ e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-0
 01d55ead-3b1d-478e-a379-22322f32dc0f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.423	2025-09-22 20:49:12.778	Process Automation Framework Design	Design automation framework for business processes using RPA and workflow tools	high	todo	2025-02-01 15:00:00	development	60	\N	5	t	\N	\N	f
 1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-21 18:24:45.417	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-21 03:00:00	deployment	12	14	3	t	\N	\N	f
 00aa5ef7-d224-4738-8f8e-9f4878ac5208	01920000-1000-7000-8000-000000000001	2025-09-11 14:41:00.334	2025-09-22 21:21:20.195	🎯 END-TO-END SYNC TEST - Updated at 17:40	This change was made via curl - watch it appear instantly in your VibeGrid!long	critical	in-progress	2025-05-31 05:00:00	development	44	0	5	t	\N	Waiting for RetailMax to finalize inventory data schema and provide sample data. Third-party integration specs still being negotiated with suppliers.	t
+a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-22 21:50:09.081	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-03-01 03:00:00	documentation	32	35	4	t	\N	\N	f
 26b282d1-820a-497c-b8dc-d7675d12ff9c	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:59.898	2025-09-22 19:17:18.67029	Real-time Analytics Dashboard	Build interactive dashboard for healthcare analytics with real-time patient monitoring and reporting	high	todo	2025-04-15 00:00:00	development	65	\N	4	t	\N	\N	t
 f98ab62c-724c-4b91-95ef-92ec6c19a0f3	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.45	2025-09-22 19:17:18.67029	Integration with EHR Systems	Develop integrations with major Electronic Health Record systems for seamless data exchange	medium	todo	2025-06-01 00:00:00	development	55	\N	4	t	\N	\N	t
 b814d501-69ad-40ee-a7b5-6c99a399f9d6	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.592	2025-09-22 19:17:18.67029	Inventory Management System	Develop real-time inventory tracking system with automated reorder points and supplier integration	high	todo	2025-04-30 00:00:00	development	60	\N	4	t	\N	\N	t
+e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-22 22:05:03.718	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	done	2025-04-01 08:00:00	development	40	\N	4	t	\N	\N	t
+3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-22 22:08:04.464	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
 2ad147f8-cd5f-46cb-b009-9df593948181	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:38.409	2025-09-12 23:07:56.881	Conduct server inventory and documentation	Complete inventory of all physical and virtual servers, document specifications, dependencies, and current usage patterns	medium	done	\N	\N	24	22.5	3	t	\N	\N	f
 19ee6cd4-67dc-42c3-af34-6dc5d9c70a67	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:48.69	2025-09-22 19:17:18.67029	SEO and Marketing Integration	Implement SEO best practices and integrate marketing tools for better online visibility and customer acquisition	medium	todo	2025-08-01 00:00:00	development	25	\N	2	t	\N	\N	f
 2b557ba6-fb05-487d-99f7-de096a167cc9	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:49.434	2025-09-19 17:08:31.596	Database Migration Scripts Development	Develop and test database migration scripts for ERP system data migration from on-premise Oracle to AWS RDS PostgreSQL	critical	done	2025-03-16 05:00:00	development	40	28	5	t	\N	Waiting for schema documentation from client IT team. Performance testing requires production-like data volume which is still being prepared.	t
@@ -1314,5 +1314,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FihDbtXWzFs9aL3P44zZyrxVVbgGfpr3pe0cCYkiUgaeBd5QaKbI4XRMJkkcFSs
+\unrestrict uf5u69QwIF6ei4UriWR8yevL0mINsCtdJO4YmeNBqDfBgGKkSTtMfbaFWzW5Bhq
 

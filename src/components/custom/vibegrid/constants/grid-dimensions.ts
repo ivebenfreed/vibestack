@@ -48,7 +48,9 @@ export const GRID_DIMENSIONS = {
     SELECTION: 101,
     EDITING: 102,
     DRAG_PREVIEW: 103,
-    CONTEXT_MENU: 104
+    CONTEXT_MENU: 104,
+    MODAL_BACKDROP: 9990,
+    MODAL_CONTENT: 9999
   }
 } as const;
 
