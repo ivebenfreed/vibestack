@@ -62,66 +62,11 @@ export class ScrollController {
     const scrollHandler = this.handleViewportScroll.bind(this);
     this.addEventListenerTracked(this.viewport, 'scroll', scrollHandler);
 
-    // Add comprehensive interaction handling if container provided
-    if (this.container) {
-      this.setupInteractionHandling();
-    }
+    // Keyboard handling now managed by KeyboardController - removed from here
 
     fileLog.info('✅ Comprehensive scroll coordination setup complete');
   }
 
-  /**
-   * Setup click and keyboard interaction handling
-   */
-  private setupInteractionHandling(): void {
-    if (!this.container) return;
-
-    // Click handling is now managed by MouseController - no click listener needed here
-
-    // Add keyboard event handling for advanced selection and navigation
-    const keydownHandler = (e: KeyboardEvent) => {
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      const isShiftKey = e.shiftKey;
-
-      const focusedCell = this.keyboardNavController?.getFocusedCell();
-      fileLog.debug('⌨️ Keyboard event', { key: e.key, shiftKey: isShiftKey, ctrlKey: isCtrlKey, focusedCell });
-
-      switch (e.key) {
-        case 'a':
-        case 'A':
-          if (isCtrlKey) {
-            e.preventDefault();
-            this.selectionController?.selectAllCells();
-            fileLog.info('⌨️ Ctrl+A - Select all cells');
-          }
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('up', isShiftKey);
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('down', isShiftKey);
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('left', isShiftKey);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          this.keyboardNavController?.handleArrowKey('right', isShiftKey);
-          break;
-        default:
-          // Let other keys pass through
-          break;
-      }
-    };
-    this.addEventListenerTracked(this.container, 'keydown', keydownHandler);
-
-    // Make container focusable to receive keyboard events
-    this.container.tabIndex = 0;
-    this.container.style.outline = 'none';
-  }
 
   /**
    * Add event listener with tracking for cleanup

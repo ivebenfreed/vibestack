@@ -18,6 +18,7 @@ export interface MouseControllerOptions {
   tableInteraction$: any; // For reactive state updates
   visualState: ReturnType<typeof createVibeGridVisualState>;
   tableCore$?: any; // For accessing processed rows and columns
+  keyboardController?: any; // For ensuring focus after interactions
 }
 
 export class MouseController {
@@ -28,6 +29,7 @@ export class MouseController {
   private tableInteraction$: any;
   private visualState: ReturnType<typeof createVibeGridVisualState>;
   private tableCore$?: any;
+  private keyboardController?: any;
 
   // Mouse state tracking
   private isDragging = false;
@@ -70,6 +72,7 @@ export class MouseController {
     this.tableInteraction$ = options.tableInteraction$;
     this.visualState = options.visualState;
     this.tableCore$ = options.tableCore$;
+    this.keyboardController = options.keyboardController;
 
     // Prevent text selection during drag operations
     this.container.style.userSelect = 'none';
@@ -236,6 +239,11 @@ export class MouseController {
       // PURE: ALWAYS select the cell when clicked - this is the universal interaction pattern
       // Pass isEditableElement=false for content elements since they handle their own editing
       this.tableInteraction$.handleCellClick(cellId, isEditableElement, e.ctrlKey, e.shiftKey);
+
+      // Ensure container gets focus for keyboard navigation after cell selection
+      if (this.keyboardController && !isEditableElement) {
+        this.keyboardController.ensureContainerFocus();
+      }
 
       // Only prevent tracking for actual input elements that need native behavior
       if (target.matches('input, textarea, select') || target.contentEditable === 'true') {
@@ -942,6 +950,11 @@ export class MouseController {
   setSelectionController(selectionController: any): void {
     this.selectionController = selectionController;
     fileLog.info('🖱️ SelectionController reference updated');
+  }
+
+  setKeyboardController(keyboardController: any): void {
+    this.keyboardController = keyboardController;
+    fileLog.info('🖱️ KeyboardController reference updated');
   }
 
   /**

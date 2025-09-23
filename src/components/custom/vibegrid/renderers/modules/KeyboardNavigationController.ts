@@ -188,7 +188,7 @@ export class KeyboardNavigationController {
           const cellId = `${rowId}:${columnId}`;
 
           // Check if column is editable before starting edit mode
-          const columns = this.getColumns();
+          const columns = this.getVisibleColumns();
           const column = columns.find(c => c.id === columnId);
           if (column && column.editable === false) {
             return true; // Consume the event but don't start editing
@@ -209,7 +209,8 @@ export class KeyboardNavigationController {
         // If currently editing, just cancel the edit and keep selection
         if (this.tableInteraction$.isEditing.get()) {
           this.tableInteraction$.cancelEdit();
-          // Keep the cell selected after canceling edit
+          // Keep the cell selected after canceling edit and focus container for keyboard events
+          this.container.focus();
           return true;
         }
 

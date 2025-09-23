@@ -19,7 +19,7 @@ export interface EventManagerOptions {
   tableViewport$: TableViewport$;
   overlayManager?: OverlayManager;
   container: HTMLElement;
-  
+
   // Event callbacks
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
 }
@@ -60,10 +60,9 @@ export class EventManager {
    */
   setupEventHandling(): void {
     this.setupContextMenu();
-    this.setupClipboardHandling();
     this.setupGlobalDocumentHandling();
-    
-    fileLog.info('✅ Global event handling setup complete');
+
+    fileLog.info('✅ Global event handling setup complete (keyboard handling moved to KeyboardController)');
   }
 
   /**
@@ -119,45 +118,6 @@ export class EventManager {
     this.addEventListenerTracked(this.container, 'contextmenu', contextMenuHandler);
   }
 
-  /**
-   * Setup clipboard operation handling
-   */
-  private setupClipboardHandling(): void {
-    const keydownHandler = (e: KeyboardEvent) => {
-      const isCtrlKey = e.ctrlKey || e.metaKey;
-      
-      if (isCtrlKey) {
-        switch (e.key.toLowerCase()) {
-          case 'c':
-            e.preventDefault();
-            this.handleCopyAction();
-            break;
-          case 'v':
-            e.preventDefault();
-            this.handlePasteAction();
-            break;
-          case 'x':
-            e.preventDefault();
-            this.handleCutAction();
-            break;
-          case 'z':
-            e.preventDefault();
-            if (e.shiftKey) {
-              this.handleRedoAction();
-            } else {
-              this.handleUndoAction();
-            }
-            break;
-          case 'y':
-            e.preventDefault();
-            this.handleRedoAction();
-            break;
-        }
-      }
-    };
-
-    this.addEventListenerTracked(this.container, 'keydown', keydownHandler);
-  }
 
   /**
    * Setup global document-level event handling for drag operations
@@ -173,7 +133,7 @@ export class EventManager {
   /**
    * Handle copy action
    */
-  private handleCopyAction(): void {
+  handleCopyAction(): void {
     fileLog.info('📋 Copy action triggered');
     
     const selectedCells = this.tableInteraction$.selectedCells.get();
@@ -203,7 +163,7 @@ export class EventManager {
   /**
    * Handle paste action
    */
-  private handlePasteAction(): void {
+  handlePasteAction(): void {
     fileLog.info('📋 Paste action triggered');
     
     const clipboard = this.tableInteraction$.clipboard.get();
@@ -231,7 +191,7 @@ export class EventManager {
   /**
    * Handle cut action
    */
-  private handleCutAction(): void {
+  handleCutAction(): void {
     fileLog.info('✂️ Cut action triggered');
     
     const selectedCells = this.tableInteraction$.selectedCells.get();
@@ -320,7 +280,7 @@ export class EventManager {
   /**
    * Handle undo action
    */
-  private handleUndoAction(): void {
+  handleUndoAction(): void {
     fileLog.info('↶ Undo action triggered');
     
     // Implement undo via tableCore$ if available
@@ -334,7 +294,7 @@ export class EventManager {
   /**
    * Handle redo action
    */
-  private handleRedoAction(): void {
+  handleRedoAction(): void {
     fileLog.info('↷ Redo action triggered');
     
     // Implement redo via tableCore$ if available

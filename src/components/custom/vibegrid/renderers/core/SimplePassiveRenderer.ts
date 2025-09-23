@@ -25,6 +25,7 @@ import { OverlayManager, type CoordinateMapping } from '../modules/OverlayManage
 import { CellFormatter } from '../components/BodyRenderer';
 import { SelectionController } from '../modules/SelectionController';
 import { KeyboardNavigationController } from '../modules/KeyboardNavigationController';
+import { KeyboardController } from '../modules/KeyboardController';
 import { ScrollController } from '../modules/ScrollController';
 import { MouseController } from '../modules/MouseController';
 import { GroupRenderer } from '../components/GroupRenderer';
@@ -113,6 +114,7 @@ export class SimplePassiveRenderer {
   // Modular controllers
   private selectionController: SelectionController | null = null;
   private keyboardNavController: KeyboardNavigationController | null = null;
+  private keyboardController: KeyboardController | null = null;
   private scrollController: ScrollController | null = null;
   private mouseController: MouseController | null = null;
   private groupRenderer: GroupRenderer | null = null;
@@ -851,8 +853,25 @@ export class SimplePassiveRenderer {
         selectionController: this.selectionController,
         tableInteraction$: this.tableInteraction$,
         visualState: this.visualState,
-        tableCore$: this.tableCore$
+        tableCore$: this.tableCore$,
+        keyboardController: null // Will be set after KeyboardController is created
       });
+
+      // Initialize KeyboardController for centralized keyboard event handling
+      this.keyboardController = new KeyboardController({
+        container: this.container,
+        keyboardNavController: this.keyboardNavController,
+        onCopy: () => this.eventManager?.handleCopyAction(),
+        onPaste: () => this.eventManager?.handlePasteAction(),
+        onCut: () => this.eventManager?.handleCutAction(),
+        onUndo: () => this.eventManager?.handleUndoAction(),
+        onRedo: () => this.eventManager?.handleRedoAction()
+      });
+
+      // Connect MouseController to KeyboardController for focus management
+      if (this.mouseController) {
+        this.mouseController.setKeyboardController(this.keyboardController);
+      }
 
       // Configure ColumnWidthManager with DOM containers
       if (this.columnWidthManager) {
@@ -1626,6 +1645,12 @@ export class SimplePassiveRenderer {
     if (this.mouseController) {
       this.mouseController.destroy();
       this.mouseController = null;
+    }
+
+    // Clean up KeyboardController
+    if (this.keyboardController) {
+      this.keyboardController.destroy();
+      this.keyboardController = null;
     }
 
     // Clean up ColumnWidthManager

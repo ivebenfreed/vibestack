@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uWH1sovgp2l2Je6DBi6pagdBKtf0JBui8pnJlat99tX66r5eibVXOg16Vuhhff3
+\restrict N4DBYYLwZ0iJPs3IwtghcpeU0DE2PZNEEMpRrpCFzspsffvfeguVq7eXLpJ0Fqz
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -916,6 +916,7 @@ COPY public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup (id, 
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_worktask (id, organization_id, created_at, updated_at, title, description, priority, status, due_date, task_type, estimated_hours, actual_hours, complexity, billable, hourly_rate, blocking_issues, code_review_required) FROM stdin;
+1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-23 00:04:07.114	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-21 08:00:00	deployment	12	14	3	t	\N	\N	f
 c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.47	2025-09-22 22:38:49.121	Mobile-First UI/UX Design	Design responsive mobile-first user interface with modern UX principles for e-commerce platform	medium	done	2025-03-20 16:00:00	design	45	\N	3	t	\N	\N	f
 08a79a18-55a1-4d36-b094-4fb3f9ddf70e	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.721	2025-09-22 22:41:25.202	Legacy System Integration	Integrate existing legacy systems with new cloud-native architecture	critical	done	2025-02-28 10:00:00	development	80	\N	5	t	\N	\N	t
 00aa5ef7-d224-4738-8f8e-9f4878ac5208	01920000-1000-7000-8000-000000000001	2025-09-11 14:41:00.334	2025-09-22 21:21:20.195	🎯 END-TO-END SYNC TEST - Updated at 17:40	This change was made via curl - watch it appear instantly in your VibeGrid!long	critical	active	2025-05-31 05:00:00	development	44	0	5	t	\N	Waiting for RetailMax to finalize inventory data schema and provide sample data. Third-party integration specs still being negotiated with suppliers.	t
@@ -924,7 +925,6 @@ c9413a3c-61db-4c99-b4fd-0a4c005f2c66	01920000-1000-7000-8000-000000000001	2025-0
 e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:49.298	2025-09-19 17:08:26.83	Mobile-First Frontend Architecture Design	Design responsive mobile-first architecture using React Native and Progressive Web App technologies. Create component library and design system.	high	done	2025-04-16 01:00:00	design	36	12	4	t	\N	\N	t
 7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-19 17:08:29.243	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	done	2025-03-15 12:00:00	deployment	35	\N	3	t	\N	\N	f
 395471fd-bb87-4a4c-ab65-1772ec1561f6	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:33.791	2025-09-19 21:35:21.758	Patient Data Encryption Implementation	Implement end-to-end encryption for PHI data at rest and in transit. Configure AES-256 encryption, key management system, and secure data access layers	high	done	2025-03-21 05:00:00	development	48	22	5	t	\N	Pending approval of encryption key management approach by HealthFirst security team. AWS KMS configuration requires additional security clearance.	t
-1576acd5-743f-43ad-b11d-b9e1cb40917c	01920000-1000-7000-8000-000000000001	2025-09-11 14:39:38.419	2025-09-21 18:24:45.417	AWS Account Setup & Initial Configuration	Set up AWS organizational account, configure billing, establish security baseline with IAM roles and policies	high	done	2025-02-21 03:00:00	deployment	12	14	3	t	\N	\N	f
 a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-22 21:50:09.081	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-03-01 03:00:00	documentation	32	35	4	t	\N	\N	f
 e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-22 22:05:03.718	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	done	2025-04-01 08:00:00	development	40	\N	4	t	\N	\N	t
 3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-22 22:08:04.464	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
@@ -1314,5 +1314,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uWH1sovgp2l2Je6DBi6pagdBKtf0JBui8pnJlat99tX66r5eibVXOg16Vuhhff3
+\unrestrict N4DBYYLwZ0iJPs3IwtghcpeU0DE2PZNEEMpRrpCFzspsffvfeguVq7eXLpJ0Fqz
 

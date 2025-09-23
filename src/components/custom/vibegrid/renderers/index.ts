@@ -26,6 +26,7 @@ export type { DOMElementFactoryOptions } from './factories/DOMElementFactory';
 export { OverlayManager } from './modules/OverlayManager';
 export { SelectionController } from './modules/SelectionController';
 export { KeyboardNavigationController } from './modules/KeyboardNavigationController';
+export { KeyboardController } from './modules/KeyboardController';
 export { ScrollController } from './modules/ScrollController';
 // CellFormatter moved to components/BodyRenderer.ts
 
