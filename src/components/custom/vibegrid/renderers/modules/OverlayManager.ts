@@ -141,6 +141,9 @@ export class OverlayManager {
         return;
       }
 
+      // DEBUG: Log every observer trigger
+      fileLog.debug('🔍 REACTIVE: OverlayManager observer triggered');
+
       // READ ALL STATE: Read all state directly to trigger observer properly
       let state;
       try {
@@ -205,7 +208,10 @@ export class OverlayManager {
         clipboardChanged,
         selectedCount: state.selectedCells.size,
         editingCell: state.editingCell,
-        isEditing: state.isEditing
+        isEditing: state.isEditing,
+        hasClipboard: !!state.clipboard,
+        clipboardOperation: state.clipboard?.operation,
+        clipboardCellCount: state.clipboard?.copiedCells?.size
       });
 
       // BATCH DOM UPDATES: Cancel any pending update and schedule new one
@@ -273,11 +279,14 @@ export class OverlayManager {
                 cellCount: state.clipboard.copiedCells.size,
                 copiedCells: Array.from(state.clipboard.copiedCells)
               });
-              this.canvasOverlay.updateClipboardIndicator(clipboardState, null);
+
+              // Get visual positions for clipboard cells (same approach as selection)
+              const clipboardVisualCells = this.getVisualCellPositions(Array.from(state.clipboard.copiedCells));
+              this.canvasOverlay.updateClipboardWithVisualPositions(clipboardVisualCells, clipboardState.isCut);
             } else if (this.canvasOverlay) {
               // Clear clipboard overlay only when clipboard is explicitly null
               fileLog.info('📋 REACTIVE: Clearing clipboard overlay');
-              this.canvasOverlay.updateClipboardIndicator(null, null);
+              this.canvasOverlay.clearClipboardIndicators();
             }
           }
 
@@ -292,7 +301,10 @@ export class OverlayManager {
               operation: state.clipboard.operation,
               cellCount: state.clipboard.copiedCells.size
             });
-            this.canvasOverlay.updateClipboardIndicator(clipboardState, null);
+
+            // Get visual positions for clipboard cells (same approach as selection)
+            const clipboardVisualCells = this.getVisualCellPositions(Array.from(state.clipboard.copiedCells));
+            this.canvasOverlay.updateClipboardWithVisualPositions(clipboardVisualCells, clipboardState.isCut);
           }
         });
       });

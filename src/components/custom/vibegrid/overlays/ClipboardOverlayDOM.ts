@@ -123,6 +123,12 @@ export class ClipboardOverlayDOM {
     });
     
     if (!clipboardState || !viewport || clipboardState.copiedCells.size === 0 || !this.coordinateMapping) {
+      fileLog.info('ClipboardOverlayDOM: Clearing due to missing requirements', {
+        hasClipboardState: !!clipboardState,
+        hasViewport: !!viewport,
+        cellCount: clipboardState?.copiedCells.size || 0,
+        hasCoordinateMapping: !!this.coordinateMapping
+      });
       this.clear();
       return;
     }
