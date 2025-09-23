@@ -182,16 +182,20 @@ export const universeSchema$ = observable(() => {
       if (schema?.entities) {
         // In universe mode, prefix entity names with orgId for uniqueness
         Object.entries(schema.entities).forEach(([entityName, entityDef]) => {
-          const prefixedName = `${orgId}_${entityName}`
-          fileLog.info(`[UniverseSchema] Adding entity ${entityName} as ${prefixedName} from org ${orgId} (${org.name || 'unnamed'})`)
-          
+          // Check if entityName is already prefixed to avoid double prefixing
+          const isAlreadyPrefixed = entityName.startsWith(`${orgId}_`)
+          const prefixedName = isAlreadyPrefixed ? entityName : `${orgId}_${entityName}`
+          const originalEntityName = isAlreadyPrefixed ? entityName.replace(`${orgId}_`, '') : entityName
+
+          fileLog.info(`[UniverseSchema] Adding entity ${entityName} as ${prefixedName} from org ${orgId} (${org.name || 'unnamed'}) ${isAlreadyPrefixed ? '[already prefixed]' : '[adding prefix]'}`)
+
           combinedEntities[prefixedName] = {
             ...entityDef,
             // Add metadata about which organization this entity belongs to
             _orgId: orgId,
             _orgName: org.name || orgId, // Fallback to orgId if name is not available
-            _originalEntityName: entityName,
-            _originalName: entityName // Also add _originalName for compatibility
+            _originalEntityName: originalEntityName,
+            _originalName: originalEntityName // Also add _originalName for compatibility
           }
           totalEntitiesAdded++
         })
@@ -382,21 +386,29 @@ function createEntityObservable(entityName: string, schema?: any) {
       if (parts.length === 2) {
         actualOrgId = parts[0]
         actualEntityName = parts[1]
-        
+
         fileLog.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
+
+        // Special case: User entity should load organization members
+        if (actualEntityName === 'User') {
+          baseUrl = `/api/dataforge/orgs/${actualOrgId}/members`
+          fileLog.info(`[Observable] Using organization members API for User entity: ${baseUrl}`)
+        } else {
+          baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
+        }
       } else {
         fileLog.error(`[Observable] Invalid entity name format: ${entityName} - expected orgId_entityName`)
         actualOrgId = 'unknown'
         actualEntityName = entityName
+        baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
       }
     } else {
       // Fallback for non-prefixed entities (shouldn't happen in universe schema)
       fileLog.debug(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
       actualOrgId = schema?._organizationId || 'unknown'
       actualEntityName = entityName
+      baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
     }
-    
-    baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
   }
   
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`

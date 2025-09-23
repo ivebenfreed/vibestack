@@ -7,12 +7,13 @@
 
 import { Hono } from 'hono';
 import type { AppContext } from '../types/hono';
-import { 
+import {
   hybridRLSOrgActorMiddleware,
-  requirePermission 
+  requirePermission
 } from '../middleware/hybrid-rls-org-actor';
 import { archetypePermissionService } from '../dataforge/ArchetypePermissionService';
 import { ArchetypeRegistry, type ArchetypeType } from '../dataforge/ArchetypeRegistry';
+import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 export const dataforgeRouter = new Hono<AppContext>();
 
@@ -1535,8 +1536,53 @@ dataforgeRouter.delete('/orgs/:orgId/options/:optionType/:optionValue',
 );
 
 // =============================================================================
-// VIRTUAL ENTITIES ENDPOINTS - For Legend State synced observables  
+// VIRTUAL ENTITIES ENDPOINTS - For Legend State synced observables
 // =============================================================================
+
+// Organization members endpoint for User entity
+dataforgeRouter.get('/orgs/:orgId/members',
+  requirePermission('entities:read'),
+  async (c) => {
+    try {
+      const { orgId } = c.req.param();
+
+      // Create database connection
+      createDatabaseConnection(c.env);
+      const db = getKysely();
+
+      // Get organization members with user data
+      const members = await db
+        .selectFrom('organization_members as om')
+        .innerJoin('user as u', 'u.id', 'om.user_id')
+        .select([
+          'u.id',
+          'u.name',
+          'u.email',
+          'om.role',
+          'om.created_at',
+          'om.updated_at'
+        ])
+        .where('om.organization_id', '=', orgId)
+        .orderBy('u.name', 'asc')
+        .execute();
+
+      return c.json({
+        success: true,
+        data: members,
+        total: members.length,
+        archetype: 'user',
+        containerModel: null
+      });
+    } catch (error) {
+      console.error('[DataForge] Failed to fetch organization members:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to fetch organization members',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
 
 // REMOVED: Legacy system options endpoint - replaced by unified options API
 
