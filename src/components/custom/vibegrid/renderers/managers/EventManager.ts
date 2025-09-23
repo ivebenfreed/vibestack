@@ -153,6 +153,16 @@ export class EventManager {
       });
       
       fileLog.info('📋 Copy completed', { cellCount: selectedCells.size });
+
+      // Debug: Check if clipboard state was actually set
+      setTimeout(() => {
+        const clipboardCheck = this.tableInteraction$.clipboard?.get?.();
+        fileLog.info('📋 Clipboard state verification', {
+          hasClipboard: !!clipboardCheck,
+          operation: clipboardCheck?.operation,
+          copiedCellsCount: clipboardCheck?.copiedCells?.size
+        });
+      }, 100);
     } catch (error) {
       fileLog.error('📋 Copy failed', error);
     }

@@ -54,6 +54,7 @@ export class OverlayManager {
   
   // Performance optimization caches
   private lastSelectionString: string = ''; // More reliable deduplication
+  private lastClipboardString: string = ''; // Clipboard state deduplication
   private updateSelectionRAF: number | null = null;
   private lastCoordinateMappingVersion: number = -1;
   
@@ -152,8 +153,19 @@ export class OverlayManager {
           // Editing state
           editingCell: this.tableInteraction$.editingCell.get(),
           editValue: this.tableInteraction$.editValue.get(),
-          isEditing: this.tableInteraction$.isEditing.get()
+          isEditing: this.tableInteraction$.isEditing.get(),
+
+          // Clipboard state
+          clipboard: this.tableInteraction$.clipboard.get()
         };
+
+        // Debug clipboard state
+        if (state.clipboard) {
+          fileLog.debug('📋 OverlayManager detected clipboard state', {
+            operation: state.clipboard.operation,
+            copiedCellsCount: state.clipboard.copiedCells.size
+          });
+        }
       } catch (error) {
         fileLog.debug('🔍 REACTIVE: Error reading state, likely during unmount', error);
         return;
@@ -174,8 +186,10 @@ export class OverlayManager {
       const selectionString = Array.from(state.selectedCells).sort().join(',');
       const selectionChanged = lastSelectionString !== selectionString;
       const editingChanged = lastEditingCell !== state.editingCell;
+      const clipboardString = state.clipboard ? `${state.clipboard.operation}:${Array.from(state.clipboard.copiedCells).sort().join(',')}` : '';
+      const clipboardChanged = this.lastClipboardString !== clipboardString;
 
-      if (!selectionChanged && !editingChanged) {
+      if (!selectionChanged && !editingChanged && !clipboardChanged) {
         fileLog.debug('🔍 REACTIVE: No meaningful changes, skipping update');
         return;
       }
@@ -183,10 +197,12 @@ export class OverlayManager {
       // Update deduplication tracking
       lastSelectionString = selectionString;
       lastEditingCell = state.editingCell;
+      this.lastClipboardString = clipboardString;
 
       fileLog.debug('🔍 REACTIVE: Consolidated state changed', {
         selectionChanged,
         editingChanged,
+        clipboardChanged,
         selectedCount: state.selectedCells.size,
         editingCell: state.editingCell,
         isEditing: state.isEditing
@@ -243,6 +259,40 @@ export class OverlayManager {
               fileLog.info('🔍 REACTIVE: Hiding editing overlay (consolidated)');
               this.editingOverlay.hide();
             }
+          }
+
+          // Handle clipboard overlay updates (independent of selection)
+          if (clipboardChanged) {
+            if (state.clipboard && state.clipboard.copiedCells.size > 0 && this.canvasOverlay) {
+              const clipboardState = {
+                copiedCells: state.clipboard.copiedCells,
+                isCut: state.clipboard.operation === 'cut'
+              };
+              fileLog.info('📋 REACTIVE: Updating clipboard overlay', {
+                operation: state.clipboard.operation,
+                cellCount: state.clipboard.copiedCells.size,
+                copiedCells: Array.from(state.clipboard.copiedCells)
+              });
+              this.canvasOverlay.updateClipboardIndicator(clipboardState, null);
+            } else if (this.canvasOverlay) {
+              // Clear clipboard overlay only when clipboard is explicitly null
+              fileLog.info('📋 REACTIVE: Clearing clipboard overlay');
+              this.canvasOverlay.updateClipboardIndicator(null, null);
+            }
+          }
+
+          // IMPORTANT: Always update clipboard overlay if clipboard exists (even without changes)
+          // This ensures visual feedback persists even when selection changes
+          if (state.clipboard && state.clipboard.copiedCells.size > 0 && this.canvasOverlay && !clipboardChanged) {
+            const clipboardState = {
+              copiedCells: state.clipboard.copiedCells,
+              isCut: state.clipboard.operation === 'cut'
+            };
+            fileLog.debug('📋 REACTIVE: Maintaining clipboard overlay (selection independent)', {
+              operation: state.clipboard.operation,
+              cellCount: state.clipboard.copiedCells.size
+            });
+            this.canvasOverlay.updateClipboardIndicator(clipboardState, null);
           }
         });
       });

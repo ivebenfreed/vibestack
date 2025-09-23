@@ -77,6 +77,13 @@ export interface TableInteractionState {
   groupConfigMenuState: {
     isOpen: boolean;
   };
+
+  // Clipboard state
+  clipboard: {
+    data: any[][] | null;
+    operation: 'copy' | 'cut' | null;
+    copiedCells: Set<string>;
+  } | null;
 }
 
 // Re-export the observable type
@@ -202,6 +209,13 @@ export function createTableInteraction$(tableCore$?: any) {
     groupConfigMenuState: {
       isOpen: false
     },
+
+    // Clipboard state
+    clipboard: null as {
+      data: any[][] | null;
+      operation: 'copy' | 'cut' | null;
+      copiedCells: Set<string>;
+    } | null,
 
     // Computed: Cell at current mouse position (pure reactive function)
     get currentHoveredCell() {
@@ -1019,6 +1033,27 @@ export function createTableInteraction$(tableCore$?: any) {
       });
 
       fileLog.info('<� Group config menu closed');
+    },
+
+    setClipboard(clipboardData: { data: any[][], operation: 'copy' | 'cut' }) {
+      const selectedCells = tableInteraction$.selectedCells.get();
+
+      tableInteraction$.clipboard.set({
+        data: clipboardData.data,
+        operation: clipboardData.operation,
+        copiedCells: new Set(selectedCells)
+      });
+
+      fileLog.info('📋 Clipboard set', {
+        operation: clipboardData.operation,
+        cellCount: selectedCells.size,
+        clipboardState: tableInteraction$.clipboard.get()
+      });
+    },
+
+    clearClipboard() {
+      tableInteraction$.clipboard.set(null);
+      fileLog.info('📋 Clipboard cleared');
     },
 
     // ====================================
