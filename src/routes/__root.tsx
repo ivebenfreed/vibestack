@@ -151,24 +151,38 @@ function AppWithInitialization() {
   // Use app initialization to check if the app is fully loaded
   const appInit = useAppInitialization()
 
-  // Start app initialization once when component mounts
+  // Start app initialization only when authenticated
   React.useEffect(() => {
-    // Check if initialization is already in progress or completed
+    // Only initialize if authenticated and not already in progress
     const currentStage = appInit.stage;
-    if (currentStage === 'idle') {
-      rootLog.debug('[APP-INIT] Starting app initialization from component mount');
+    if (isAuthenticated && currentStage === 'idle') {
+      rootLog.debug('[APP-INIT] Starting app initialization - user authenticated');
       appInitMethods$.initialize().catch((error) => {
         rootLog.error('[APP-INIT] App initialization failed:', error);
       });
+    } else if (!isAuthenticated && currentStage !== 'idle') {
+      // Reset initialization if user becomes unauthenticated
+      rootLog.debug('[APP-INIT] Resetting app initialization - user not authenticated');
+      appInitMethods$.reset();
     }
-  }, []); // Run once on mount
+  }, [isAuthenticated]); // Run when authentication state changes
 
   // Use route readiness tracking
   const routeReady = useSelector(routeReadiness$.isReady)
   const shouldShowLoadingForRoute = useSelector(routeReadiness$.shouldShowLoading)
 
+  // Check if we're on a public auth route
+  const currentPath = router.state.location.pathname
+  const isPublicAuthRoute = currentPath.startsWith('/sign-in') ||
+                           currentPath.startsWith('/sign-up') ||
+                           currentPath.startsWith('/forgot-password') ||
+                           currentPath.startsWith('/reset-password') ||
+                           currentPath.startsWith('/verify-email') ||
+                           currentPath.startsWith('/otp')
+
   // Determine if we should show loading screen
-  const shouldShowLoading = !appInit.isReady || shouldShowLoadingForRoute
+  // Don't show loading for public auth routes, only for authenticated app initialization
+  const shouldShowLoading = !isPublicAuthRoute && ((isAuthenticated && !appInit.isReady) || shouldShowLoadingForRoute)
 
   // Start route loading tracking only on initial mount
   React.useEffect(() => {
@@ -213,9 +227,21 @@ function AppWithInitialization() {
     }
   }, [navigate]);
 
-  // Show loading screen until app initialization is complete
-  // Once app is ready, render outlet with loading overlay if route isn't ready
-  if (!appInit.isReady) {
+  // Handle unauthenticated users - redirect to sign-in immediately
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      rootLog.debug('[APP-INIT] User not authenticated, triggering redirect to sign-in');
+      navigate({ to: '/sign-in', replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Show loading while redirect happens for unauthenticated users (but not on public auth routes)
+  if (!isAuthenticated && !isPublicAuthRoute) {
+    return <UnifiedLoadingScreen />; // Brief loading while redirect happens
+  }
+
+  // Show loading screen until app initialization is complete (only for authenticated users, not on public routes)
+  if (isAuthenticated && !appInit.isReady && !isPublicAuthRoute) {
     rootLog.debug('[APP-INIT] Showing UnifiedLoadingScreen - app not ready', {
       appInitReady: appInit.isReady,
       stage: appInit.stage,

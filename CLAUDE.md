@@ -154,7 +154,7 @@ curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 
 ## Simple Logger System with File and Folder Level Control
 
-**Simple 3-level logging system (info, error, debug) with global configuration and file/folder level overrides.**
+**Simple 4-level logging system (debug, info, warn, error) with global configuration and file/folder level overrides.**
 
 ### Basic Usage in Code
 ```typescript
@@ -163,9 +163,10 @@ import { log } from '@/logger';
 // Create a logger for your file
 const myLog = log('MyComponent.tsx');
 
-// Use the three log levels
-myLog.info('Component rendered', { props });
+// Use the four log levels
 myLog.debug('Debug info', data);
+myLog.info('Component rendered', { props });
+myLog.warn('Warning message', warning);
 myLog.error('Error occurred', error);
 ```
 

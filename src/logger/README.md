@@ -1,12 +1,12 @@
 # Simple Logger System with File and Folder Level Overrides
 
-**Simple 3-level logging system (info, error, debug) with global configuration and file/folder level overrides.**
+**Simple 4-level logging system (debug, info, warn, error) with global configuration and file/folder level overrides.**
 
 This logger provides a simple but powerful logging system with persistent browser storage and runtime configuration via the logControl API.
 
 ## Features
 
-- Three log levels: info, error, debug
+- Four log levels: debug, info, warn, error
 - Global log level configuration
 - File and folder level overrides
 - Runtime configuration via logControl API
@@ -21,9 +21,10 @@ import { log } from '@/logger';
 // Create a logger for your file
 const myLog = log('MyComponent.tsx');
 
-// Use the three log levels
-myLog.info('Component rendered', { props });
+// Use the four log levels
 myLog.debug('Debug info', data);
+myLog.info('Component rendered', { props });
+myLog.warn('Warning message', warning);
 myLog.error('Error occurred', error);
 ```
 
