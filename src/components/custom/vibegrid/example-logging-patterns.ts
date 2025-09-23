@@ -1,76 +1,73 @@
 /**
- * EXAMPLE LOGGING PATTERNS
- * 
- * This file demonstrates different ways to use the simple logger
- * with global settings and file-level overrides.
+ * EXAMPLE LOGGING PATTERNS - NEW SYSTEM
+ *
+ * This file demonstrates the new logger system with runtime controls
+ * via the logControl API.
  */
 
-import { createLogger, type LogLevel } from '@/logger/simple-logger';
+import { log } from '@/logger';
 
 // ============================================
-// PATTERN 1: Always use global setting
+// PATTERN 1: Standard file logging
 // ============================================
-const globalLogger = createLogger('ExampleGlobal');
-// This logger will use whatever VITE_LOG_LEVEL is set to
+const fileLog = log('ExampleComponent');
 
-// ============================================
-// PATTERN 2: Always override (ignore global)
-// ============================================
-const ALWAYS_DEBUG: LogLevel = 'debug';
-const debugLogger = createLogger('ExampleDebug', ALWAYS_DEBUG);
-// This logger will ALWAYS be at debug level, regardless of global
+export function demonstrateNewLogging() {
+  // Standard usage - controlled by runtime logControl API
+  fileLog.debug('Debug information - controlled by logControl');
+  fileLog.info('Info message - controlled by logControl');
+  fileLog.warn('Warning message - controlled by logControl');
+  fileLog.error('Error message - always important');
 
-// ============================================
-// PATTERN 3: Conditional override (recommended)
-// ============================================
-const OVERRIDE_LEVEL: LogLevel | undefined = undefined; // Change to 'debug' when debugging
-const conditionalLogger = createLogger('ExampleConditional', OVERRIDE_LEVEL);
-// When undefined: uses global setting
-// When set to a level: overrides global
-
-// ============================================
-// PATTERN 4: Silence a noisy component
-// ============================================
-const SILENCE_NOISY: LogLevel = 'off';
-const silencedLogger = createLogger('NoisyComponent', SILENCE_NOISY);
-// This logger is always off, even if global is 'debug'
-
-// ============================================
-// PATTERN 5: Environment-based override
-// ============================================
-const ENV_OVERRIDE: LogLevel | undefined = 
-  process.env.NODE_ENV === 'development' ? 'debug' : undefined;
-const envLogger = createLogger('ExampleEnv', ENV_OVERRIDE);
-// Debug in development, use global in production
-
-export function demonstrateLogging() {
-  // These will respect their configured levels
-  globalLogger.debug('Only shows if global is debug or lower');
-  debugLogger.debug('Always shows (forced debug)');
-  conditionalLogger.debug('Depends on OVERRIDE_LEVEL setting');
-  silencedLogger.debug('Never shows (forced off)');
-  envLogger.debug('Shows in development');
-  
-  // Errors typically show unless explicitly silenced
-  globalLogger.error('Errors usually show');
-  silencedLogger.error('Even errors are silenced here');
+  // The logging level is controlled at runtime via browser console:
+  // logControl.setGlobalLevel('debug');  // Show all logs
+  // logControl.setFileLevel('ExampleComponent', 'error'); // Only errors for this file
+  // logControl.setFolderLevel('vibegrid', 'info'); // Set folder-level controls
 }
 
 /**
- * USAGE GUIDELINES:
- * 
- * 1. For most files: Use Pattern 1 (respect global)
- *    const log = createLogger('ComponentName');
- * 
- * 2. For debugging specific issues: Use Pattern 3
- *    const LOG_LEVEL: LogLevel | undefined = 'debug'; // Toggle this
- *    const log = createLogger('ComponentName', LOG_LEVEL);
- * 
- * 3. For critical components: Use Pattern 2
- *    const LOG_LEVEL: LogLevel = 'info'; // Always show important info
- *    const log = createLogger('CriticalComponent', LOG_LEVEL);
- * 
- * 4. For noisy libraries: Use Pattern 4
- *    const LOG_LEVEL: LogLevel = 'off';
- *    const log = createLogger('NoisyLibrary', LOG_LEVEL);
+ * NEW LOGGER USAGE GUIDELINES:
+ *
+ * 1. STANDARD PATTERN: Use this in all files
+ *    import { log } from '@/logger';
+ *    const fileLog = log('ComponentName');
+ *
+ * 2. RUNTIME CONTROL: Use browser console to control logging
+ *    logControl.setGlobalLevel('debug');         // Global debug mode
+ *    logControl.setFileLevel('MyComponent', 'error'); // File-specific level
+ *    logControl.setFolderLevel('vibegrid', 'info');   // Folder-level control
+ *
+ * 3. UTILITY FUNCTIONS:
+ *    logControl.debug();           // Global debug mode
+ *    logControl.error();           // Global error-only mode
+ *    logControl.quiet('vibegrid'); // Set component/folder to error-only
+ *    logControl.focus('MyComponent'); // Focus on one component
+ *    logControl.status();          // Check current config
+ *    logControl.reset();           // Reset to defaults
+ *
+ * 4. PERSISTENT CONFIGURATION:
+ *    - All settings saved to localStorage automatically
+ *    - Survives page reloads and HMR
+ *    - Per-origin (including port) storage
+ *
+ * 5. BENEFITS OVER OLD SYSTEM:
+ *    - No need to modify source code to change log levels
+ *    - Runtime control via browser console
+ *    - File and folder-level granular control
+ *    - Persistent configuration
+ *    - Global settings with specific overrides
+ */
+
+/**
+ * MIGRATION FROM OLD SYSTEM:
+ *
+ * OLD (simple-logger):
+ *   import { createLogger, type LogLevel } from '@/logger/simple-logger';
+ *   const LOG_LEVEL: LogLevel = 'debug';
+ *   const log = createLogger('ComponentName', LOG_LEVEL);
+ *
+ * NEW (runtime-controlled):
+ *   import { log } from '@/logger';
+ *   const fileLog = log('ComponentName');
+ *   // Control via browser console: logControl.setFileLevel('ComponentName', 'debug')
  */

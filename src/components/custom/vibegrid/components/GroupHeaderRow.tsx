@@ -2,11 +2,9 @@ import React from 'react';
 import { ChevronRight, ChevronDown, Users, Folder, Calendar, Tag } from 'lucide-react';
 import type { GroupNode } from '../types';
 import { cn } from '@/lib/utils';
-import { createLogger, type LogLevel } from '@/logger/simple-logger';
+import { log } from '@/logger';
 
-// File-level log control - explicit override
-const LOG_LEVEL: LogLevel | undefined = 'debug';  // OVERRIDE: Force debug for group headers
-const log = createLogger('GroupHeaderRow', LOG_LEVEL);
+const fileLog = log('GroupHeaderRow');
 
 interface GroupHeaderRowProps {
   groupNode: GroupNode;
@@ -42,7 +40,7 @@ export function GroupHeaderRow({
   const indentPx = depth * 24;
   
   // Example logging usage
-  log.debug('Rendering group header', { 
+  fileLog.debug('Rendering group header', { 
     field: groupNode.field, 
     value: groupNode.displayValue,
     rowCount: groupNode.rowCount,

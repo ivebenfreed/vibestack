@@ -16,11 +16,9 @@ import type {
   VirtualRowType
 } from '../types';
 import type { GroupRowOrderConfig } from '../stores/data-state';
-import { createLogger, type LogLevel } from '@/logger/simple-logger';
+import { log } from '@/logger';
 
-// File-level log control
-const LOG_LEVEL: LogLevel = 'debug';  // DEBUG: Monitoring group processing
-const log = createLogger('GroupProcessor', LOG_LEVEL);
+const fileLog = log('GroupProcessor');
 
 // ====================================
 // CONSTANTS
@@ -57,7 +55,7 @@ export class GroupProcessor {
     config: GroupConfig,
     groupRowOrders?: Record<string, GroupRowOrderConfig>
   ): GroupTree {
-    log.info('GroupProcessor: processData called', {
+    fileLog.info('GroupProcessor: processData called', {
       rowCount: rows.length,
       columnCount: columns.length,
       groupFieldCount: config.fields.length,
@@ -88,7 +86,7 @@ export class GroupProcessor {
       groupCount: this.countGroups(groupTree.groups)
     };
     
-    log.info('GroupProcessor: processData completed', {
+    fileLog.info('GroupProcessor: processData completed', {
       originalRows: rows.length,
       virtualRows: virtualRows.length,
       groupCount: result.groupCount,
@@ -140,7 +138,7 @@ export class GroupProcessor {
         } else if (option && typeof option === 'object' && 'value' in option) {
           optionValue = option.value;
         } else {
-          log.warn('GroupProcessor: Invalid option format', { option, fieldName });
+          fileLog.warn('GroupProcessor: Invalid option format', { option, fieldName });
           return;
         }
 
@@ -150,7 +148,7 @@ export class GroupProcessor {
         }
       });
 
-      log.info('🔄 GroupProcessor: Created empty groups for all options', {
+      fileLog.info('🔄 GroupProcessor: Created empty groups for all options', {
         fieldName,
         optionCount: column.options.length,
         emptyGroupKeys: Array.from(groupMap.keys())
@@ -161,7 +159,7 @@ export class GroupProcessor {
     rows.forEach((row, index) => {
       // Debug: log the actual data structure to understand the format
       if (index === 0) {
-        log.info('🔍 GroupProcessor: Examining first row structure', {
+        fileLog.info('🔍 GroupProcessor: Examining first row structure', {
           row: row,
           hasData: !!row?.data,
           hasDirectAccess: !!row?.[fieldName],
@@ -180,7 +178,7 @@ export class GroupProcessor {
         // Direct format: row.fieldName
         value = row[fieldName];
       } else {
-        log.warn('GroupProcessor: Skipping invalid row', { row, fieldName });
+        fileLog.warn('GroupProcessor: Skipping invalid row', { row, fieldName });
         return;
       }
 
@@ -207,7 +205,7 @@ export class GroupProcessor {
         // The groupKey is created by getGroupKey() which normalizes the value
         // We need to reverse this process to get the original value
         value = this.getValueFromGroupKey(groupKey);
-        log.debug('🔄 GroupProcessor: Using derived value for empty group', {
+        fileLog.debug('🔄 GroupProcessor: Using derived value for empty group', {
           groupKey,
           derivedValue: value,
           fieldName
@@ -221,7 +219,7 @@ export class GroupProcessor {
           // Direct format: row.fieldName
           value = firstRow[fieldName];
         } else {
-          log.warn('GroupProcessor: Invalid firstRow in groupMap', { firstRow, fieldName });
+          fileLog.warn('GroupProcessor: Invalid firstRow in groupMap', { firstRow, fieldName });
           return;
         }
       }
@@ -232,7 +230,7 @@ export class GroupProcessor {
       let orderedChildren = groupRows;
       if (groupRows.length > 0 && groupRowOrders && groupRowOrders[groupId]) {
         orderedChildren = this.applyCustomRowOrdering(groupRows, groupRowOrders[groupId]);
-        log.debug('✅ Applied custom row ordering', {
+        fileLog.debug('✅ Applied custom row ordering', {
           groupId,
           originalCount: groupRows.length,
           orderedCount: orderedChildren.length
@@ -296,7 +294,7 @@ export class GroupProcessor {
           // Direct format: row.fieldName
           value = row[fieldName];
         } else {
-          log.warn('GroupProcessor: Skipping invalid row in multi-level grouping', { row, fieldName });
+          fileLog.warn('GroupProcessor: Skipping invalid row in multi-level grouping', { row, fieldName });
           return;
         }
 
@@ -324,7 +322,7 @@ export class GroupProcessor {
           // Direct format: row.fieldName
           value = firstRow[fieldName];
         } else {
-          log.warn('GroupProcessor: Invalid firstRow in multi-level groupMap', { firstRow, fieldName });
+          fileLog.warn('GroupProcessor: Invalid firstRow in multi-level groupMap', { firstRow, fieldName });
           return;
         }
         const groupId = `group_${fieldName}_${groupKey}${parentId ? `_${parentId}` : ''}`;
@@ -474,7 +472,7 @@ export class GroupProcessor {
     expandedGroups: Set<string>
   ): VirtualRow[] {
     
-    log.info('GroupProcessor.flattenGroupTree called', {
+    fileLog.info('GroupProcessor.flattenGroupTree called', {
       groupCount: groups.length,
       expandedGroups: Array.from(expandedGroups),
       firstGroupId: groups[0]?.id,
@@ -496,7 +494,7 @@ export class GroupProcessor {
         isExpandable: true
       });
       
-      log.info('GroupProcessor: Processing group', {
+      fileLog.info('GroupProcessor: Processing group', {
         groupId: group.id,
         isExpanded: expandedGroups.has(group.id),
         childrenCount: group.children?.length || 0,
@@ -505,7 +503,7 @@ export class GroupProcessor {
       
       // Add children if group is expanded
       if (expandedGroups.has(group.id)) {
-        log.info('GroupProcessor: Group is expanded, adding children', {
+        fileLog.info('GroupProcessor: Group is expanded, adding children', {
           groupId: group.id,
           childrenCount: group.children.length
         });
@@ -529,7 +527,7 @@ export class GroupProcessor {
           }
         });
       } else {
-        log.info('GroupProcessor: Group is collapsed, not adding children', {
+        fileLog.info('GroupProcessor: Group is collapsed, not adding children', {
           groupId: group.id
         });
       }
@@ -537,7 +535,7 @@ export class GroupProcessor {
     
     groups.forEach(group => addGroupAndChildren(group, 0));
     
-    log.info('GroupProcessor.flattenGroupTree result', {
+    fileLog.info('GroupProcessor.flattenGroupTree result', {
       totalVirtualRows: virtualRows.length,
       groupRows: virtualRows.filter(vr => vr.type === 'group').length,
       dataRows: virtualRows.filter(vr => vr.type === 'data').length

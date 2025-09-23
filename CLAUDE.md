@@ -129,10 +129,8 @@ Bash(command="pnpm test --watch", run_in_background=true)
 # Start unified Cloudflare Worker with Vite integration
 pnpm dev  # Runs on port 4000 by default
 
-# Configure port for worktrees (recommended)
-export DEV_PORT=4001  # For issue-123 worktree
-export DEV_PORT=4002  # For issue-456 worktree
-pnpm dev
+# DO NOT configure custom ports - always use default 4000
+# Port configuration is handled by .env.local (DEV_PORT=4000)
 
 # Test API directly
 curl -X GET http://localhost:4000/health
@@ -148,11 +146,11 @@ curl -X POST "http://localhost:4000/api/auth/sign-in/email" -H "Content-Type: ap
 curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
 ```
 
-### Port Configuration for Worktrees:
-- **Main branch**: `DEV_PORT=4000` (default)
-- **Worktrees**: Set `DEV_PORT=400X` where X is unique per worktree
-- **StrictPort**: Enabled to prevent port confusion - server will fail if port is unavailable
-- **Environment**: Add `export DEV_PORT=4001` to your shell profile for persistent worktree ports
+### Port Configuration:
+- **ALWAYS USE PORT 4000**: Only use the port specified in `.env.local` (DEV_PORT=4000)
+- **DO NOT use custom ports**: Avoid setting DEV_PORT environment variables
+- **Logger Configuration**: Settings are saved per-port in localStorage - using different ports breaks logger controls
+- **Consistency**: All development should happen on the same port to maintain configuration state
 
 ## Simple Logger System with File and Folder Level Control
 

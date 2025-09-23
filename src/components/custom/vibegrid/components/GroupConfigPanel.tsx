@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react';
 import { X, Plus, ChevronDown, ChevronUp, GripVertical, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { createLogger, type LogLevel } from '@/logger/simple-logger';
+import { log } from '@/logger';
 
-// File-level log control
-const LOG_LEVEL: LogLevel = 'debug';  // DEBUG: Monitoring group configuration
-const log = createLogger('GroupConfigPanel', LOG_LEVEL);
+const fileLog = log('GroupConfigPanel');
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
