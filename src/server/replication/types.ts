@@ -71,12 +71,22 @@ export interface ReplicationConfig {
 }
 
 /**
- * Generate a unique replication slot name based on the current dev server port
- * This prevents slot conflicts when multiple dev servers are running
+ * Generate a unique replication slot name based on the environment
+ * Dev: Uses port + process ID to prevent conflicts between dev servers and HMR restarts
+ * Prod: Uses fixed name since there's only one production instance
  */
 export function getReplicationSlotName(): string {
-  const port = process.env.DEV_PORT || process.env.PORT || '4000';
-  return `elevra_port_${port}`;
+  // Dev environment detection: DEV_PORT exists, or NODE_ENV is development
+  const isDev = !!process.env.DEV_PORT || process.env.NODE_ENV === 'development' || process.env.ENVIRONMENT === 'dev';
+
+  if (isDev) {
+    // In dev, use port and process ID to prevent conflicts
+    const port = process.env.DEV_PORT || process.env.PORT || '4000';
+    return `elevra_dev_port_${port}_pid_${process.pid}`;
+  } else {
+    // In production, use fixed slot name
+    return 'elevra_production_slot';
+  }
 }
 
 export const DEFAULT_REPLICATION_CONFIG: ReplicationConfig = {

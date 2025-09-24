@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict K9dUnaDdcnlUJDph96isTZFWM9uH1T92diWhObQNgHEroBh7QmMXdVMBwelO9rj
+\restrict bCYS20RNpbgICnPKOpI3lLOVQFQej2GcPYc9nj1MzaqKRQwrMtF1WJfwrmwAT0O
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -912,6 +912,12 @@ fca5f420-69e6-41d3-9494-7449ba77e4be	TestConnectionCleanup	c07a605c-98e2-42ec-a8
 2c447493-1152-48c4-8cda-f8201fe1a3b6	TestConnectionCleanup	5bd31a59-87d9-4f7e-a29e-31d009109208	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:51:24.504	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:51:24.504	\N	\N
 15159a66-51d1-4aef-a4ed-1b2283dff0e4	TestConnectionCleanup	9f731429-90e3-48ee-a089-d18dbf28ecc8	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:01:17.254	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:01:17.254	\N	\N
 6c3ba2b5-7214-40e1-b5f1-1e4cc9f2648c	TestConnectionCleanup	31187d9b-ba61-4fa7-852a-35a10487efc1	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:09:25.564	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:09:25.564	\N	\N
+30d0c160-a44e-4687-931c-4645a9b935ae	TestConnectionCleanup	eaad7023-f169-461e-bff7-e709c603bc3c	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:16:08.095	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:16:08.095	\N	\N
+3a4b289b-2cb0-47b3-9b51-9bdea6dddea7	TestConnectionCleanup	c701adf0-8ea2-4058-8031-52df3ffdf765	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:20:20.832	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:20:20.832	\N	\N
+8ea7ae7a-33da-4888-b0cc-af61e4161ea8	TestConnectionCleanup	53822449-b7c3-4cdb-aa66-68ecefb43109	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:21:03.492	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:21:03.492	\N	\N
+c6c1390f-bc49-4851-807b-2251c522a017	TestConnectionCleanup	723418f4-8a70-44d6-a8d2-646223167604	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:21:42.743	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:21:42.743	\N	\N
+f30c9bec-776e-4256-8603-86fab8cd0028	TestConnectionCleanup	6f0b8384-4f1b-4abf-ba1c-4ee8082bfb10	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:22:06.213	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:22:06.213	\N	\N
+3ae52dcf-7787-4867-b1da-1c7883d23c7d	TestConnectionCleanup	1ced1304-9b37-4ff4-8433-bece3c91ac8d	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:25:52.969	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:25:52.969	\N	\N
 \.
 
 
@@ -935,6 +941,7 @@ COPY public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup (id, 
 3f053c3d-eba5-40c3-8122-7e6485897d7a	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:31.414567	2025-09-24 17:14:31.414567	Sync Test 1758734071	Testing sync notifications	active	\N	test_value
 aaa67762-ce09-47f2-80a6-6d03780b4def	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:49.14932	2025-09-24 17:14:49.14932	Real-Time Sync Test 1758734089	Testing real-time sync notifications	active	\N	sync_test_1758734089
 9910f017-0701-43e1-b6df-557b50a43e78	01920000-1000-7000-8000-000000000001	2025-09-24 17:15:06.528419	2025-09-24 17:15:06.528419	Final Sync Test 13:15:06	Testing complete sync notification flow	active	\N	final_test
+1ced1304-9b37-4ff4-8433-bece3c91ac8d	01920000-1000-7000-8000-000000000001	2025-09-24 20:25:52.905	2025-09-24 20:25:52.905	Corrected Dev Test	Testing with proper dev environment detection	draft	\N	corrected_dev_test
 b861ee46-55f8-4d71-b95d-96b0d6e24c5e	01920000-1000-7000-8000-000000000001	2025-09-24 17:27:16.386	2025-09-24 17:28:05.403	API Sync Test Record - UPDATED	Testing sync notifications via API UPDATE	deleted	\N	updated_api_value
 d1dcce5d-49e0-49aa-b095-afea8ca0cc86	01920000-1000-7000-8000-000000000001	2025-09-24 18:26:35.076422	2025-09-24 18:26:35.076422	IMMEDIATE SYNC TEST 14:26:35	Real-time sync test	active	\N	immediate_test
 4c05cd8d-7b5f-4bf8-8e0c-69c51a7eb9de	01920000-1000-7000-8000-000000000001	2025-09-24 18:35:42.177346	2025-09-24 18:35:42.177346	PEEK TEST 14:35:42	Testing peek/advance pattern	active	\N	peek_test
@@ -957,6 +964,12 @@ ea425a8d-932b-4b1f-b39d-1e57d91f26d9	01920000-1000-7000-8000-000000000001	2025-0
 5bd31a59-87d9-4f7e-a29e-31d009109208	01920000-1000-7000-8000-000000000001	2025-09-24 19:51:24.486	2025-09-24 19:51:24.486	Clean Logging Test Record	Testing cleaned up logging with debouncing	draft	\N	clean-logging-test
 9f731429-90e3-48ee-a089-d18dbf28ecc8	01920000-1000-7000-8000-000000000001	2025-09-24 20:01:17.242	2025-09-24 20:01:17.242	WAL Debug Polling Test	Testing WAL polling debug output	draft	\N	wal-debug-test
 31187d9b-ba61-4fa7-852a-35a10487efc1	01920000-1000-7000-8000-000000000001	2025-09-24 20:09:25.546	2025-09-24 20:09:25.546	Internal LSN Tracking Test	Testing internal LSN tracking instead of slot advancement	draft	\N	internal-lsn-test
+wal-test-1758744816.734129	01920000-1000-7000-8000-000000000001	2025-09-24 20:13:36.734129	2025-09-24 20:13:36.734129	WAL Test Record	Testing WAL polling reliability at 2025-09-24 20:13:36.734129+00	draft	\N	test_value_1758744816.734129
+eaad7023-f169-461e-bff7-e709c603bc3c	01920000-1000-7000-8000-000000000001	2025-09-24 20:16:08.076	2025-09-24 20:16:08.076	WAL Test Record	Testing WAL polling reliability via DataForge API	draft	\N	dataforge_api_test
+c701adf0-8ea2-4058-8031-52df3ffdf765	01920000-1000-7000-8000-000000000001	2025-09-24 20:20:20.809	2025-09-24 20:20:20.809	Fixed WAL Test	Testing WAL polling after slot conflict fix	draft	\N	fixed_slot_test
+53822449-b7c3-4cdb-aa66-68ecefb43109	01920000-1000-7000-8000-000000000001	2025-09-24 20:21:03.474	2025-09-24 20:21:03.474	Slot Fix Test	Testing after implementing process-specific slot naming	draft	\N	slot_fix_test
+723418f4-8a70-44d6-a8d2-646223167604	01920000-1000-7000-8000-000000000001	2025-09-24 20:21:42.717	2025-09-24 20:21:42.717	Clean Slate Test	Testing with old slot removed and new process-specific naming	draft	\N	clean_slate_test
+6f0b8384-4f1b-4abf-ba1c-4ee8082bfb10	01920000-1000-7000-8000-000000000001	2025-09-24 20:22:06.197	2025-09-24 20:22:06.197	Final WAL Test	Testing WAL polling with process-specific slots	draft	\N	final_wal_test
 \.
 
 
@@ -1364,5 +1377,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict K9dUnaDdcnlUJDph96isTZFWM9uH1T92diWhObQNgHEroBh7QmMXdVMBwelO9rj
+\unrestrict bCYS20RNpbgICnPKOpI3lLOVQFQej2GcPYc9nj1MzaqKRQwrMtF1WJfwrmwAT0O
 

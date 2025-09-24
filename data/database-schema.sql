@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict Qq1QQgApvhuZ0kbvFgFZOnaDn2TZsVf8PnTUnRMQ7vR3TeeAhLwOyaXIbCcfvnE
+\restrict 8cYDC2Qxx53U2y6heX3spnPmYlV6GKR2Zhpq0abOZ5sOGkEg7la3RjoC1OBEvJ7
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict Qq1QQgApvhuZ0kbvFgFZOnaDn2TZsVf8PnTUnRMQ7vR3TeeAhLwOyaXIbCcfvnE
+\unrestrict 8cYDC2Qxx53U2y6heX3spnPmYlV6GKR2Zhpq0abOZ5sOGkEg7la3RjoC1OBEvJ7
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict DNuJAbEoWaDw7VrfQjHC40K5Ai604JR63Vp7Wxa7Ficelz4a2SF7Tqbbis1Esbq
+\restrict zA4A8faAnSFx6sq8VaUyzS5x64dHOsA3Hlu5DxKit86X4VSmUk9zYYkh7bgqUCW
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DNuJAbEoWaDw7VrfQjHC40K5Ai604JR63Vp7Wxa7Ficelz4a2SF7Tqbbis1Esbq
+\unrestrict zA4A8faAnSFx6sq8VaUyzS5x64dHOsA3Hlu5DxKit86X4VSmUk9zYYkh7bgqUCW
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict FXYjb2SBf9qDDoofYsOqmYdnKjpUg6nZNP2frxH6qGGcHOScoj7864MhzWWyNob
+\restrict CwrnyAMkV7ejBxaJmzEh5utnhmltEZWqsNEQRNhadsh3WL9naMtSlgetJly8rU1
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict FXYjb2SBf9qDDoofYsOqmYdnKjpUg6nZNP2frxH6qGGcHOScoj7864MhzWWyNob
+\unrestrict CwrnyAMkV7ejBxaJmzEh5utnhmltEZWqsNEQRNhadsh3WL9naMtSlgetJly8rU1
 \connect elevra_dev
-\restrict FXYjb2SBf9qDDoofYsOqmYdnKjpUg6nZNP2frxH6qGGcHOScoj7864MhzWWyNob
+\restrict CwrnyAMkV7ejBxaJmzEh5utnhmltEZWqsNEQRNhadsh3WL9naMtSlgetJly8rU1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -5176,6 +5176,15 @@ ALTER TABLE public.team_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: elevra_pub; Type: PUBLICATION; Schema: -; Owner: postgres
+--
+
+CREATE PUBLICATION elevra_pub FOR ALL TABLES WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION elevra_pub OWNER TO postgres;
+
+--
 -- Name: vibestack_pub; Type: PUBLICATION; Schema: -; Owner: postgres
 --
 
@@ -5351,7 +5360,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FXYjb2SBf9qDDoofYsOqmYdnKjpUg6nZNP2frxH6qGGcHOScoj7864MhzWWyNob
+\unrestrict CwrnyAMkV7ejBxaJmzEh5utnhmltEZWqsNEQRNhadsh3WL9naMtSlgetJly8rU1
 
 --
 -- Database "postgres" dump
@@ -5363,7 +5372,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict khnbYH7TdQDkzhiZGHL9LQmiw6jKaZi2mZoUtqrgLldfevV8cnIbXR0a7ErlSbI
+\restrict oPqsTgqRH3OHLWR9apK9Z0Pr2P33BphLEzYJUja2Kfw1uNOh0V8HZdjuhvH8YiM
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5384,7 +5393,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict khnbYH7TdQDkzhiZGHL9LQmiw6jKaZi2mZoUtqrgLldfevV8cnIbXR0a7ErlSbI
+\unrestrict oPqsTgqRH3OHLWR9apK9Z0Pr2P33BphLEzYJUja2Kfw1uNOh0V8HZdjuhvH8YiM
 
 --
 -- PostgreSQL database cluster dump complete

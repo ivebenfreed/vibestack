@@ -93,9 +93,13 @@ export class ReplicationDO extends DurableObject {
   }> {
     try {
       replicationLogger.debug('Initializing replication system', {}, MODULE_NAME);
-      
-      // Check if slot exists or create it
+
       const c = this.getContext();
+
+      // Clean up abandoned dev slots before creating new ones
+      await this.stateManager.cleanupAbandonedDevSlots(c);
+
+      // Check if slot exists or create it
       const slotStatus = await this.stateManager.checkSlotStatus(c);
       
       // Use debug instead of info to reduce duplicate logs

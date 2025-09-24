@@ -159,6 +159,62 @@ export class StateManager {
   }
 
   /**
+   * Clean up abandoned dev slots from previous sessions
+   * In dev environments, HMR creates multiple ReplicationDO instances
+   * This cleans up slots from dead processes to prevent conflicts
+   */
+  public async cleanupAbandonedDevSlots(c: MinimalContext): Promise<void> {
+    // Dev environment detection: DEV_PORT exists, or NODE_ENV is development
+    const isDev = !!process.env.DEV_PORT || process.env.NODE_ENV === 'development' || process.env.ENVIRONMENT === 'dev';
+    if (!isDev) return;
+
+    try {
+      await withPostgresClient(async (client) => {
+        const port = process.env.DEV_PORT || process.env.PORT || '4000';
+
+        // Find all dev slots for this port
+        const slotsResult = await client.unsafe(`
+          SELECT slot_name, active_pid
+          FROM pg_replication_slots
+          WHERE slot_name LIKE $1
+        `, [`elevra_dev_port_${port}_pid_%`]);
+
+        for (const slot of slotsResult) {
+          const slotName = slot.slot_name;
+          const activePid = slot.active_pid;
+
+          // Extract PID from slot name
+          const pidMatch = slotName.match(/elevra_dev_port_\d+_pid_(\d+)/);
+          if (pidMatch) {
+            const slotPid = parseInt(pidMatch[1]);
+
+            // Check if the process is still running
+            try {
+              process.kill(slotPid, 0); // Signal 0 just checks if process exists
+              replicationLogger.debug('Dev slot still active', { slot: slotName, pid: slotPid }, MODULE_NAME);
+            } catch (err) {
+              // Process doesn't exist, clean up the slot
+              try {
+                await client.unsafe(`SELECT pg_drop_replication_slot($1)`, [slotName]);
+                replicationLogger.info('Cleaned up abandoned dev slot', { slot: slotName, deadPid: slotPid }, MODULE_NAME);
+              } catch (dropErr) {
+                replicationLogger.warn('Failed to cleanup abandoned slot', {
+                  slot: slotName,
+                  error: dropErr instanceof Error ? dropErr.message : String(dropErr)
+                }, MODULE_NAME);
+              }
+            }
+          }
+        }
+      });
+    } catch (err) {
+      replicationLogger.warn('Dev slot cleanup failed', {
+        error: err instanceof Error ? err.message : String(err)
+      }, MODULE_NAME);
+    }
+  }
+
+  /**
    * Drop replication slot if it exists
    */
   public async dropSlot(c: MinimalContext): Promise<void> {
