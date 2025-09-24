@@ -77,30 +77,30 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   // Get entity schema using the normalized entity name from display schema
   const entitySchema = React.useMemo(() => {
     if (!schema?.entities) return null
-    
+
     // Use centralized entity name utilities for consistent normalization
     const normalizedEntityName = EntityNameUtils.fromUrlFormat(entityName)
-    
+
     // More detailed debugging before final result
     const entityKeys = schema?.entities ? Object.keys(schema?.entities) : []
-    
+
     // Try multiple lookup strategies
     let result = null
-    
+
     if (schema?.entities) {
       // Strategy 1: Direct normalized name lookup (e.g., "Client")
       result = schema.entities[normalizedEntityName]
-      
-      // Strategy 2: Full entity key lookup (e.g., "01920000-1000-7000-8000-000000000001_Client")  
+
+      // Strategy 2: Full entity key lookup (e.g., "01920000-1000-7000-8000-000000000001_Client")
       if (!result) {
         const fullEntityKey = `${orgId}_${normalizedEntityName}`
         result = schema.entities[fullEntityKey]
       }
-      
+
       // Strategy 3: Look for any key containing the normalized name
       if (!result) {
-        const matchingKey = Object.keys(schema.entities).find(key => 
-          key.includes(`_${normalizedEntityName}`) || 
+        const matchingKey = Object.keys(schema.entities).find(key =>
+          key.includes(`_${normalizedEntityName}`) ||
           key.toLowerCase().includes(normalizedEntityName.toLowerCase())
         )
         if (matchingKey) {
@@ -108,8 +108,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
         }
       }
     }
-    
-    
+
     return result
   }, [schema, entityName])
   
