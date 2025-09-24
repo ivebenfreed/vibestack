@@ -44,11 +44,11 @@ apiApp.use('*', cors({
   origin: (origin, c) => {
     // For unified worker architecture, the frontend and backend run on the same port
     const isDev = c.env.ENVIRONMENT === 'development' || c.env.ENVIRONMENT === 'local' || !c.env.ENVIRONMENT;
-    console.log(`[CORS DEBUG] Environment: ${c.env.ENVIRONMENT}, checking origin: ${origin}`);
-    
+    console.log(`[CORS DEBUG] Environment: ${c.env.ENVIRONMENT}, isDev: ${isDev}, checking origin: ${origin}`);
+
     // Build allowed origins based on environment
     const allowedOrigins = [];
-    
+
     if (isDev) {
       // In development, allow common localhost ports for unified worker architecture
       allowedOrigins.push(
@@ -70,17 +70,22 @@ apiApp.use('*', cors({
         'https://app.codevibesmatter.com'
       );
     }
-    
+
+    console.log(`[CORS DEBUG] isDev=${isDev}, allowedOrigins.length=${allowedOrigins.length}:`, JSON.stringify(allowedOrigins));
+
     if (!origin) {
       // For same-origin requests (unified worker), allow null origin
+      console.log(`[CORS DEBUG] No origin header, allowing same-origin request`);
       return null;
     }
-    
+
     if (allowedOrigins.includes(origin)) {
+      console.log(`[CORS DEBUG] ✅ Origin ${origin} is allowed`);
       return origin; // Return the exact matching origin
     } else {
       // Log and reject non-matching origins
-      console.warn(`[CORS] Rejected origin: ${origin}`);
+      console.warn(`[CORS DEBUG] ❌ Origin ${origin} REJECTED (not in allowed list)`);
+      console.warn(`[CORS DEBUG] ❌ Available origins:`, JSON.stringify(allowedOrigins));
       return null; // Return null to disallow the origin instead of a default
     }
   },
