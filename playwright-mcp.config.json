@@ -1,0 +1,15 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "isolated": false,
+    "userDataDir": ".playwright/profiles/main",
+    "launchOptions": {
+      "headless": false,
+      "args": [
+        "--remote-debugging-port=9222"
+      ]
+    }
+  },
+  "outputDir": ".playwright/output",
+  "capabilities": ["tabs", "vision", "pdf"]
+}

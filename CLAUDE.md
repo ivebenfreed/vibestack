@@ -22,7 +22,7 @@ ps aux | grep -E "(node|pnpm|dev)" | grep -v grep
 Bash(command="pnpm dev", run_in_background=true)
 
 # Start console monitoring
-Bash(command="pnpm tester-dev", run_in_background=true)
+Bash(command="pnpm chrome-remote", run_in_background=true)
 ```
 
 ### 2. Browser Automation
@@ -38,16 +38,22 @@ mcp__browsermcp__browser_type(element="Input", ref="s1e45", text="value", submit
 
 ### 3. Console Monitoring
 ```bash
-# All output
-BashOutput(bash_id="[tester-dev-id]")
+# All browser console output from Playwright
+BashOutput(bash_id="[chrome-remote-id]")
 
-# Filtered output
-BashOutput(bash_id="[tester-dev-id]", filter="ERROR|WARNING")
+# Filtered console output (errors and warnings only)
+BashOutput(bash_id="[chrome-remote-id]", filter="ERROR|WARNING")
 
 # Recent logs (timestamps are UTC, not local time!)
 # Get UTC: date -u +"%H:%M"
 # Last 5 min example: filter="01:0[0-5]:[0-9]{2}"
 ```
+
+**Chrome Remote Console Features:**
+- **Real-time monitoring**: Captures all `console.log`, `console.error`, `console.warn`, etc.
+- **Playwright integration**: Connects directly to Playwright browser profile
+- **Color-coded output**: Different colors for log levels (error=red, warn=yellow, info=cyan)
+- **Structured data**: Formats objects and arrays from console output
 
 ## Database
 
@@ -133,7 +139,7 @@ logControl.reset();    // Reset to default
 ```bash
 # Development
 pnpm dev                    # Start dev server
-pnpm tester-dev            # Console monitoring
+pnpm chrome-remote         # Chrome DevTools console monitoring
 pnpm type-check            # Type checking
 
 # Database

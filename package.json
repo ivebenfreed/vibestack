@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev --port 8787 --ip 127.0.0.1",
+    "chrome-remote": "node scripts/chrome-remote.js",
     "build": "vite build",
     "build:with-typecheck": "tsc -b tsconfig.ci.json && vite build",
     "build:worker": "wrangler deploy --outdir=dist",
