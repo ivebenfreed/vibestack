@@ -1,10 +1,25 @@
 {
   "mcpServers": {
     "playwright": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/home/benfreed/dev/vibestack/scripts/playwright-mcp-wrapper.js"
+        "@playwright/mcp@latest",
+        "--user-data-dir=.playwright/profiles/main",
+        "--output-dir=.playwright/output",
+        "--save-session",
+        "--save-trace",
+        "--allowed-origins=localhost:4000;127.0.0.1:4000"
       ]
+    },
+    "playwright-extension": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--extension"
+      ],
+      "env": {
+        "PLAYWRIGHT_MCP_EXTENSION_TOKEN": "SKi9qRwUBMLsu80k-jozgeOWycTK6mqzhyH-pMuiS3w"
+      }
     }
   }
 }
