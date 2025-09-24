@@ -38,13 +38,12 @@ const formSchema = z.object({
 export function UserAuthFormLegend({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
-  
+
   // Use Legend State auth hook instead of complex XState machine
   const { signIn, isAuthenticated, isSigningIn, error, clearError } = useLegendAuth();
-  
+
   const routerState = useRouterState()
   const searchParams = routerState.location.search as { redirect?: string }
-  const redirectTo = searchParams.redirect || '/'
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,15 +53,18 @@ export function UserAuthFormLegend({ className, ...props }: UserAuthFormProps) {
     },
   })
 
-  // Handle successful authentication - much simpler than XState version
+  // Handle success after login
   useEffect(() => {
-    if (isAuthenticated) {
-      fileLog.info("[LEGEND_AUTH] Authentication successful, redirecting to:", redirectTo);
+    if (isAuthenticated && isLoading) {
+      fileLog.info("[LEGEND_AUTH] Authentication successful");
       toast.success("Login successful!");
-      navigate({ to: redirectTo, replace: true });
       setIsLoading(false);
+
+      // Navigate to redirect destination or /universe (never go to root)
+      const destination = searchParams.redirect && searchParams.redirect !== '/' && searchParams.redirect ? searchParams.redirect : '/universe';
+      navigate({ to: destination, replace: true });
     }
-  }, [isAuthenticated, redirectTo, navigate]);
+  }, [isAuthenticated, isLoading, searchParams.redirect, navigate]);
 
   // Handle auth errors - direct and simple
   useEffect(() => {
@@ -83,19 +85,19 @@ export function UserAuthFormLegend({ className, ...props }: UserAuthFormProps) {
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
     clearError(); // Clear any previous errors
-    
+
     try {
       fileLog.info("[LEGEND_AUTH] Attempting sign-in:", data.email);
-      
+
       // Use Legend State auth - much simpler than XState machine
-      const success = await signIn(data.email, data.password);
-      
+      const success = await signIn({ email: data.email, password: data.password });
+
       if (!success) {
         // Error is already set in the auth observable
         setIsLoading(false);
       }
-      // Success will be handled by the useEffect above when isAuthenticated becomes true
-      
+      // Success handling and redirect will happen automatically via TanStack Router
+
     } catch (error: any) {
       fileLog.error("[LEGEND_AUTH] Sign In Error:", error);
       const errorMessage = error?.message || "A network error occurred. Please try again.";

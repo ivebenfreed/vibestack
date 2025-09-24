@@ -54,9 +54,11 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   // Handle successful authentication with proper orchestrator coordination
   useEffect(() => {
     if (isAuthenticated && isLoading) {
-      fileLog.info("[AUTH] Authentication successful via orchestrator, redirecting to:", redirectTo);
+      // Never redirect to root - always use /universe as fallback
+      const destination = redirectTo && redirectTo !== '/' ? redirectTo : '/universe';
+      fileLog.info("[AUTH] Authentication successful via orchestrator, redirecting to:", destination);
       toast.success("Login successful!");
-      navigate({ to: redirectTo, replace: true });
+      navigate({ to: destination, replace: true });
       setIsLoading(false);
     }
   }, [isAuthenticated, isLoading, redirectTo, navigate]);

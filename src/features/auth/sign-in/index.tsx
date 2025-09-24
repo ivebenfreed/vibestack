@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import AuthLayout from '../auth-layout'
-import { UserAuthForm } from './components/user-auth-form'
+import { UserAuthFormLegend } from './components/user-auth-form-legend'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useLegendAuth } from '@/legend-state/hooks/use-legend-auth'
 import { useEffect } from 'react'
@@ -19,26 +19,21 @@ export default function SignIn() {
   useRouteReady();
 
   // Use Legend State as the default and only auth system
-  const { isAuthenticated } = useLegendAuth();
-  
+  const { isAuthenticated, user } = useLegendAuth();
+
   const navigate = useNavigate()
   const search = useSearch({ from: '/(auth)/sign-in' })
-  
-  // Auto-redirect if authenticated (route guard handles system readiness)
+
+  // Handle case where user navigates to sign-in while properly authenticated
+  // Only redirect if user has both authentication flag AND user data
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[SignIn] User authenticated via Legend State - auto-redirecting')
-      const redirectTo = search.redirect || '/universe' // Default to universe dashboard
-      console.log('[SignIn] Attempting to redirect to:', redirectTo)
-      
-      // Use TanStack Router for proper navigation
-      if (redirectTo === '/' || !redirectTo || redirectTo === '') {
-        navigate({ to: '/universe', replace: true })
-      } else {
-        navigate({ to: redirectTo, replace: true })
-      }
+    const hasValidUser = user && user.email;
+
+    if (isAuthenticated && hasValidUser) {
+      const redirectTo = search.redirect && search.redirect !== '/' ? search.redirect : '/universe';
+      navigate({ to: redirectTo, replace: true });
     }
-  }, [isAuthenticated, navigate, search.redirect])
+  }, [isAuthenticated, user, navigate, search.redirect])
   
   return (
     <AuthLayout>
@@ -52,7 +47,7 @@ export default function SignIn() {
           
         </CardHeader>
         <CardContent>
-          <UserAuthForm />
+          <UserAuthFormLegend />
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2">
           <p className="text-sm text-muted-foreground">

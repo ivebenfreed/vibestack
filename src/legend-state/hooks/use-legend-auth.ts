@@ -16,7 +16,7 @@ export function useLegendAuth() {
   const loading = useObservable(authLoading$);
   const loadingOrganizations = useObservable(auth$.loadingOrganizations);
   const error = useObservable(authError$);
-  const isAuthenticated = !!user; // Computed from user state
+  const isAuthenticated = !!user; // Simple and consistent - user exists = authenticated
 
   // Actions from the auth observable - functions don't need .get()
   const signIn = auth$.signIn;

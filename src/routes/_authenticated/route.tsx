@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect, useLocation, useNavigate } from '@tanstack/react-router'
 import React, { useEffect } from 'react'
 import { observer } from '@legendapp/state/react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
@@ -22,58 +22,9 @@ const myLog = log('routes/_authenticated/route.tsx');
 export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
   beforeLoad: async ({ location }) => {
-    // AUTH MACHINE REMOVED - Use Legend State auth directly
-    myLog.debug('[APP-INIT] _authenticated beforeLoad triggered', { path: location.pathname })
-    
-    // Check Legend State auth - wait for loading to complete
-    const legendStateLoading = auth$.loading.get()
-    const legendStateUser = auth$.user.get()
-    const isLegendStateAuthenticated = !!legendStateUser
-    
-    // If Legend State is still loading, wait for it to complete
-    if (legendStateLoading && !legendStateUser) {
-      
-      await new Promise<void>((resolve) => {
-        let resolved = false
-        
-        const checkState = () => {
-          const currentLoading = auth$.loading.get()
-          const currentUser = auth$.user.get()
-          
-          // Resolve when loading completes (either with user or without)
-          if (!resolved && !currentLoading) {
-            resolved = true
-            resolve()
-          }
-        }
-        
-        // Subscribe to loading state changes
-        const unsubscribe = auth$.loading.onChange(checkState)
-        
-        // Check immediately in case it already finished
-        checkState()
-        
-        // Cleanup subscription after resolve
-        setTimeout(() => {
-          if (resolved) unsubscribe()
-        }, 0)
-      })
-    }
-    
-    // Re-check Legend State auth after waiting
-    const finalLegendStateUser = auth$.user.get()
-    const finalIsLegendStateAuthenticated = !!finalLegendStateUser
-    
-    
-    if (!finalIsLegendStateAuthenticated) {
-      throw redirect({
-        to: '/sign-in',
-        search: { redirect: location.pathname },
-        replace: true
-      })
-    }
-    
-    // Components will handle their own loading states using UnifiedLoadingScreen
+    // Let components handle authentication redirects to avoid race conditions
+    // TanStack Router beforeLoad runs too early in the auth loading process
+    myLog.debug('[APP-INIT] _authenticated beforeLoad - letting components handle auth', { path: location.pathname })
   },
   component: RouteComponent,
 })
@@ -87,12 +38,32 @@ function RouteComponent() {
 }
 
 const AuthenticatedContent = observer(function AuthenticatedContent() {
+  const navigate = useNavigate()
+  const location = useLocation()
 
   // Signal route readiness
   useRouteReady();
 
   // Use unified auth system that combines XState and Legend State
   const unifiedAuth = useUnifiedAuth();
+
+  // Handle authentication redirect when auth loads
+  useEffect(() => {
+    // Only redirect if auth has finished loading and user is not authenticated
+    // Don't redirect to sign-in with sign-in as the redirect parameter
+    if (!unifiedAuth.loading && !unifiedAuth.isAuthenticated) {
+      myLog.debug('[APP-INIT] User not authenticated after auth load, redirecting to sign-in', {
+        path: location.pathname
+      });
+
+      const redirectParam = location.pathname.startsWith('/sign-in') ? {} : { redirect: location.pathname };
+      navigate({
+        to: '/sign-in',
+        search: redirectParam,
+        replace: true
+      });
+    }
+  }, [unifiedAuth.loading, unifiedAuth.isAuthenticated, navigate, location.pathname]);
   
   
   // Use unified auth state directly

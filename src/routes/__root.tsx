@@ -229,11 +229,21 @@ function AppWithInitialization() {
 
   // Handle unauthenticated users - redirect to sign-in immediately
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isPublicAuthRoute) {
       rootLog.debug('[APP-INIT] User not authenticated, triggering redirect to sign-in');
-      navigate({ to: '/sign-in', replace: true });
+      // Don't add redirect parameter if already on auth routes to avoid loops
+      const currentPath = router.state.location.pathname;
+      const shouldPreserveRedirect = !currentPath.startsWith('/sign-in') &&
+                                    !currentPath.startsWith('/sign-up') &&
+                                    !isPublicAuthRoute;
+
+      navigate({
+        to: '/sign-in',
+        search: shouldPreserveRedirect ? { redirect: currentPath } : {},
+        replace: true
+      });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, isPublicAuthRoute, router.state.location.pathname]);
 
   // Show loading while redirect happens for unauthenticated users (but not on public auth routes)
   if (!isAuthenticated && !isPublicAuthRoute) {

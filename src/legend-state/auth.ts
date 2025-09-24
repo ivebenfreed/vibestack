@@ -1,4 +1,4 @@
-import { observable } from '@legendapp/state';
+import { observable, computed } from '@legendapp/state';
 import { authClient } from '@/lib/auth';
 import { log } from '@/logger';
 
@@ -145,10 +145,12 @@ export const auth$ = observable<AuthState & {
     // Clear auth state
     auth$.user.set(null);
     auth$.organization.set(null);
+    auth$.userOrganizations.set([]);
     auth$.authToken.set(null);
     auth$.sessionExpiry.set(null);
     auth$.error.set(null);
     auth$.loading.set(false);
+    auth$.loadingOrganizations.set(false);
 
     // Clear any persisted auth state
     try {

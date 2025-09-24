@@ -43,7 +43,7 @@ const apiApp = new OpenAPIHono<AppBindings>().basePath('/api');
 apiApp.use('*', cors({
   origin: (origin, c) => {
     // For unified worker architecture, the frontend and backend run on the same port
-    const isDev = c.env.ENVIRONMENT === 'development' || !c.env.ENVIRONMENT;
+    const isDev = c.env.ENVIRONMENT === 'development' || c.env.ENVIRONMENT === 'local' || !c.env.ENVIRONMENT;
     console.log(`[CORS DEBUG] Environment: ${c.env.ENVIRONMENT}, checking origin: ${origin}`);
     
     // Build allowed origins based on environment
