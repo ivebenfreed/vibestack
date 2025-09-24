@@ -146,7 +146,7 @@ function AppWithInitialization() {
   const router = useRouter()
 
   // Use unified auth
-  const { isAuthenticated, isSystemReady: unifiedSystemReady } = useUnifiedAuth()
+  const { isAuthenticated, loading: authLoading, isSystemReady: unifiedSystemReady } = useUnifiedAuth()
 
   // Use app initialization to check if the app is fully loaded
   const appInit = useAppInitialization()
@@ -227,10 +227,11 @@ function AppWithInitialization() {
     }
   }, [navigate]);
 
-  // Handle unauthenticated users - redirect to sign-in immediately
+  // Handle unauthenticated users - redirect to sign-in only after auth check completes
   React.useEffect(() => {
-    if (!isAuthenticated && !isPublicAuthRoute) {
-      rootLog.debug('[APP-INIT] User not authenticated, triggering redirect to sign-in');
+    // Only redirect if auth has finished loading and user is not authenticated
+    if (!authLoading && !isAuthenticated && !isPublicAuthRoute) {
+      rootLog.debug('[APP-INIT] User not authenticated after auth load complete, triggering redirect to sign-in');
       // Don't add redirect parameter if already on auth routes to avoid loops
       const currentPath = router.state.location.pathname;
       const shouldPreserveRedirect = !currentPath.startsWith('/sign-in') &&
@@ -243,11 +244,11 @@ function AppWithInitialization() {
         replace: true
       });
     }
-  }, [isAuthenticated, navigate, isPublicAuthRoute, router.state.location.pathname]);
+  }, [authLoading, isAuthenticated, navigate, isPublicAuthRoute, router.state.location.pathname]);
 
-  // Show loading while redirect happens for unauthenticated users (but not on public auth routes)
-  if (!isAuthenticated && !isPublicAuthRoute) {
-    return <UnifiedLoadingScreen />; // Brief loading while redirect happens
+  // Show loading while auth is checking or while redirect happens for unauthenticated users (but not on public auth routes)
+  if ((authLoading || !isAuthenticated) && !isPublicAuthRoute) {
+    return <UnifiedLoadingScreen />; // Loading while auth checks or redirect happens
   }
 
   // Show loading screen until app initialization is complete (only for authenticated users, not on public routes)

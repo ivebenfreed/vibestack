@@ -90,20 +90,37 @@ export class CanvasOverlayDOM {
     // not just the viewport. Otherwise, overlays for cells outside the initial viewport
     // will be clipped. We need to match the full scrollable width of the table.
     //
-    // PERFORMANCE FIX: Defer scrollWidth calculation to avoid forced reflow during init
-    let scrollWidth = 3000; // Conservative fallback
+    // IMPROVED FIX: Get actual scroll width immediately and also monitor for changes
+    let scrollWidth = Math.max(3000, this.container?.scrollWidth || 3000);
 
-    // Use requestAnimationFrame to defer layout-dependent calculations
-    requestAnimationFrame(() => {
+    // Also update after layout in case content changes
+    const updateOverlayWidth = () => {
       const actualScrollWidth = this.container?.scrollWidth;
       if (actualScrollWidth && actualScrollWidth > scrollWidth && this.overlayContainer) {
         this.overlayContainer.style.width = `${actualScrollWidth}px`;
+        scrollWidth = actualScrollWidth;
         fileLog.debug('📐 Updated overlay container width after layout', {
           actualScrollWidth,
-          initialWidth: scrollWidth
+          previousWidth: scrollWidth
         });
       }
-    });
+    };
+
+    // Update immediately and also after layout
+    requestAnimationFrame(updateOverlayWidth);
+
+    // Also listen for scroll events to detect when content width changes
+    if (this.container) {
+      const scrollHandler = () => {
+        updateOverlayWidth();
+      };
+      this.container.addEventListener('scroll', scrollHandler, { passive: true });
+
+      // Store cleanup function
+      (this.overlayContainer as any).__scrollCleanup = () => {
+        this.container?.removeEventListener('scroll', scrollHandler);
+      };
+    }
 
     Object.assign(this.overlayContainer.style, {
       position: 'absolute',
@@ -175,26 +192,42 @@ export class CanvasOverlayDOM {
       });
 
       // CRITICAL: Selection container must also match full scrollable width
-      // PERFORMANCE FIX: Use fallback initially, update after layout
-      let scrollWidth = 3000;
+      // IMPROVED FIX: Get actual scroll width immediately and monitor for changes
+      let scrollWidth = Math.max(3000, this.container?.scrollWidth || 3000);
 
       selectionContainer.style.position = 'absolute';
       selectionContainer.style.top = '0';
       selectionContainer.style.left = '0';
-      selectionContainer.style.width = `${scrollWidth}px`; // Initial width
+      selectionContainer.style.width = `${scrollWidth}px`; // Use actual width immediately
       selectionContainer.style.height = '100%';
 
-      // Update width after layout to avoid forced reflow during init
-      requestAnimationFrame(() => {
+      // Also update after layout and monitor for changes
+      const updateSelectionWidth = () => {
         const actualScrollWidth = this.container?.scrollWidth;
         if (actualScrollWidth && actualScrollWidth > scrollWidth) {
           selectionContainer.style.width = `${actualScrollWidth}px`;
-          fileLog.debug('📐 Updated selection container width after layout', {
+          scrollWidth = actualScrollWidth;
+          fileLog.debug('📐 Updated selection container width', {
             actualScrollWidth,
-            initialWidth: scrollWidth
+            previousWidth: scrollWidth
           });
         }
-      });
+      };
+
+      requestAnimationFrame(updateSelectionWidth);
+
+      // Also update when container width changes
+      if (this.container) {
+        const resizeObserver = new ResizeObserver(() => {
+          updateSelectionWidth();
+        });
+        resizeObserver.observe(this.container);
+
+        // Store cleanup function
+        (selectionContainer as any).__resizeCleanup = () => {
+          resizeObserver.disconnect();
+        };
+      }
 
       fileLog.debug('✅ DIAGNOSTIC: Overlay container positioned to fill parent with scroll alignment');
 
@@ -691,6 +724,12 @@ export class CanvasOverlayDOM {
     
     // Destroy all overlay instances
     if (this.selectionOverlay) {
+      // Cleanup selection container's resize observer if it exists
+      const selectionContainer = this.overlayContainer?.querySelector('.vibegridx-selection-container');
+      if (selectionContainer && (selectionContainer as any).__resizeCleanup) {
+        (selectionContainer as any).__resizeCleanup();
+      }
+
       this.selectionOverlay.destroy();
       this.selectionOverlay = null;
     }
@@ -720,8 +759,13 @@ export class CanvasOverlayDOM {
       this.columnResizeOverlay = null;
     }
     
-    // Remove container
+    // Remove container and cleanup event listeners
     if (this.overlayContainer) {
+      // Cleanup scroll event listener if it exists
+      if ((this.overlayContainer as any).__scrollCleanup) {
+        (this.overlayContainer as any).__scrollCleanup();
+      }
+
       this.overlayContainer.remove();
       this.overlayContainer = null;
     }
