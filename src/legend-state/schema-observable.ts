@@ -9,6 +9,7 @@
 
 import { observable } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
+import { observablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
 import { log } from '@/logger'
 import { getEnhancedFieldHandler } from '@/server/dataforge/fields'
 
@@ -226,20 +227,49 @@ export interface RelationshipFieldDefinition {
  */
 export function createSchemaObservable(orgId: string) {
   fileLog.info(`[SchemaObservable] Creating schema observable for org: ${orgId}`)
-  
+
   const crudConfig = {
     // Enable differential sync for schema updates
     changesSince: 'last-sync',
-    
+
     // Schema versioning fields
     fieldId: 'orgId',
     fieldUpdatedAt: 'version',
     fieldCreatedAt: 'created_at',
+
+    // **LEGEND STATE PERSISTENCE**
+    persist: {
+      name: `schema_${orgId}`,
+      plugin: observablePersistIndexedDB({
+        databaseName: `elevra_org_${orgId.replace(/-/g, '_')}`,
+        version: 1, // Schema tables use simple versioning
+        tableNames: [`schema_${orgId}`]
+      }),
+      retrySync: true, // Retry failed schema fetches
+      transform: {
+        load: (cachedData: any) => {
+          if (!cachedData) return null
+          // Add timestamp-based cache validation
+          const cacheAge = Date.now() - (cachedData.cachedAt || 0)
+          const maxAge = 5 * 60 * 1000 // 5 minutes cache
+          if (cacheAge > maxAge) {
+            fileLog.info(`[SchemaObservable] Schema cache expired for org ${orgId}, will refresh`)
+            return null // Force refresh if stale
+          }
+          fileLog.info(`[SchemaObservable] Using cached schema for org ${orgId}`)
+          return cachedData
+        },
+        save: (data: any) => ({
+          ...data,
+          cachedAt: Date.now()
+        })
+      }
+    },
     
     // LIST - Load organization schema from server
     list: async () => {
       try {
-        fileLog.info(`[SchemaObservable] Loading schema for org: ${orgId}`)
+        fileLog.info(`🔄 [SYNC-SCHEMA] Loading schema for org: ${orgId}`)
         
         const response = await fetch(`/api/dataforge/orgs/${orgId}/schema`, {
           method: 'GET',
@@ -280,30 +310,10 @@ export function createSchemaObservable(orgId: string) {
         // Transform to schema format
         const processedSchema = processSchemaResponse(orgId, schemaArray)
         
-        fileLog.info(`[SchemaObservable] Loaded schema with ${Object.keys(processedSchema.entities).length} entities`)
+        fileLog.info(`✅ [SYNC-SCHEMA] Loaded schema with ${Object.keys(processedSchema.entities).length} entities for org: ${orgId}`)
         
-        // 🚀 CRITICAL: Immediately configure persistence when schema is loaded
-        // This ensures entities will have persistence config available when they are created
-        try {
-          const entityNames = Object.keys(processedSchema.entities).map(entityName => `${orgId}_${entityName}`)
-          
-          if (entityNames.length > 0) {
-            fileLog.info(`[SchemaObservable] 🎯 Triggering immediate persistence setup for ${entityNames.length} entities`)
-            
-            // Import and call the persistence setup function immediately
-            const { setupFullPersistenceConfig } = await import('./persistence-utils')
-            const persistenceConfig = await setupFullPersistenceConfig(entityNames, orgId)
-            
-            if (persistenceConfig) {
-              fileLog.info(`[SchemaObservable] 🎯 Successfully configured persistence with ${Object.keys(persistenceConfig.entityTableMap || {}).length} entity mappings`)
-            }
-            
-            fileLog.info(`[SchemaObservable] ✅ Persistence configuration completed for ${entityNames.length} entities`)
-          }
-        } catch (persistenceError) {
-          fileLog.error(`[SchemaObservable] Failed to setup persistence for org ${orgId}:`, persistenceError)
-          // Continue with schema loading even if persistence setup fails
-        }
+        // Note: Persistence setup is now handled globally after all schemas are loaded
+        // This prevents multiple version increments from individual schema loads
         
         // Return as single-item array for syncedCrud list format
         return [processedSchema]
@@ -341,14 +351,14 @@ export function createSchemaObservable(orgId: string) {
       }
       
       if (typeof window !== 'undefined') {
-        window.addEventListener('vibestack:schema-change-notification', handler as any)
-        window.addEventListener('vibestack:reload-schema', handler as any)
+        window.addEventListener('elevra:schema-change-notification', handler as any)
+        window.addEventListener('elevra:reload-schema', handler as any)
       }
       
       return () => {
         if (typeof window !== 'undefined') {
-          window.removeEventListener('vibestack:schema-change-notification', handler as any)
-          window.removeEventListener('vibestack:reload-schema', handler as any)
+          window.removeEventListener('elevra:schema-change-notification', handler as any)
+          window.removeEventListener('elevra:reload-schema', handler as any)
         }
       }
     },
@@ -521,7 +531,7 @@ export function clearSchemaObservables() {
 export function reloadSchema(orgId: string) {
   fileLog.info(`[SchemaObservable] Triggering manual schema reload for org: ${orgId}`)
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vibestack:reload-schema', {
+    window.dispatchEvent(new CustomEvent('elevra:reload-schema', {
       detail: { type: 'schema-reload', orgId }
     }))
   }

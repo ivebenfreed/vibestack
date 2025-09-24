@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pBx3ydychis83hHyAvouuwIgpFcZnxX811cshqg8ZjEgSD1XQ0pBe6BWLFUgrKH
+\restrict vmTMWk1Itq5zkVikfbjfQdj9o73NMxn49tTRWBh2kWC1g2U9DXQuKjLoR4rLkeY
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -666,6 +666,10 @@ COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id
 d15bd69a-c973-4f03-8f33-4f1784ff436d	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-11 14:31:53.067	HealthFirst Medical	Regional healthcare provider with 15 hospitals and 200+ clinics	active	\N	HealthFirst Medical	healthcare	large	https://healthfirst-med.org	it-projects@healthfirst.org	+15550456	{"amount": 425000, "currency": "USD"}	2022-08-01	[object Object]	gold	4
 ba575163-5ab4-4f38-9aeb-7bc2005d7cc1	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-12 01:20:59.906	RetailMax Corp	National retail chain with 500+ locations across the US	active	\N	RetailMax Corp	retail	enterprise	https://retailmax.com	tech-team@retailmax.com	+15550789	{"amount": 650000, "currency": "USD"}	2023-11-20	[object Object]	gold	4
 cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-12 22:55:12.976	TechCorp Industries	Leading technology company specializing in enterprise software solutions	active	""	TechCorp Industries	technology	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
+9c8ea06c-1124-4f75-9e50-1194a72654d7	01920000-1000-7000-8000-000000000001	2025-09-24 13:59:08.89	2025-09-24 13:59:08.89	Test Sync Client	Testing incremental sync functionality	active	\N	Test Sync Corp	technology	medium	https://testsync.com	test@testsync.com	+15551234	{"amount": 100000, "currency": "USD"}	2025-09-24	\N	silver	3
+34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-24 15:36:02.405	Another Test Client	Second test for sync monitoring	active	\N	Another Test Corp	finance	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	bronze	4
+419ba750-c803-431a-8028-81424d062566	01920000-1000-7000-8000-000000000001	2025-09-24 16:27:00.609	2025-09-24 16:27:00.609	Debug Sync Client	Third test for sync debugging	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
+cfb82e34-551d-42b6-81c5-71d41ed1621e	01920000-1000-7000-8000-000000000001	2025-09-24 16:30:13.759	2025-09-24 16:30:13.759	Debug Sync Client	Third test for sync debugging	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
 \.
 
 
@@ -888,6 +892,10 @@ d651812d-9d77-4baf-bbe5-73adf2aaa524	WorkTask	291a87b3-3107-4acb-9d64-2813f8c65d
 f793628c-6ba5-4b76-9614-1b335429b8ff	WorkTask	291a87b3-3107-4acb-9d64-2813f8c65ded	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-21 16:56:55.627	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-21 16:56:55.627	\N	\N
 5fa4d73c-b7e4-4e09-a8e8-eef0cbff61c7	TestConnectionCleanup	89f11a71-3c4a-4206-83da-ce6720abef75	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-22 20:24:22.846	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-22 20:24:22.846	\N	\N
 cef09705-6c68-4b61-be63-f26bc874226b	TestConnectionCleanup	01538900-dd6a-46c1-bbc1-cecd5efe69e5	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-22 20:47:02.854	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-22 20:47:02.854	\N	\N
+cdad60d1-4400-455e-b51f-1d5ae69cc620	Client	9c8ea06c-1124-4f75-9e50-1194a72654d7	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 13:59:08.904	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 13:59:08.904	\N	\N
+ddc5f250-7547-401f-9a9b-505b8a6e6d58	Client	34479597-44b4-4b21-a49c-3549744f4e13	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 15:36:02.421	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 15:36:02.421	\N	\N
+86e2b3c2-0401-42d9-8300-980d87601804	Client	419ba750-c803-431a-8028-81424d062566	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 16:27:00.634	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 16:27:00.634	\N	\N
+518ad554-8fc7-42b5-8736-1cc312ccfecc	Client	cfb82e34-551d-42b6-81c5-71d41ed1621e	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 16:30:13.78	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 16:30:13.78	\N	\N
 \.
 
 
@@ -1314,5 +1322,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pBx3ydychis83hHyAvouuwIgpFcZnxX811cshqg8ZjEgSD1XQ0pBe6BWLFUgrKH
+\unrestrict vmTMWk1Itq5zkVikfbjfQdj9o73NMxn49tTRWBh2kWC1g2U9DXQuKjLoR4rLkeY
 

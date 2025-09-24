@@ -51,11 +51,12 @@ export const syncNotifications$ = observable({
    * This is called directly from the WebSocket message handler
    */
   addNotification(notification: TableChangeNotification) {
-    fileLog.info('📨 Adding sync notification', {
+    fileLog.info('📨 [SYNC-NOTIFY] Processing table change notification:', {
       tables: notification.tables,
       messageId: notification.messageId,
       organizationId: notification.organizationId,
-      source: notification.source
+      source: notification.source,
+      lsn: notification.lsn
     })
 
     // Update latest notification
@@ -184,13 +185,13 @@ export const syncStatus$ = computed(() => {
 
 // Export for debugging in development
 if (import.meta.env.DEV) {
-  ;(window as any).__vibestack_sync_notifications = {
+  ;(window as any).__elevra_sync_notifications = {
     syncNotifications$,
     allNotifications$,
     syncStatus$
   }
 
-  fileLog.info('🔧 Sync notifications debugging available on window.__vibestack_sync_notifications')
+  fileLog.info('🔧 Sync notifications debugging available on window.__elevra_sync_notifications')
 }
 
 /**

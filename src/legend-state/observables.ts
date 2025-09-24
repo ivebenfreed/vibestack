@@ -439,7 +439,7 @@ function createEntityObservable(entityName: string, schema?: any) {
     // LIST - Simple function that returns array of records (Legend State v3 pattern)
     list: async () => {
       try {
-        fileLog.info(`[Observable] Loading ${entityName} from:`, baseUrl);
+        fileLog.info(`🔄 [SYNC-LIST] Loading ${entityName} from: ${baseUrl}`);
         
         const response = await fetch(baseUrl, {
           credentials: 'include',
@@ -449,22 +449,22 @@ function createEntityObservable(entityName: string, schema?: any) {
         if (!response.ok) {
           // Handle common cases gracefully
           if (response.status === 404) {
-            fileLog.info(`[Observable] Entity ${entityName} table not found (404) - returning empty data`)
+            fileLog.info(`🔍 [SYNC-EMPTY] Entity ${entityName} table not found (404) - returning empty data`)
             return []
           }
           if (response.status === 500) {
             // Likely table doesn't exist - don't spam console
-            fileLog.info(`[Observable] Entity ${entityName} table not created yet (500) - returning empty data`)
+            fileLog.info(`🔍 [SYNC-EMPTY] Entity ${entityName} table not created yet (500) - returning empty data`)
             return []
           }
-          fileLog.error(`[Observable] Failed to load ${entityName}:`, response.status)
+          fileLog.error(`❌ [SYNC-ERROR] Failed to load ${entityName}:`, response.status)
           return []
         }
         
         const result = await response.json()
         const data = result.data || []
         
-        fileLog.info(`[Observable] Loaded ${entityName}: ${data.length} records`)
+        fileLog.info(`✅ [SYNC-SUCCESS] Loaded ${entityName}: ${data.length} records`)
         
         return data
       } catch (error) {
@@ -476,6 +476,7 @@ function createEntityObservable(entityName: string, schema?: any) {
     // CREATE - Add new item with enhanced error context
     create: async (item: any) => {
       try {
+        fileLog.info(`🔄 [SYNC-CREATE] Creating ${entityName} record:`, { id: item.id, name: item.name || item.title || 'unnamed' })
         // Optional: Validate before creating - disabled for now since validation endpoint doesn't exist
         if (false && schema?.validation !== false) {
           try {
@@ -847,6 +848,17 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
   }
   
   try {
+    // Initialize persistence before schema loading to ensure manager is available when schemas trigger persistence config
+    fileLog.info(`[Observable] Initializing persistence before schema loading`)
+    try {
+      // Estimate total entities (will be refined after schema loading)
+      const estimatedEntityCount = organizationIds.length * 8 // rough estimate
+      await initializePersistence(userId, organizationIds, estimatedEntityCount)
+      fileLog.info(`[Observable] ✅ Persistence initialized before schema loading`)
+    } catch (persistenceError) {
+      fileLog.warn('[Observable] Persistence initialization failed, continuing with schema loading:', persistenceError)
+    }
+
     // Load schemas from all organizations in parallel
     const schemaPromises = organizationIds.map(async (orgId) => {
       try {
@@ -919,9 +931,16 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
     
     // **NEW: Add virtual entities for options system**
     await addVirtualOptionsEntities(organizationIds)
-    
-    // NOTE: Persistence initialization is now handled by the simplified Legend State initialization
-    // This ensures proper timing and entity count calculation
+
+    // **NEW: Setup global persistence configuration after all schemas are loaded**
+    // This prevents multiple version increments from individual schema loads
+    try {
+      const { setupGlobalPersistenceConfig } = await import('./persistence-utils')
+      await setupGlobalPersistenceConfig()
+      fileLog.info(`[Observable] ✅ Global persistence configuration completed after all schemas loaded`)
+    } catch (persistenceError) {
+      fileLog.warn('[Observable] Global persistence setup failed:', persistenceError)
+    }
     
   } catch (error) {
     fileLog.error('[Observable] Failed to load universe context:', error)
@@ -1075,6 +1094,10 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     // Create persistence manager with enhanced error handling
     persistenceManager = createPersistenceManager(primaryOrgId, userId)
     setPersistenceManagerReference(persistenceManager)
+
+    // Reset global persistence setup guard for fresh initialization
+    const { resetGlobalPersistenceSetup } = await import('./persistence-utils')
+    resetGlobalPersistenceSetup()
     
     // Set up persistence config setter so immediate persistence setup can update global config
     setPersistenceConfigSetter((config: any) => {
@@ -1426,7 +1449,7 @@ export function handleTableNotification(notification: any) {
     const userId = universeUserId$.peek()
     if (userId) {
       // Trigger a universe context reload (will be implemented by auth system)
-      window.dispatchEvent(new CustomEvent('vibestack:reload-universe-schema', {
+      window.dispatchEvent(new CustomEvent('elevra:reload-universe-schema', {
         detail: { userId }
       }))
     }
@@ -1434,7 +1457,7 @@ export function handleTableNotification(notification: any) {
   }
   
   // Dispatch custom event that entity stores listen to
-  window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
+  window.dispatchEvent(new CustomEvent('elevra:table-change-notification', {
     detail: notification,
   }))
 }
@@ -1739,14 +1762,14 @@ export const entityOperations = {
       const result = entity$[tempId].get()
       
       // Emit success event for UI feedback
-      window.dispatchEvent(new CustomEvent('vibestack:entity-created', {
+      window.dispatchEvent(new CustomEvent('elevra:entity-created', {
         detail: { entityName, data: result }
       }))
       
       return result
     } catch (error) {
       // Emit error event for UI feedback
-      window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
+      window.dispatchEvent(new CustomEvent('elevra:entity-error', {
         detail: { entityName, operation: 'create', error: error.message }
       }))
       throw error
@@ -1885,14 +1908,14 @@ export const entityOperations = {
       }
       
       // Emit success event for UI feedback
-      window.dispatchEvent(new CustomEvent('vibestack:entity-deleted', {
+      window.dispatchEvent(new CustomEvent('elevra:entity-deleted', {
         detail: { entityName, id }
       }))
       
       return { success: true }
     } catch (error) {
       // Emit error event for UI feedback
-      window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
+      window.dispatchEvent(new CustomEvent('elevra:entity-error', {
         detail: { entityName, operation: 'delete', id, error: error.message }
       }))
       throw error
@@ -1975,16 +1998,16 @@ export async function initializePersistenceWithEntityCount(
 // Debug: Expose to window in development
 if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
   // Legacy debug exposure - replaced with universe context
-  (window as any).vibestackUniverseContext = {
+  (window as any).elevraUniverseContext = {
     orgId: universeOrgId$,
     schema: universeSchema$,
     loading: universeLoading$,
     error: universeError$,
     userId: universeUserId$
   }
-  ;(window as any).vibestackBatchOps = batchOperations
-  ;(window as any).vibestackEntityOps = entityOperations
-  ;(window as any).vibestackInitManager = initializationManager
+  ;(window as any).elevraBatchOps = batchOperations
+  ;(window as any).elevraEntityOps = entityOperations
+  ;(window as any).elevraInitManager = initializationManager
   
   // Expose key functions for debugging
   ;(window as any).entities$ = entities$
@@ -1992,7 +2015,7 @@ if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') 
   ;(window as any).loadUniverseContext = loadUniverseContext
   
   // Add debug function to manually clear IndexedDB
-  ;(window as any).vibestackClearIndexedDB = async () => {
+  ;(window as any).elevraClearIndexedDB = async () => {
     if (persistenceManager) {
       await persistenceManager.clearOrganizationData()
       console.log('[VibeStack Debug] Legacy IndexedDB data cleared. Refresh the page to see changes.')
@@ -2002,7 +2025,7 @@ if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') 
   }
   
   // Add debug function for initialization metrics
-  ;(window as any).vibestackInitMetrics = () => {
+  ;(window as any).elevraInitMetrics = () => {
     const metrics = initializationManager.getMetrics()
     console.log('[VibeStack Debug] Initialization Metrics:', metrics)
     return metrics

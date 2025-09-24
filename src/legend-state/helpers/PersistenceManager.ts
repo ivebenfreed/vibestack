@@ -43,7 +43,7 @@ export class PersistenceManager {
   constructor(organizationId: string, userId: string, dbName?: string, dbVersion?: number) {
     this.organizationId = organizationId
     this.userId = userId
-    this.dbName = dbName || `vibestack_org_${organizationId.replace(/-/g, '_')}`
+    this.dbName = dbName || `elevra_org_${organizationId.replace(/-/g, '_')}`
     this.dbVersion = dbVersion || 1
     
     fileLog.info('[PersistenceManager] Initialized', {
@@ -58,8 +58,8 @@ export class PersistenceManager {
    * Generate database version based on entity schema to ensure IndexedDB upgrades
    */
   private generateSchemaVersion(entityNames: string[]): number {
-    const versionKey = `vibestack_db_version_${this.organizationId}`
-    const schemaHashKey = `vibestack_db_schema_hash_${this.organizationId}`
+    const versionKey = `elevra_db_version_${this.organizationId}`
+    const schemaHashKey = `elevra_db_schema_hash_${this.organizationId}`
     
     // Create a stable hash of the entity names to detect schema changes
     const currentSchemaHash = this.createSchemaHash(entityNames)
@@ -120,7 +120,7 @@ export class PersistenceManager {
       ...entityNames.map(name => {
         // Convert composite key to valid table name by replacing invalid chars
         const sanitized = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-        return `vibestack_${sanitized}`
+        return `elevra_${sanitized}`
       }),
       'metadata',
       'sync_state'
@@ -189,7 +189,7 @@ export class PersistenceManager {
    */
   private checkForVersionDowngrade(newVersion: number): boolean {
     // Check if there's a database that might have a higher version
-    const oldVersionKey = `vibestack_db_version_${this.organizationId}`
+    const oldVersionKey = `elevra_db_version_${this.organizationId}`
     const storedVersion = localStorage.getItem(oldVersionKey)
     
     if (!storedVersion) {
@@ -528,7 +528,7 @@ export class PersistenceManager {
    * Get persistence options for an entity
    */
   public getPersistOptions(entityName: string): Partial<PersistOptions> {
-    const persistKey = `vibestack_${entityName.toLowerCase()}`
+    const persistKey = `elevra_${entityName.toLowerCase()}`
     
     return {
       name: persistKey,

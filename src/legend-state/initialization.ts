@@ -122,21 +122,8 @@ export async function initializeLegendState(
     initializationActions.setLoading(true, 'Setting up persistence');
     initializationActions.setProgress(10);
 
-    // 🔧 PERSISTENCE: Initialize persistence manager BEFORE loading schemas/entities
-    // This ensures entities are created WITH persistence configuration from the start
-    initLog.info('[LegendStateInit] Initializing persistence manager first');
-    
-    try {
-      // Import the internal initializePersistence function - need to expose it  
-      const { initializePersistenceWithEntityCount } = await import('@/legend-state/observables');
-      // Initialize with expected entity count (we'll get actual count after schema loading)
-      await initializePersistenceWithEntityCount(userId, organizationIds, 12); // Wide Corp has 12 entities
-      
-      initLog.info('[LegendStateInit] ✅ Persistence manager initialized successfully');
-    } catch (persistenceError) {
-      initLog.error('[LegendStateInit] Failed to initialize persistence:', persistenceError);
-      // Don't fail the entire initialization for persistence errors
-    }
+    // Persistence is now initialized internally within loadUniverseContext
+    // This ensures proper dependency ordering without race conditions
 
     initializationActions.setProgress(30);
     initializationActions.setLoading(true, 'Loading universe schemas');

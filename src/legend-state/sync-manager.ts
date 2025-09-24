@@ -109,10 +109,10 @@ export const statusText$ = computed(() => {
  * Generate or retrieve persistent client ID for WebSocket connection
  */
 function getPersistentClientId(): string {
-  let persistentClientId = localStorage.getItem('vibestack_websocket_client_id')
+  let persistentClientId = localStorage.getItem('elevra_websocket_client_id')
   if (!persistentClientId) {
     persistentClientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-    localStorage.setItem('vibestack_websocket_client_id', persistentClientId)
+    localStorage.setItem('elevra_websocket_client_id', persistentClientId)
     fileLog.info('🆔 Generated new persistent client ID:', persistentClientId)
   } else {
     fileLog.info('🆔 Using existing persistent client ID:', persistentClientId)
@@ -126,7 +126,15 @@ function getPersistentClientId(): string {
 async function createWebSocketConnection(serverUrl: string, clientId: string, organizationId: string): Promise<WebSocket> {
   return new Promise<WebSocket>((resolve, reject) => {
     try {
-      const ws = new WebSocket(`${serverUrl}?clientId=${clientId}&organizationId=${organizationId}&lsn=0/0`)
+      const wsUrl = `${serverUrl}?clientId=${clientId}&organizationId=${organizationId}&lsn=0/0`
+      fileLog.info('🔌 [WEBSOCKET-CONNECT] Attempting connection:', {
+        serverUrl,
+        clientId,
+        organizationId,
+        fullUrl: wsUrl
+      })
+
+      const ws = new WebSocket(wsUrl)
       
       const connectionTimeout = setTimeout(() => {
         ws.close()
@@ -161,15 +169,21 @@ async function createWebSocketConnection(serverUrl: string, clientId: string, or
  */
 function setupWebSocketHandlers(ws: WebSocket) {
   ws.onmessage = (event) => {
+    // RAW MESSAGE LOGGING - see everything that comes through
+    fileLog.info('🔴 [WEBSOCKET-RAW] Message received:', {
+      data: event.data,
+      timestamp: new Date().toISOString()
+    })
     try {
       const message = JSON.parse(event.data)
       
       // Log non-heartbeat messages for debugging
       if (message.type !== 'srv_heartbeat') {
-        fileLog.debug('🔄 WebSocket message received:', {
+        fileLog.info('📨 [SYNC-NOTIFY] WebSocket message received:', {
           type: message.type,
           messageId: message.messageId,
-          fullMessage: message
+          tables: message.tables,
+          organizationId: message.organizationId
         })
       }
       
@@ -460,7 +474,7 @@ if (import.meta.hot) {
 
 // Export for debugging
 if (import.meta.env.DEV) {
-  ;(window as any).__vibestack_sync_manager = {
+  ;(window as any).__elevra_sync_manager = {
     syncState$,
     connectionStatus$,
     statusText$,
