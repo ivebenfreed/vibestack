@@ -670,15 +670,15 @@ export class SyncDO extends DurableObject {
         return new Response('Invalid notification data', { status: 400 });
       }
 
-      // Verify this client belongs to the specified organization
-      if (this.syncConnection?.organizationId !== organizationId) {
-        syncLogger.debug('Table change notification for different organization', {
-          clientId,
-          clientOrg: this.syncConnection?.organizationId,
-          notificationOrg: organizationId
-        }, MODULE_NAME);
-        return new Response('OK', { status: 200 }); // Silently ignore - not an error
-      }
+      // Universe scope: Accept notifications for ANY organization
+      // Frontend will handle permission filtering via Legend State
+      syncLogger.debug('Table change notification received (universe scope)', {
+        clientId,
+        clientPrimaryOrg: this.syncConnection?.organizationId,
+        notificationOrg: organizationId,
+        tables,
+        source
+      }, MODULE_NAME);
 
       // Create table change notification message
       const notification: ServerTableChangeNotificationMessage = {

@@ -67,9 +67,18 @@ export class UnifiedClientRegistry {
         lastSeen: Date.now()
       };
 
-      // Primary storage: Single client record with org context
-      // Key format: unified_client:{orgId}:{clientId}
-      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${clientInfo.organizationId}:${clientInfo.clientId}`;
+      // Universe-scoped storage: Client record with user context (not org-scoped)
+      // Key format: unified_client:{clientId} (no org prefix for universe scope)
+      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${clientInfo.clientId}`;
+
+      syncLogger.info('🔧 REGISTRY STORE DEBUG: Storing client with key', {
+        clientKey,
+        organizationId: clientInfo.organizationId,
+        clientId: clientInfo.clientId,
+        prefix: UnifiedClientRegistry.CLIENT_PREFIX,
+        ttlSeconds: UnifiedClientRegistry.CLIENT_TTL
+      }, MODULE_NAME);
+
       await this.env.CLIENT_REGISTRY.put(clientKey, JSON.stringify(unifiedClientInfo), {
         expirationTtl: UnifiedClientRegistry.CLIENT_TTL
       });
@@ -151,6 +160,13 @@ export class UnifiedClientRegistry {
   async getOrgActiveClients(organizationId: string): Promise<string[]> {
     try {
       const prefix = `${UnifiedClientRegistry.CLIENT_PREFIX}${organizationId}:`;
+
+      syncLogger.info('🔧 REGISTRY LOOKUP DEBUG: Searching for clients', {
+        organizationId,
+        prefix,
+        staticPrefix: UnifiedClientRegistry.CLIENT_PREFIX
+      }, MODULE_NAME);
+
       const listResult = await this.env.CLIENT_REGISTRY.list({ prefix });
       
       const activeClientIds: string[] = [];
@@ -191,11 +207,56 @@ export class UnifiedClientRegistry {
   }
 
   /**
+   * Get ALL active clients across all organizations (universe scope)
+   * Used for sending notifications that will be filtered by frontend permissions
+   */
+  async getAllActiveClients(): Promise<string[]> {
+    try {
+      const prefix = UnifiedClientRegistry.CLIENT_PREFIX;
+      const listResult = await this.env.CLIENT_REGISTRY.list({ prefix });
+
+      const activeClientIds: string[] = [];
+
+      for (const key of listResult.keys) {
+        try {
+          const data = await this.env.CLIENT_REGISTRY.get(key.name);
+          if (data) {
+            const clientInfo: UnifiedClientInfo = JSON.parse(data);
+            if (clientInfo.active) {
+              activeClientIds.push(clientInfo.clientId);
+            }
+          }
+        } catch (parseError) {
+          syncLogger.warn('Failed to parse client data', {
+            key: key.name,
+            error: parseError instanceof Error ? parseError.message : String(parseError)
+          }, MODULE_NAME);
+        }
+      }
+
+      syncLogger.info('🌍 UNIVERSE REGISTRY: Retrieved all active clients', {
+        activeClientCount: activeClientIds.length,
+        clientIds: activeClientIds,
+        allKeysFound: listResult.keys.map(k => k.name)
+      }, MODULE_NAME);
+
+      return activeClientIds;
+
+    } catch (error) {
+      syncLogger.error('Failed to get all active clients', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return [];
+    }
+  }
+
+  /**
    * Get complete client information
    */
-  async getClientInfo(clientId: string, organizationId: string): Promise<UnifiedClientInfo | null> {
+  async getClientInfo(clientId: string, organizationId?: string): Promise<UnifiedClientInfo | null> {
     try {
-      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${organizationId}:${clientId}`;
+      // Use universe-scoped key format (no org prefix)
+      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${clientId}`;
       const data = await this.env.CLIENT_REGISTRY.get(clientKey);
       
       if (data) {
@@ -217,9 +278,10 @@ export class UnifiedClientRegistry {
   /**
    * Mark client as inactive (called on disconnect)
    */
-  async markClientInactive(clientId: string, organizationId: string): Promise<void> {
+  async markClientInactive(clientId: string, organizationId?: string): Promise<void> {
     try {
-      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${organizationId}:${clientId}`;
+      // Use universe-scoped key format (no org prefix)
+      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${clientId}`;
       const data = await this.env.CLIENT_REGISTRY.get(clientKey);
 
       if (data) {
@@ -250,9 +312,10 @@ export class UnifiedClientRegistry {
   /**
    * Remove client completely (called on explicit disconnect)
    */
-  async removeClient(clientId: string, organizationId: string): Promise<void> {
+  async removeClient(clientId: string, organizationId?: string): Promise<void> {
     try {
-      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${organizationId}:${clientId}`;
+      // Use universe-scoped key format (no org prefix)
+      const clientKey = `${UnifiedClientRegistry.CLIENT_PREFIX}${clientId}`;
       await this.env.CLIENT_REGISTRY.delete(clientKey);
       
       // Remove from organization index

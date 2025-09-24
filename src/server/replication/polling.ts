@@ -251,13 +251,28 @@ export class PollingManager {
 
           // Process changes for table notifications only (no storing in change_history)
           const result = await this.processChangesForNotifications(changes);
-          
+
+          // ONLY advance replication slot after successful processing
+          if (result.tablesChanged.length > 0 || result.clientsNotified > 0) {
+            const lastLSN = changes[changes.length - 1]?.lsn;
+            if (lastLSN) {
+              await this.advanceReplicationSlot(lastLSN);
+              await this.stateManager.setLSN(lastLSN);
+
+              replicationLogger.info('🎯 SLOT ADVANCED AFTER SUCCESSFUL PROCESSING', {
+                lastLSN,
+                tablesChanged: result.tablesChanged,
+                clientsNotified: result.clientsNotified
+              }, MODULE_NAME);
+            }
+          }
+
           replicationLogger.info('✅ SIMPLIFIED NOTIFICATION CYCLE COMPLETED', {
             walEntriesProcessed: changes.length,
             tablesChanged: result.tablesChanged,
             organizationsNotified: result.organizationsNotified,
             clientsNotified: result.clientsNotified,
-            nextPollIn: this.config.pollingInterval || DEFAULT_POLL_INTERVAL
+            nextPollIn: this.config.pollingInterval || DEFAULT_BATCH_SIZE
           }, MODULE_NAME);
           
         } catch (processError) {
@@ -394,11 +409,19 @@ export class PollingManager {
 
   private async sendTableChangeNotification(organizationId: string, tables: string[], lsn: string): Promise<number> {
     try {
-      // Use the unified client registry system - get active clients for org and notify them directly
+      // Use universe-scoped client lookup - send to ALL active clients
+      // Frontend will handle organization permission filtering via Legend State
       const { UnifiedClientRegistry } = await import('../sync/unified-client-registry');
-      
+
       const unifiedRegistry = new UnifiedClientRegistry(this.env);
-      const clientIds = await unifiedRegistry.getOrgActiveClients(organizationId);
+      const clientIds = await unifiedRegistry.getAllActiveClients();
+
+      replicationLogger.info('🌍 UNIVERSE SYNC: Broadcasting to all active clients', {
+        organizationId,
+        tables,
+        allActiveClients: clientIds.length,
+        reason: 'Frontend will filter based on user permissions'
+      }, MODULE_NAME);
       
       if (clientIds.length === 0) {
         replicationLogger.debug('No active clients for organization', {
@@ -541,20 +564,45 @@ export class PollingManager {
     }
   }
 
+  /**
+   * Advance replication slot to specified LSN after successful processing
+   */
+  private async advanceReplicationSlot(lsn: string): Promise<void> {
+    try {
+      await withPostgresClient(async (client) => {
+        await client.unsafe(`
+          SELECT pg_replication_slot_advance($1, $2)
+        `, [this.config.slot, lsn]);
+
+        replicationLogger.debug('Replication slot advanced', {
+          slot: this.config.slot,
+          lsn
+        }, MODULE_NAME);
+      });
+    } catch (error) {
+      replicationLogger.error('Failed to advance replication slot', {
+        slot: this.config.slot,
+        lsn,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
   private async pollForChanges(): Promise<WALData[] | null> {
-    try {      
-      replicationLogger.debug('Polling for changes using safe connection pattern', {
+    try {
+      replicationLogger.debug('Polling for changes using peek/advance pattern', {
         slot: this.config.slot,
         batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
       }, MODULE_NAME);
-      
+
       return await withPostgresClient(async (client) => {
         const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
-        
-        // Consume changes and advance LSN automatically - no need to track LSN state
+
+        // Use PEEK to see available changes without advancing slot
         const result = await client.unsafe(`
-          SELECT data, lsn, xid 
-          FROM pg_logical_slot_get_changes(
+          SELECT data, lsn, xid
+          FROM pg_logical_slot_peek_changes(
             $1,
             NULL,
             NULL,
@@ -563,13 +611,19 @@ export class PollingManager {
           )
           LIMIT $2
         `, [this.config.slot, batchSize]);
-        
+
         const newChanges = result.map(row => ({
           data: row.data as string,
           lsn: row.lsn as string,
           xid: row.xid as string
         }));
-        
+
+        replicationLogger.info('🔍 PEEK RESULTS', {
+          changesFound: newChanges.length,
+          firstLSN: newChanges[0]?.lsn,
+          lastLSN: newChanges[newChanges.length - 1]?.lsn
+        }, MODULE_NAME);
+
         return newChanges.length > 0 ? newChanges : null;
       });
     } catch (err) {

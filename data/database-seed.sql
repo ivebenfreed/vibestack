@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict l4RLc5DbzjIa48OHGwRUwTNBYEY41DjPaCnjNUhnnKU0zVqmymDyQhQnE3u8sbV
+\restrict W6u8fBV8FA9fsrKGUTz1umYCBYZy5jTxdJ28RcIhuu56q6shnxy5MzwGT2BH2kr
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -896,6 +896,7 @@ cdad60d1-4400-455e-b51f-1d5ae69cc620	Client	9c8ea06c-1124-4f75-9e50-1194a72654d7
 ddc5f250-7547-401f-9a9b-505b8a6e6d58	Client	34479597-44b4-4b21-a49c-3549744f4e13	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 15:36:02.421	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 15:36:02.421	\N	\N
 86e2b3c2-0401-42d9-8300-980d87601804	Client	419ba750-c803-431a-8028-81424d062566	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 16:27:00.634	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 16:27:00.634	\N	\N
 518ad554-8fc7-42b5-8736-1cc312ccfecc	Client	cfb82e34-551d-42b6-81c5-71d41ed1621e	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 16:30:13.78	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 16:30:13.78	\N	\N
+4210ae84-03c9-4c5d-b713-dd3ad9969191	TestConnectionCleanup	b861ee46-55f8-4d71-b95d-96b0d6e24c5e	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 17:27:16.397	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 17:27:16.397	\N	\N
 \.
 
 
@@ -916,6 +917,16 @@ a99c7666-08d4-45e8-bde7-7a1c454a7d9d	01920000-1000-7000-8000-000000000001	2025-0
 COPY public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup (id, organization_id, created_at, updated_at, name, description, status, data, test_field) FROM stdin;
 89f11a71-3c4a-4206-83da-ce6720abef75	01920000-1000-7000-8000-000000000001	2025-09-22 20:24:22.804	2025-09-22 20:24:22.804	Test Record	\N	draft	\N	Test Value
 01538900-dd6a-46c1-bbc1-cecd5efe69e5	01920000-1000-7000-8000-000000000001	2025-09-22 20:47:02.842	2025-09-22 20:47:02.842	API Test Record	\N	draft	\N	Working
+3f053c3d-eba5-40c3-8122-7e6485897d7a	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:31.414567	2025-09-24 17:14:31.414567	Sync Test 1758734071	Testing sync notifications	active	\N	test_value
+aaa67762-ce09-47f2-80a6-6d03780b4def	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:49.14932	2025-09-24 17:14:49.14932	Real-Time Sync Test 1758734089	Testing real-time sync notifications	active	\N	sync_test_1758734089
+9910f017-0701-43e1-b6df-557b50a43e78	01920000-1000-7000-8000-000000000001	2025-09-24 17:15:06.528419	2025-09-24 17:15:06.528419	Final Sync Test 13:15:06	Testing complete sync notification flow	active	\N	final_test
+b861ee46-55f8-4d71-b95d-96b0d6e24c5e	01920000-1000-7000-8000-000000000001	2025-09-24 17:27:16.386	2025-09-24 17:28:05.403	API Sync Test Record - UPDATED	Testing sync notifications via API UPDATE	deleted	\N	updated_api_value
+d1dcce5d-49e0-49aa-b095-afea8ca0cc86	01920000-1000-7000-8000-000000000001	2025-09-24 18:26:35.076422	2025-09-24 18:26:35.076422	IMMEDIATE SYNC TEST 14:26:35	Real-time sync test	active	\N	immediate_test
+4c05cd8d-7b5f-4bf8-8e0c-69c51a7eb9de	01920000-1000-7000-8000-000000000001	2025-09-24 18:35:42.177346	2025-09-24 18:35:42.177346	PEEK TEST 14:35:42	Testing peek/advance pattern	active	\N	peek_test
+e95b575c-c66f-4d99-8793-b577cd796fb9	01920000-1000-7000-8000-000000000001	2025-09-24 18:46:40.872378	2025-09-24 18:46:40.872378	FALLBACK TEST 14:46:40	Testing fallback client notification	active	\N	fallback_test
+fe32f0d6-6917-41cf-bbe5-af61e9783a3a	01920000-1000-7000-8000-000000000001	2025-09-24 18:52:53.790565	2025-09-24 18:52:53.790565	UNIVERSE TEST 14:52:53	Testing universe-scoped notifications	active	\N	universe_test
+78ffebe0-3acc-45bf-8395-f1e68e21af6d	01920000-1000-7000-8000-000000000001	2025-09-24 18:56:42.081827	2025-09-24 18:56:42.081827	🎯 UNIVERSE SYNC FIXED 14:56:42	Testing fixed universe-scoped sync	active	\N	universe_fixed
+5ea74089-813a-4b21-87e0-86c8e6551a98	01920000-1000-7000-8000-000000000001	2025-09-24 19:06:21.769659	2025-09-24 19:06:21.769659	🚀 WEBSOCKET TEST 15:06:21	Testing WebSocket table notifications	active	\N	websocket_test
 \.
 
 
@@ -984,6 +995,7 @@ COPY public.org_01993ac7_c10a_7b35_afe1_855338a4fbcb_testproject (id, organizati
 c0d1028e-6f07-413e-87f8-b1d7d21ac1ba	01993ac7-c10a-7b35-afe1-855338a4fbcb	2025-09-11 21:57:53.884	2025-09-11 21:57:53.884	My First Test Project	Testing lore and canon collection auto-creation	\N	not_started	\N	\N	\N	0	\N	\N
 f54f5227-0585-45bc-bd0c-d1b02cacbb3c	01993ac7-c10a-7b35-afe1-855338a4fbcb	2025-09-11 22:00:48.521	2025-09-11 22:00:48.577	Test Project with Lore Canon	Testing if lore and canon collections are created automatically	\N	not_started	\N	\N	\N	0	3c1fdecd-26ba-4f46-b1e0-0fbce99b6898	d5960084-5f8d-4e78-8b2d-e75e4963a576
 f845c4e0-4afd-4e5f-99a0-1cc898022bef	01993ac7-c10a-7b35-afe1-855338a4fbcb	2025-09-11 22:04:48.509	2025-09-11 22:04:48.58	Fresh Test Project After Restart	Testing lore and canon collection auto-creation after server restart	\N	not_started	\N	\N	\N	0	a24902bb-c4a7-4afc-bfc5-daed0de56620	a07bf082-bd23-4d68-b318-200685e216e2
+df908b47-b4f4-46b0-85ce-acbe04a075fd	01993ac7-c10a-7b35-afe1-855338a4fbcb	2025-09-24 19:12:13.415423	2025-09-24 19:12:13.415423	UNAUTHORIZED ACCESS TEST 15:12:13	Testing frontend permission filtering	\N	active	\N	\N	\N	0	\N	\N
 \.
 
 
@@ -1322,5 +1334,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict l4RLc5DbzjIa48OHGwRUwTNBYEY41DjPaCnjNUhnnKU0zVqmymDyQhQnE3u8sbV
+\unrestrict W6u8fBV8FA9fsrKGUTz1umYCBYZy5jTxdJ28RcIhuu56q6shnxy5MzwGT2BH2kr
 
