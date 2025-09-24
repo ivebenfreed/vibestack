@@ -1358,10 +1358,21 @@ export class SyncDO extends DurableObject {
         }, MODULE_NAME);
         
         webSockets.forEach((ws, index) => {
-          ws.serializeAttachment(contextData);  // Don't JSON.stringify - use structured clone
+          // ENHANCED: Merge with existing basic context if present
+          const existingAttachment = ws.deserializeAttachment();
+          const mergedContext = existingAttachment ? {
+            ...existingAttachment,  // Keep basic context (clientId, organizationId, etc.)
+            ...contextData,         // Add full sync connection
+            timestamp: Date.now()   // Update timestamp
+          } : contextData;
+
+          ws.serializeAttachment(mergedContext);  // Don't JSON.stringify - use structured clone
+
           syncLogger.info(`HIBERNATION DEBUG: Stored context in WebSocket ${index}`, {
             clientId: this.clientId,
-            wsIndex: index
+            wsIndex: index,
+            hadExistingAttachment: !!existingAttachment,
+            mergedContextSize: JSON.stringify(mergedContext).length
           }, MODULE_NAME);
         });
         
@@ -1406,21 +1417,46 @@ export class SyncDO extends DurableObject {
         
         syncLogger.info('HIBERNATION DEBUG: WebSocket attachment found', {
           hasAttachment: !!attachment,
-          attachmentType: typeof attachment
+          attachmentType: typeof attachment,
+          attachmentValue: attachment,
+          isNull: attachment === null,
+          isUndefined: attachment === undefined,
+          hasClientId: attachment?.clientId,
+          hasSyncConnection: attachment?.syncConnection
         }, MODULE_NAME);
         
         if (attachment) {
           const contextData = attachment;  // No need to JSON.parse - already deserialized
-          
+
           syncLogger.info('HIBERNATION DEBUG: Parsed attachment data', {
             hasClientId: !!contextData.clientId,
             hasSyncConnection: !!contextData.syncConnection,
-            clientId: contextData.clientId
+            hasBasicContext: !!contextData.accepted,
+            clientId: contextData.clientId,
+            organizationId: contextData.organizationId || contextData.syncConnection?.organizationId
           }, MODULE_NAME);
-          
-          // Restore simple context
+
+          // Restore client ID (available in both basic and full context)
           this.clientId = contextData.clientId || '';
-          this.syncConnection = contextData.syncConnection;
+
+          // Check if this is full context or basic context
+          if (contextData.syncConnection) {
+            // Full context with sync connection
+            this.syncConnection = contextData.syncConnection;
+            syncLogger.info('HIBERNATION DEBUG: Restored full sync connection context', {
+              clientId: this.clientId,
+              organizationId: this.syncConnection.organizationId
+            }, MODULE_NAME);
+          } else if (contextData.accepted && contextData.organizationId) {
+            // Basic context from WebSocket acceptance - need to rebuild sync connection
+            syncLogger.info('HIBERNATION DEBUG: Found basic context, attempting to rebuild sync connection', {
+              clientId: this.clientId,
+              organizationId: contextData.organizationId
+            }, MODULE_NAME);
+
+            // Try to rebuild sync connection from basic context
+            // This would typically require re-authentication, but for now we'll try storage fallback
+          }
           
           if (this.syncConnection) {
             // Update StateManager with user context

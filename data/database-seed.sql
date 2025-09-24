@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict W6u8fBV8FA9fsrKGUTz1umYCBYZy5jTxdJ28RcIhuu56q6shnxy5MzwGT2BH2kr
+\restrict K9dUnaDdcnlUJDph96isTZFWM9uH1T92diWhObQNgHEroBh7QmMXdVMBwelO9rj
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -897,6 +897,21 @@ ddc5f250-7547-401f-9a9b-505b8a6e6d58	Client	34479597-44b4-4b21-a49c-3549744f4e13
 86e2b3c2-0401-42d9-8300-980d87601804	Client	419ba750-c803-431a-8028-81424d062566	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 16:27:00.634	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 16:27:00.634	\N	\N
 518ad554-8fc7-42b5-8736-1cc312ccfecc	Client	cfb82e34-551d-42b6-81c5-71d41ed1621e	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 16:30:13.78	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 16:30:13.78	\N	\N
 4210ae84-03c9-4c5d-b713-dd3ad9969191	TestConnectionCleanup	b861ee46-55f8-4d71-b95d-96b0d6e24c5e	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 17:27:16.397	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 17:27:16.397	\N	\N
+0e97c3e5-846d-439e-9e3b-aafb659d612f	TestConnectionCleanup	4c3d1c08-50d7-4785-a3f8-ce37b1e67244	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:25:58.829	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:25:58.829	\N	\N
+51ea2efc-ab62-467f-b8f6-ffa82cfd2429	TestConnectionCleanup	4d90de34-1b59-4c38-8bdc-bd4a8bdb7dae	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:28:04.8	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:28:04.8	\N	\N
+09b618ec-d179-46ef-80a6-89a50b68090e	TestConnectionCleanup	cd250dd8-7d44-403f-849f-b677ace5dcb0	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:28:35.786	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:28:35.786	\N	\N
+05bdb913-4669-4ede-8452-af959b28d7a9	TestConnectionCleanup	8052fdfa-759c-4ec0-b06d-6b63fd70bfca	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:29:57.862	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:29:57.862	\N	\N
+9a6e3033-931a-45b1-b9c7-c766eaf0885c	TestConnectionCleanup	805f14e3-7984-414d-9e93-21c1da4324bb	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:30:37.971	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:30:37.971	\N	\N
+c416e7ab-93ca-4820-ae71-57db1a30794b	TestConnectionCleanup	d898b789-60fe-4a14-aadf-c081b0a053d8	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:31:34.052	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:31:34.052	\N	\N
+83de8f4a-8d5f-4eb0-a59b-b2de71a3b911	TestConnectionCleanup	3b3f22e1-0db2-4df0-8ff6-2fb1dc983cf9	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:36:08.258	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:36:08.258	\N	\N
+09e8ac78-24ca-4bb0-88eb-b2295cff32cc	TestConnectionCleanup	2fe19d4f-3a11-497f-9eca-8c54c35b80ee	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:37:52.339	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:37:52.339	\N	\N
+fca5f420-69e6-41d3-9494-7449ba77e4be	TestConnectionCleanup	c07a605c-98e2-42ec-a865-89b264582164	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:39:05.544	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:39:05.544	\N	\N
+428d9a25-c74e-4b7c-8647-45bcae0e1d71	TestConnectionCleanup	6d243aff-f05c-4f52-a36f-0fe1b34f016c	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:43:07.374	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:43:07.374	\N	\N
+05b49557-88c0-40ff-9b3c-e8890c87a7a7	TestConnectionCleanup	ea425a8d-932b-4b1f-b39d-1e57d91f26d9	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:45:15.994	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:45:15.994	\N	\N
+5556dc4e-61c4-4c78-9cbb-96a138d58842	TestConnectionCleanup	61a4bc62-22da-4c67-9c58-3ac32b68b0b0	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:48:02.093	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:48:02.093	\N	\N
+2c447493-1152-48c4-8cda-f8201fe1a3b6	TestConnectionCleanup	5bd31a59-87d9-4f7e-a29e-31d009109208	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 19:51:24.504	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 19:51:24.504	\N	\N
+15159a66-51d1-4aef-a4ed-1b2283dff0e4	TestConnectionCleanup	9f731429-90e3-48ee-a089-d18dbf28ecc8	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:01:17.254	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:01:17.254	\N	\N
+6c3ba2b5-7214-40e1-b5f1-1e4cc9f2648c	TestConnectionCleanup	31187d9b-ba61-4fa7-852a-35a10487efc1	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:09:25.564	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:09:25.564	\N	\N
 \.
 
 
@@ -927,6 +942,21 @@ e95b575c-c66f-4d99-8793-b577cd796fb9	01920000-1000-7000-8000-000000000001	2025-0
 fe32f0d6-6917-41cf-bbe5-af61e9783a3a	01920000-1000-7000-8000-000000000001	2025-09-24 18:52:53.790565	2025-09-24 18:52:53.790565	UNIVERSE TEST 14:52:53	Testing universe-scoped notifications	active	\N	universe_test
 78ffebe0-3acc-45bf-8395-f1e68e21af6d	01920000-1000-7000-8000-000000000001	2025-09-24 18:56:42.081827	2025-09-24 18:56:42.081827	🎯 UNIVERSE SYNC FIXED 14:56:42	Testing fixed universe-scoped sync	active	\N	universe_fixed
 5ea74089-813a-4b21-87e0-86c8e6551a98	01920000-1000-7000-8000-000000000001	2025-09-24 19:06:21.769659	2025-09-24 19:06:21.769659	🚀 WEBSOCKET TEST 15:06:21	Testing WebSocket table notifications	active	\N	websocket_test
+4c3d1c08-50d7-4785-a3f8-ce37b1e67244	01920000-1000-7000-8000-000000000001	2025-09-24 19:25:58.805	2025-09-24 19:25:58.805	Test Sync Notification Record	Testing if sync notifications trigger data refresh after fixes	draft	\N	sync-test-value
+4d90de34-1b59-4c38-8bdc-bd4a8bdb7dae	01920000-1000-7000-8000-000000000001	2025-09-24 19:28:04.775	2025-09-24 19:28:04.775	Debug Test Record 2	Testing debug output for sync notifications	draft	\N	debug-sync-test-2
+cd250dd8-7d44-403f-849f-b677ace5dcb0	01920000-1000-7000-8000-000000000001	2025-09-24 19:28:35.764	2025-09-24 19:28:35.764	Debug Keys Test Record 3	Testing key lookup debug output	draft	\N	debug-keys-test-3
+8052fdfa-759c-4ec0-b06d-6b63fd70bfca	01920000-1000-7000-8000-000000000001	2025-09-24 19:29:57.831	2025-09-24 19:29:57.831	Final Debug Test Record	Final test to see notification lookup	draft	\N	final-debug-test
+805f14e3-7984-414d-9e93-21c1da4324bb	01920000-1000-7000-8000-000000000001	2025-09-24 19:30:37.954	2025-09-24 19:30:37.954	Deduplication Test Record	Testing message deduplication and debug output	draft	\N	dedup-test-final
+d898b789-60fe-4a14-aadf-c081b0a053d8	01920000-1000-7000-8000-000000000001	2025-09-24 19:31:34.035	2025-09-24 19:31:34.035	Entity Mapping Test Record	Testing enhanced entity name mapping	draft	\N	entity-mapping-test
+3b3f22e1-0db2-4df0-8ff6-2fb1dc983cf9	01920000-1000-7000-8000-000000000001	2025-09-24 19:36:08.244	2025-09-24 19:36:08.244	Direct Refresh Test Record	Testing direct refresh registry approach	draft	\N	direct-refresh-test
+2fe19d4f-3a11-497f-9eca-8c54c35b80ee	01920000-1000-7000-8000-000000000001	2025-09-24 19:37:52.324	2025-09-24 19:37:52.324	Post-Refresh Test Record	Testing after browser refresh with all fixes	draft	\N	post-refresh-test
+c07a605c-98e2-42ec-a865-89b264582164	01920000-1000-7000-8000-000000000001	2025-09-24 19:39:05.532	2025-09-24 19:39:05.532	Fresh System Test Record	Testing fresh system after all fixes	draft	\N	fresh-system-test
+6d243aff-f05c-4f52-a36f-0fe1b34f016c	01920000-1000-7000-8000-000000000001	2025-09-24 19:43:07.36	2025-09-24 19:43:07.36	Enhanced Debug Test Record	Testing enhanced hibernation debug output	draft	\N	enhanced-debug-test
+ea425a8d-932b-4b1f-b39d-1e57d91f26d9	01920000-1000-7000-8000-000000000001	2025-09-24 19:45:15.985	2025-09-24 19:45:15.985	WebSocket Hibernation Fix Test	Testing WebSocket hibernation fixes with immediate attachment	draft	\N	hibernation-fix-test
+61a4bc62-22da-4c67-9c58-3ac32b68b0b0	01920000-1000-7000-8000-000000000001	2025-09-24 19:48:02.083	2025-09-24 19:48:02.083	Real-Time Sync Confirmation Test	Final test to confirm real-time sync is working	draft	\N	real-time-sync-confirmed
+5bd31a59-87d9-4f7e-a29e-31d009109208	01920000-1000-7000-8000-000000000001	2025-09-24 19:51:24.486	2025-09-24 19:51:24.486	Clean Logging Test Record	Testing cleaned up logging with debouncing	draft	\N	clean-logging-test
+9f731429-90e3-48ee-a089-d18dbf28ecc8	01920000-1000-7000-8000-000000000001	2025-09-24 20:01:17.242	2025-09-24 20:01:17.242	WAL Debug Polling Test	Testing WAL polling debug output	draft	\N	wal-debug-test
+31187d9b-ba61-4fa7-852a-35a10487efc1	01920000-1000-7000-8000-000000000001	2025-09-24 20:09:25.546	2025-09-24 20:09:25.546	Internal LSN Tracking Test	Testing internal LSN tracking instead of slot advancement	draft	\N	internal-lsn-test
 \.
 
 
@@ -1334,5 +1364,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict W6u8fBV8FA9fsrKGUTz1umYCBYZy5jTxdJ28RcIhuu56q6shnxy5MzwGT2BH2kr
+\unrestrict K9dUnaDdcnlUJDph96isTZFWM9uH1T92diWhObQNgHEroBh7QmMXdVMBwelO9rj
 

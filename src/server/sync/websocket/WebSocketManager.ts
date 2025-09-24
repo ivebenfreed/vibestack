@@ -102,6 +102,23 @@ export class WebSocketManager {
     // Configure WebSocket with hibernation API
     if (server) {
       this.context.ctx.acceptWebSocket(server);
+
+      // CRITICAL FIX: Store basic attachment data IMMEDIATELY after accepting WebSocket
+      // This ensures hibernation has something to work with
+      const basicContext = {
+        clientId,
+        organizationId,
+        timestamp: Date.now(),
+        accepted: true
+      };
+
+      server.serializeAttachment(basicContext);
+
+      syncLogger.info('WebSocket accepted with basic attachment data', {
+        clientId,
+        organizationId,
+        attachmentSize: JSON.stringify(basicContext).length
+      }, MODULE_NAME);
     }
     
     // Return connection info for further processing by parent

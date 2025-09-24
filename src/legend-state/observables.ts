@@ -721,13 +721,27 @@ function createEntityObservable(entityName: string, schema?: any) {
 
     // REACTIVE SYNC SUBSCRIPTION - Direct Legend State observable subscription
     subscribe: ({ refresh }: { refresh: () => void }) => {
+      // REGISTER REFRESH FUNCTION - Create global registry for direct refresh access
+      if (typeof window !== 'undefined') {
+        if (!(window as any).__elevra_entities_refresh_registry) {
+          (window as any).__elevra_entities_refresh_registry = {}
+        }
+        (window as any).__elevra_entities_refresh_registry[entityName] = refresh
+
+        fileLog.info(`🔄 [REFRESH-REGISTRY] Registered refresh function for ${entityName}`)
+      }
       // Create reactive subscription to sync notifications for this entity
       const notificationHandler = (notification: any) => {
         if (!notification) return
 
-        // Only log notifications in development for debugging
-        if (typeof window !== 'undefined' && window.location?.hostname === 'localhost' && notification.test) {
-          fileLog.info(`[Observable] ${entityName} received test notification:`, notification)
+        // DEBUG: Always log notification handler calls in development
+        if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+          fileLog.info(`[Observable] 🔔 ${entityName} notification handler called`, {
+            hasNotification: !!notification,
+            messageId: notification?.messageId,
+            tables: notification?.tables,
+            timestamp: notification?.timestamp
+          })
         }
 
         // **Enhanced notification handling for virtual entities**
@@ -743,10 +757,36 @@ function createEntityObservable(entityName: string, schema?: any) {
             fileLog.info(`[Observable] Virtual entity ${entityName} sync triggered by backend table change:`, notification.tables)
           }
         } else {
-          // Regular entities use original logic - entity name matching
+          // Regular entities use enhanced logic - entity name matching with fallbacks
           isRelevantNotification = notification?.tables?.some((tableName: string) => {
-            const expectedTableName = entityName.toLowerCase() + 's'
-            return tableName === expectedTableName
+            // Extract the base entity name without org prefix
+            const baseEntityName = entityName.includes('_') ? entityName.split('_').slice(1).join('_') : entityName
+
+            // Try multiple matching patterns:
+            // 1. Standard plural: Task -> tasks
+            const standardPlural = baseEntityName.toLowerCase() + 's'
+            // 2. Direct match: testconnectioncleanup -> testconnectioncleanup
+            const directMatch = baseEntityName.toLowerCase()
+            // 3. Org-prefixed table format: org_01234_task -> task
+            const orgTablePattern = tableName.includes('_') ? tableName.split('_').slice(-1)[0] : ''
+
+            const matches = tableName === standardPlural ||
+                           tableName === directMatch ||
+                           orgTablePattern === baseEntityName.toLowerCase()
+
+            if (matches && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+              fileLog.info(`[Observable] Table match found: ${tableName} matches entity ${entityName}`, {
+                entityName,
+                baseEntityName,
+                tableName,
+                standardPlural,
+                directMatch,
+                orgTablePattern,
+                matchType: tableName === standardPlural ? 'plural' : tableName === directMatch ? 'direct' : 'org-prefix'
+              })
+            }
+
+            return matches
           })
 
           if (isRelevantNotification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
@@ -766,6 +806,14 @@ function createEntityObservable(entityName: string, schema?: any) {
       // DIRECT OBSERVABLE SUBSCRIPTION - No CustomEvent needed
       const entityNotification$ = syncNotifications$.getNotificationFor(entityName)
 
+      // DEBUG: Log the entity notification subscription
+      if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+        fileLog.info(`[Observable] ${entityName} notification subscription setup`, {
+          entityName,
+          hasNotificationGetter: typeof entityNotification$ === 'function' || typeof entityNotification$.get === 'function'
+        })
+      }
+
       // Subscribe to notifications using Legend State's when() for reactive subscription
       const unsubscribe = when(entityNotification$, notificationHandler)
 
@@ -774,8 +822,16 @@ function createEntityObservable(entityName: string, schema?: any) {
       // Return cleanup function
       return () => {
         unsubscribe()
-        if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-          fileLog.info(`[Observable] ${entityName} unsubscribed from direct sync notifications`)
+
+        // CLEANUP REFRESH REGISTRY
+        if (typeof window !== 'undefined') {
+          if ((window as any).__elevra_entities_refresh_registry) {
+            delete (window as any).__elevra_entities_refresh_registry[entityName]
+            fileLog.info(`🗑️ [REFRESH-REGISTRY] Unregistered refresh function for ${entityName}`)
+          }
+          if (window.location?.hostname === 'localhost') {
+            fileLog.info(`[Observable] ${entityName} unsubscribed from direct sync notifications`)
+          }
         }
       }
     }

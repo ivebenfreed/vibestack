@@ -591,7 +591,7 @@ export class PollingManager {
 
   private async pollForChanges(): Promise<WALData[] | null> {
     try {
-      replicationLogger.debug('Polling for changes using peek/advance pattern', {
+      replicationLogger.info('🔍 [WAL-DEBUG] Polling for changes using peek/advance pattern', {
         slot: this.config.slot,
         batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
       }, MODULE_NAME);
@@ -599,7 +599,11 @@ export class PollingManager {
       return await withPostgresClient(async (client) => {
         const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
 
-        // Use PEEK to see available changes without advancing slot
+        // ENHANCED: Use internal LSN tracking instead of slot advancement
+        // Get our current internal LSN position to filter only new changes
+        const currentInternalLSN = this.stateManager.getLSN();
+
+        // Use PEEK to see available changes without advancing slot, filtered by our internal position
         const result = await client.unsafe(`
           SELECT data, lsn, xid
           FROM pg_logical_slot_peek_changes(
@@ -609,14 +613,34 @@ export class PollingManager {
             'include-xids', '1',
             'include-timestamp', 'true'
           )
-          LIMIT $2
-        `, [this.config.slot, batchSize]);
+          WHERE lsn > $2::pg_lsn
+          ORDER BY lsn
+          LIMIT $3
+        `, [this.config.slot, currentInternalLSN, batchSize]);
+
+        replicationLogger.info('🔍 [LSN-FILTER] Internal LSN filtering', {
+          slot: this.config.slot,
+          currentInternalLSN,
+          newChangesFound: result.length,
+          batchSize
+        }, MODULE_NAME);
 
         const newChanges = result.map(row => ({
           data: row.data as string,
           lsn: row.lsn as string,
           xid: row.xid as string
         }));
+
+        // DEBUG: Log detailed polling results
+        replicationLogger.info('🔍 [WAL-DEBUG] Poll results', {
+          slot: this.config.slot,
+          slotUsedInQuery: this.config.slot,
+          resultRows: result.length,
+          mappedChanges: newChanges.length,
+          hasResults: result.length > 0,
+          sampleLSNs: newChanges.slice(0, 3).map(c => c.lsn),
+          query: `pg_logical_slot_peek_changes('${this.config.slot}', NULL, NULL, 'include-xids', '1', 'include-timestamp', 'true')`
+        }, MODULE_NAME);
 
         replicationLogger.info('🔍 PEEK RESULTS', {
           changesFound: newChanges.length,
