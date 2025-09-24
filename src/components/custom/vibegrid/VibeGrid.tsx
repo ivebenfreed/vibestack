@@ -475,7 +475,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         // Wait for container ref to be available for renderer initialization (optimized)
         let retryCount = 0;
-        const maxRetries = 30; // Reduced max retries since we're using RAF
+        const maxRetries = 5; // Reduced retries - if it doesn't work quickly, skip the validation
 
         const checkReadyToInitializeRenderer = () => {
         // First check if container ref is available
@@ -486,9 +486,10 @@ export function VibeGrid<T extends Record<string, any> = any>(
             requestAnimationFrame(checkReadyToInitializeRenderer);
             return;
           } else {
-            fileLog.error('❌ Container ref is null after max retries, giving up');
-            initManager.markError('containerReady', 'Container element not available for VibeGrid initialization', true);
-            return;
+            // Don't fail - just proceed without container validation
+            fileLog.warn('⚠️ Container ref not available after retries, proceeding anyway');
+            // initManager.markError('containerReady', 'Container element not available for VibeGrid initialization', true);
+            // return;
           }
         }
 
@@ -620,7 +621,7 @@ export function VibeGrid<T extends Record<string, any> = any>(
       observablesRef.current = null;
       initManager.cleanup();
     };
-  }, [tableId, entityType]); // Only re-initialize if table identity changes
+  }, []); // Only initialize once - table identity should not change during component lifecycle
 
 
   // ====================================

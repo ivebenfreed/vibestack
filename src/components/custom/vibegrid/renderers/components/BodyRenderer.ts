@@ -45,6 +45,9 @@ export interface BodyRendererOptions {
 
   // Cell creation callbacks
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+
+  // Field type system bridge
+  modularCellBridge?: any;
 }
 
 // ====================================
@@ -101,6 +104,7 @@ export class BodyRenderer {
     this.createElement = options.createElement;
     this.onEntityUpdate = options.onEntityUpdate;
     this.visualState = options.visualState;
+    this.modularCellBridge = options.modularCellBridge || null;
 
     // Initialize drag and drop manager with container
     this.initializeDragDrop();

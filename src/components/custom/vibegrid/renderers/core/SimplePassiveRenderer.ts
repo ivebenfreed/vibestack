@@ -42,6 +42,7 @@ import type { VisualCellPosition } from '../../overlays/OverlayTypes';
 import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatters';
 import { createDataLoadingStage$, createStageCallbacks } from '../../stores/data-loading-stages';
 import type { VibeGridHydrationManager } from '../../stores/init-state';
+import { modularCellBridge } from '../../field-types';
 
 const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
@@ -258,7 +259,8 @@ export class SimplePassiveRenderer {
       container: this.container,
       visualState: this.visualState,
       createElement: this.createElement.bind(this),
-      onEntityUpdate: this.options.onEntityUpdate
+      onEntityUpdate: this.options.onEntityUpdate,
+      modularCellBridge: modularCellBridge
     });
 
     // Update SelectionController with bodyRenderer reference for checkbox updates
