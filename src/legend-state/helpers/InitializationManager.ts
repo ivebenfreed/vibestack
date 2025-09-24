@@ -25,6 +25,7 @@ export interface InitializationState {
     syncConfiguration: boolean
     schemaValidation: boolean
     dataHydration: boolean
+    fieldTypeSystem: boolean
   }
   error?: string
   timestamp?: number
@@ -56,7 +57,8 @@ class InitializationManager {
       persistenceSetup: false,
       syncConfiguration: false,
       schemaValidation: false,
-      dataHydration: false
+      dataHydration: false,
+      fieldTypeSystem: false
     }
   })
 
@@ -116,7 +118,8 @@ class InitializationManager {
         persistenceSetup: false,
         syncConfiguration: false,
         schemaValidation: false,
-        dataHydration: false
+        dataHydration: false,
+        fieldTypeSystem: false
       }
     })
 
@@ -171,10 +174,27 @@ class InitializationManager {
       this.state$.progress.dataHydration.set(true)
       fileLog.info(`[InitManager] ✅ Data hydration setup complete`)
 
+      // Step 5: Initialize Field Type System
+      fileLog.info(`[InitManager] Step 5: Initializing field type system`)
+      try {
+        // Dynamically import the field type system to ensure ModularCellBridge is available
+        const fieldTypesModule = await import('@/components/custom/vibegrid/field-types')
+        const { initializeFieldTypeSystem } = fieldTypesModule
+
+        // Initialize the field type system
+        initializeFieldTypeSystem()
+
+        this.state$.progress.fieldTypeSystem.set(true)
+        fileLog.info(`[InitManager] ✅ Field type system initialized`)
+      } catch (error) {
+        fileLog.error(`[InitManager] ⚠️ Field type system initialization failed:`, error)
+        // Continue without field type system - it may be initialized later by VibeGrid
+      }
+
       // Mark as ready
       this.state$.status.set('ready')
       this.state$.timestamp.set(Date.now())
-      
+
       fileLog.info(`[InitManager] 🎉 Universe initialization complete for user ${userId}`)
 
     } catch (error) {

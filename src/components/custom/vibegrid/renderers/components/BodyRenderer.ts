@@ -108,8 +108,15 @@ export class BodyRenderer {
     // Setup observer for selection changes to update checkboxes
     this.setupSelectionObserver();
 
-    // Initialize modular cell system synchronously
-    this.initializeModularCellSystem();
+    // Check if modular cell system is already available globally (from init manager)
+    // This allows synchronous access if it's already initialized
+    if (typeof window !== 'undefined' && window.vibegridCellBridge) {
+      this.modularCellBridge = window.vibegridCellBridge;
+      fileLog.info('🎯 [FIELD-BRIDGE] Modular cell system already available from init manager');
+    } else {
+      // Initialize modular cell system asynchronously as fallback
+      this.initializeModularCellSystem();
+    }
 
     fileLog.info('🏗️ BodyRenderer initialized (Phase 2.1 consolidated)');
   }
@@ -129,8 +136,20 @@ export class BodyRenderer {
    * Initialize modular cell system for enhanced field type support
    */
   private async initializeModularCellSystem(): Promise<void> {
+    // First check if it's already available globally (from init manager)
+    if (typeof window !== 'undefined' && window.vibegridCellBridge) {
+      this.modularCellBridge = window.vibegridCellBridge;
+      fileLog.info('🎯 [FIELD-BRIDGE] Modular cell system already initialized (from init manager)', {
+        supportedTypes: this.modularCellBridge.getStats().registry.totalTypes,
+        basicTypes: this.modularCellBridge.getStats().registry.basicTypes.length,
+        relationshipTypes: this.modularCellBridge.getStats().registry.relationshipTypes.length,
+        rollupTypes: this.modularCellBridge.getStats().registry.rollupTypes.length
+      });
+      return;
+    }
+
     try {
-      // Dynamically import the modular system to avoid circular dependencies
+      // Fallback: Dynamically import the modular system to avoid circular dependencies
       const modularModule = await import('../../field-types');
       this.modularCellBridge = modularModule.modularCellBridge;
 
