@@ -601,7 +601,7 @@ export class PollingManager {
 
         // ENHANCED: Use internal LSN tracking instead of slot advancement
         // Get our current internal LSN position to filter only new changes
-        const currentInternalLSN = this.stateManager.getLSN();
+        const currentInternalLSN = await this.stateManager.getLSN();
 
         // Use PEEK to see available changes without advancing slot, filtered by our internal position
         const result = await client.unsafe(`
