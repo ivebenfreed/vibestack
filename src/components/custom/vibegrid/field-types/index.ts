@@ -135,7 +135,7 @@ export function initializeFieldTypeSystem(): void {
       // Set up periodic cache cleanup (every 5 minutes)
       setInterval(() => {
         try {
-          modularCellBridge['relationshipDataManager']?.cleanupExpiredCache?.();
+          modularCellBridge.relationshipDataManager?.cleanupExpiredCache?.();
         } catch (error) {
           console.warn('[FIELD-SYSTEM] Cache cleanup failed:', error);
         }
