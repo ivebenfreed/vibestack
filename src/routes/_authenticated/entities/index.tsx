@@ -80,7 +80,25 @@ const EntitiesListPage = observer(function EntitiesListPage() {
   const { currentOrganization, user } = useAuth();
   const schema = use$(universeSchema$);
   const orgId = use$(universeOrgId$);
-  
+
+  // Helper function to safely parse entity name and org ID
+  const parseEntityInfo = (entityName: string) => {
+    if (!entityName.includes('_')) {
+      // This should never happen if users have proper org context
+      throw new Error(`Invalid entity name format: ${entityName} - expected orgId_entityName format but entity name has no underscore. Current orgId: ${orgId}`);
+    }
+
+    const parts = entityName.split('_');
+    if (parts.length < 2) {
+      throw new Error(`Invalid entity name format: ${entityName} - expected orgId_entityName format but got ${parts.length} parts after splitting. Current orgId: ${orgId}`);
+    }
+
+    return {
+      orgId: parts[0],
+      entityName: parts.slice(1).join('_') // Handle entity names with underscores
+    };
+  };
+
   // Components should only consume observables, not trigger loads
   // Loading is handled by auth state machines
   
@@ -294,10 +312,13 @@ const EntitiesListPage = observer(function EntitiesListPage() {
                     <TableCell className="font-medium">
                       <Link
                         to="/org/$orgId/entities/$entityName"
-                        params={{ 
-                          orgId: item._entityName.includes('_') ? item._entityName.split('_')[0] : 'unknown',
-                          entityName: item._entityName.includes('_') ? item._entityName.split('_')[1] : item._entityName
-                        }}
+                        params={(() => {
+                          const parsed = parseEntityInfo(item._entityName);
+                          return {
+                            orgId: parsed.orgId,
+                            entityName: parsed.entityName
+                          };
+                        })()}
                         className="hover:underline"
                       >
                         {item.name || item.title || 'Untitled'}
@@ -328,10 +349,13 @@ const EntitiesListPage = observer(function EntitiesListPage() {
                           <DropdownMenuItem asChild>
                             <Link
                               to="/org/$orgId/entities/$entityName"
-                              params={{ 
-                                orgId: item._entityName.includes('_') ? item._entityName.split('_')[0] : 'unknown',
-                                entityName: item._entityName.includes('_') ? item._entityName.split('_')[1] : item._entityName
-                              }}
+                              params={(() => {
+                                const parsed = parseEntityInfo(item._entityName);
+                                return {
+                                  orgId: parsed.orgId,
+                                  entityName: parsed.entityName
+                                };
+                              })()}
                             >
                               <Eye className="mr-2 h-4 w-4" />
                               View
@@ -393,10 +417,13 @@ const EntitiesListPage = observer(function EntitiesListPage() {
                       <DropdownMenuItem asChild>
                         <Link
                           to="/org/$orgId/entities/$entityName"
-                          params={{ 
-                            orgId: item._entityName.includes('_') ? item._entityName.split('_')[0] : 'unknown',
-                            entityName: item._entityName.includes('_') ? item._entityName.split('_')[1] : item._entityName
-                          }}
+                          params={(() => {
+                            const parsed = parseEntityInfo(item._entityName);
+                            return {
+                              orgId: parsed.orgId,
+                              entityName: parsed.entityName
+                            };
+                          })()}
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View

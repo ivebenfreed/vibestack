@@ -373,7 +373,10 @@ function createEntityObservable(entityName: string, schema?: any) {
       baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
     } else {
       // Fallback for other virtual entities
-      actualOrgId = schema._orgId || 'unknown'
+      if (!schema._orgId) {
+        throw new Error(`Missing organization ID for virtual entity '${entityName}' - schema._orgId is required but was: ${JSON.stringify(schema._orgId)}`)
+      }
+      actualOrgId = schema._orgId
       actualEntityName = schema._originalName || entityName
       baseUrl = `/api/dataforge/virtual/${actualEntityName.toLowerCase()}`
     }
@@ -405,7 +408,10 @@ function createEntityObservable(entityName: string, schema?: any) {
     } else {
       // Fallback for non-prefixed entities (shouldn't happen in universe schema)
       fileLog.debug(`[Observable] Non-prefixed entity name: ${entityName} - using schema _organizationId`)
-      actualOrgId = schema?._organizationId || 'unknown'
+      if (!schema?._organizationId) {
+        throw new Error(`Missing organization ID for entity '${entityName}' - schema._organizationId is required but was: ${JSON.stringify(schema?._organizationId)}`)
+      }
+      actualOrgId = schema._organizationId
       actualEntityName = entityName
       baseUrl = `/api/dataforge/orgs/${actualOrgId}/data/${actualEntityName}`
     }
