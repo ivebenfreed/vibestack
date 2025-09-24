@@ -43,8 +43,10 @@ BashOutput(bash_id="[tester-dev-id]")
 
 # Filtered output
 BashOutput(bash_id="[tester-dev-id]", filter="ERROR|WARNING")
-BashOutput(bash_id="[tester-dev-id]", filter="AUTH|sign-in")
-BashOutput(bash_id="[tester-dev-id]", filter="WebSocket|sync")
+
+# Recent logs (timestamps are UTC, not local time!)
+# Get UTC: date -u +"%H:%M"
+# Last 5 min example: filter="01:0[0-5]:[0-9]{2}"
 ```
 
 ## Database
