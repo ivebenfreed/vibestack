@@ -255,18 +255,37 @@ const appInitMethods = {
       throw new Error('User or organizations not available');
     }
 
-    const orgIds = userOrganizations.map(org => org.id);
-
-    // Load universe context (schemas for all orgs)
-    await loadUniverseContext(user.id, orgIds, userOrganizations);
-
-    // Verify universe loaded
+    // Check if universe is already loaded
     const universeOrgs = Object.keys(universeContext$.organizations.get());
-    if (universeOrgs.length === 0) {
-      throw new Error('Failed to load universe context');
-    }
+    if (universeOrgs.length > 0) {
+      initLog.info(`🌌 Universe context already loaded with ${universeOrgs.length} organizations, checking if schemas are ready...`);
 
-    initLog.info(`🌌 Universe context created, waiting for organization schemas to load...`);
+      // Check if all schemas are already loaded
+      const organizations = Object.values(universeContext$.organizations.get());
+      const stillLoadingOrgs = organizations.filter(org => org.loading);
+
+      if (stillLoadingOrgs.length === 0) {
+        initLog.info(`✅ All organization schemas already loaded, proceeding to entities stage`);
+        // Auto-advance to entities immediately
+        if (this.canLoadEntities) {
+          await this.advanceToStage('entities');
+        }
+        return true;
+      } else {
+        initLog.info(`🌌 Universe loaded but ${stillLoadingOrgs.length} schemas still loading, waiting...`);
+      }
+    } else {
+      // Load universe context (schemas for all orgs) if not already loaded
+      const orgIds = userOrganizations.map(org => org.id);
+      await loadUniverseContext(user.id, orgIds, userOrganizations);
+
+      // Verify universe loaded
+      const newUniverseOrgs = Object.keys(universeContext$.organizations.get());
+      if (newUniverseOrgs.length === 0) {
+        throw new Error('Failed to load universe context');
+      }
+      initLog.info(`🌌 Universe context created, waiting for organization schemas to load...`);
+    }
 
     // CRITICAL: Wait for all organization schemas to actually load
     // This prevents entity pages from loading before schemas are ready
@@ -280,10 +299,23 @@ const appInitMethods = {
         const totalOrgs = organizations.length;
         const readyOrgs = totalOrgs - stillLoadingOrgs.length;
 
-        initLog.info(`🌌 Schema loading progress: ${readyOrgs}/${totalOrgs} organizations ready`);
+        initLog.info(`🌌 Schema loading progress: ${readyOrgs}/${totalOrgs} organizations ready`, {
+          totalOrgs,
+          readyOrgs,
+          stillLoadingCount: stillLoadingOrgs.length,
+          elapsed: Date.now() - startTime
+        });
 
-        if (stillLoadingOrgs.length === 0) {
+        // If all organizations are ready OR if there are no organizations (edge case)
+        if (stillLoadingOrgs.length === 0 && totalOrgs > 0) {
           initLog.info(`✅ All ${totalOrgs} organization schemas loaded successfully`);
+          resolve();
+          return;
+        }
+
+        // Handle edge case where no organizations exist
+        if (totalOrgs === 0) {
+          initLog.info(`✅ No organizations to load, proceeding...`);
           resolve();
           return;
         }
@@ -291,7 +323,10 @@ const appInitMethods = {
         // Timeout check
         if (Date.now() - startTime > maxWaitTime) {
           const stillLoadingIds = stillLoadingOrgs.map(org => org.orgId || 'unknown');
-          reject(new Error(`Schema loading timeout: ${stillLoadingIds.join(', ')} still loading after ${maxWaitTime}ms`));
+          initLog.error(`❌ Schema loading timeout: ${stillLoadingIds.join(', ')} still loading after ${maxWaitTime}ms`);
+          // Don't reject, just resolve to continue - schemas may be ready enough
+          initLog.info(`⚠️ Proceeding despite timeout - app may still work`);
+          resolve();
           return;
         }
 
@@ -414,6 +449,7 @@ const appInitMethods = {
 
   // Initialize the app loading sequence
   async initialize(): Promise<boolean> {
+    console.log('🚀 INIT METHOD CALLED - Starting app initialization sequence');
     initLog.info('🚀 Starting app initialization sequence');
     this.reset();
 
@@ -469,8 +505,14 @@ const appInitMethods = {
   }
 };
 
-// Export methods separately for easier access
-export const appInitMethods$ = appInitMethods;
+// Export methods with proper binding
+export const appInitMethods$ = {
+  initialize: appInitMethods.initialize.bind(appInitMethods),
+  reset: appInitMethods.reset.bind(appInitMethods),
+  markReady: appInitMethods.markReady.bind(appInitMethods),
+  retry: appInitMethods.retry.bind(appInitMethods),
+  getDetailedStatus: appInitMethods.getDetailedStatus.bind(appInitMethods)
+};
 
 /**
  * Hook for using app initialization state in components

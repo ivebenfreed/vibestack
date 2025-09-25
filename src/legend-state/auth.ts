@@ -324,15 +324,8 @@ when(() => {
     organizations: organizations.map(org => ({ id: org.id, name: org.name }))
   });
   
-  try {
-    // Use proper app initialization stages instead of simple initialization
-    const { appInitMethods$ } = await import('@/legend-state/app-initialization-stages');
-    await appInitMethods$.initialize();
-
-    authLog.info('[AUTH$] Successfully initialized app using staged initialization');
-  } catch (error) {
-    authLog.error('[AUTH$] Failed to initialize app stages:', error);
-  }
+  // Universe context loaded - app initialization stages will handle the rest
+  authLog.info('[AUTH$] Universe context loaded, ready for staged initialization');
 });
 
 // Export computed values for convenience

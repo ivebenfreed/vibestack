@@ -16,6 +16,8 @@ import React from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { routeReadiness$, routeReadinessActions } from '@/legend-state/route-readiness'
 import { useSelector } from '@legendapp/state/react'
+import { auth$ } from '@/legend-state/auth'
+import { universeContext$ } from '@/legend-state/observables'
 
 // Router context interface with atom setters
 interface RouterContext {
@@ -151,21 +153,22 @@ function AppWithInitialization() {
   // Use app initialization to check if the app is fully loaded
   const appInit = useAppInitialization()
 
-  // Start app initialization only when authenticated
+  // Start staged app initialization when authenticated
   React.useEffect(() => {
-    // Only initialize if authenticated and not already in progress
     const currentStage = appInit.stage;
+
     if (isAuthenticated && currentStage === 'idle') {
-      rootLog.debug('[APP-INIT] Starting app initialization - user authenticated');
-      appInitMethods$.initialize().catch((error) => {
-        rootLog.error('[APP-INIT] App initialization failed:', error);
+      rootLog.info('[APP-INIT] Starting staged app initialization');
+      appInitMethods$.initialize().then((success) => {
+        rootLog.info(`[APP-INIT] Staged initialization ${success ? 'completed' : 'failed'}`);
+      }).catch((error) => {
+        rootLog.error('[APP-INIT] Staged initialization failed:', error);
       });
     } else if (!isAuthenticated && currentStage !== 'idle') {
-      // Reset initialization if user becomes unauthenticated
       rootLog.debug('[APP-INIT] Resetting app initialization - user not authenticated');
       appInitMethods$.reset();
     }
-  }, [isAuthenticated]); // Run when authentication state changes
+  }, [isAuthenticated, appInit.stage]);
 
   // Use route readiness tracking
   const routeReady = useSelector(routeReadiness$.isReady)
@@ -251,13 +254,15 @@ function AppWithInitialization() {
     return <UnifiedLoadingScreen />; // Loading while auth checks or redirect happens
   }
 
-  // Show loading screen until app initialization is complete (only for authenticated users, not on public routes)
-  if (isAuthenticated && !appInit.isReady && !isPublicAuthRoute) {
-    rootLog.debug('[APP-INIT] Showing UnifiedLoadingScreen - app not ready', {
-      appInitReady: appInit.isReady,
-      stage: appInit.stage,
-      progress: appInit.progressPercent
-    });
+  // Check if universe context is loaded (simpler than complex staged system)
+  const universeLoaded = useSelector(() => {
+    const universeOrgs = Object.keys(universeContext$.organizations.get());
+    return universeOrgs.length > 0;
+  });
+
+  // Show loading screen until universe context is loaded
+  if (isAuthenticated && !universeLoaded && !isPublicAuthRoute) {
+    rootLog.debug('[APP-INIT] Showing UnifiedLoadingScreen - universe not loaded yet');
     return <UnifiedLoadingScreen />
   }
 
