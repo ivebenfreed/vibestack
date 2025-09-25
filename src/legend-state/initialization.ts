@@ -132,19 +132,27 @@ export async function initializeLegendState(
     const { loadUniverseContext } = await import('@/legend-state/observables');
     await loadUniverseContext(userId, organizationIds, organizationData);
     
-    // Reactively wait for schema to be properly loaded instead of timing hack
-    const { universeSchema$ } = await import('@/legend-state');
+    // Reactively wait for ALL organization schemas to be properly loaded
+    const { universeSchema$, universeContext$ } = await import('@/legend-state');
     const { when } = await import('@legendapp/state');
-    
-    // Wait for schema object to exist (not necessarily with entities - some orgs have 0 entities)
+
+    // Wait for ALL organizations to finish loading their schemas
     await when(() => {
-      const schema = universeSchema$.peek();
-      initLog.info('[LegendStateInit] Checking schema readiness:', { 
-        hasSchema: !!schema,
-        hasEntities: !!(schema?.entities),
-        entityCount: schema?.entities ? Object.keys(schema.entities).length : 0
+      const universe = universeContext$.peek();
+      const organizations = Object.values(universe.organizations);
+      const stillLoadingOrgs = organizations.filter(org => org.loading);
+      const totalOrgs = organizations.length;
+      const readyOrgs = totalOrgs - stillLoadingOrgs.length;
+
+      initLog.info('[LegendStateInit] Checking schema readiness:', {
+        totalOrgs,
+        readyOrgs,
+        stillLoadingOrgs: stillLoadingOrgs.length,
+        allSchemasReady: stillLoadingOrgs.length === 0 && totalOrgs > 0
       });
-      return !!schema; // Wait until we have schema object (entities may be empty)
+
+      // Wait until all organizations have finished loading their schemas
+      return stillLoadingOrgs.length === 0 && totalOrgs > 0;
     });
     
     // Get the final entity count (may be 0 for some organizations)

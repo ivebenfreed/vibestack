@@ -266,7 +266,43 @@ const appInitMethods = {
       throw new Error('Failed to load universe context');
     }
 
-    initLog.info(`✅ Universe context loaded with ${universeOrgs.length} organizations`);
+    initLog.info(`🌌 Universe context created, waiting for organization schemas to load...`);
+
+    // CRITICAL: Wait for all organization schemas to actually load
+    // This prevents entity pages from loading before schemas are ready
+    await new Promise<void>((resolve, reject) => {
+      const maxWaitTime = 30000; // 30 seconds timeout
+      const startTime = Date.now();
+
+      const checkSchemasReady = () => {
+        const organizations = Object.values(universeContext$.organizations.get());
+        const stillLoadingOrgs = organizations.filter(org => org.loading);
+        const totalOrgs = organizations.length;
+        const readyOrgs = totalOrgs - stillLoadingOrgs.length;
+
+        initLog.info(`🌌 Schema loading progress: ${readyOrgs}/${totalOrgs} organizations ready`);
+
+        if (stillLoadingOrgs.length === 0) {
+          initLog.info(`✅ All ${totalOrgs} organization schemas loaded successfully`);
+          resolve();
+          return;
+        }
+
+        // Timeout check
+        if (Date.now() - startTime > maxWaitTime) {
+          const stillLoadingIds = stillLoadingOrgs.map(org => org.orgId || 'unknown');
+          reject(new Error(`Schema loading timeout: ${stillLoadingIds.join(', ')} still loading after ${maxWaitTime}ms`));
+          return;
+        }
+
+        // Check again soon
+        setTimeout(checkSchemasReady, 100);
+      };
+
+      checkSchemasReady();
+    });
+
+    initLog.info(`✅ Universe schemas fully loaded, advancing to entities stage`);
 
     // Auto-advance to entities
     if (this.canLoadEntities) {

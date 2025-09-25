@@ -77,8 +77,20 @@ export const universeContext$ = observable({
 /**
  * Get universe-wide loading state
  * Replaces: orgContext$.loading
+ * Returns true if universe is loading OR any organizations are still loading their schemas
  */
-export const universeLoading$ = observable(() => universeContext$.get().loading)
+export const universeLoading$ = observable(() => {
+  const universe = universeContext$.get()
+
+  // If main universe is loading, we're definitely loading
+  if (universe.loading) return true
+
+  // Check if any organizations are still loading
+  const organizations = Object.values(universe.organizations || {})
+  const hasLoadingOrgs = organizations.some(org => org.loading)
+
+  return hasLoadingOrgs
+})
 
 /**
  * Get universe-wide error state

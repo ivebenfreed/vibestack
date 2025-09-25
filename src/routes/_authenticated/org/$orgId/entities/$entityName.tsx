@@ -3,7 +3,7 @@ import { observer } from '@legendapp/state/react'
 import { use$ } from '@legendapp/state/react'
 import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
-import { 
+import {
   getEntity$,
   universeLoading$,
   universeError$,
@@ -52,12 +52,12 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   const { user } = useAuth()
   const userId = user?.id
 
-
   // ✅ ALWAYS call ALL hooks at the top - no conditionals before this point
   // Use universe-based observables - schema-driven org parameters
   const loading = use$(universeLoading$)
   const error = use$(universeError$)
   const schema = use$(universeSchema$)
+
   
   // ✅ ALWAYS call getEntity$ and use$ to maintain consistent hook order
   // Call this unconditionally even if we don't have schema yet
@@ -81,9 +81,6 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
 
     // Use centralized entity name utilities for consistent normalization
     const normalizedEntityName = EntityNameUtils.fromUrlFormat(entityName)
-
-    // More detailed debugging before final result
-    const entityKeys = schema?.entities ? Object.keys(schema?.entities) : []
 
     // Try multiple lookup strategies
     let result = null
@@ -111,7 +108,7 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     }
 
     return result
-  }, [schema, entityName])
+  }, [schema, entityName, orgId])
   
   if (!orgId) {
     return (
@@ -135,23 +132,36 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
 
-  // Only show "Entity Not Found" for legitimate missing entities after schema is fully loaded
-  if (!loading && schema && !entitySchema) {
+  // Show loading state until we have both schema and entity schema resolved
+  // This prevents the "Entity Not Found" flash during initial page load
+  if (loading || !schema || !entitySchema) {
+    // Only show "Entity Not Found" if we're not loading, have a schema, but specifically can't find the entity
+    if (!loading && schema && !entitySchema) {
+      return (
+        <div className="container mx-auto py-6">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold">Entity Not Found</h2>
+            <p className="text-muted-foreground">
+              The entity "{entityName}" was not found in organization {orgId}.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    // Otherwise show loading state
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">
-          <h2 className="text-xl font-semibold">Entity Not Found</h2>
-          <p className="text-muted-foreground">
-            The entity "{entityName}" was not found in organization {orgId}.
-          </p>
+          <p className="text-muted-foreground">Loading entity...</p>
         </div>
       </div>
     )
   }
-  
+
   // ✅ SIMPLIFIED: Just pass the essentials, let UniversalEntityPage and VibeGrid handle the rest
   // Pass the properly formatted entity name with org prefix - UniversalEntityPage will handle display formatting
-  
+
   return (
     <UniversalEntityPage
       entityName={actualEntityKey}
