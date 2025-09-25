@@ -6,10 +6,12 @@
  */
 
 import { log } from '@/logger';
+import { toast } from 'sonner';
 import type { TableCore$ } from '../../stores/data-state';
 import type { TableInteraction$ } from '../../stores/interaction-state';
 import type { TableViewport$ } from '../../stores/pure-observables';
 import type { OverlayManager } from '../modules/OverlayManager';
+import { ClipboardManager } from '../../managers/ClipboardManager';
 
 const fileLog = log('components/custom/vibegrid/renderers/managers/EventManager.ts');
 
@@ -31,7 +33,8 @@ export class EventManager {
   private overlayManager?: OverlayManager;
   private container: HTMLElement;
   private onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
-  
+  private clipboardManager: ClipboardManager;
+
   // Event state
   private activeEventListeners: Array<{
     target: EventTarget;
@@ -46,6 +49,13 @@ export class EventManager {
     this.overlayManager = options.overlayManager;
     this.container = options.container;
     this.onEntityUpdate = options.onEntityUpdate;
+
+    // Initialize clipboard manager
+    this.clipboardManager = new ClipboardManager({
+      tableCore$: this.tableCore$,
+      tableInteraction$: this.tableInteraction$,
+      onEntityUpdate: this.onEntityUpdate
+    });
   }
 
   /**
@@ -97,10 +107,10 @@ export class EventManager {
             this.overlayManager?.hideContextMenu();
           },
           onCopy: () => {
-            this.handleCopyAction();
+            this.clipboardManager.handleCopy();
           },
           onPaste: () => {
-            this.handlePasteAction();
+            this.clipboardManager.handlePaste();
           },
           onCut: () => {
             this.handleCutAction();
@@ -131,103 +141,68 @@ export class EventManager {
   }
 
   /**
-   * Handle copy action
+   * Handle copy action (delegated to ClipboardManager)
    */
   handleCopyAction(): void {
-    fileLog.info('📋 Copy action triggered');
-    
-    const selectedCells = this.tableInteraction$.selectedCells.get();
-    if (selectedCells.size === 0) {
-      fileLog.info('📋 No cells selected for copy');
-      return;
-    }
-
-    try {
-      const copiedData = this.extractSelectedCellData(selectedCells);
-      this.copyToClipboard(copiedData);
-      
-      // Store in internal clipboard for paste operations
-      this.tableInteraction$.setClipboard({
-        data: copiedData,
-        operation: 'copy'
-      });
-      
-      fileLog.info('📋 Copy completed', { cellCount: selectedCells.size });
-
-      // Debug: Check if clipboard state was actually set
-      setTimeout(() => {
-        const clipboardCheck = this.tableInteraction$.clipboard?.get?.();
-        fileLog.info('📋 Clipboard state verification', {
-          hasClipboard: !!clipboardCheck,
-          operation: clipboardCheck?.operation,
-          copiedCellsCount: clipboardCheck?.copiedCells?.size
-        });
-      }, 100);
-    } catch (error) {
-      fileLog.error('📋 Copy failed', error);
-    }
-    
+    this.clipboardManager.handleCopy();
     this.overlayManager?.hideContextMenu();
   }
 
   /**
-   * Handle paste action
+   * Handle paste action (delegated to ClipboardManager)
    */
-  handlePasteAction(): void {
-    fileLog.info('📋 Paste action triggered');
-    
-    const clipboard = this.tableInteraction$.clipboard.get();
-    if (!clipboard || !clipboard.data) {
-      fileLog.info('📋 No clipboard data available');
-      return;
-    }
-
-    try {
-      const selectedCells = this.tableInteraction$.selectedCells.get();
-      if (selectedCells.size === 0) {
-        fileLog.info('📋 No target cells selected for paste');
-        return;
-      }
-
-      this.pasteClipboardData(clipboard.data, selectedCells);
-      fileLog.info('📋 Paste completed');
-    } catch (error) {
-      fileLog.error('📋 Paste failed', error);
-    }
-    
+  async handlePasteAction(): Promise<void> {
+    await this.clipboardManager.handlePaste();
     this.overlayManager?.hideContextMenu();
   }
 
   /**
-   * Handle cut action
+   * Handle cut action (copy then clear)
    */
-  handleCutAction(): void {
+  async handleCutAction(): Promise<void> {
     fileLog.info('✂️ Cut action triggered');
-    
+
     const selectedCells = this.tableInteraction$.selectedCells.get();
     if (selectedCells.size === 0) {
-      fileLog.info('✂️ No cells selected for cut');
+      toast.warning('No cells selected', {
+        description: 'Select cells to cut first',
+        duration: 3000
+      });
       return;
     }
 
     try {
-      const cutData = this.extractSelectedCellData(selectedCells);
-      this.copyToClipboard(cutData);
-      
-      // Store in internal clipboard for paste operations
-      this.tableInteraction$.setClipboard({
-        data: cutData,
-        operation: 'cut'
-      });
-      
-      // Clear the selected cells
-      this.clearSelectedCells(selectedCells);
-      
-      fileLog.info('✂️ Cut completed', { cellCount: selectedCells.size });
+      // First copy the data
+      const copySuccess = await this.clipboardManager.handleCopy();
+
+      if (copySuccess) {
+        // Mark as cut operation
+        const clipboard = this.tableInteraction$.clipboard.get();
+        if (clipboard) {
+          this.tableInteraction$.setClipboard({
+            ...clipboard,
+            operation: 'cut'
+          });
+        }
+
+        // Clear the selected cells
+        this.clearSelectedCells(selectedCells);
+
+        toast.success('Data cut to clipboard', {
+          description: `${selectedCells.size} cells cut`,
+          duration: 2000
+        });
+
+        fileLog.info('✂️ Cut completed', { cellCount: selectedCells.size });
+      }
     } catch (error) {
       fileLog.error('✂️ Cut failed', error);
+      toast.error('Cut operation failed', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+        duration: 4000
+      });
     }
-    
+
     this.overlayManager?.hideContextMenu();
   }
 
@@ -315,198 +290,7 @@ export class EventManager {
     }
   }
 
-  /**
-   * Extract data from selected cells for clipboard operations
-   */
-  private extractSelectedCellData(selectedCells: Set<string>): any[][] {
-    const rows = this.tableCore$.processedRows.get();
-    const columns = this.tableCore$.columns.get();
-    
-    // Group cells by row
-    const cellsByRow = new Map<string, Map<string, any>>();
-    
-    selectedCells.forEach(cellId => {
-      const [rowId, columnId] = cellId.split(':');
-      
-      if (!cellsByRow.has(rowId)) {
-        cellsByRow.set(rowId, new Map());
-      }
-      
-      const row = rows.find(r => r.id === rowId);
-      const value = row ? row[columnId] : '';
-      
-      cellsByRow.get(rowId)!.set(columnId, value);
-    });
-    
-    // Convert to 2D array format
-    const data: any[][] = [];
-    cellsByRow.forEach((cellsInRow, rowId) => {
-      const rowData: any[] = [];
-      columns.forEach(column => {
-        if (cellsInRow.has(column.id)) {
-          rowData.push(cellsInRow.get(column.id));
-        }
-      });
-      if (rowData.length > 0) {
-        data.push(rowData);
-      }
-    });
-    
-    return data;
-  }
 
-  /**
-   * Copy data to system clipboard
-   */
-  private async copyToClipboard(data: any[][]): Promise<void> {
-    try {
-      // Convert 2D array to tab-separated text
-      const text = data.map(row => row.join('\t')).join('\n');
-      
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-    } catch (error) {
-      fileLog.error('📋 Failed to copy to system clipboard', error);
-    }
-  }
-
-  /**
-   * Paste clipboard data to selected cells
-   */
-  private pasteClipboardData(data: any[][], targetCells: Set<string>): void {
-    fileLog.info('📋 Pasting data', {
-      dataRows: data.length,
-      dataCols: data[0]?.length || 0,
-      targetCells: targetCells.size
-    });
-
-    if (data.length === 0 || targetCells.size === 0) {
-      fileLog.warn('📋 No data or target cells for paste operation');
-      return;
-    }
-
-    // Convert target cells to array for easier processing
-    const targetCellArray = Array.from(targetCells);
-
-    // Get the first target cell to determine the starting position
-    const [startRowId, startColumnId] = targetCellArray[0].split(':');
-
-    // Get current data context for proper mapping
-    const processedRows = this.tableCore$.processedRows?.get() || [];
-    const visibleColumns = this.tableCore$.visibleColumns?.get() || [];
-
-    fileLog.debug('📋 Data context check', {
-      processedRowsCount: processedRows.length,
-      visibleColumnsCount: visibleColumns.length,
-      hasTableCore: !!this.tableCore$,
-      hasProcessedRows: !!this.tableCore$.processedRows,
-      hasVisibleColumns: !!this.tableCore$.visibleColumns
-    });
-
-    if (processedRows.length === 0 || visibleColumns.length === 0) {
-      fileLog.error('📋 No data context available for paste operation', {
-        processedRowsCount: processedRows.length,
-        visibleColumnsCount: visibleColumns.length
-      });
-      return;
-    }
-
-    // Find starting indices
-    const startRowIndex = processedRows.findIndex(row => row.id === startRowId);
-    const startColIndex = visibleColumns.findIndex(col => col.id === startColumnId);
-
-    if (startRowIndex === -1 || startColIndex === -1) {
-      fileLog.error('📋 Could not find starting position for paste', {
-        startRowId,
-        startColumnId,
-        startRowIndex,
-        startColIndex
-      });
-      return;
-    }
-
-    fileLog.info('📋 Starting paste operation', {
-      startRowIndex,
-      startColIndex,
-      dataRows: data.length,
-      dataCols: data[0].length,
-      availableRows: processedRows.length,
-      availableCols: visibleColumns.length
-    });
-
-    // Paste data cell by cell
-    let pastedCount = 0;
-    let errorCount = 0;
-
-    for (let dataRowIdx = 0; dataRowIdx < data.length; dataRowIdx++) {
-      for (let dataColIdx = 0; dataColIdx < data[dataRowIdx].length; dataColIdx++) {
-        const targetRowIdx = startRowIndex + dataRowIdx;
-        const targetColIdx = startColIndex + dataColIdx;
-
-        // Check bounds
-        if (targetRowIdx >= processedRows.length || targetColIdx >= visibleColumns.length) {
-          continue; // Skip cells that would go out of bounds
-        }
-
-        const targetRow = processedRows[targetRowIdx];
-        const targetColumn = visibleColumns[targetColIdx];
-        const pasteValue = data[dataRowIdx][dataColIdx];
-
-        // Skip selection column and non-data columns
-        if (targetColumn.id === 'selection' || !targetRow || !targetColumn) {
-          continue;
-        }
-
-        try {
-          if (this.onEntityUpdate) {
-            fileLog.debug('📋 Pasting to cell', {
-              rowId: targetRow.id,
-              columnId: targetColumn.id,
-              value: pasteValue,
-              dataPosition: `[${dataRowIdx},${dataColIdx}]`,
-              targetPosition: `[${targetRowIdx},${targetColIdx}]`
-            });
-
-            // Update the entity field with the pasted value
-            this.onEntityUpdate(targetRow.id, { [targetColumn.id]: pasteValue });
-            pastedCount++;
-          } else {
-            fileLog.warn('📋 No onEntityUpdate callback available');
-            errorCount++;
-          }
-        } catch (error) {
-          fileLog.error('📋 Failed to paste to cell', {
-            rowId: targetRow.id,
-            columnId: targetColumn.id,
-            value: pasteValue,
-            error: error instanceof Error ? error.message : String(error)
-          });
-          errorCount++;
-        }
-      }
-    }
-
-    fileLog.info('📋 Paste operation completed', {
-      pastedCount,
-      errorCount,
-      totalAttempted: data.length * data[0].length
-    });
-
-    // Clear clipboard after successful paste (optional behavior)
-    if (pastedCount > 0 && errorCount === 0) {
-      // You can uncomment this to clear clipboard after paste
-      // this.tableInteraction$.clearClipboard();
-    }
-  }
 
   /**
    * Clear values from selected cells

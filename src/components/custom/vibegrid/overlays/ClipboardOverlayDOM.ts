@@ -1,6 +1,7 @@
 import type { ViewportInfo } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
+import { GRID_DIMENSIONS } from '../constants/grid-dimensions';
 import { log } from '@/logger';
 const fileLog = log('components/custom/vibegrid/overlays/ClipboardOverlayDOM.ts');
 
@@ -51,7 +52,7 @@ export class ClipboardOverlayDOM {
       right: '0',
       bottom: '0',
       pointerEvents: 'none',
-      zIndex: '5' // Below selection overlay
+      zIndex: `${GRID_DIMENSIONS.Z_INDEX.CLIPBOARD}` // Below selection overlay
     });
     
     this.container.appendChild(this.overlayContainer);
@@ -157,7 +158,7 @@ export class ClipboardOverlayDOM {
       this.overlayContainer.appendChild(this.indicator);
     }
     
-    // Apply styles
+    // Apply styles with enhanced visibility
     const color = isCut ? this.config.cutColor! : this.config.copyColor!;
     Object.assign(this.indicator.style, {
       position: 'absolute',
@@ -165,12 +166,14 @@ export class ClipboardOverlayDOM {
       top: `${y}px`,
       width: `${width}px`,
       height: `${height}px`,
-      border: `2px dashed ${color}`,
-      borderRadius: '2px',
+      border: `3px dashed ${color}`, // Thicker border for visibility
+      borderRadius: '3px',
       boxSizing: 'border-box',
       pointerEvents: 'none',
       opacity: '1',
-      animation: 'clipboard-pulse 2s infinite'
+      animation: 'clipboard-pulse 2s infinite',
+      // Add shadow to make it more visible under selection
+      boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.8), 0 0 0 1px ${color}`
     });
     
     // Add pulsing animation

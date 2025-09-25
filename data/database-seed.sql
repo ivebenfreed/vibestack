@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict D1cZknIcp6fTowRl9w43SWq5XmcYaFnrc9B8MSFxCNa7n3gByGn74bhVfCu4u52
+\restrict I3EBCAcGVHiPkgJxzbm4rZkKPW5eWmBTJrx4LATSz0f3Z2sEfLLhn4YeXF8rQ1g
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -663,13 +663,13 @@ COPY public.org_01920000_1000_7000_8000_000000000001_apitestentity (id, organiza
 --
 
 COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id, created_at, updated_at, name, description, status, data, company_name, industry, company_size, website_url, primary_contact_email, phone_number, annual_contract_value, client_since, headquarters_address, client_tier, satisfaction_rating) FROM stdin;
-d15bd69a-c973-4f03-8f33-4f1784ff436d	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-11 14:31:53.067	HealthFirst Medical	Regional healthcare provider with 15 hospitals and 200+ clinics	active	\N	HealthFirst Medical	healthcare	large	https://healthfirst-med.org	it-projects@healthfirst.org	+15550456	{"amount": 425000, "currency": "USD"}	2022-08-01	[object Object]	gold	4
+34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-25 15:52:34.815	Another Test Client	Test Sync Client	active	\N	Another Test Corp	finance	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	bronze	4
 ba575163-5ab4-4f38-9aeb-7bc2005d7cc1	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-12 01:20:59.906	RetailMax Corp	National retail chain with 500+ locations across the US	active	\N	RetailMax Corp	retail	enterprise	https://retailmax.com	tech-team@retailmax.com	+15550789	{"amount": 650000, "currency": "USD"}	2023-11-20	[object Object]	gold	4
-cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-12 22:55:12.976	TechCorp Industries	Leading technology company specializing in enterprise software solutions	active	""	TechCorp Industries	technology	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
-9c8ea06c-1124-4f75-9e50-1194a72654d7	01920000-1000-7000-8000-000000000001	2025-09-24 13:59:08.89	2025-09-24 13:59:08.89	Test Sync Client	Testing incremental sync functionality	active	\N	Test Sync Corp	technology	medium	https://testsync.com	test@testsync.com	+15551234	{"amount": 100000, "currency": "USD"}	2025-09-24	\N	silver	3
-34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-24 15:36:02.405	Another Test Client	Second test for sync monitoring	active	\N	Another Test Corp	finance	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	bronze	4
 419ba750-c803-431a-8028-81424d062566	01920000-1000-7000-8000-000000000001	2025-09-24 16:27:00.609	2025-09-24 16:27:00.609	Debug Sync Client	Third test for sync debugging	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
-cfb82e34-551d-42b6-81c5-71d41ed1621e	01920000-1000-7000-8000-000000000001	2025-09-24 16:30:13.759	2025-09-24 16:30:13.759	Debug Sync Client	Third test for sync debugging	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
+cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-25 15:06:22.558	RetailMax Corp	Leading technology company specializing in enterprise software solutions	active	""	TechCorp Industries	technology	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
+d15bd69a-c973-4f03-8f33-4f1784ff436d	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-25 15:37:19.497	active	Regional healthcare provider with 15 hospitals and 200+ clinics	draft	\N	HealthFirst Medical	healthcare	large	https://healthfirst-med.org	it-projects@healthfirst.org	+15550456	{"amount": 425000, "currency": "USD"}	2022-08-01	[object Object]	gold	4
+cfb82e34-551d-42b6-81c5-71d41ed1621e	01920000-1000-7000-8000-000000000001	2025-09-24 16:30:13.759	2025-09-25 15:43:54.963	Debug Sync Client	Debug Sync Client	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
+9c8ea06c-1124-4f75-9e50-1194a72654d7	01920000-1000-7000-8000-000000000001	2025-09-24 13:59:08.89	2025-09-25 15:52:32.214	Test Sync Client	Testing incremental sync functionality	active	\N	Test Sync Corp	technology	medium	https://testsync.com	test@testsync.com	+15551234	{"amount": 100000, "currency": "USD"}	2025-09-24	\N	silver	3
 \.
 
 
@@ -1423,5 +1423,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict D1cZknIcp6fTowRl9w43SWq5XmcYaFnrc9B8MSFxCNa7n3gByGn74bhVfCu4u52
+\unrestrict I3EBCAcGVHiPkgJxzbm4rZkKPW5eWmBTJrx4LATSz0f3Z2sEfLLhn4YeXF8rQ1g
 

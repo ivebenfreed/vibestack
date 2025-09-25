@@ -45,6 +45,7 @@ export const GRID_DIMENSIONS = {
   Z_INDEX: {
     TABLE_CONTENT: 1,
     OVERLAYS: 100,
+    CLIPBOARD: 100.5, // Just below selection for visibility
     SELECTION: 101,
     EDITING: 102,
     DRAG_PREVIEW: 103,
