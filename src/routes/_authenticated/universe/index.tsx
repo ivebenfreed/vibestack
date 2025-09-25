@@ -21,6 +21,7 @@ import { Link } from '@tanstack/react-router'
 import { universeSchema$, getEntity$ } from '@/legend-state'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
 import { useMemo } from 'react'
+import { performanceTracker } from '@/utils/performance-tracker'
 
 export const Route = createFileRoute('/_authenticated/universe/')({
   loader: async () => {
@@ -157,10 +158,15 @@ function UniversePage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <CardTitle className="text-lg">
-                              <Link 
-                                to="/org/$orgId/dashboard" 
+                              <Link
+                                to="/org/$orgId/dashboard"
                                 params={{ orgId: world.id }}
                                 className="hover:underline"
+                                preload="intent"
+                                preloadDelay={50}
+                                onClick={() => {
+                                  performanceTracker.startNavigation(`/org/${world.id}/dashboard`)
+                                }}
                               >
                                 {world.name}
                               </Link>
