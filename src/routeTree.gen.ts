@@ -31,7 +31,6 @@ import { Route as authCompleteRegistrationRouteImport } from './routes/(auth)/co
 import { Route as authCheckEmailRouteImport } from './routes/(auth)/check-email'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedDebugRouteRouteImport } from './routes/_authenticated/debug/route'
-import { Route as AuthenticatedWorldsIndexRouteImport } from './routes/_authenticated/worlds/index'
 import { Route as AuthenticatedUniverseIndexRouteImport } from './routes/_authenticated/universe/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
@@ -40,7 +39,6 @@ import { Route as AuthenticatedEntitiesIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedDebugIndexRouteImport } from './routes/_authenticated/debug/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
-import { Route as AuthenticatedWorldsWorldIdRouteImport } from './routes/_authenticated/worlds/$worldId'
 import { Route as AuthenticatedUniverseDetailRouteImport } from './routes/_authenticated/universe/detail'
 import { Route as AuthenticatedTasksTimelineRouteImport } from './routes/_authenticated/tasks/timeline'
 import { Route as AuthenticatedTasksKanbanRouteImport } from './routes/_authenticated/tasks/kanban'
@@ -169,12 +167,6 @@ const AuthenticatedDebugRouteRoute = AuthenticatedDebugRouteRouteImport.update({
   path: '/debug',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedWorldsIndexRoute =
-  AuthenticatedWorldsIndexRouteImport.update({
-    id: '/worlds/',
-    path: '/worlds/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedUniverseIndexRoute =
   AuthenticatedUniverseIndexRouteImport.update({
     id: '/universe/',
@@ -237,12 +229,6 @@ const AuthenticatedDebugEntityOperationsLazyRoute =
       (d) => d.Route,
     ),
   )
-const AuthenticatedWorldsWorldIdRoute =
-  AuthenticatedWorldsWorldIdRouteImport.update({
-    id: '/worlds/$worldId',
-    path: '/worlds/$worldId',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedUniverseDetailRoute =
   AuthenticatedUniverseDetailRouteImport.update({
     id: '/universe/detail',
@@ -393,7 +379,6 @@ export interface FileRoutesByFullPath {
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/universe/detail': typeof AuthenticatedUniverseDetailRoute
-  '/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
   '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -404,7 +389,6 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
-  '/worlds': typeof AuthenticatedWorldsIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
@@ -443,7 +427,6 @@ export interface FileRoutesByTo {
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/universe/detail': typeof AuthenticatedUniverseDetailRoute
-  '/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
   '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -454,7 +437,6 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
-  '/worlds': typeof AuthenticatedWorldsIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
@@ -497,7 +479,6 @@ export interface FileRoutesById {
   '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/_authenticated/universe/detail': typeof AuthenticatedUniverseDetailRoute
-  '/_authenticated/worlds/$worldId': typeof AuthenticatedWorldsWorldIdRoute
   '/_authenticated/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
@@ -508,7 +489,6 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/universe/': typeof AuthenticatedUniverseIndexRoute
-  '/_authenticated/worlds/': typeof AuthenticatedWorldsIndexRoute
   '/_authenticated/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/_authenticated/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/_authenticated/org/$orgId/': typeof AuthenticatedOrgOrgIdIndexRoute
@@ -551,7 +531,6 @@ export interface FileRouteTypes {
     | '/tasks/kanban'
     | '/tasks/timeline'
     | '/universe/detail'
-    | '/worlds/$worldId'
     | '/debug/entity-operations'
     | '/debug/sync'
     | '/apps'
@@ -562,7 +541,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/tasks'
     | '/universe'
-    | '/worlds'
     | '/org/$orgId/dashboard'
     | '/org/$orgId/test-passive-renderer'
     | '/org/$orgId'
@@ -601,7 +579,6 @@ export interface FileRouteTypes {
     | '/tasks/kanban'
     | '/tasks/timeline'
     | '/universe/detail'
-    | '/worlds/$worldId'
     | '/debug/entity-operations'
     | '/debug/sync'
     | '/apps'
@@ -612,7 +589,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/universe'
-    | '/worlds'
     | '/org/$orgId/dashboard'
     | '/org/$orgId/test-passive-renderer'
     | '/org/$orgId'
@@ -654,7 +630,6 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks/kanban'
     | '/_authenticated/tasks/timeline'
     | '/_authenticated/universe/detail'
-    | '/_authenticated/worlds/$worldId'
     | '/_authenticated/debug/entity-operations'
     | '/_authenticated/debug/sync'
     | '/_authenticated/apps/'
@@ -665,7 +640,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
     | '/_authenticated/universe/'
-    | '/_authenticated/worlds/'
     | '/_authenticated/org/$orgId/dashboard'
     | '/_authenticated/org/$orgId/test-passive-renderer'
     | '/_authenticated/org/$orgId/'
@@ -834,13 +808,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/worlds/': {
-      id: '/_authenticated/worlds/'
-      path: '/worlds'
-      fullPath: '/worlds'
-      preLoaderRoute: typeof AuthenticatedWorldsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/universe/': {
       id: '/_authenticated/universe/'
       path: '/universe'
@@ -910,13 +877,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/debug/entity-operations'
       preLoaderRoute: typeof AuthenticatedDebugEntityOperationsLazyRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
-    }
-    '/_authenticated/worlds/$worldId': {
-      id: '/_authenticated/worlds/$worldId'
-      path: '/worlds/$worldId'
-      fullPath: '/worlds/$worldId'
-      preLoaderRoute: typeof AuthenticatedWorldsWorldIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/universe/detail': {
       id: '/_authenticated/universe/detail'
@@ -1123,14 +1083,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
   AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
   AuthenticatedUniverseDetailRoute: typeof AuthenticatedUniverseDetailRoute
-  AuthenticatedWorldsWorldIdRoute: typeof AuthenticatedWorldsWorldIdRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedEntitiesIndexRoute: typeof AuthenticatedEntitiesIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUniverseIndexRoute: typeof AuthenticatedUniverseIndexRoute
-  AuthenticatedWorldsIndexRoute: typeof AuthenticatedWorldsIndexRoute
   AuthenticatedOrgOrgIdDashboardRoute: typeof AuthenticatedOrgOrgIdDashboardRoute
   AuthenticatedOrgOrgIdTestPassiveRendererRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   AuthenticatedOrgOrgIdIndexRoute: typeof AuthenticatedOrgOrgIdIndexRoute
@@ -1145,14 +1103,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
   AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
   AuthenticatedUniverseDetailRoute: AuthenticatedUniverseDetailRoute,
-  AuthenticatedWorldsWorldIdRoute: AuthenticatedWorldsWorldIdRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedEntitiesIndexRoute: AuthenticatedEntitiesIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUniverseIndexRoute: AuthenticatedUniverseIndexRoute,
-  AuthenticatedWorldsIndexRoute: AuthenticatedWorldsIndexRoute,
   AuthenticatedOrgOrgIdDashboardRoute: AuthenticatedOrgOrgIdDashboardRoute,
   AuthenticatedOrgOrgIdTestPassiveRendererRoute:
     AuthenticatedOrgOrgIdTestPassiveRendererRoute,

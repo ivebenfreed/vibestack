@@ -12,9 +12,8 @@ import { dataforgeMigrationRouter } from '../routes/dataforge-migration-api.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
 
-// Core business logic APIs (Worlds, Teams)
+// Core business logic APIs (Teams)
 import teamsOpenAPIRouter from '../routes/teams-api-openapi'
-import worldsApi from '../routes/worlds-api-openapi'
 import universeApi from '../routes/universe-api-openapi'
 // Custom organization routes removed - using Better Auth endpoints instead
 
@@ -53,7 +52,6 @@ api.route('/debug', debugTableDataRouter)
 
 // Core business logic API routes
 api.route('/teams', teamsOpenAPIRouter) // Now using OpenAPI version
-api.route('/worlds', worldsApi)
 api.route('/universe', universeApi)
 
 // Import and mount Kysely-based generic API

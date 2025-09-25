@@ -88,7 +88,6 @@ publicOpenAPIRouter.openapi(testAutoDocRoute, (c) => {
 
 // Import all OpenAPIHono routers for documentation generation
 import teamsOpenAPIRouter from '../routes/teams-api-openapi';
-import worldsApi from '../routes/worlds-api-openapi';
 import universeApi from '../routes/universe-api-openapi';
 import protectedOpenAPIRouter from './protected-openapi';
 // import organizationsOpenAPIRouter from './organizations-openapi'; // Disabled due to UUID validation issue
@@ -105,7 +104,6 @@ publicOpenAPIRouter.get('/openapi', createOpenAPIEndpoint(
     // { app: organizationsOpenAPIRouter, basePath: '' },
     // Business logic routes
     { app: teamsOpenAPIRouter, basePath: '/teams' },
-    { app: worldsApi, basePath: '/worlds' },
     { app: universeApi, basePath: '/universe' },
   ],
   {

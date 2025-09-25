@@ -33,6 +33,14 @@
 - **External Swagger UI**: Paste `http://localhost:4000/api/openapi` into https://editor.swagger.io
 - **Internal Swagger UI**: `http://localhost:4000/api/ui` (requires authentication)
 
+**Finding Entities for Organizations:**
+- Use **DataForge API**: `/api/dataforge/orgs/{orgId}/entities/{archetype}`
+- Organization-scoped entity management with full CRUD operations
+- Example: `GET /api/dataforge/orgs/01920000-1000-7000-8000-000000000001/entities/project`
+- Supported archetypes: `project`, `task`, `document`, `record`, `collection`, etc.
+
+**Note:** The legacy `/worlds` API has been removed. Organizations are now the primary containers for entities.
+
 ## Architecture
 
 **Single Cloudflare Worker app with unified frontend and backend:**
