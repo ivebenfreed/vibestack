@@ -16,7 +16,7 @@ const fileLog = log('legend-state/app-initialization-stages.ts');
 
 // Create a prefixed logger for app initialization
 const initLog = {
-  info: (message: string, data?: any) => fileLog.debug(`[APP-INIT] ${message}`, data), // Changed to debug level
+  info: (message: string, data?: any) => fileLog.info(`[APP-INIT] ${message}`, data),
   debug: (message: string, data?: any) => fileLog.debug(`[APP-INIT] ${message}`, data),
   warn: (message: string, data?: any) => fileLog.warn(`[APP-INIT] ${message}`, data),
   error: (message: string, data?: any) => fileLog.error(`[APP-INIT] ${message}`, data),
