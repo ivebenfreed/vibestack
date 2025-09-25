@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GwCKnm8QBqFxupWFmzumZscdbkHXko2p1WF0KvcXfcRVsZEbpDtKKVxIcu6SjSs
+\restrict fBCa0YcP0K32EAzzzU7iso7c4j8ymazsmw1dyQZjSwOulDEaqikfdvYPUmDNYMl
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -664,7 +664,6 @@ COPY public.org_01920000_1000_7000_8000_000000000001_apitestentity (id, organiza
 
 COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id, created_at, updated_at, name, description, status, data, company_name, industry, company_size, website_url, primary_contact_email, phone_number, annual_contract_value, client_since, headquarters_address, client_tier, satisfaction_rating) FROM stdin;
 1abf5d0f-aa94-48d4-8128-64f6c7aa6da4	01920000-1000-7000-8000-000000000001	2025-09-25 17:39:21.061	2025-09-25 18:15:23.498	💯 FINAL FRONTEND SYNC TEST	This should appear in frontend immediately	active	\N	Curl Sync Corp	technology	startup	https://curlsync.com	sync@curlsync.com	+15556789	{"amount": 125000, "currency": "USD"}	2025-09-25	\N	silver	5
-34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-25 18:18:11.959	🌍 CROSS-ORG SYNC TEST	Testing universe-scope notifications across orgs	inactive	\N	API Test Corp - Updated via Curl	Software Testing & QA	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	premium	5
 10f7147a-2b20-4501-8c32-96c5f3e79c1a	01920000-1000-7000-8000-000000000001	2025-09-25 17:26:45.265122	2025-09-25 18:19:04.03	🎯 FINAL VERIFICATION TEST	Last test to verify complete sync chain	pending	\N	DataForge Scale Test Corp	Technology - Updated at 2025-09-25 17:59:22.158957+00	medium	https://waltest-updated.com	test@waltest.com	\N	{"amount": 0, "currency": "USD"}	2024-01-01	\N	platinum	5
 e40fb1ab-54c9-4657-a860-5caba55088ad	01920000-1000-7000-8000-000000000001	2025-09-25 18:46:34.618	2025-09-25 19:58:03.612	🎯 CROSS-ORG SUCCESS!!	Testing if notifications flow across organizations	active	\N	Hibernation Test Corp	technology	startup	https://hibernation-test.com	test@hibernation-test.com	+15559999	{"amount": 50000, "currency": "USD"}	2025-09-25	\N	silver	5
 cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-25 17:43:06.809	TechCorp Industries - Updated	Expanded partnership with new AI initiatives	active	""	TechCorp Industries	artificial_intelligence	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
@@ -673,6 +672,7 @@ cfb82e34-551d-42b6-81c5-71d41ed1621e	01920000-1000-7000-8000-000000000001	2025-0
 9c8ea06c-1124-4f75-9e50-1194a72654d7	01920000-1000-7000-8000-000000000001	2025-09-24 13:59:08.89	2025-09-25 17:43:07.791	Test Sync Client - Performance Test	Updated for sync performance testing	active	\N	Test Sync Corp	technology	medium	https://testsync-updated.com	test@testsync.com	+15551234	{"amount": 150000, "currency": "USD"}	2025-09-24	\N	silver	4
 9293fd8b-5187-4b73-8aec-081418dc9b89	01920000-1000-7000-8000-000000000001	2025-09-25 17:43:23.266	2025-09-25 17:43:35.164	Sync Performance Demo Client	Update #3 - Final optimization	active	\N	SyncPerf Inc	technology	medium	https://syncperf.io	demo@syncperf.io	+15551111	{"amount": 100000, "currency": "USD"}	2025-09-25	\N	silver	5
 ba575163-5ab4-4f38-9aeb-7bc2005d7cc1	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-25 20:40:46.415756	RAPID TEST 10 - 1758832846.383096880	Testing hibernation fix for frontend sync	active	\N	RetailMax Corp	retail	enterprise	https://retailmax.com	tech-team@retailmax.com	+15550789	{"amount": 720000, "currency": "USD"}	2023-11-20	[object Object]	enterprise	5
+34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-25 20:57:19.194	🌍 CROSS-ORG SYNC TEST	Testing universe-scope notifications across orgs	inactive	\N	API Test Corp - Updated via Curl	Software Testing & QA	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	premium	5
 419ba750-c803-431a-8028-81424d062566	01920000-1000-7000-8000-000000000001	2025-09-24 16:27:00.609	2025-09-25 18:11:13.32	RAPID API TEST #3	Rapid fire API update testing	archived	\N	Debug Corp	technology	startup	https://scale-test-1758823162.158957.com	debug@debug.com	+1-555-SCALE-1758823162.158957	{"amount": 50000, "currency": "USD"}	2025-09-24	Scale Test HQ - Updated at 2025-09-25 17:59:22.158957+00	premium	5
 \.
 
@@ -1430,5 +1430,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GwCKnm8QBqFxupWFmzumZscdbkHXko2p1WF0KvcXfcRVsZEbpDtKKVxIcu6SjSs
+\unrestrict fBCa0YcP0K32EAzzzU7iso7c4j8ymazsmw1dyQZjSwOulDEaqikfdvYPUmDNYMl
 
