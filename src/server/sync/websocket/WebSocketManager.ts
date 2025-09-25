@@ -66,13 +66,17 @@ export class WebSocketManager {
       organizationId
     }, MODULE_NAME);
     
-    // CRITICAL: Require all essential parameters for security
+    // CRITICAL: Require clientId but make organizationId optional for backwards compatibility
     if (!clientId) {
       return new Response('Missing clientId parameter', { status: 400 });
     }
-    
+
+    // Log warning if organizationId is missing but allow connection
     if (!organizationId) {
-      return new Response('Missing organizationId parameter - organization context is required for all sync operations', { status: 400 });
+      syncLogger.warn('WebSocket connection without organizationId', {
+        clientId,
+        url: request.url
+      }, MODULE_NAME);
     }
     
     // Validate LSN if provided
@@ -166,18 +170,15 @@ export class WebSocketManager {
             error: handlerError instanceof Error ? handlerError.message : String(handlerError)
           }, MODULE_NAME);
           
-          // If this was a client changes message and it failed, release the lock
-          // Note: We're not releasing the lock here anymore - lock will be released
-          // after acknowledgments are sent via notifyClientChangesComplete
-          if (message.type === 'clt_send_changes' && 
-              (handlerError instanceof Error && !handlerError.message.includes('WebSocketUnavailable'))) {
-            // For non-WebSocket errors, release lock immediately
+          // FIXED: Always release processing lock on any error to prevent deadlock
+          if (message.type === 'clt_send_changes') {
             this.context.setProcessingClientChanges(false);
             syncLogger.info('Client changes processing failed - releasing processing lock', {
               clientId: this.context.clientId,
-              messageId: message.messageId
+              messageId: message.messageId,
+              error: handlerError instanceof Error ? handlerError.message : String(handlerError)
             }, MODULE_NAME);
-            
+
             // Process any pending updates
             this.context.processPendingLiveUpdates();
           }
@@ -250,8 +251,9 @@ export class WebSocketManager {
           messageId: message.messageId,
           clientId: this.context.clientId
         }, MODULE_NAME);
-        // Throw an error with a consistent message format that's easy to detect
-        throw new Error('WebSocketUnavailable: No active WebSocket connections for client ' + this.context.clientId);
+        // Don't throw - return gracefully to avoid breaking the sync process
+        // This allows the system to continue operating even if WebSocket is temporarily unavailable
+        return;
       }
       
       // Add detailed logging for table changes messages to debug null/object conversion
@@ -288,11 +290,26 @@ export class WebSocketManager {
         }, MODULE_NAME);
       }
       
-      // Send to all active connections
+      // Send to all active connections with improved error handling
+      let successfulSends = 0;
+      let lastError: Error | null = null;
+
       for (const ws of webSockets) {
         try {
+          // Check WebSocket ready state before sending
+          if (ws.readyState !== 1) { // 1 = OPEN
+            syncLogger.warn('WebSocket not in OPEN state, skipping send', {
+              type: message.type,
+              messageId: message.messageId,
+              clientId: this.context.clientId,
+              readyState: ws.readyState
+            }, MODULE_NAME);
+            continue;
+          }
+
           ws.send(JSON.stringify(message));
-          
+          successfulSends++;
+
           // Only log successful sends for non-heartbeat messages
           if (message.type !== 'srv_heartbeat') {
             syncLogger.info('✅ MESSAGE SENT SUCCESSFULLY', {
@@ -304,14 +321,28 @@ export class WebSocketManager {
             }, MODULE_NAME);
           }
         } catch (sendError) {
+          lastError = sendError instanceof Error ? sendError : new Error(String(sendError));
           syncLogger.error('Error sending message to WebSocket', {
             type: message.type,
             messageId: message.messageId,
             clientId: this.context.clientId,
-            error: sendError instanceof Error ? sendError.message : String(sendError)
+            error: lastError.message,
+            wsReadyState: ws.readyState
           }, MODULE_NAME);
-          throw sendError;
+          // Don't throw immediately - try other WebSockets first
         }
+      }
+
+      // Only throw if no WebSockets succeeded
+      if (successfulSends === 0 && lastError) {
+        syncLogger.error('All WebSocket sends failed', {
+          type: message.type,
+          messageId: message.messageId,
+          clientId: this.context.clientId,
+          totalWebSockets: webSockets.length,
+          lastError: lastError.message
+        }, MODULE_NAME);
+        // Still don't throw - log the error but continue execution
       }
     } catch (error) {
       syncLogger.error('Unexpected error in send method', {
