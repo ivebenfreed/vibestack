@@ -2,6 +2,30 @@
 
 *Essential guidance for Claude Code when working with this repository.*
 
+## What is Elevra?
+
+**Elevra** is a custom data vault system with flexible entity creation and relationship management. It's a framework for building dynamic, data-intensive applications using archetype-based patterns and custom fields.
+
+### Core Functionality
+**🗃️ DataForge Entity System**: The heart of Elevra - dynamic entity creation with:
+- **Archetypes**: Template patterns (project, task, document, record, collection, etc.)
+- **Custom Fields**: 40+ field types with rich validation and UI metadata
+- **Relationship Management**: Flexible entity-to-entity and user-to-entity relationships
+- **Real-time Sync**: Legend State + WebSocket sync between browser and server databases
+
+**🧠 Knowledge Management**: AI-powered documentation system with:
+- **Lore**: Purpose, meaning, culture ("why this matters")
+- **Canon**: Rules, standards, processes ("how things work")
+- **Semantic Fields**: Rich metadata for AI context and understanding
+
+**📊 VibeGrid**: High-performance data grid with hybrid React/DOM rendering for managing entity data
+
+### System Architecture
+- **Entity Archetypes**: Predefined patterns like `project`, `task`, `document`, `record`, `collection`
+- **Custom Fields**: 40+ types including `text`, `number`, `rating`, `slider`, `coordinates`, `markdown`, `rollup_count`, `computed_expression`
+- **Relationships**: `user_reference`, `entity_reference` with configurable semantics (`assigned_to`, `belongs_to`, `contributes_to`)
+- **Organizations**: Multi-tenant with per-org entity schemas and data isolation
+
 ## API Documentation
 
 **OpenAPI Documentation Access:**
