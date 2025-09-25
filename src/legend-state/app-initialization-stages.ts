@@ -11,6 +11,7 @@ import { auth$ } from './auth';
 import { unifiedAuth$ } from './unified-auth';
 import { loadUniverseContext, universeContext$ } from './observables';
 import { OptionsManager } from './reference-system/options-manager';
+import { syncActions } from './sync-manager';
 
 const fileLog = log('legend-state/app-initialization-stages.ts');
 
@@ -248,96 +249,156 @@ const appInitMethods = {
   async executeUniverseLoad(): Promise<boolean> {
     initLog.debug('🌌 Loading universe context and schemas');
 
-    const user = unifiedAuth$.user.get();
-    const userOrganizations = unifiedAuth$.userOrganizations.get();
+    try {
+      const user = unifiedAuth$.user.get();
+      const userOrganizations = unifiedAuth$.userOrganizations.get();
 
-    if (!user || !userOrganizations) {
-      throw new Error('User or organizations not available');
-    }
+      initLog.info('🌌 Universe load debug - user and orgs:', {
+        hasUser: !!user,
+        userEmail: user?.email,
+        orgCount: userOrganizations?.length || 0
+      });
 
-    // Check if universe is already loaded
-    const universeOrgs = Object.keys(universeContext$.organizations.get());
-    if (universeOrgs.length > 0) {
-      initLog.info(`🌌 Universe context already loaded with ${universeOrgs.length} organizations, checking if schemas are ready...`);
+      if (!user || !userOrganizations) {
+        throw new Error('User or organizations not available');
+      }
 
-      // Check if all schemas are already loaded
-      const organizations = Object.values(universeContext$.organizations.get());
-      const stillLoadingOrgs = organizations.filter(org => org.loading);
+      // REACTIVE: Wait for universe context to be populated using Legend State
+      initLog.info('🌌 Waiting for universe context to be populated reactively...');
 
-      if (stillLoadingOrgs.length === 0) {
-        initLog.info(`✅ All organization schemas already loaded, proceeding to entities stage`);
-        // Auto-advance to entities immediately
-        if (this.canLoadEntities) {
-          await this.advanceToStage('entities');
+      // Use Legend State when() to reactively wait for universe context
+      await when(() => {
+        const orgKeys = Object.keys(universeContext$.organizations.get());
+        const hasOrgs = orgKeys.length > 0;
+
+        if (!hasOrgs) {
+          initLog.info('🌌 Universe context not ready yet, waiting reactively...');
+        } else {
+          initLog.info(`🌌 Universe context ready with ${orgKeys.length} organizations!`);
         }
-        return true;
-      } else {
-        initLog.info(`🌌 Universe loaded but ${stillLoadingOrgs.length} schemas still loading, waiting...`);
-      }
-    } else {
-      // Load universe context (schemas for all orgs) if not already loaded
-      const orgIds = userOrganizations.map(org => org.id);
-      await loadUniverseContext(user.id, orgIds, userOrganizations);
 
-      // Verify universe loaded
-      const newUniverseOrgs = Object.keys(universeContext$.organizations.get());
-      if (newUniverseOrgs.length === 0) {
-        throw new Error('Failed to load universe context');
-      }
-      initLog.info(`🌌 Universe context created, waiting for organization schemas to load...`);
-    }
+        return hasOrgs;
+      });
 
-    // CRITICAL: Wait for all organization schemas to actually load
-    // This prevents entity pages from loading before schemas are ready
+      // Universe context is ready - connect sync immediately
+      initLog.info(`🌌 Universe context ready, connecting sync manager`);
+
+      // 🔄 Initialize sync connection now that universe context is available
+      try {
+        const user = unifiedAuth$.user.get();
+        const userOrganizations = unifiedAuth$.userOrganizations.get();
+
+        if (user && userOrganizations && userOrganizations.length > 0) {
+          // Use the primary organization (first one) for sync connection
+          const primaryOrg = userOrganizations[0];
+
+          initLog.info('🔄 [Sync] Connecting sync manager from reactive universe stage:', {
+            organizationId: primaryOrg.id,
+            userId: user.id
+          });
+
+          await syncActions.connect(primaryOrg.id, user.id);
+
+          initLog.info('✅ [Sync] Sync manager connected successfully from reactive universe stage');
+        } else {
+          initLog.warn('⚠️ [Sync] Cannot connect sync - missing user or organizations');
+        }
+      } catch (error) {
+        initLog.error('❌ [Sync] Failed to connect sync manager:', error);
+        // Don't fail the initialization - sync can be retried later
+      }
+
+      // Auto-advance to entities
+      if (this.canLoadEntities) {
+        await this.advanceToStage('entities');
+      }
+
+    // PROPER: Wait for schemas to actually load by monitoring schema observables
     await new Promise<void>((resolve, reject) => {
-      const maxWaitTime = 30000; // 30 seconds timeout
+      const maxWaitTime = 10000; // 10 seconds timeout
       const startTime = Date.now();
 
-      const checkSchemasReady = () => {
-        const organizations = Object.values(universeContext$.organizations.get());
-        const stillLoadingOrgs = organizations.filter(org => org.loading);
-        const totalOrgs = organizations.length;
-        const readyOrgs = totalOrgs - stillLoadingOrgs.length;
+      const checkSchemasLoaded = () => {
+        try {
+          const organizations = Object.values(universeContext$.organizations.get());
 
-        initLog.info(`🌌 Schema loading progress: ${readyOrgs}/${totalOrgs} organizations ready`, {
-          totalOrgs,
-          readyOrgs,
-          stillLoadingCount: stillLoadingOrgs.length,
-          elapsed: Date.now() - startTime
-        });
+          // Check if all organization schema observables have actual data
+          const schemasWithData = organizations.filter(org => {
+            try {
+              const schemaData = org.schema?.get?.();
+              return schemaData && Object.keys(schemaData).length > 0;
+            } catch {
+              return false;
+            }
+          });
 
-        // If all organizations are ready OR if there are no organizations (edge case)
-        if (stillLoadingOrgs.length === 0 && totalOrgs > 0) {
-          initLog.info(`✅ All ${totalOrgs} organization schemas loaded successfully`);
-          resolve();
-          return;
+          const totalOrgs = organizations.length;
+          const readyOrgs = schemasWithData.length;
+
+          initLog.info(`🌌 Schema data progress: ${readyOrgs}/${totalOrgs} organizations have schema data`, {
+            totalOrgs,
+            readyOrgs,
+            elapsed: Date.now() - startTime
+          });
+
+          // If all organizations have schema data
+          if (readyOrgs === totalOrgs && totalOrgs > 0) {
+            initLog.info(`✅ All ${totalOrgs} organization schemas loaded with data`);
+            resolve();
+            return;
+          }
+
+          // Handle edge case where no organizations exist
+          if (totalOrgs === 0) {
+            initLog.info(`✅ No organizations to load, proceeding...`);
+            resolve();
+            return;
+          }
+
+          // Timeout check
+          if (Date.now() - startTime > maxWaitTime) {
+            initLog.warn(`⚠️ Schema loading timeout after ${maxWaitTime}ms, proceeding anyway`);
+            resolve();
+            return;
+          }
+
+          // Check again soon
+          setTimeout(checkSchemasLoaded, 200);
+        } catch (error) {
+          initLog.error('❌ Error checking schema readiness:', error);
+          resolve(); // Proceed anyway
         }
-
-        // Handle edge case where no organizations exist
-        if (totalOrgs === 0) {
-          initLog.info(`✅ No organizations to load, proceeding...`);
-          resolve();
-          return;
-        }
-
-        // Timeout check
-        if (Date.now() - startTime > maxWaitTime) {
-          const stillLoadingIds = stillLoadingOrgs.map(org => org.orgId || 'unknown');
-          initLog.error(`❌ Schema loading timeout: ${stillLoadingIds.join(', ')} still loading after ${maxWaitTime}ms`);
-          // Don't reject, just resolve to continue - schemas may be ready enough
-          initLog.info(`⚠️ Proceeding despite timeout - app may still work`);
-          resolve();
-          return;
-        }
-
-        // Check again soon
-        setTimeout(checkSchemasReady, 100);
       };
 
-      checkSchemasReady();
+      checkSchemasLoaded();
     });
 
-    initLog.info(`✅ Universe schemas fully loaded, advancing to entities stage`);
+    initLog.info(`✅ Universe schemas fully loaded, connecting sync manager before advancing to entities stage`);
+
+    // 🔄 Initialize sync connection now that schemas are ready
+    try {
+      const user = unifiedAuth$.user.get();
+      const userOrganizations = unifiedAuth$.userOrganizations.get();
+
+      if (user && userOrganizations && userOrganizations.length > 0) {
+        // Use the primary organization (first one) for sync connection
+        const primaryOrg = userOrganizations[0];
+
+        initLog.info('🔄 [Sync] Connecting sync manager from staged universe initialization:', {
+          organizationId: primaryOrg.id,
+          userId: user.id
+        });
+
+        await syncActions.connect(primaryOrg.id, user.id);
+
+        initLog.info('✅ [Sync] Sync manager connected successfully from universe stage');
+      } else {
+        initLog.warn('⚠️ [Sync] Cannot connect sync - missing user or organizations');
+      }
+    } catch (error) {
+      initLog.error('❌ [Sync] Failed to connect sync manager:', error);
+      // Don't fail the initialization - sync can be retried later
+    }
 
     // Auto-advance to entities
     if (this.canLoadEntities) {
@@ -345,6 +406,12 @@ const appInitMethods = {
     }
 
     return true;
+
+    } catch (error) {
+      initLog.error('❌ [Universe] executeUniverseLoad failed:', error);
+      this.handleError(error as Error);
+      return false;
+    }
   },
 
   async executeInitialEntitiesLoad(): Promise<boolean> {
