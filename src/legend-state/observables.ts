@@ -6,7 +6,7 @@
  * Updated to fix HMR reload issues - Force timestamp update.
  */
 
-import { observable, syncState, when } from '@legendapp/state'
+import { observable, syncState, when, batch } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { configureSynced } from '@legendapp/state/sync'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
@@ -112,16 +112,17 @@ export const universeSchema$ = observable(() => {
   const universe = universeContext$.get()
   const organizations = Object.values(universe.organizations)
   const readyOrganizations = organizations.filter(org => !org.loading)
-  
-  fileLog.info(`[UniverseSchema] Computing universe schema with ${organizations.length} organizations (${readyOrganizations.length} ready, ${organizations.length - readyOrganizations.length} still loading)`)
-  
+
+  // Only log when the computation is actually meaningful
+  if (organizations.length > 0 && readyOrganizations.length === organizations.length) {
+    fileLog.debug(`[UniverseSchema] Computing universe schema with ${organizations.length} organizations (${readyOrganizations.length} ready, ${organizations.length - readyOrganizations.length} still loading)`)
+  }
+
   if (organizations.length === 0) {
-    fileLog.debug(`[UniverseSchema] No organizations found, returning null`)
     return null
   }
-  
+
   if (readyOrganizations.length === 0) {
-    fileLog.debug(`[UniverseSchema] All ${organizations.length} organizations still loading, returning null for now`)
     return null
   }
   
@@ -138,29 +139,19 @@ export const universeSchema$ = observable(() => {
     }
     
     // NOTE: Loading check is no longer needed since readyOrganizations already filters out loading orgs
-    
-    fileLog.info(`[UniverseSchema] Processing org ${orgId} (${org.name || 'unnamed'})`)
-    
+
+    fileLog.debug(`[UniverseSchema] Processing org ${orgId} (${org.name || 'unnamed'})`)
+
     // FIXED: Get schema observable directly from cache instead of stored reference
     // This avoids the corruption that happens when Legend State's assign() stores the observable
     const schemaObservable = getSchemaObservable$(orgId)
-    
+
     if (!schemaObservable) {
       fileLog.debug(`[UniverseSchema] No schema observable found for org ${orgId}, will load asynchronously`)
       return
     }
-    
-    fileLog.info(`[UniverseSchema] Found schema observable for org ${orgId}, getting data...`)
-    
+
     const schemaData = schemaObservable.get() // Reactive access to schema data
-    
-    fileLog.info(`[UniverseSchema] Schema data for org ${orgId}:`, {
-      hasData: !!schemaData,
-      isObject: typeof schemaData === 'object',
-      isArray: Array.isArray(schemaData),
-      dataKeys: schemaData && typeof schemaData === 'object' ? Object.keys(schemaData) : [],
-      dataType: typeof schemaData
-    })
     
     // syncedCrud observables return objects with IDs as keys: { [orgId]: schemaObject }
     // Handle different data states:
@@ -184,13 +175,7 @@ export const universeSchema$ = observable(() => {
       fileLog.debug(`[UniverseSchema] No schema found for org ${orgId} in syncedCrud data`)
       return // Skip this org - no schema available
     }
-      
-      fileLog.info(`[UniverseSchema] Schema object for org ${orgId}:`, {
-        hasSchema: !!schema,
-        hasEntities: !!schema?.entities,
-        entityCount: schema?.entities ? Object.keys(schema.entities).length : 0
-      })
-      
+
       if (schema?.entities) {
         // In universe mode, prefix entity names with orgId for uniqueness
         Object.entries(schema.entities).forEach(([entityName, entityDef]) => {
@@ -198,8 +183,6 @@ export const universeSchema$ = observable(() => {
           const isAlreadyPrefixed = entityName.startsWith(`${orgId}_`)
           const prefixedName = isAlreadyPrefixed ? entityName : `${orgId}_${entityName}`
           const originalEntityName = isAlreadyPrefixed ? entityName.replace(`${orgId}_`, '') : entityName
-
-          fileLog.info(`[UniverseSchema] Adding entity ${entityName} as ${prefixedName} from org ${orgId} (${org.name || 'unnamed'}) ${isAlreadyPrefixed ? '[already prefixed]' : '[adding prefix]'}`)
 
           combinedEntities[prefixedName] = {
             ...entityDef,
@@ -211,15 +194,17 @@ export const universeSchema$ = observable(() => {
           }
           totalEntitiesAdded++
         })
+
+        fileLog.debug(`[UniverseSchema] Added ${Object.keys(schema.entities).length} entities from org ${orgId}`)
       }
   })
-  
-  fileLog.info(`[UniverseSchema] Completed universe schema computation:`, {
-    organizationsProcessed: organizations.length,
+
+  fileLog.debug(`[UniverseSchema] Completed universe schema computation:`, {
+    organizationsProcessed: readyOrganizations.length,
     totalEntitiesAdded,
     combinedEntityKeys: Object.keys(combinedEntities)
   })
-  
+
   return {
     entities: combinedEntities,
     orgId: 'universe', // Special identifier for universe mode
@@ -872,13 +857,34 @@ function createEntityObservable(entityName: string, schema?: any) {
  * Load universe context - schemas from ALL user organizations
  * This should only be called by auth state machines, not components
  */
+// Initialization guard to prevent multiple concurrent loads
+let initializationPromise: Promise<void> | null = null
+
 export async function loadUniverseContext(userId: string, organizationIds: string[], organizationData?: Array<{ id: string; name: string }>) {
+  // Prevent concurrent initialization
+  if (initializationPromise) {
+    fileLog.debug(`[Observable] Universe context loading already in progress, waiting for completion`)
+    return initializationPromise
+  }
+
+  initializationPromise = doLoadUniverseContext(userId, organizationIds, organizationData)
+
+  try {
+    await initializationPromise
+  } finally {
+    initializationPromise = null
+  }
+}
+
+async function doLoadUniverseContext(userId: string, organizationIds: string[], organizationData?: Array<{ id: string; name: string }>) {
   fileLog.info(`[Observable] Loading universe context for ${organizationIds.length} organizations`)
-  
-  // Update loading state
-  universeContext$.loading.set(true)
-  universeContext$.error.set(null)
-  universeContext$.userId.set(userId)
+
+  // Batch initial state updates to prevent intermediate notifications
+  batch(() => {
+    universeContext$.loading.set(true)
+    universeContext$.error.set(null)
+    universeContext$.userId.set(userId)
+  })
   
   // Fetch organization details from API if not provided
   const orgNameMap = new Map<string, string>()
@@ -990,9 +996,12 @@ export async function loadUniverseContext(userId: string, organizationIds: strin
         })
       }
     })
-    
-    universeContext$.loading.set(false)
-    
+
+    // Batch final state updates
+    batch(() => {
+      universeContext$.loading.set(false)
+    })
+
     const successfulResults = results.filter(r => r.success).length
     
     fileLog.info(`[Observable] Universe context loaded with ${successfulResults}/${organizationIds.length} organizations. Schema observables will load entity data reactively.`)
@@ -1110,7 +1119,7 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
         })
         
         const businessEntityCount = existingBusinessEntities.length
-        fileLog.info(`[Observable] Added SystemOption, CustomOption, and ${businessEntityCount} entity reference virtual entities for org ${orgId}`)
+        fileLog.debug(`[Observable] Added SystemOption, CustomOption, and ${businessEntityCount} entity reference virtual entities for org ${orgId}`)
       }
     })
     

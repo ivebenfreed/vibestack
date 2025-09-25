@@ -49,12 +49,28 @@ export async function setupGlobalPersistenceConfig(): Promise<void> {
   }
 
   try {
-    // Collect all entities from all loaded schemas
-    const { universeSchema$ } = await import('./index')
-    const schema = universeSchema$.peek()
+    // Collect all entities from all loaded schemas - WAIT for schemas to be ready
+    const { universeSchema$, universeContext$ } = await import('./index')
+    const { when } = await import('@legendapp/state')
 
+    // Wait for schemas to actually be ready before setting up persistence
+    await when(() => {
+      const context = universeContext$.peek()
+      const organizations = Object.values(context.organizations || {})
+      const allReady = organizations.length > 0 && organizations.every(org => !org.loading)
+
+      if (allReady) {
+        const schema = universeSchema$.peek()
+        const hasEntities = schema?.entities && Object.keys(schema.entities).length > 0
+        fileLog.info(`[PersistenceUtils] Persistence wait check: ${organizations.length} orgs ready, ${hasEntities ? Object.keys(schema.entities).length : 0} entities`)
+        return hasEntities
+      }
+      return false
+    })
+
+    const schema = universeSchema$.peek()
     if (!schema || !schema.entities) {
-      fileLog.info('[PersistenceUtils] No schema entities found, skipping persistence configuration')
+      fileLog.info('[PersistenceUtils] No schema entities found after waiting, skipping persistence configuration')
       return
     }
 
@@ -65,9 +81,8 @@ export async function setupGlobalPersistenceConfig(): Promise<void> {
     })
 
     // Also include schema table names for each organization
-    const { universeContext$ } = await import('./observables')
-    const universeContext = universeContext$.peek()
-    const orgIds = Object.keys(universeContext?.organizations || {})
+    const contextData = universeContext$.peek()
+    const orgIds = Object.keys(contextData?.organizations || {})
     const schemaTableNames = orgIds.map(orgId => `schema_${orgId}`)
 
     const allTableNames = [...allEntityNames, ...schemaTableNames]

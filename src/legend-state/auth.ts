@@ -325,15 +325,13 @@ when(() => {
   });
   
   try {
-    const { initializeLegendState } = await import('@/legend-state/initialization');
-    const organizationIds = organizations.map(org => org.id);
-    const organizationData = organizations.map(org => ({ id: org.id, name: org.name }));
-    
-    await initializeLegendState(user.id, organizationIds, organizationData);
-    
-    authLog.info('[AUTH$] Successfully initialized Legend State from simplified initialization');
+    // Use proper app initialization stages instead of simple initialization
+    const { appInitMethods$ } = await import('@/legend-state/app-initialization-stages');
+    await appInitMethods$.initialize();
+
+    authLog.info('[AUTH$] Successfully initialized app using staged initialization');
   } catch (error) {
-    authLog.error('[AUTH$] Failed to load universe context from Legend State auth:', error);
+    authLog.error('[AUTH$] Failed to initialize app stages:', error);
   }
 });
 
