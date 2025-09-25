@@ -269,7 +269,7 @@ export function createSchemaObservable(orgId: string) {
     // LIST - Load organization schema from server
     list: async () => {
       try {
-        fileLog.info(`🔄 [SYNC-SCHEMA] Loading schema for org: ${orgId}`)
+        fileLog.info(`🔄 [SCHEMA-LOAD] Loading schema for org: ${orgId}`)
         
         const response = await fetch(`/api/dataforge/orgs/${orgId}/schema`, {
           method: 'GET',
@@ -310,7 +310,7 @@ export function createSchemaObservable(orgId: string) {
         // Transform to schema format
         const processedSchema = processSchemaResponse(orgId, schemaArray)
         
-        fileLog.info(`✅ [SYNC-SCHEMA] Loaded schema with ${Object.keys(processedSchema.entities).length} entities for org: ${orgId}`)
+        fileLog.info(`✅ [SCHEMA-LOAD] Loaded schema with ${Object.keys(processedSchema.entities).length} entities for org: ${orgId}`)
         
         // Note: Persistence setup is now handled globally after all schemas are loaded
         // This prevents multiple version increments from individual schema loads

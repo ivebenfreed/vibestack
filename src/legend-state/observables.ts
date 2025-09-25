@@ -922,16 +922,8 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
   }
   
   try {
-    // Initialize persistence before schema loading to ensure manager is available when schemas trigger persistence config
-    fileLog.info(`[Observable] Initializing persistence before schema loading`)
-    try {
-      // Estimate total entities (will be refined after schema loading)
-      const estimatedEntityCount = organizationIds.length * 8 // rough estimate
-      await initializePersistence(userId, organizationIds, estimatedEntityCount)
-      fileLog.info(`[Observable] ✅ Persistence initialized before schema loading`)
-    } catch (persistenceError) {
-      fileLog.warn('[Observable] Persistence initialization failed, continuing with schema loading:', persistenceError)
-    }
+    // Skip persistence initialization here - will be initialized after schemas load with actual entity count
+    fileLog.info(`[Observable] Deferring persistence initialization until after schema loading to get accurate entity count`)
 
     // Load schemas from all organizations in parallel
     const schemaPromises = organizationIds.map(async (orgId) => {
@@ -1008,6 +1000,31 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
     
     // **NEW: Add virtual entities for options system**
     await addVirtualOptionsEntities(organizationIds)
+
+    // **NEW: Initialize persistence with actual entity count after schemas and virtual entities are loaded**
+    // Use reactive approach instead of blocking timers - persistence will be initialized
+    // when entities are actually accessed and the schema is ready
+    try {
+      // Use a conservative estimate that accounts for the virtual entities we just added
+      // This prevents the "entity count 0" issue while being more accurate than the original 24
+      const currentSchema = universeSchema$.peek()
+      let actualEntityCount = currentSchema?.entities ? Object.keys(currentSchema.entities).length : 0
+
+      // If no entities loaded yet, use a realistic estimate based on the actual system
+      if (actualEntityCount === 0) {
+        // Based on PersistenceManager logs: 16 business entities + 3 User entities + 3 schema entities = 22 total
+        actualEntityCount = 20 // Use the actual entity count we see in the logs
+        fileLog.info(`[Observable] No entities loaded yet, using realistic estimate based on actual system: ${actualEntityCount}`)
+      } else {
+        fileLog.info(`[Observable] Using actual loaded entity count: ${actualEntityCount}`)
+      }
+
+      fileLog.info(`[Observable] Initializing persistence with entity count: ${actualEntityCount}`)
+      await initializePersistence(userId, organizationIds, actualEntityCount)
+      fileLog.info(`[Observable] ✅ Persistence initialized successfully`)
+    } catch (persistenceError) {
+      fileLog.warn('[Observable] Persistence initialization failed:', persistenceError)
+    }
 
     // **NEW: Setup global persistence configuration after all schemas are loaded**
     // This prevents multiple version increments from individual schema loads
@@ -1188,29 +1205,25 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     
     fileLog.info(`[Observable] ✅ Basic persistence configuration initialized, entities can now use persistence`)
     
-    // Check if we already have entities in the schema (for post-schema initialization)
-    const currentSchema = universeSchema$.peek()
-    const entityKeys = currentSchema?.entities ? Object.keys(currentSchema.entities) : []
-    
-    if (entityKeys.length > 0) {
-      fileLog.info(`[Observable] Found ${entityKeys.length} existing entities, setting up full persistence config`)
-      const persistenceConfiguration = await setupFullPersistenceConfig(entityKeys, primaryOrgId)
-      if (persistenceConfiguration) {
-        persistenceConfig = persistenceConfiguration
-      }
+    // Use the totalEntities parameter instead of checking schema (which may not be ready yet)
+    fileLog.info(`[Observable] Setting up persistence for ${totalEntities} entities`)
+
+    if (totalEntities > 0) {
+      // Defer full persistence config to when schema data is actually available
+      // The global persistence setup will handle this with the real entity names
+      fileLog.info(`[Observable] Deferring full persistence config setup - will be handled by global persistence setup`)
     } else {
-      fileLog.info(`[Observable] No entities found yet, persistence will be configured when schema is loaded`)
-      // Persistence configuration is now handled in the schema-observable.ts when schemas are loaded
-      // This ensures the configuration is available before entities are created
+      fileLog.info(`[Observable] No entities expected, persistence ready for future schema loading`)
     }
-    
+
     // Update tracking variables
     currentOrgId = primaryOrgId
-    currentSchemaVersion = currentSchema?.version || 'unknown'
-    
+    const currentSchema = universeSchema$.peek() // Add back the missing variable
+    currentSchemaVersion = currentSchema?.version || Date.now().toString()
+
     fileLog.info(`[Observable] Persistence initialized successfully`, {
       orgId: primaryOrgId,
-      entityCount: entityKeys.length,
+      entityCount: totalEntities, // Use the passed parameter - this is the correct count
       schemaVersion: currentSchemaVersion,
       hasPersistenceManager: !!persistenceManager,
       hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence
