@@ -25,9 +25,8 @@ export interface SyncState {
   isConnected: boolean
   isConnecting: boolean
   error: string | null
-  
+
   // Connection details
-  organizationId: string | null
   userId: string | null
   clientId: string
   serverUrl: string | null
@@ -59,8 +58,7 @@ export const syncState$ = observable<SyncState>({
   isConnected: false,
   isConnecting: false,
   error: null,
-  
-  organizationId: null,
+
   userId: null,
   clientId: '',
   serverUrl: null,
@@ -249,7 +247,6 @@ function startHeartbeat() {
           type: 'clt_heartbeat',
           clientId: state.clientId,
           lsn: '0/0',
-          organizationId: state.organizationId,
           messageId: `heartbeat_${Date.now()}`,
           timestamp: Date.now()
         }
@@ -303,13 +300,14 @@ function handleDisconnection(reason: string) {
   // Attempt reconnection if under max attempts
   if (currentState.reconnectAttempts < currentState.maxReconnectAttempts) {
     const delay = syncConfig.reconnectBaseDelay * Math.pow(2, currentState.reconnectAttempts)
-    
+
     fileLog.info(`🔄 Reconnecting in ${delay}ms (attempt ${currentState.reconnectAttempts + 1}/${currentState.maxReconnectAttempts})`)
-    
+
     const timeout = setTimeout(async () => {
       try {
         syncState$.reconnectTimeout.set(null)
-        await syncActions.connect(currentState.organizationId!, currentState.userId!)
+        // Pass dummy org ID since connect still expects it but doesn't use it
+        await syncActions.connect('', currentState.userId!)
       } catch (error) {
         fileLog.error('Reconnection failed:', error)
       }
@@ -329,16 +327,15 @@ function handleDisconnection(reason: string) {
  */
 export const syncActions = {
   /**
-   * Connect to WebSocket server
+   * Connect to WebSocket server (user-scoped, receives notifications for all user's orgs)
    */
   async connect(organizationId: string, userId: string): Promise<void> {
     fileLog.info('🔗 Initiating user-scoped sync connection:', { userId })
 
-    // Update connection state - REMOVE organization scoping
+    // Update connection state - user-scoped only
     syncState$.assign({
       isConnecting: true,
       error: null,
-      organizationId: null, // No longer organization-specific
       userId,
       clientId: getPersistentClientId(),
       serverUrl: getSyncWebSocketUrl()
@@ -421,9 +418,9 @@ export const syncActions = {
    */
   async reconnect(): Promise<void> {
     const state = syncState$.peek()
-    
-    if (!state.organizationId || !state.userId) {
-      throw new Error('Cannot reconnect without organization and user ID')
+
+    if (!state.userId) {
+      throw new Error('Cannot reconnect without user ID')
     }
     
     // Reset reconnection attempts
@@ -437,7 +434,8 @@ export const syncActions = {
     
     // Wait briefly then reconnect
     await new Promise(resolve => setTimeout(resolve, 100))
-    await this.connect(state.organizationId, state.userId)
+    // Pass dummy org ID since connect still expects it but doesn't use it
+    await this.connect('', state.userId)
   },
   
   /**
@@ -447,7 +445,6 @@ export const syncActions = {
     this.disconnect()
     
     syncState$.assign({
-      organizationId: null,
       userId: null,
       clientId: '',
       serverUrl: null,

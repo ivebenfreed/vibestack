@@ -342,25 +342,34 @@ export class SyncDO extends DurableObject {
       syncLogger.info('Starting org-aware sync process', {
         clientId,
         userId: this.userConnection.userId,
-        organizationId: this.userConnection.organizationId,
+        organizationCount: this.userConnection.organizations.length,
         clientLSN
       }, MODULE_NAME);
 
-      // Register client with unified registry
-      await this.unifiedClientRegistry.registerClient({
+      // Register client for ALL organizations the user has access to
+      for (const org of this.userConnection.organizations) {
+        await this.unifiedClientRegistry.registerClient({
+          clientId,
+          organizationId: org.id,
+          organizationSlug: org.slug,
+          userId: this.userConnection.userId,
+          userRole: org.role,
+          userEmail: this.userConnection.userEmail,
+          userName: this.userConnection.userName
+        });
+
+        syncLogger.debug('Client registered with organization', {
+          clientId,
+          organizationId: org.id,
+          organizationSlug: org.slug,
+          userRole: org.role
+        }, MODULE_NAME);
+      }
+
+      syncLogger.info('Client registered for all user organizations', {
         clientId,
-        organizationId: this.userConnection.organizationId,
-        organizationSlug: this.userConnection.organizationSlug,
-        userId: this.userConnection.userId,
-        userRole: this.userConnection.userRole,
-        userEmail: this.userConnection.userEmail,
-        userName: this.userConnection.userName
-      });
-      
-      syncLogger.debug('Client registered with organization-aware registry', {
-        clientId,
-        organizationId: this.userConnection.organizationId,
-        organizationSlug: this.userConnection.organizationSlug
+        totalOrganizations: this.userConnection.organizations.length,
+        organizations: this.userConnection.organizations.map(o => ({ id: o.id, slug: o.slug }))
       }, MODULE_NAME);
 
       // Note: WebSocket is ready after successful upgrade in hibernation API
@@ -639,7 +648,7 @@ export class SyncDO extends DurableObject {
           hasClientId: !!this.clientId
         }, MODULE_NAME);
 
-        await this.restoreContextAfterHibernation();
+        await this.restoreFromHibernation();
       }
 
       if (!clientId) {
@@ -1210,21 +1219,44 @@ export class SyncDO extends DurableObject {
       
       // Re-register client with unified registry after hibernation
       if (this.clientId && this.userConnection) {
-        await this.unifiedClientRegistry.registerClient({
-          clientId: this.clientId,
-          organizationId: this.userConnection.organizationId,
-          organizationSlug: this.userConnection.organizationSlug,
-          userId: this.userConnection.userId,
-          userRole: this.userConnection.userRole,
-          userEmail: this.userConnection.userEmail,
-          userName: this.userConnection.userName
-        });
-        
-        syncLogger.info('Re-registered client with unified registry after hibernation', {
-          clientId: this.clientId,
-          organizationId: this.userConnection.organizationId,
-          userId: this.userConnection.userId
-        }, MODULE_NAME);
+        // For user-scoped connections, register for ALL organizations
+        if (this.userConnection.organizations && this.userConnection.organizations.length > 0) {
+          for (const org of this.userConnection.organizations) {
+            await this.unifiedClientRegistry.registerClient({
+              clientId: this.clientId,
+              organizationId: org.id,
+              organizationSlug: org.slug,
+              userId: this.userConnection.userId,
+              userRole: org.role,
+              userEmail: this.userConnection.userEmail,
+              userName: this.userConnection.userName
+            });
+          }
+
+          syncLogger.info('Re-registered client for all user organizations after hibernation', {
+            clientId: this.clientId,
+            userId: this.userConnection.userId,
+            organizationCount: this.userConnection.organizations.length,
+            organizations: this.userConnection.organizations.map(o => o.id)
+          }, MODULE_NAME);
+        } else {
+          // Fallback for legacy organization-scoped connections
+          await this.unifiedClientRegistry.registerClient({
+            clientId: this.clientId,
+            organizationId: this.userConnection.organizationId,
+            organizationSlug: this.userConnection.organizationSlug,
+            userId: this.userConnection.userId,
+            userRole: this.userConnection.userRole,
+            userEmail: this.userConnection.userEmail,
+            userName: this.userConnection.userName
+          });
+
+          syncLogger.info('Re-registered client with unified registry after hibernation', {
+            clientId: this.clientId,
+            organizationId: this.userConnection.organizationId,
+            userId: this.userConnection.userId
+          }, MODULE_NAME);
+        }
       }
       
       this.registerMessageHandlers();
