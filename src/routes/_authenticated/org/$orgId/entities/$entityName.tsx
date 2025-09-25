@@ -26,9 +26,9 @@ export const Route = createFileRoute('/_authenticated/org/$orgId/entities/$entit
   },
   loader: async ({ params }) => {
     // Organization ID and entity name are available in params
-    return { 
+    return {
       organizationId: params.orgId,
-      entityName: params.entityName 
+      entityName: params.entityName
     }
   },
   component: OrganizationEntityPage,
@@ -42,20 +42,21 @@ function OrganizationEntityPage() {
   return <OrganizationEntityPageInner key={`${orgId}-${entityName}`} orgId={orgId} entityName={entityName} />
 }
 
-const OrganizationEntityPageInner = observer(function OrganizationEntityPageInner({ 
-  orgId, 
-  entityName 
-}: { 
+const OrganizationEntityPageInner = observer(function OrganizationEntityPageInner({
+  orgId,
+  entityName
+}: {
   orgId: string
-  entityName: string 
+  entityName: string
 }) {
   const { user } = useAuth()
   const userId = user?.id
-  
+
+
   // ✅ ALWAYS call ALL hooks at the top - no conditionals before this point
   // Use universe-based observables - schema-driven org parameters
   const loading = use$(universeLoading$)
-  const error = use$(universeError$)  
+  const error = use$(universeError$)
   const schema = use$(universeSchema$)
   
   // ✅ ALWAYS call getEntity$ and use$ to maintain consistent hook order
