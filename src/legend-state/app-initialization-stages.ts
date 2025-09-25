@@ -5,7 +5,7 @@
  * Coordinates sequential loading with observable dependency tracking
  */
 
-import { observable, batch } from '@legendapp/state';
+import { observable, batch, when } from '@legendapp/state';
 import { log } from '@/logger';
 import { auth$ } from './auth';
 import { unifiedAuth$ } from './unified-auth';
@@ -44,7 +44,7 @@ export interface AppLoadingContext {
 }
 
 /**
- * Global app initialization stage manager
+ * Global app initialization stage manager with HMR persistence
  */
 export const appInitStage$ = observable({
   stage: 'idle' as AppLoadingStage,
@@ -59,6 +59,22 @@ export const appInitStage$ = observable({
     retryCount: 0
   } as AppLoadingContext,
 });
+
+// HMR: Preserve app initialization state across hot reloads
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    initLog.info('🔥 HMR: Preserving app initialization state');
+    // Legend State observables persist automatically
+  });
+
+  import.meta.hot.accept(() => {
+    initLog.info('🔥 HMR: App initialization state preserved');
+    // Don't reset if already ready
+    if (appInitStage$.stage.get() === 'ready') {
+      initLog.info('🔥 HMR: App already initialized, skipping reset');
+    }
+  });
+}
 
 // Define methods as separate functions to avoid circular references
 const appInitMethods = {
@@ -263,149 +279,38 @@ const appInitMethods = {
         throw new Error('User or organizations not available');
       }
 
-      // REACTIVE: Wait for universe context to be populated using Legend State
-      initLog.info('🌌 Waiting for universe context to be populated reactively...');
+      // FIXED: Actually call loadUniverseContext to populate universe context from auth organizations
+      initLog.info('🌌 Loading universe context from auth organizations');
 
-      // Use Legend State when() to reactively wait for universe context
-      await when(() => {
-        const orgKeys = Object.keys(universeContext$.organizations.get());
-        const hasOrgs = orgKeys.length > 0;
+      const organizationIds = userOrganizations.map(org => org.id);
+      const organizationData = userOrganizations.map(org => ({ id: org.id, name: org.name }));
 
-        if (!hasOrgs) {
-          initLog.info('🌌 Universe context not ready yet, waiting reactively...');
-        } else {
-          initLog.info(`🌌 Universe context ready with ${orgKeys.length} organizations!`);
-        }
-
-        return hasOrgs;
-      });
-
-      // Universe context is ready - connect sync immediately
-      initLog.info(`🌌 Universe context ready, connecting sync manager`);
-
-      // 🔄 Initialize sync connection now that universe context is available
       try {
-        const user = unifiedAuth$.user.get();
-        const userOrganizations = unifiedAuth$.userOrganizations.get();
+        await loadUniverseContext(user.id, organizationIds, organizationData);
+        initLog.info(`✅ Universe context loaded with ${organizationIds.length} organizations`);
+      } catch (error) {
+        initLog.error(`❌ loadUniverseContext failed:`, error);
+        throw error;
+      }
 
-        if (user && userOrganizations && userOrganizations.length > 0) {
-          // Use the primary organization (first one) for sync connection
-          const primaryOrg = userOrganizations[0];
+      // Debug: Check if we can advance to entities
+      try {
+        initLog.info(`🌌 Universe stage complete, checking if can advance to entities: ${this.canLoadEntities}`);
 
-          initLog.info('🔄 [Sync] Connecting sync manager from reactive universe stage:', {
-            organizationId: primaryOrg.id,
-            userId: user.id
-          });
-
-          await syncActions.connect(primaryOrg.id, user.id);
-
-          initLog.info('✅ [Sync] Sync manager connected successfully from reactive universe stage');
+        // Auto-advance to entities stage after universe context is loaded
+        if (this.canLoadEntities) {
+          initLog.info(`🌌 Advancing to entities stage...`);
+          await this.advanceToStage('entities');
+          initLog.info(`✅ Advanced to entities stage successfully`);
         } else {
-          initLog.warn('⚠️ [Sync] Cannot connect sync - missing user or organizations');
+          initLog.warn(`⚠️ Cannot advance to entities - canLoadEntities is false`);
         }
       } catch (error) {
-        initLog.error('❌ [Sync] Failed to connect sync manager:', error);
-        // Don't fail the initialization - sync can be retried later
+        initLog.error(`❌ Failed to advance to entities stage:`, error);
+        throw error;
       }
 
-      // Auto-advance to entities
-      if (this.canLoadEntities) {
-        await this.advanceToStage('entities');
-      }
-
-    // PROPER: Wait for schemas to actually load by monitoring schema observables
-    await new Promise<void>((resolve, reject) => {
-      const maxWaitTime = 10000; // 10 seconds timeout
-      const startTime = Date.now();
-
-      const checkSchemasLoaded = () => {
-        try {
-          const organizations = Object.values(universeContext$.organizations.get());
-
-          // Check if all organization schema observables have actual data
-          const schemasWithData = organizations.filter(org => {
-            try {
-              const schemaData = org.schema?.get?.();
-              return schemaData && Object.keys(schemaData).length > 0;
-            } catch {
-              return false;
-            }
-          });
-
-          const totalOrgs = organizations.length;
-          const readyOrgs = schemasWithData.length;
-
-          initLog.info(`🌌 Schema data progress: ${readyOrgs}/${totalOrgs} organizations have schema data`, {
-            totalOrgs,
-            readyOrgs,
-            elapsed: Date.now() - startTime
-          });
-
-          // If all organizations have schema data
-          if (readyOrgs === totalOrgs && totalOrgs > 0) {
-            initLog.info(`✅ All ${totalOrgs} organization schemas loaded with data`);
-            resolve();
-            return;
-          }
-
-          // Handle edge case where no organizations exist
-          if (totalOrgs === 0) {
-            initLog.info(`✅ No organizations to load, proceeding...`);
-            resolve();
-            return;
-          }
-
-          // Timeout check
-          if (Date.now() - startTime > maxWaitTime) {
-            initLog.warn(`⚠️ Schema loading timeout after ${maxWaitTime}ms, proceeding anyway`);
-            resolve();
-            return;
-          }
-
-          // Check again soon
-          setTimeout(checkSchemasLoaded, 200);
-        } catch (error) {
-          initLog.error('❌ Error checking schema readiness:', error);
-          resolve(); // Proceed anyway
-        }
-      };
-
-      checkSchemasLoaded();
-    });
-
-    initLog.info(`✅ Universe schemas fully loaded, connecting sync manager before advancing to entities stage`);
-
-    // 🔄 Initialize sync connection now that schemas are ready
-    try {
-      const user = unifiedAuth$.user.get();
-      const userOrganizations = unifiedAuth$.userOrganizations.get();
-
-      if (user && userOrganizations && userOrganizations.length > 0) {
-        // Use the primary organization (first one) for sync connection
-        const primaryOrg = userOrganizations[0];
-
-        initLog.info('🔄 [Sync] Connecting sync manager from staged universe initialization:', {
-          organizationId: primaryOrg.id,
-          userId: user.id
-        });
-
-        await syncActions.connect(primaryOrg.id, user.id);
-
-        initLog.info('✅ [Sync] Sync manager connected successfully from universe stage');
-      } else {
-        initLog.warn('⚠️ [Sync] Cannot connect sync - missing user or organizations');
-      }
-    } catch (error) {
-      initLog.error('❌ [Sync] Failed to connect sync manager:', error);
-      // Don't fail the initialization - sync can be retried later
-    }
-
-    // Auto-advance to entities
-    if (this.canLoadEntities) {
-      await this.advanceToStage('entities');
-    }
-
-    return true;
+      return true;
 
     } catch (error) {
       initLog.error('❌ [Universe] executeUniverseLoad failed:', error);
@@ -500,6 +405,12 @@ const appInitMethods = {
   },
 
   reset(): void {
+    // Don't reset if already ready (preserve across HMR)
+    if (appInitStage$.stage.get() === 'ready') {
+      initLog.info('🔄 Skipping reset - app already initialized and ready');
+      return;
+    }
+
     initLog.info('🔄 Resetting app initialization');
 
     batch(() => {
@@ -516,6 +427,12 @@ const appInitMethods = {
 
   // Initialize the app loading sequence
   async initialize(): Promise<boolean> {
+    // Don't restart if already ready
+    if (appInitStage$.stage.get() === 'ready') {
+      initLog.info('🚀 App already initialized, skipping restart');
+      return true;
+    }
+
     console.log('🚀 INIT METHOD CALLED - Starting app initialization sequence');
     initLog.info('🚀 Starting app initialization sequence');
     this.reset();

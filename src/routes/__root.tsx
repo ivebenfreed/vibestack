@@ -143,20 +143,31 @@ function RootComponentInternal() {
 }
 
 function AppWithInitialization() {
-  rootLog.debug('[APP-INIT] AppWithInitialization rendering at', Date.now());
+  rootLog.info('[APP-INIT] AppWithInitialization rendering at', Date.now());
   const navigate = useNavigate()
   const router = useRouter()
 
   // Use unified auth
   const { isAuthenticated, loading: authLoading, isSystemReady: unifiedSystemReady } = useUnifiedAuth()
 
+  rootLog.info('[APP-INIT] Auth state before useAppInitialization:', { isAuthenticated, authLoading, unifiedSystemReady });
+
   // Use app initialization to check if the app is fully loaded
   const appInit = useAppInitialization()
 
-  // Start staged app initialization when authenticated
+  rootLog.info('[APP-INIT] AppInit state:', { stage: appInit.stage, isReady: appInit.isReady, hasError: appInit.hasError });
+
+  // Start staged app initialization when authenticated (only once)
   React.useEffect(() => {
     const currentStage = appInit.stage;
 
+    rootLog.debug('[APP-INIT] useEffect triggered:', {
+      isAuthenticated,
+      currentStage,
+      shouldStart: isAuthenticated && currentStage === 'idle'
+    });
+
+    // Only start initialization if authenticated and truly idle (not after HMR reloads)
     if (isAuthenticated && currentStage === 'idle') {
       rootLog.info('[APP-INIT] Starting staged app initialization');
       appInitMethods$.initialize().then((success) => {
@@ -164,11 +175,18 @@ function AppWithInitialization() {
       }).catch((error) => {
         rootLog.error('[APP-INIT] Staged initialization failed:', error);
       });
-    } else if (!isAuthenticated && currentStage !== 'idle') {
+    } else if (!isAuthenticated && currentStage !== 'idle' && currentStage !== 'ready') {
+      // Only reset if not ready - preserve ready state across HMR
       rootLog.debug('[APP-INIT] Resetting app initialization - user not authenticated');
       appInitMethods$.reset();
+    } else {
+      rootLog.debug('[APP-INIT] Skipping initialization:', {
+        isAuthenticated,
+        currentStage,
+        reason: !isAuthenticated ? 'not authenticated' : currentStage !== 'idle' ? `stage is ${currentStage}, not idle` : 'unknown'
+      });
     }
-  }, [isAuthenticated, appInit.stage]);
+  }, [isAuthenticated]); // Remove appInit.stage from deps to prevent HMR restart loops
 
   // Use route readiness tracking
   const routeReady = useSelector(routeReadiness$.isReady)
@@ -254,16 +272,16 @@ function AppWithInitialization() {
     return <UnifiedLoadingScreen />; // Loading while auth checks or redirect happens
   }
 
-  // Check if universe context is loaded (simpler than complex staged system)
-  const universeLoaded = useSelector(() => {
-    const universeOrgs = Object.keys(universeContext$.organizations.get());
-    return universeOrgs.length > 0;
-  });
-
-  // Show loading screen until universe context is loaded
-  if (isAuthenticated && !universeLoaded && !isPublicAuthRoute) {
-    rootLog.debug('[APP-INIT] Showing UnifiedLoadingScreen - universe not loaded yet');
+  // Show loading screen until app initialization is complete (only listen to isReady)
+  if (isAuthenticated && !appInit.isReady && !isPublicAuthRoute) {
+    rootLog.debug('[APP-INIT] Showing UnifiedLoadingScreen - app not ready yet');
     return <UnifiedLoadingScreen />
+  }
+
+  // Show error screen if initialization failed
+  if (isAuthenticated && appInit.hasError && !isPublicAuthRoute) {
+    rootLog.debug('[APP-INIT] Showing error screen - initialization failed');
+    return <UnifiedLoadingScreen />; // UnifiedLoadingScreen handles error display
   }
 
   rootLog.debug('[APP-INIT] App ready, rendering Outlet', {

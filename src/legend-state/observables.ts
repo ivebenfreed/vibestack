@@ -998,8 +998,10 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
     
     fileLog.info(`[Observable] Universe context loaded with ${successfulResults}/${organizationIds.length} organizations. Schema observables will load entity data reactively.`)
     
-    // **NEW: Add virtual entities for options system**
-    await addVirtualOptionsEntities(organizationIds)
+    // **NEW: Add virtual entities for options system (async, non-blocking)**
+    addVirtualOptionsEntities(organizationIds).catch(error => {
+      fileLog.warn('[Observable] Virtual options entities failed (non-critical):', error);
+    });
 
     // **NEW: Initialize persistence with actual entity count after schemas and virtual entities are loaded**
     // Use reactive approach instead of blocking timers - persistence will be initialized
@@ -1026,15 +1028,15 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
       fileLog.warn('[Observable] Persistence initialization failed:', persistenceError)
     }
 
-    // **NEW: Setup global persistence configuration after all schemas are loaded**
+    // **NEW: Setup global persistence configuration after all schemas are loaded (async, non-blocking)**
     // This prevents multiple version increments from individual schema loads
-    try {
-      const { setupGlobalPersistenceConfig } = await import('./persistence-utils')
-      await setupGlobalPersistenceConfig()
-      fileLog.info(`[Observable] ✅ Global persistence configuration completed after all schemas loaded`)
-    } catch (persistenceError) {
-      fileLog.warn('[Observable] Global persistence setup failed:', persistenceError)
-    }
+    import('./persistence-utils').then(({ setupGlobalPersistenceConfig }) => {
+      return setupGlobalPersistenceConfig();
+    }).then(() => {
+      fileLog.info(`[Observable] ✅ Global persistence configuration completed after all schemas loaded`);
+    }).catch(persistenceError => {
+      fileLog.warn('[Observable] Global persistence setup failed:', persistenceError);
+    });
     
   } catch (error) {
     fileLog.error('[Observable] Failed to load universe context:', error)
