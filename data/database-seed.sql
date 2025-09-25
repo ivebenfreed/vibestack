@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fBCa0YcP0K32EAzzzU7iso7c4j8ymazsmw1dyQZjSwOulDEaqikfdvYPUmDNYMl
+\restrict 1jSsAS2wU6UKKeVLIlybMZVAxAs0Mrjw5B1oToxdVnmAK27PlZbNtGgouPFUbgQ
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -1038,8 +1038,8 @@ e2e84521-c389-43e2-a292-9772d439a4a2	01920000-1000-7000-8000-000000000001	2025-0
 7c4de892-faa8-4a4f-8a04-6073fd1de7d9	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.275	2025-09-19 17:08:29.243	Data Backup and Recovery System	Implement automated backup system with disaster recovery protocols for patient data	high	done	2025-03-15 12:00:00	deployment	35	\N	3	t	\N	\N	f
 395471fd-bb87-4a4c-ab65-1772ec1561f6	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:33.791	2025-09-19 21:35:21.758	Patient Data Encryption Implementation	Implement end-to-end encryption for PHI data at rest and in transit. Configure AES-256 encryption, key management system, and secure data access layers	high	done	2025-03-21 05:00:00	development	48	22	5	t	\N	Pending approval of encryption key management approach by HealthFirst security team. AWS KMS configuration requires additional security clearance.	t
 08a79a18-55a1-4d36-b094-4fb3f9ddf70e	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.721	2025-09-22 22:41:25.202	REPLICATION TEST #3 - Updated at 2025-09-25 17:48:48.595185+00	Integrate existing legacy systems with new cloud-native architecture	critical	done	2025-02-28 10:00:00	development	80	\N	5	t	\N	\N	t
-a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-22 21:50:09.081	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	critical	done	2025-03-01 03:00:00	documentation	32	35	4	t	\N	\N	f
 01d55ead-3b1d-478e-a379-22322f32dc0f	01920000-1000-7000-8000-000000000001	2025-09-12 01:53:37.423	2025-09-22 20:49:12.778	FINAL STRESS TEST #5 - 2025-09-25 17:57:23.007927+00	Design automation framework for business processes using RPA and workflow tools	high	not_started	2025-02-01 15:00:00	development	60	\N	5	t	\N	\N	f
+a83e5281-a924-4e0d-9f1b-1432b5c7e4cd	01920000-1000-7000-8000-000000000001	2025-09-11 14:40:22.467	2025-09-25 22:01:37.805	HIPAA Compliance Audit & Documentation	Comprehensive HIPAA compliance audit, risk assessment documentation, and preparation of required policies and procedures for healthcare data handling	medium	done	2025-03-01 08:00:00	documentation	32	35	4	t	\N	\N	f
 e8d56cd7-d06f-4a28-82bd-a0cc9464a8e4	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:22.873	2025-09-22 22:05:03.718	Payment Gateway Integration	Integrate multiple payment gateways including PayPal, Stripe, and cryptocurrency options	critical	done	2025-04-01 08:00:00	development	40	\N	4	t	\N	\N	t
 3c3d5db9-8b4f-4c23-9e2f-b39daa1e42d6	01920000-1000-7000-8000-000000000001	2025-09-11 14:36:49.008	2025-09-22 22:08:04.464	Set up AWS VPC and security groups	Configure virtual private cloud, subnets, security groups, and network access control lists for secure cloud infrastructure	high	done	\N	\N	16	8	4	t	\N	\N	t
 f98ab62c-724c-4b91-95ef-92ec6c19a0f3	01920000-1000-7000-8000-000000000001	2025-09-12 01:54:00.45	2025-09-22 19:17:18.67029	Integration with EHR Systems	Develop integrations with major Electronic Health Record systems for seamless data exchange	medium	not_started	2025-06-01 00:00:00	development	55	\N	4	t	\N	\N	t
@@ -1430,5 +1430,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fBCa0YcP0K32EAzzzU7iso7c4j8ymazsmw1dyQZjSwOulDEaqikfdvYPUmDNYMl
+\unrestrict 1jSsAS2wU6UKKeVLIlybMZVAxAs0Mrjw5B1oToxdVnmAK27PlZbNtGgouPFUbgQ
 

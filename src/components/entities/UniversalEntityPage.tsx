@@ -4,16 +4,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { VibeGrid } from '@/components/custom/vibegrid'
 import { createEntityColumnsObservable } from '@/legend-state/observables/table-columns'
 import { entityOperations } from '@/legend-state'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
-import { 
-  Plus, 
-  Settings, 
+import {
+  Settings,
   BarChart3,
   FolderOpen,
   CheckSquare,
@@ -51,16 +47,13 @@ interface UniversalEntityPageProps {
   archetype?: string
 }
 
-export function UniversalEntityPage({ 
-  entityName, 
-  data = [], 
+export function UniversalEntityPage({
+  entityName,
+  data = [],
   schema,
   orgId,
-  archetype: propArchetype 
+  archetype: propArchetype
 }: UniversalEntityPageProps) {
-  const [addModalOpen, setAddModalOpen] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null)
   
@@ -162,222 +155,6 @@ export function UniversalEntityPage({
         </div>
         
         <div className="flex items-center gap-1">
-          <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-7 px-2 text-xs">
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add New {displayName}</DialogTitle>
-                <DialogDescription>
-                  Create a new {displayName.toLowerCase()} record
-                </DialogDescription>
-              </DialogHeader>
-              
-              <form onSubmit={async (e) => {
-                e.preventDefault()
-                setIsSubmitting(true)
-                
-                try {
-                  // Schema-aware validation - find the primary field for this entity
-                  const primaryField = schemaFields ? 
-                    Object.keys(schemaFields).find(field => 
-                      ['name', 'title', 'subject', 'summary'].includes(field.toLowerCase())
-                    ) : 'name'
-                  
-                  // Check if primary field is provided and not empty
-                  if (primaryField && (!formData[primaryField] || !formData[primaryField].trim())) {
-                    alert(`${primaryField.replace(/_/g, ' ')} is required`)
-                    return
-                  }
-                  
-                  // Email validation if provided
-                  if (formData.email && formData.email.trim() && !formData.email.includes('@')) {
-                    alert('Please enter a valid email address')
-                    return
-                  }
-                  
-                  // Prepare the data with required timestamps and system fields
-                  const now = new Date().toISOString()
-                  const baseData = {
-                    ...formData,
-                    id: crypto.randomUUID(),
-                    created_at: now,
-                    updated_at: now,
-                    organization_id: orgId
-                  }
-                  
-                  // Only add fields that exist in the schema to avoid database errors
-                  const recordData = { ...baseData }
-                  
-                  // Add record_type only if it exists in schema (typically for record archetype)
-                  const hasRecordType = schemaFields && Object.keys(schemaFields).some(field => field === 'record_type')
-                  console.log('[UniversalEntityPage] Schema check for record_type:', { 
-                    hasSchema: !!schema, 
-                    hasFields: !!schema?.fields,
-                    fieldNames: schema?.fields ? Object.keys(schema.fields) : null,
-                    hasRecordType,
-                    entityName
-                  })
-                  if (hasRecordType) {
-                    recordData.record_type = entityName.toLowerCase()
-                    console.log('[UniversalEntityPage] Added record_type:', recordData.record_type)
-                  }
-                  
-                  // Add status with default if not provided and field exists in schema
-                  if (schema?.fields && Object.keys(schema.fields).some(field => field === 'status')) {
-                    recordData.status = formData.status || 'draft'
-                  }
-                  
-                  // Add priority with default if not provided and field exists in schema
-                  if (schema?.fields && Object.keys(schema.fields).some(field => field === 'priority')) {
-                    recordData.priority = formData.priority || 'medium'
-                  }
-                  
-                  // Use EntityNameUtils to ensure proper prefixing without duplication
-                  const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '')
-                  
-                  console.log('🚀 Creating entity:', { entityName, fullEntityName, recordData })
-                  
-                  // Create the entity using entityOperations
-                  await entityOperations.createEntity(fullEntityName, recordData)
-                  
-                  // Reset form and close modal
-                  setFormData({})
-                  setAddModalOpen(false)
-                  
-                  console.log('✅ Entity created successfully')
-                } catch (error) {
-                  console.error('❌ Error creating entity:', error)
-                  alert(`Error creating ${entityName}: ${error.message || 'Unknown error'}`)
-                } finally {
-                  setIsSubmitting(false)
-                }
-              }} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  {/* Use schema fields if available, otherwise provide fallback fields based on visible columns */}
-                  {schemaFields ? (
-                    Object.entries(schemaFields).map(([fieldName, fieldDef]: [string, any]) => {
-                      const safeFieldDef = fieldDef && typeof fieldDef === 'object' ? fieldDef : {}
-                      const fieldType = String(safeFieldDef.type || 'text')
-                      const fieldDescription = String(safeFieldDef.description || '')
-                      const isRequired = Boolean(safeFieldDef.required)
-                      
-                      // Skip system fields that are auto-generated
-                      if (['id', 'created_at', 'updated_at'].includes(fieldName)) {
-                        return null
-                      }
-                      
-                      return (
-                        <div key={fieldName} className="space-y-2">
-                          <Label htmlFor={fieldName} className="text-sm font-medium">
-                            {fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            {isRequired && <span className="text-red-500 ml-1">*</span>}
-                          </Label>
-                          
-                          {fieldType === 'text' || fieldType === 'varchar' ? (
-                            fieldDescription.toLowerCase().includes('long') || fieldDescription.toLowerCase().includes('description') || fieldName.toLowerCase().includes('notes') ? (
-                              <Textarea
-                                id={fieldName}
-                                placeholder={fieldDescription || `Enter ${fieldName}`}
-                                value={formData[fieldName] || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
-                                required={isRequired}
-                                className="min-h-[80px]"
-                              />
-                            ) : (
-                              <Input
-                                id={fieldName}
-                                type="text"
-                                placeholder={fieldDescription || `Enter ${fieldName}`}
-                                value={formData[fieldName] || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
-                                required={isRequired}
-                              />
-                            )
-                          ) : fieldType === 'integer' || fieldType === 'number' ? (
-                            <Input
-                              id={fieldName}
-                              type="number"
-                              placeholder={fieldDescription || `Enter ${fieldName}`}
-                              value={formData[fieldName] || ''}
-                              onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value ? Number(e.target.value) : '' }))}
-                              required={isRequired}
-                            />
-                          ) : fieldType === 'boolean' ? (
-                            <div className="flex items-center space-x-2">
-                              <input
-                                id={fieldName}
-                                type="checkbox"
-                                checked={formData[fieldName] || false}
-                                onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.checked }))}
-                                className="rounded border-gray-300"
-                              />
-                              <Label htmlFor={fieldName} className="text-sm text-muted-foreground">
-                                {fieldDescription || `Enable ${fieldName}`}
-                              </Label>
-                            </div>
-                          ) : fieldType === 'email' || fieldName.toLowerCase().includes('email') ? (
-                            <Input
-                              id={fieldName}
-                              type="email"
-                              placeholder={fieldDescription || `Enter ${fieldName}`}
-                              value={formData[fieldName] || ''}
-                              onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
-                              required={isRequired}
-                            />
-                          ) : (
-                            // Default to text input for unknown types
-                            <Input
-                              id={fieldName}
-                              type="text"
-                              placeholder={fieldDescription || `Enter ${fieldName}`}
-                              value={formData[fieldName] || ''}
-                              onChange={(e) => setFormData(prev => ({ ...prev, [fieldName]: e.target.value }))}
-                              required={isRequired}
-                            />
-                          )}
-                          
-                          {fieldDescription && (
-                            <p className="text-xs text-muted-foreground">{fieldDescription}</p>
-                          )}
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="p-8 text-center text-gray-500">
-                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg font-medium mb-2">Schema not available</p>
-                      <p className="text-sm">
-                        Cannot create new {displayName} records without schema information. 
-                        Please ensure the entity schema is properly loaded.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => {
-                      setFormData({})
-                      setAddModalOpen(false)
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating...' : `Create ${displayName}`}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

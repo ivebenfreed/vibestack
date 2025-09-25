@@ -732,6 +732,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
           tableInteraction$={observablesRef.current.tableInteraction$}
           enableGrouping={enableGrouping}
           visualState={visualState}
+          entityName={entityType}
+          orgId={universeOrgId$.get()}
         />
       )}
 

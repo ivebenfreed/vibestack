@@ -2,6 +2,7 @@ import React from 'react';
 import { observer } from '@legendapp/state/react';
 import { VibeGridXColumnVisibilityPure } from './VibeGridXColumnVisibilityPure';
 import { GroupConfigDropdownPure } from './GroupConfigDropdownPure';
+import { VibeGridEntityAdd } from './VibeGridEntityAdd';
 import type { TableCore$ } from '../stores/data-state';
 import type { TableInteraction$ } from '../stores/interaction-state';
 import { createVibeGridVisualState } from '../stores/visual-state';
@@ -13,6 +14,9 @@ interface VibeGridXHeaderPureProps {
   enableGrouping?: boolean;
   className?: string;
   visualState: ReturnType<typeof createVibeGridVisualState>;
+  // Entity information for add functionality
+  entityName?: string;
+  orgId?: string;
 }
 
 export const VibeGridXHeaderPure = observer(function VibeGridXHeaderPure({
@@ -20,7 +24,9 @@ export const VibeGridXHeaderPure = observer(function VibeGridXHeaderPure({
   tableInteraction$,
   enableGrouping = false,
   className = '',
-  visualState
+  visualState,
+  entityName,
+  orgId
 }: VibeGridXHeaderPureProps) {
   // Visual state is passed from parent VibeGrid component
 
@@ -40,6 +46,14 @@ export const VibeGridXHeaderPure = observer(function VibeGridXHeaderPure({
       </div>
       
       <div className="flex items-center gap-2">
+        {entityName && (
+          <VibeGridEntityAdd
+            tableCore$={tableCore$}
+            visualState={visualState}
+            entityName={entityName}
+            orgId={orgId}
+          />
+        )}
         {enableGrouping && (
           <GroupConfigDropdownPure
             tableCore$={tableCore$}

@@ -32,7 +32,6 @@ import { useAuth } from '@/lib/auth';
 import { getEntity$, universeSchema$ } from '@/legend-state';
 import { use$ } from '@legendapp/state/react';
 import { observer } from '@legendapp/state/react';
-import { WorldSelector } from '@/features/worlds/WorldSelector';
 
 // Archetype configuration with icons and descriptions
 const ARCHETYPES = [
@@ -257,14 +256,22 @@ export const QuickEntityCreate = observer(function QuickEntityCreate() {
 
             {/* World Selection for Projects and Documents */}
             {needsWorldSelection && (
-              <WorldSelector
-                label="World (Optional)"
-                value={formData.world_id}
-                onValueChange={(worldId) => setFormData({ ...formData, world_id: worldId })}
-                placeholder="Select a world to organize this..."
-                showPersonalWorlds={true}
-                showOrganizationalWorlds={true}
-              />
+              <div className="space-y-2">
+                <Label>World (Optional)</Label>
+                <Select
+                  value={formData.world_id || ''}
+                  onValueChange={(worldId) => setFormData({ ...formData, world_id: worldId })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a world to organize this..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No world</SelectItem>
+                    <SelectItem value="personal">Personal</SelectItem>
+                    <SelectItem value="work">Work</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             
             {/* Add custom fields based on entity schema here */}
