@@ -127,7 +127,7 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   }, [location.pathname])
   
   // Pages that need full height content area
-  const fullHeightPages = ['/tasks']
+  const fullHeightPages = ['/tasks', '/entities', '/org']
   const isFullHeight = fullHeightPages.some(page => location.pathname.startsWith(page))
   
   // Get page title based on route - removed broken references
