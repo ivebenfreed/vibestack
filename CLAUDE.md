@@ -2,6 +2,13 @@
 
 *Essential guidance for Claude Code when working with this repository.*
 
+## API Documentation
+
+**OpenAPI Documentation Access:**
+- **Raw OpenAPI Spec**: `http://localhost:4000/api/openapi` (public, no auth)
+- **External Swagger UI**: Paste `http://localhost:4000/api/openapi` into https://editor.swagger.io
+- **Internal Swagger UI**: `http://localhost:4000/api/ui` (requires authentication)
+
 ## Architecture
 
 **Single Cloudflare Worker app with unified frontend and backend:**
