@@ -76,12 +76,12 @@ export interface ReplicationConfig {
  * Prod: Uses fixed name since there's only one production instance
  */
 export function getReplicationSlotName(): string {
-  // Dev environment detection: DEV_PORT exists, or NODE_ENV is development
-  const isDev = !!process.env.DEV_PORT || process.env.NODE_ENV === 'development' || process.env.ENVIRONMENT === 'dev';
+  // Use standard Vite environment variables
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
 
   if (isDev) {
     // In dev, use port and process ID to prevent conflicts
-    const port = process.env.DEV_PORT || process.env.PORT || '4000';
+    const port = import.meta.env.VITE_DEV_PORT || '4000';
     return `elevra_dev_port_${port}_pid_${process.pid}`;
   } else {
     // In production, use fixed slot name

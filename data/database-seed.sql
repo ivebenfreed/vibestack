@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bh4Iq8KcBNtXh5gxSfsrT8YccBlNcftmtFz2h7NihCF2xiRpzhkKdvvEljcU6e1
+\restrict zJ32F40yQwxGlELbrmhcAoLzGazeyju65RIEnbMA0vL9HAokAXxszMuuisQzi6W
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -665,6 +665,7 @@ COPY public.org_01920000_1000_7000_8000_000000000001_apitestentity (id, organiza
 COPY public.org_01920000_1000_7000_8000_000000000001_client (id, organization_id, created_at, updated_at, name, description, status, data, company_name, industry, company_size, website_url, primary_contact_email, phone_number, annual_contract_value, client_since, headquarters_address, client_tier, satisfaction_rating) FROM stdin;
 ba575163-5ab4-4f38-9aeb-7bc2005d7cc1	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-12 01:20:59.906	RetailMax Corp	National retail chain with 500+ locations across the US	active	\N	RetailMax Corp	retail	enterprise	https://retailmax.com	tech-team@retailmax.com	+15550789	{"amount": 650000, "currency": "USD"}	2023-11-20	[object Object]	gold	4
 34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-25 17:16:40.938	UPDATED Test Client - Live Sync Test	Updated description to test sync functionality	active	\N	Another Test Corp	finance	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	bronze	4
+10f7147a-2b20-4501-8c32-96c5f3e79c1a	01920000-1000-7000-8000-000000000001	2025-09-25 17:26:45.265122	2025-09-25 17:26:45.265122	WAL Test Client	Testing WAL polling after reliability fixes - 1758821205	active	\N	WAL Test Company	\N	\N	\N	test@waltest.com	\N	{"amount": 0, "currency": "USD"}	2024-01-01	\N	\N	4
 419ba750-c803-431a-8028-81424d062566	01920000-1000-7000-8000-000000000001	2025-09-24 16:27:00.609	2025-09-24 16:27:00.609	Debug Sync Client	Third test for sync debugging	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
 cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-25 15:06:22.558	RetailMax Corp	Leading technology company specializing in enterprise software solutions	active	""	TechCorp Industries	technology	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
 d15bd69a-c973-4f03-8f33-4f1784ff436d	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-25 15:37:19.497	active	Regional healthcare provider with 15 hospitals and 200+ clinics	draft	\N	HealthFirst Medical	healthcare	large	https://healthfirst-med.org	it-projects@healthfirst.org	+15550456	{"amount": 425000, "currency": "USD"}	2022-08-01	[object Object]	gold	4
@@ -1423,5 +1424,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bh4Iq8KcBNtXh5gxSfsrT8YccBlNcftmtFz2h7NihCF2xiRpzhkKdvvEljcU6e1
+\unrestrict zJ32F40yQwxGlELbrmhcAoLzGazeyju65RIEnbMA0vL9HAokAXxszMuuisQzi6W
 
