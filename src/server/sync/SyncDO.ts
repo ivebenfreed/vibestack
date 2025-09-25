@@ -638,7 +638,18 @@ export class SyncDO extends DurableObject {
         }, MODULE_NAME);
         this.registerMessageHandlers();
       }
-      
+
+      // FIXED: Restore hibernation context if missing
+      if (!this.syncConnection || !this.clientId) {
+        syncLogger.info('HIBERNATION FIX: Restoring context for table change notification', {
+          clientId,
+          hasSyncConnection: !!this.syncConnection,
+          hasClientId: !!this.clientId
+        }, MODULE_NAME);
+
+        await this.restoreContextAfterHibernation();
+      }
+
       if (!clientId) {
         return new Response('Missing clientId parameter', { status: 400 });
       }
@@ -670,14 +681,15 @@ export class SyncDO extends DurableObject {
         return new Response('Invalid notification data', { status: 400 });
       }
 
-      // Universe scope: Accept notifications for ANY organization
-      // Frontend will handle permission filtering via Legend State
-      syncLogger.debug('Table change notification received (universe scope)', {
+      // FIXED: Universe scope - Accept notifications for ANY organization
+      // Frontend will handle organization permission filtering via Legend State
+      syncLogger.info('🌍 UNIVERSE NOTIFICATION: Accepting cross-org change notification', {
         clientId,
         clientPrimaryOrg: this.syncConnection?.organizationId,
         notificationOrg: organizationId,
         tables,
-        source
+        source,
+        reason: 'User can access multiple orgs - frontend will filter'
       }, MODULE_NAME);
 
       // Create table change notification message

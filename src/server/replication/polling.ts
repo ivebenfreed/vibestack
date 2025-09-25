@@ -257,6 +257,7 @@ export class PollingManager {
             const lastLSN = changes[changes.length - 1]?.lsn;
             if (lastLSN) {
               await this.advanceReplicationSlot(lastLSN);
+              // FIXED: Sync internal state with slot position to prevent future drift
               await this.stateManager.setLSN(lastLSN);
 
               replicationLogger.info('🎯 SLOT ADVANCED AFTER SUCCESSFUL PROCESSING', {
@@ -589,7 +590,7 @@ export class PollingManager {
     }
   }
 
-  private async pollForChanges(): Promise<WALData[] | null> {
+  private async pollForChanges(isRetry = false): Promise<WALData[] | null> {
     try {
       replicationLogger.info('🔍 [WAL-DEBUG] Polling for changes using peek/advance pattern', {
         slot: this.config.slot,
@@ -599,11 +600,17 @@ export class PollingManager {
       return await withPostgresClient(async (client) => {
         const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
 
-        // ENHANCED: Use internal LSN tracking instead of slot advancement
-        // Get our current internal LSN position to filter only new changes
-        const currentInternalLSN = await this.stateManager.getLSN();
+        // FIXED: Use slot's actual confirmed_flush_lsn instead of internal storage
+        // This ensures we always start from the slot's real position, not stale internal state
+        const slotResult = await client.unsafe(`
+          SELECT confirmed_flush_lsn
+          FROM pg_replication_slots
+          WHERE slot_name = $1
+        `, [this.config.slot]);
 
-        // Use PEEK to see available changes without advancing slot, filtered by our internal position
+        const currentSlotLSN = slotResult.length > 0 ? slotResult[0].confirmed_flush_lsn : '0/0';
+
+        // Use PEEK to see available changes without advancing slot, filtered by slot's actual position
         const result = await client.unsafe(`
           SELECT data, lsn, xid
           FROM pg_logical_slot_peek_changes(
@@ -616,11 +623,11 @@ export class PollingManager {
           WHERE lsn > $2::pg_lsn
           ORDER BY lsn
           LIMIT $3
-        `, [this.config.slot, currentInternalLSN, batchSize]);
+        `, [this.config.slot, currentSlotLSN, batchSize]);
 
-        replicationLogger.info('🔍 [LSN-FILTER] Internal LSN filtering', {
+        replicationLogger.info('🔍 [LSN-FILTER] Slot LSN filtering', {
           slot: this.config.slot,
-          currentInternalLSN,
+          currentSlotLSN,
           newChangesFound: result.length,
           batchSize
         }, MODULE_NAME);
@@ -665,6 +672,34 @@ export class PollingManager {
       
       if (errorMsg.includes('replication slot') && errorMsg.includes('is active for PID')) {
         replicationLogger.warn('Replication slot in use by another process during poll', errorDetails, MODULE_NAME);
+
+        // FIXED: Try to terminate stale connection and retry once
+        try {
+          const pidMatch = errorMsg.match(/PID (\d+)/);
+          if (pidMatch) {
+            const stalePid = parseInt(pidMatch[1]);
+            replicationLogger.info('Attempting to terminate stale replication connection', { stalePid }, MODULE_NAME);
+
+            await withPostgresClient(async (client) => {
+              // Terminate the stale connection
+              await client.unsafe(`SELECT pg_terminate_backend($1)`, [stalePid]);
+              replicationLogger.info('Terminated stale replication connection', { stalePid }, MODULE_NAME);
+            });
+
+            // Small delay to allow cleanup
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Retry the poll once after cleanup (prevent infinite recursion)
+            if (!isRetry) {
+              return this.pollForChanges(true);
+            }
+          }
+        } catch (cleanupErr) {
+          replicationLogger.warn('Failed to cleanup stale connection', {
+            error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)
+          }, MODULE_NAME);
+        }
+
         return null;
       } else if (errorMsg.includes('connect') || errorMsg.includes('timeout')) {
         replicationLogger.error('Database connection failed during polling', {
