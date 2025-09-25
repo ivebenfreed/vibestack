@@ -34,6 +34,15 @@ interface FieldValue {
   error?: string;
 }
 
+/**
+ * VibeGridEntityAdd - Dynamic entity form with enhanced schema integration
+ *
+ * This component leverages the enhanced schema API to provide:
+ * - Rich validation metadata from backend field handlers
+ * - Consistent error messages from field.validation.messages
+ * - Display metadata for labels, placeholders, and formatting
+ * - Proper field type handling aligned with the 47+ field type system
+ */
 export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
   tableCore$,
   visualState,
@@ -44,6 +53,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Record<string, FieldValue>>({});
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   // Get reactive data from observables
   const columns = tableCore$.columns.get();
@@ -69,37 +79,88 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
     if (isOpen && formFields.length > 0) {
       const initialData: Record<string, FieldValue> = {};
       formFields.forEach(field => {
-        const isRequired = field.required || field.fieldSchema?.required || field.id === 'name';
+        // Use enhanced validation metadata for required check
+        const isRequired = field.required || field.validation?.required || field.id === 'name';
+
+        // Use defaultValue from enhanced schema if available
+        let defaultValue = field.defaultValue;
+        if (defaultValue === undefined || defaultValue === null) {
+          if (field.type === 'boolean') {
+            defaultValue = false;
+          } else {
+            defaultValue = '';
+          }
+        }
+
         initialData[field.id] = {
-          value: field.type === 'boolean' ? false : '',
-          isValid: !isRequired,
+          value: defaultValue,
+          isValid: !isRequired, // Only mark as invalid if required and no default
           error: undefined
         };
       });
       setFormData(initialData);
+      setHasAttemptedSubmit(false); // Reset submission attempt state
     }
   }, [isOpen, formFields]);
 
   const validateField = (fieldId: string, value: any, field: any): { isValid: boolean; error?: string } => {
     if (!field) return { isValid: true };
 
+    // Use enhanced validation metadata from backend schema
+    const validation = field.validation;
+    const isRequired = field.required || validation?.required || fieldId === 'name';
+
     // Required field validation
-    const isRequired = field.required || field.fieldSchema?.required || fieldId === 'name';
     if (isRequired && (value === '' || value === null || value === undefined)) {
-      const fieldName = field.label || field.id || fieldId;
-      return { isValid: false, error: `${fieldName} is required` };
+      const errorMessage = validation?.messages?.required || `${field.label || fieldId} is required`;
+      return { isValid: false, error: errorMessage };
     }
 
-    // Email validation
-    if (field.type === 'email' && value && typeof value === 'string' && !value.includes('@')) {
-      return { isValid: false, error: 'Please enter a valid email address' };
+    // Skip validation for empty optional fields
+    if (!isRequired && (value === '' || value === null || value === undefined)) {
+      return { isValid: true };
     }
 
-    // Number validation
-    if ((field.type === 'number' || field.type === 'integer') && value !== '' && value !== null) {
+    // Pattern validation (covers email, phone, url, etc.)
+    if (validation?.pattern && value !== '' && value !== null) {
+      const pattern = new RegExp(validation.pattern);
+      if (!pattern.test(String(value))) {
+        const errorMessage = validation.messages?.pattern ||
+                            validation.messages?.custom?.[`INVALID_${field.type.toUpperCase()}`] ||
+                            `Invalid ${field.type} format`;
+        return { isValid: false, error: errorMessage };
+      }
+    }
+
+    // Length validation
+    if (validation?.maxLength && String(value).length > validation.maxLength) {
+      const errorMessage = validation.messages?.maxLength ||
+                          `Too long (maximum ${validation.maxLength} characters)`;
+      return { isValid: false, error: errorMessage };
+    }
+
+    if (validation?.minLength && String(value).length < validation.minLength) {
+      const errorMessage = validation.messages?.minLength ||
+                          `Too short (minimum ${validation.minLength} characters)`;
+      return { isValid: false, error: errorMessage };
+    }
+
+    // Number range validation
+    if ((field.type === 'number' || field.type === 'integer' || field.type === 'decimal') && value !== '' && value !== null) {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
       if (isNaN(numValue)) {
-        return { isValid: false, error: 'Please enter a valid number' };
+        const errorMessage = validation?.messages?.custom?.INVALID_NUMBER || 'Please enter a valid number';
+        return { isValid: false, error: errorMessage };
+      }
+
+      if (validation?.min !== undefined && numValue < validation.min) {
+        const errorMessage = validation.messages?.min || `Must be at least ${validation.min}`;
+        return { isValid: false, error: errorMessage };
+      }
+
+      if (validation?.max !== undefined && numValue > validation.max) {
+        const errorMessage = validation.messages?.max || `Must be no more than ${validation.max}`;
+        return { isValid: false, error: errorMessage };
       }
     }
 
@@ -134,6 +195,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasAttemptedSubmit(true); // Mark that user has attempted to submit
 
     // Force validation on all fields before submit
     const validationErrors: string[] = [];
@@ -149,7 +211,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
 
     if (validationErrors.length > 0) {
       console.log('🚨 [VibeGridEntityAdd] Validation errors:', validationErrors);
-      alert(`Please fix the following errors:\n${validationErrors.join('\n')}`);
+      // Don't show alert - the status indicator will show the error message
       return;
     }
 
@@ -210,15 +272,45 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
     const fieldValue = formData[field.id];
     if (!fieldValue) return null;
 
-    const containerClassName = `space-y-2 ${!fieldValue.isValid ? 'border-red-500' : ''}`;
-    const fieldLabel = field.label || field.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    // Enhanced visual feedback for field states
+    const isRequired = field.required || field.validation?.required || field.id === 'name';
+    const hasError = !fieldValue.isValid;
+    const isEmpty = fieldValue.value === '' || fieldValue.value === null || fieldValue.value === undefined;
+    const showRequiredState = isRequired && isEmpty && !fieldValue.error;
+
+    const containerClassName = `space-y-2 ${hasError ? 'border-l-4 border-l-red-500 pl-3' : showRequiredState ? 'border-l-4 border-l-orange-300 pl-3' : ''}`;
+
+    // Use enhanced display metadata for label and placeholder
+    const fieldLabel = field.label ||
+                      field.display?.label ||
+                      field.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    const placeholder = field.display?.placeholder ||
+                       field.validation?.messages?.placeholder ||
+                       field.description ||
+                       `Enter ${fieldLabel.toLowerCase()}`;
+
+    // Enhanced input styling based on validation state
+    const getInputClassName = (baseClasses = '') => {
+      const classes = [baseClasses];
+
+      if (hasError) {
+        classes.push('border-red-500 focus:border-red-500 focus:ring-red-200');
+      } else if (showRequiredState) {
+        classes.push('border-orange-300 focus:border-orange-400 focus:ring-orange-100');
+      } else if (isRequired && !isEmpty) {
+        classes.push('border-green-400 focus:border-green-500 focus:ring-green-100');
+      }
+
+      return classes.filter(Boolean).join(' ');
+    };
 
     return (
       <div key={field.id} className={containerClassName}>
-        <Label htmlFor={field.id} className="text-sm font-medium">
+        <Label htmlFor={field.id} className={`text-sm font-medium ${hasError ? 'text-red-700' : showRequiredState ? 'text-orange-700' : ''}`}>
           {fieldLabel}
-          {(field.required || field.fieldSchema?.required || field.id === 'name') && (
-            <span className="text-red-500 ml-1">*</span>
+          {isRequired && (
+            <span className={`ml-1 ${hasError ? 'text-red-500' : showRequiredState ? 'text-orange-500' : 'text-red-400'}`}>*</span>
           )}
         </Label>
 
@@ -258,7 +350,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between"
+                    className={getInputClassName("w-full justify-between")}
                   >
                     {fieldValue.value
                       ? options.find(option => option === fieldValue.value)?.charAt(0).toUpperCase() + options.find(option => option === fieldValue.value)?.slice(1)
@@ -303,7 +395,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   type="number"
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value ? Number(e.target.value) : '')}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                  placeholder={placeholder}
+                  className={getInputClassName()}
                 />
               );
 
@@ -315,7 +408,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   step="0.01"
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value ? Number(e.target.value) : '')}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                  placeholder={placeholder}
+                  className={getInputClassName()}
                 />
               );
 
@@ -342,7 +436,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                     <Button
                       id={field.id}
                       variant="outline"
-                      className="w-full justify-start text-left font-normal"
+                      className={getInputClassName("w-full justify-start text-left font-normal")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {fieldValue.value ? format(new Date(fieldValue.value), "PPP") : "Pick a date"}
@@ -366,7 +460,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   type="email"
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                  placeholder={placeholder}
+                  className={getInputClassName()}
                 />
               );
 
@@ -377,7 +472,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   type="url"
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                  placeholder={placeholder}
+                  className={getInputClassName()}
                 />
               );
 
@@ -388,7 +484,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   type="tel"
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                  placeholder={placeholder}
+                  className={getInputClassName()}
                 />
               );
 
@@ -411,8 +508,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   id={field.id}
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
-                  className="min-h-[80px]"
+                  placeholder={placeholder}
+                  className={getInputClassName("min-h-[80px]")}
                 />
               );
 
@@ -427,7 +524,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                     type="email"
                     value={fieldValue.value}
                     onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                    placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                    placeholder={placeholder}
                   />
                 );
               }
@@ -439,7 +536,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                     type="url"
                     value={fieldValue.value}
                     onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                    placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                    placeholder={placeholder}
                   />
                 );
               }
@@ -451,7 +548,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                     type="tel"
                     value={fieldValue.value}
                     onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                    placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                    placeholder={placeholder}
                   />
                 );
               }
@@ -467,8 +564,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   id={field.id}
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
-                  className="min-h-[80px]"
+                  placeholder={placeholder}
+                  className={getInputClassName("min-h-[80px]")}
                 />
               ) : (
                 <Input
@@ -476,7 +573,8 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
                   type="text"
                   value={fieldValue.value}
                   onChange={(e) => updateFieldValue(field.id, e.target.value)}
-                  placeholder={field.description || `Enter ${fieldLabel.toLowerCase()}`}
+                  placeholder={placeholder}
+                  className={getInputClassName()}
                 />
               );
           }
@@ -509,6 +607,7 @@ export const VibeGridEntityAdd = observer(function VibeGridEntityAdd({
             Create a new {displayName.toLowerCase()} record using the same field editors as the table.
           </DialogDescription>
         </DialogHeader>
+
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
