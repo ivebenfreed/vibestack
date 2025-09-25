@@ -245,25 +245,7 @@ export function createSchemaObservable(orgId: string) {
         version: 1, // Schema tables use simple versioning
         tableNames: [`schema_${orgId}`]
       }),
-      retrySync: true, // Retry failed schema fetches
-      transform: {
-        load: (cachedData: any) => {
-          if (!cachedData) return null
-          // Add timestamp-based cache validation
-          const cacheAge = Date.now() - (cachedData.cachedAt || 0)
-          const maxAge = 5 * 60 * 1000 // 5 minutes cache
-          if (cacheAge > maxAge) {
-            fileLog.info(`[SchemaObservable] Schema cache expired for org ${orgId}, will refresh`)
-            return null // Force refresh if stale
-          }
-          fileLog.info(`[SchemaObservable] Using cached schema for org ${orgId}`)
-          return cachedData
-        },
-        save: (data: any) => ({
-          ...data,
-          cachedAt: Date.now()
-        })
-      }
+      retrySync: true
     },
     
     // LIST - Load organization schema from server

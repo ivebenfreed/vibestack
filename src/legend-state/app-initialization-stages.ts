@@ -11,7 +11,6 @@ import { auth$ } from './auth';
 import { unifiedAuth$ } from './unified-auth';
 import { loadUniverseContext, universeContext$ } from './observables';
 import { OptionsManager } from './reference-system/options-manager';
-import { syncActions } from './sync-manager';
 
 const fileLog = log('legend-state/app-initialization-stages.ts');
 
@@ -29,6 +28,7 @@ export type AppLoadingStage =
   | 'organizations'      // Loading user organizations
   | 'universe'          // Loading universe context/schemas
   | 'entities'          // Initial entity data load
+  | 'sync'              // Initialize sync connection
   | 'options'           // Preloading common options (needs entities)
   | 'ready'            // Fully initialized
   | 'error';           // Error state
@@ -80,14 +80,14 @@ if (import.meta.hot) {
 const appInitMethods = {
   // Progress tracking
   get progress(): number {
-    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'entities', 'options', 'ready'];
+    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'entities', 'sync', 'options', 'ready'];
     const currentIndex = stages.indexOf(appInitStage$.stage.get());
     const totalStages = stages.length - 1; // Don't count 'idle'
     return Math.max(0, currentIndex) / totalStages;
   },
 
   get progressPercent(): number {
-    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'entities', 'options', 'ready'];
+    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'entities', 'sync', 'options', 'ready'];
     const currentIndex = stages.indexOf(appInitStage$.stage.get());
     const totalStages = stages.length - 1; // Don't count 'idle'
     const progress = Math.max(0, currentIndex) / totalStages;
@@ -101,6 +101,7 @@ const appInitMethods = {
       case 'organizations': return 'Loading organizations...';
       case 'universe': return 'Loading schemas...';
       case 'entities': return 'Loading entity data...';
+      case 'sync': return 'Connecting to sync...';
       case 'options': return 'Loading system options...';
       case 'ready': return 'Ready!';
       case 'error': return 'Initialization failed';
@@ -121,8 +122,12 @@ const appInitMethods = {
     return appInitStage$.stage.get() === 'universe';
   },
 
-  get canLoadOptions() {
+  get canLoadSync() {
     return appInitStage$.stage.get() === 'entities';
+  },
+
+  get canLoadOptions() {
+    return appInitStage$.stage.get() === 'sync';
   },
 
   get isReady() {
@@ -180,6 +185,9 @@ const appInitMethods = {
           break;
         case 'entities':
           success = await this.executeInitialEntitiesLoad();
+          break;
+        case 'sync':
+          success = await this.executeSyncConnection();
           break;
         case 'options':
           success = await this.executeOptionsPreload();
@@ -339,12 +347,62 @@ const appInitMethods = {
 
     initLog.info('✅ Entity system ready');
 
-    // Auto-advance to options
-    if (this.canLoadOptions) {
-      await this.advanceToStage('options');
+    // Auto-advance to sync
+    if (this.canLoadSync) {
+      await this.advanceToStage('sync');
     }
 
     return true;
+  },
+
+  async executeSyncConnection(): Promise<boolean> {
+    initLog.debug('🔗 Initializing sync connection');
+
+    try {
+      // Get user and organization info
+      const user = unifiedAuth$.user.get();
+      const userOrganizations = unifiedAuth$.userOrganizations.get();
+
+      if (!user || !userOrganizations || userOrganizations.length === 0) {
+        throw new Error('User or organizations not available for sync connection');
+      }
+
+      // Use the first organization for sync connection
+      const primaryOrganization = userOrganizations[0];
+
+      initLog.info('🔗 Connecting sync to organization:', {
+        orgId: primaryOrganization.id,
+        orgName: primaryOrganization.name,
+        userId: user.id
+      });
+
+      // Import sync actions
+      const { syncActions } = await import('./sync-manager');
+
+      // Connect to sync
+      await syncActions.connect(primaryOrganization.id, user.id);
+
+      initLog.info('✅ Sync connection established');
+
+      // Auto-advance to options
+      if (this.canLoadOptions) {
+        await this.advanceToStage('options');
+      }
+
+      return true;
+
+    } catch (error) {
+      initLog.error('❌ Sync connection failed:', error);
+      // Don't fail the entire initialization if sync fails - continue to options
+      initLog.warn('⚠️ Continuing without sync (sync will retry automatically)');
+
+      // Auto-advance to options even if sync fails
+      if (this.canLoadOptions) {
+        await this.advanceToStage('options');
+      }
+
+      return true; // Don't fail initialization
+    }
   },
 
   async executeOptionsPreload(): Promise<boolean> {
