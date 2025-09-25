@@ -7,7 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { KnowledgeTab } from '@/components/ui/knowledge-tab-simplified'
+import React from 'react'
+
+// ⚡ PERFORMANCE: Lazy load heavy component to reduce initial bundle size
+const KnowledgeTab = React.lazy(() => import('@/components/ui/knowledge-tab-simplified').then(m => ({ default: m.KnowledgeTab })))
 import { 
   ArrowLeft, 
   Globe, 
@@ -384,12 +387,14 @@ function UniverseDetailPage() {
           </TabsContent>
           
           <TabsContent value="knowledge">
-            <KnowledgeTab
-              entityType="universe"
-              entityId={universe.id}
-              entityName={universe.name}
-              organizationId={user?.default_organization_id || universe.id}
-            />
+            <React.Suspense fallback={<div className="text-center py-4">Loading knowledge...</div>}>
+              <KnowledgeTab
+                entityType="universe"
+                entityId={universe.id}
+                entityName={universe.name}
+                organizationId={user?.default_organization_id || universe.id}
+              />
+            </React.Suspense>
           </TabsContent>
         </Tabs>
       </div>

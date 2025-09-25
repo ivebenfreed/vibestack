@@ -45,6 +45,7 @@ import {
   Edit
 } from 'lucide-react'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
+import { performanceTracker } from '@/utils/performance-tracker'
 
 interface EntityCardProps {
   entityName: string
@@ -208,7 +209,14 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
   return (
     <>
       <Card className="hover:shadow-md transition-all duration-200 cursor-pointer relative group border-border/50 bg-card/50 backdrop-blur-sm">
-        <Link to={route.to} params={route.params} className="block">
+        <Link
+          to={route.to}
+          params={route.params}
+          className="block"
+          onClick={() => {
+            performanceTracker.startNavigation(`${route.to}?entity=${route.params.entityName}`)
+          }}
+        >
           <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-3'>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">

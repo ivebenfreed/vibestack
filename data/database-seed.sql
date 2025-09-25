@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict G9Dp7TOTOqJF1bPkbQZX1nZWghSaheGEkwKVWEB13RBSmzpcfaxK2O3Abxc7X5x
+\restrict zXYR6naN7zX5fkkLxtLyk3DqwJ95Tuhd1hf6LVGfZ0dpPUbec7nXWILMEWsP0ca
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -961,7 +961,6 @@ a99c7666-08d4-45e8-bde7-7a1c454a7d9d	01920000-1000-7000-8000-000000000001	2025-0
 COPY public.org_01920000_1000_7000_8000_000000000001_testconnectioncleanup (id, organization_id, created_at, updated_at, name, description, status, data, test_field) FROM stdin;
 89f11a71-3c4a-4206-83da-ce6720abef75	01920000-1000-7000-8000-000000000001	2025-09-22 20:24:22.804	2025-09-22 20:24:22.804	Test Record	\N	draft	\N	Test Value
 01538900-dd6a-46c1-bbc1-cecd5efe69e5	01920000-1000-7000-8000-000000000001	2025-09-22 20:47:02.842	2025-09-22 20:47:02.842	API Test Record	\N	draft	\N	Working
-3f053c3d-eba5-40c3-8122-7e6485897d7a	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:31.414567	2025-09-24 17:14:31.414567	Sync Test 1758734071	Testing sync notifications	active	\N	test_value
 aaa67762-ce09-47f2-80a6-6d03780b4def	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:49.14932	2025-09-24 17:14:49.14932	Real-Time Sync Test 1758734089	Testing real-time sync notifications	active	\N	sync_test_1758734089
 9910f017-0701-43e1-b6df-557b50a43e78	01920000-1000-7000-8000-000000000001	2025-09-24 17:15:06.528419	2025-09-24 17:15:06.528419	Final Sync Test 13:15:06	Testing complete sync notification flow	active	\N	final_test
 1ced1304-9b37-4ff4-8433-bece3c91ac8d	01920000-1000-7000-8000-000000000001	2025-09-24 20:25:52.905	2025-09-24 20:25:52.905	Corrected Dev Test	Testing with proper dev environment detection	draft	\N	corrected_dev_test
@@ -1016,6 +1015,7 @@ ee170ec5-6445-4135-86b0-3fe77ce65f43	01920000-1000-7000-8000-000000000001	2025-0
 c65a7bd9-bc01-4034-a116-5425b90a73c5	01920000-1000-7000-8000-000000000001	2025-09-24 20:31:30.967	2025-09-24 20:31:30.967	Volume Test Record 20	High volume test record created at 1758745890.722	draft	\N	volume_test_20_1758745890.722
 750b492b-28fa-4233-96b6-c132e5435514	01920000-1000-7000-8000-000000000001	2025-09-24 20:34:52.446	2025-09-24 20:34:52.446	VibeGrid Test 1	Real-time grid update test 1758746092.327	draft	\N	vibegrid_1_1758746092.327
 fbe0a831-eeb1-47ac-b7e0-ac65fdd2605b	01920000-1000-7000-8000-000000000001	2025-09-24 20:34:53.592	2025-09-24 20:34:53.592	VibeGrid Test 2	Real-time grid update test 1758746093.483	draft	\N	vibegrid_2_1758746093.483
+3f053c3d-eba5-40c3-8122-7e6485897d7a	01920000-1000-7000-8000-000000000001	2025-09-24 17:14:31.414567	2025-09-25 14:12:27.406	Sync Test 1758734071	Testing sync notifications	active	\N	test_value
 \.
 
 
@@ -1423,5 +1423,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict G9Dp7TOTOqJF1bPkbQZX1nZWghSaheGEkwKVWEB13RBSmzpcfaxK2O3Abxc7X5x
+\unrestrict zXYR6naN7zX5fkkLxtLyk3DqwJ95Tuhd1hf6LVGfZ0dpPUbec7nXWILMEWsP0ca
 

@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ContentContainer } from '@/components/layout/content-container'
 import { Badge } from '@/components/ui/badge'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
-import { EntityCreationDialog } from './EntityCreationDialog'
+// ⚡ PERFORMANCE: Lazy load heavy components to reduce initial bundle size
+const EntityCreationDialog = React.lazy(() => import('./EntityCreationDialog').then(m => ({ default: m.EntityCreationDialog })))
+const KnowledgeTab = React.lazy(() => import('@/components/ui/knowledge-tab-simplified').then(m => ({ default: m.KnowledgeTab })))
+const QuickEntityCreate = React.lazy(() => import('./QuickEntityCreate').then(m => ({ default: m.QuickEntityCreate })))
 import { EntityCard } from './EntityCard'
-import { QuickEntityCreate } from './QuickEntityCreate'
-import { KnowledgeTab } from '@/components/ui/knowledge-tab-simplified'
 import { PlusCircle, Globe, Building } from 'lucide-react'
 import { 
   universeLoading$,
@@ -136,7 +137,9 @@ const DashboardLegend = observer(function DashboardLegend() {
           <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
         </div>
         <div className='flex items-center space-x-2'>
-          <QuickEntityCreate />
+          <React.Suspense fallback={<div className="text-center py-2">Loading...</div>}>
+            <QuickEntityCreate />
+          </React.Suspense>
           <Button onClick={() => setCreateDialogOpen(true)} variant="outline">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Entity Type
@@ -167,19 +170,23 @@ const DashboardLegend = observer(function DashboardLegend() {
         </TabsContent>
         
         <TabsContent value='knowledge' className='space-y-4'>
-          <KnowledgeTab 
-            entityType={isUniverseMode ? 'universe' : 'world'}
-            entityId={routeOrgId || currentOrgId || 'universe'}
-            entityName={displayOrganizationName}
-            organizationId={routeOrgId || currentOrgId || ''}
-          />
+          <React.Suspense fallback={<div className="text-center py-4">Loading knowledge...</div>}>
+            <KnowledgeTab
+              entityType={isUniverseMode ? 'universe' : 'world'}
+              entityId={routeOrgId || currentOrgId || 'universe'}
+              entityName={displayOrganizationName}
+              organizationId={routeOrgId || currentOrgId || ''}
+            />
+          </React.Suspense>
         </TabsContent>
       </Tabs>
 
-      <EntityCreationDialog 
-        open={createDialogOpen} 
-        onOpenChange={setCreateDialogOpen} 
-      />
+      <React.Suspense fallback={null}>
+        <EntityCreationDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+        />
+      </React.Suspense>
     </ContentContainer>
   )
 })

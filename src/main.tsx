@@ -63,22 +63,28 @@ function getRouter() {
         setProjectAtoms: undefined!,
         setUserAtoms: undefined!,
       },
-      // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
-      defaultPreload: false,  // Disabled to prevent performance issues
-      defaultPreloadStaleTime: 10_000, // Cache preloaded routes for 10 seconds
+      // ⚡ PERFORMANCE: Enable aggressive preloading for faster navigation
+      defaultPreload: 'intent',  // Preload on hover/focus
+      defaultPreloadStaleTime: 30_000, // Cache preloaded routes for 30 seconds
       defaultPendingMs: 0, // ⚡ INSTANT: No delay for pending UI
       defaultPendingMinMs: 0, // ⚡ INSTANT: No minimum pending duration
 
-      // ⚡ PERFORMANCE: Reduced aggressiveness to prevent excessive multiple route loading
-      defaultPreloadDelay: 0, // ⚡ INSTANT: No preload delay
-      defaultPreloadGcTime: 30_000, // Keep preloaded routes in memory for 30 seconds
+      // ⚡ PERFORMANCE: Aggressive preloading for instant navigation
+      defaultPreloadDelay: 50, // 50ms hover delay before preload
+      defaultPreloadGcTime: 60_000, // Keep preloaded routes in memory for 60 seconds
 
-      // TIMING DEBUG: Hook into router events
+      // TIMING DEBUG: Hook into router events (enabled in dev for debugging)
       onBeforeLoad: ({ location, cause }) => {
         console.log(`⏱️ [ROUTER-TIMING] onBeforeLoad: ${performance.now().toFixed(3)}ms - ${location.pathname} (${cause})`);
       },
       onLoad: ({ location, cause }) => {
         console.log(`⏱️ [ROUTER-TIMING] onLoad: ${performance.now().toFixed(3)}ms - ${location.pathname} (${cause})`);
+      },
+      onBeforeNavigate: ({ location, cause }) => {
+        console.log(`🧭 [ROUTER-TIMING] onBeforeNavigate: ${performance.now().toFixed(3)}ms - ${location.pathname} (${cause})`);
+      },
+      onNavigate: ({ location, cause }) => {
+        console.log(`🧭 [ROUTER-TIMING] onNavigate: ${performance.now().toFixed(3)}ms - ${location.pathname} (${cause})`);
       }
     })
     

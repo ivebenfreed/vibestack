@@ -162,8 +162,8 @@ function UniversePage() {
                                 to="/org/$orgId/dashboard"
                                 params={{ orgId: world.id }}
                                 className="hover:underline"
-                                preload="intent"
-                                preloadDelay={50}
+                                preload="viewport"
+                                preloadDelay={0}
                                 onClick={() => {
                                   performanceTracker.startNavigation(`/org/${world.id}/dashboard`)
                                 }}

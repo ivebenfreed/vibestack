@@ -1,8 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { observer } from '@legendapp/state/react'
 import { use$ } from '@legendapp/state/react'
-import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
+import * as React from 'react'
+
+// ⚡ PERFORMANCE: Lazy load heavy component to reduce initial bundle size
+const UniversalEntityPage = React.lazy(() => import('@/components/entities/UniversalEntityPage').then(m => ({ default: m.UniversalEntityPage })))
 import {
   getEntity$,
   universeLoading$,
@@ -10,7 +13,6 @@ import {
   universeSchema$
 } from '@/legend-state'
 import { useEffect } from 'react'
-import * as React from 'react'
 import { z } from 'zod'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 
@@ -24,8 +26,8 @@ export const Route = createFileRoute('/_authenticated/org/$orgId/entities/$entit
     parse: (params) => orgEntityRouteSchema.parse(params),
     stringify: ({ orgId, entityName }) => ({ orgId, entityName })
   },
-  loader: async ({ params }) => {
-    // Organization ID and entity name are available in params
+  loader: ({ params }) => {
+    // ⚡ PERFORMANCE: Make loader synchronous to eliminate async overhead
     return {
       organizationId: params.orgId,
       entityName: params.entityName
@@ -163,10 +165,12 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   // Pass the properly formatted entity name with org prefix - UniversalEntityPage will handle display formatting
 
   return (
-    <UniversalEntityPage
-      entityName={actualEntityKey}
-      schema={entitySchema}
-      orgId={orgId}
-    />
+    <React.Suspense fallback={<div className="flex items-center justify-center py-8">Loading entity page...</div>}>
+      <UniversalEntityPage
+        entityName={actualEntityKey}
+        schema={entitySchema}
+        orgId={orgId}
+      />
+    </React.Suspense>
   )
 })
