@@ -123,21 +123,23 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
   
-  if (loading) {
+  // Show loading state during any of these conditions:
+  // 1. Universe is loading
+  // 2. No schema available yet
+  // 3. Schema exists but entity schema not found yet (prevents flash of "entity not found")
+  if (loading || !schema || !entitySchema) {
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">
-          <h2 className="text-xl font-semibold">Loading Organization Data...</h2>
+          <h2 className="text-xl font-semibold">Loading Entity Data...</h2>
           <p className="text-muted-foreground">
-            Initializing {entityName} store for organization {orgId.slice(0, 8)}...
+            Initializing {entityName} for organization {orgId.slice(0, 8)}...
           </p>
         </div>
       </div>
     )
   }
-  
-  // Universe-based approach - no context switching needed, removed hasCorrectContext check
-  
+
   if (error) {
     return (
       <div className="container mx-auto py-6">
@@ -148,8 +150,9 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
       </div>
     )
   }
-  
-  
+
+  // At this point we have schema loaded and entitySchema should be available
+  // If we still don't have entitySchema, it's a legitimate "not found" case
   if (!entitySchema) {
     return (
       <div className="container mx-auto py-6">
