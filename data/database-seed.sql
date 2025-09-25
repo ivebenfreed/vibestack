@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4urJh2PQiHBCnRnF2Fe3dmqta53pAxWEGAYP42ZOIcLzaN88zSd5g4Q76o9TmsQ
+\restrict 1EleNizG0hKEyCB0k6fgtIFPSfpYnCovq3a6j62eu9sCqt2t4UAHhjs2MXnhDeg
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -667,6 +667,7 @@ ba575163-5ab4-4f38-9aeb-7bc2005d7cc1	01920000-1000-7000-8000-000000000001	2025-0
 1abf5d0f-aa94-48d4-8128-64f6c7aa6da4	01920000-1000-7000-8000-000000000001	2025-09-25 17:39:21.061	2025-09-25 18:15:23.498	💯 FINAL FRONTEND SYNC TEST	This should appear in frontend immediately	active	\N	Curl Sync Corp	technology	startup	https://curlsync.com	sync@curlsync.com	+15556789	{"amount": 125000, "currency": "USD"}	2025-09-25	\N	silver	5
 34479597-44b4-4b21-a49c-3549744f4e13	01920000-1000-7000-8000-000000000001	2025-09-24 15:36:02.405	2025-09-25 18:18:11.959	🌍 CROSS-ORG SYNC TEST	Testing universe-scope notifications across orgs	inactive	\N	API Test Corp - Updated via Curl	Software Testing & QA	small	https://anothertest.com	contact@anothertest.com	+15559999	{"amount": 75000, "currency": "USD"}	2025-09-24	\N	premium	5
 10f7147a-2b20-4501-8c32-96c5f3e79c1a	01920000-1000-7000-8000-000000000001	2025-09-25 17:26:45.265122	2025-09-25 18:19:04.03	🎯 FINAL VERIFICATION TEST	Last test to verify complete sync chain	pending	\N	DataForge Scale Test Corp	Technology - Updated at 2025-09-25 17:59:22.158957+00	medium	https://waltest-updated.com	test@waltest.com	\N	{"amount": 0, "currency": "USD"}	2024-01-01	\N	platinum	5
+e40fb1ab-54c9-4657-a860-5caba55088ad	01920000-1000-7000-8000-000000000001	2025-09-25 18:46:34.618	2025-09-25 19:58:03.612	🎯 CROSS-ORG SUCCESS!!	Testing if notifications flow across organizations	active	\N	Hibernation Test Corp	technology	startup	https://hibernation-test.com	test@hibernation-test.com	+15559999	{"amount": 50000, "currency": "USD"}	2025-09-25	\N	silver	5
 cc777446-7988-4d72-af88-0f69fe09c21e	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:38.922	2025-09-25 17:43:06.809	TechCorp Industries - Updated	Expanded partnership with new AI initiatives	active	""	TechCorp Industries	artificial_intelligence	enterprise	https://techcorp.com	projects@techcorp.com	+15550123	{"amount": 850000, "currency": "USD"}	2023-03-15	[object Object]	platinum	5
 d15bd69a-c973-4f03-8f33-4f1784ff436d	01920000-1000-7000-8000-000000000001	2025-09-11 14:31:53.067	2025-09-25 15:37:19.497	active	Regional healthcare provider with 15 hospitals and 200+ clinics	draft	\N	HealthFirst Medical	healthcare	large	https://healthfirst-med.org	it-projects@healthfirst.org	+15550456	{"amount": 425000, "currency": "USD"}	2022-08-01	[object Object]	gold	4
 cfb82e34-551d-42b6-81c5-71d41ed1621e	01920000-1000-7000-8000-000000000001	2025-09-24 16:30:13.759	2025-09-25 15:43:54.963	Debug Sync Client	Debug Sync Client	active	\N	Debug Corp	technology	startup	https://debug.com	debug@debug.com	+15550000	{"amount": 50000, "currency": "USD"}	2025-09-24	\N	bronze	5
@@ -946,6 +947,7 @@ f9d27876-e415-4527-8a94-777fbce7e912	TestConnectionCleanup	c65a7bd9-bc01-4034-a1
 5f87d6bd-e61f-4e11-b83f-191b0cb4b51c	TestConnectionCleanup	fbe0a831-eeb1-47ac-b7e0-ac65fdd2605b	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-24 20:34:53.607	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-24 20:34:53.607	\N	\N
 b79a236f-8487-4771-96d1-0b86a894fa6b	Client	1abf5d0f-aa94-48d4-8128-64f6c7aa6da4	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-25 17:39:21.109	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-25 17:39:21.109	\N	\N
 08b15038-9765-4879-9d4c-cee223399ba7	Client	9293fd8b-5187-4b73-8aec-081418dc9b89	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-25 17:43:23.279	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-25 17:43:23.279	\N	\N
+c13dd0f2-b570-4ecd-ad28-8505fadf523e	Client	e40fb1ab-54c9-4657-a860-5caba55088ad	created_by	\N	User	0198b046-c453-72d9-b71a-092e1f75601a	"{}"	2025-09-25 18:46:34.692	\N	0198b046-c453-72d9-b71a-092e1f75601a	2025-09-25 18:46:34.692	\N	\N
 \.
 
 
@@ -1428,5 +1430,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 3, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4urJh2PQiHBCnRnF2Fe3dmqta53pAxWEGAYP42ZOIcLzaN88zSd5g4Q76o9TmsQ
+\unrestrict 1EleNizG0hKEyCB0k6fgtIFPSfpYnCovq3a6j62eu9sCqt2t4UAHhjs2MXnhDeg
 

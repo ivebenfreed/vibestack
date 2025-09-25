@@ -13,7 +13,7 @@
  */
 
 import { observable, computed, when } from '@legendapp/state'
-import { getOrgActorWebSocketUrl, syncConfig } from '../sync/config'
+import { getSyncWebSocketUrl, syncConfig } from '../sync/config'
 import { syncNotifications$ } from './sync-notifications'
 import { log } from '@/logger'
 
@@ -123,14 +123,14 @@ function getPersistentClientId(): string {
 /**
  * Create WebSocket connection with reactive state management
  */
-async function createWebSocketConnection(serverUrl: string, clientId: string, organizationId: string): Promise<WebSocket> {
+async function createWebSocketConnection(serverUrl: string, clientId: string, userId: string): Promise<WebSocket> {
   return new Promise<WebSocket>((resolve, reject) => {
     try {
-      const wsUrl = `${serverUrl}?clientId=${clientId}&organizationId=${organizationId}&lsn=0/0`
-      fileLog.info('🔌 [WEBSOCKET-CONNECT] Attempting connection:', {
+      const wsUrl = `${serverUrl}?clientId=${clientId}&userId=${userId}&lsn=0/0`
+      fileLog.info('🔌 [WEBSOCKET-CONNECT] Attempting user-scoped connection:', {
         serverUrl,
         clientId,
-        organizationId,
+        userId,
         fullUrl: wsUrl
       })
 
@@ -332,23 +332,23 @@ export const syncActions = {
    * Connect to WebSocket server
    */
   async connect(organizationId: string, userId: string): Promise<void> {
-    fileLog.info('🔗 Initiating sync connection:', { organizationId, userId })
-    
-    // Update connection state
+    fileLog.info('🔗 Initiating user-scoped sync connection:', { userId })
+
+    // Update connection state - REMOVE organization scoping
     syncState$.assign({
       isConnecting: true,
       error: null,
-      organizationId,
+      organizationId: null, // No longer organization-specific
       userId,
       clientId: getPersistentClientId(),
-      serverUrl: getOrgActorWebSocketUrl(organizationId)
+      serverUrl: getSyncWebSocketUrl()
     })
     
     try {
       const ws = await createWebSocketConnection(
         syncState$.serverUrl.peek()!,
         syncState$.clientId.peek(),
-        organizationId
+        userId
       )
       
       // Set up message handlers

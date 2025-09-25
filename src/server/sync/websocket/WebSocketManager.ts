@@ -54,26 +54,40 @@ export class WebSocketManager {
    * Handle WebSocket upgrade request
    */
   async handleWebSocketUpgrade(request: Request): Promise<Response> {
-    // Extract parameters
+    // Extract parameters - support both org-scoped and user-scoped connections
     let clientId = this.getQueryParam(request, 'clientId');
     let clientLSN = this.getQueryParam(request, 'lsn');
     let organizationId = this.getQueryParam(request, 'organizationId');
-    
+    let userId = this.getQueryParam(request, 'userId');
+
     // Log request parameters
     syncLogger.debug('WebSocket connection request', {
       clientId,
       lsn: clientLSN,
-      organizationId
+      organizationId,
+      userId
     }, MODULE_NAME);
-    
-    // CRITICAL: Require clientId but make organizationId optional for backwards compatibility
+
+    // CRITICAL: Require clientId
     if (!clientId) {
       return new Response('Missing clientId parameter', { status: 400 });
     }
 
-    // Log warning if organizationId is missing but allow connection
-    if (!organizationId) {
-      syncLogger.warn('WebSocket connection without organizationId', {
+    // Support both connection types
+    if (userId) {
+      syncLogger.info('✅ User-scoped WebSocket connection accepted', {
+        clientId,
+        userId,
+        connectionType: 'USER_SCOPED'
+      }, MODULE_NAME);
+    } else if (organizationId) {
+      syncLogger.info('✅ Organization-scoped WebSocket connection accepted', {
+        clientId,
+        organizationId,
+        connectionType: 'ORG_SCOPED'
+      }, MODULE_NAME);
+    } else {
+      syncLogger.warn('WebSocket connection without organizationId or userId', {
         clientId,
         url: request.url
       }, MODULE_NAME);

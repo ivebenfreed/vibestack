@@ -19,7 +19,7 @@ import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebS
 import { UnifiedClientRegistry } from './unified-client-registry';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
 // import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
-import { OrgAwareSyncManager, type SyncConnection } from './org-aware-sync-manager';
+import { OrgAwareSyncManager, type SyncConnection, type MultiOrgSyncConnection } from './org-aware-sync-manager';
 
 import type { 
   ServerMessage, 
@@ -55,8 +55,8 @@ export class SyncDO extends DurableObject {
   private clientId: string = '';
   private syncId: string;
   
-  // Organization-aware sync context
-  private syncConnection: SyncConnection | null = null;
+  // User-scoped sync context (NO single-org compatibility)
+  private userConnection: MultiOrgSyncConnection | null = null;
   private orgAwareSyncManager!: OrgAwareSyncManager;
   
   // Service modules
@@ -141,7 +141,7 @@ export class SyncDO extends DurableObject {
       env: this.env,
       clientId: this.clientId,
       unifiedClientRegistry: this.unifiedClientRegistry,
-      getOrganizationContext: () => this.syncConnection ? { organizationId: this.syncConnection.organizationId } : null,
+      getOrganizationContext: () => this.userConnection ? { userId: this.userConnection.userId, organizations: this.userConnection.organizations } : null,
       getContext: () => this.getContext()
     };
     this.broadcastManager = new BroadcastManager(broadcastContext);
@@ -152,11 +152,11 @@ export class SyncDO extends DurableObject {
       stateManager: this.stateManager,
       getContext: () => this.getContext(),
       webSocketHandler: this,
-      organizationId: this.syncConnection?.organizationId, // Fallback for backward compatibility
-      userId: this.syncConnection?.userId,
-      getOrganizationContext: () => this.syncConnection ? {
-        organizationId: this.syncConnection.organizationId,
-        userId: this.syncConnection.userId
+      organizationId: this.userConnection?.userId || 'USER_SCOPED',
+      userId: this.userConnection?.userId,
+      getOrganizationContext: () => this.userConnection ? {
+        userId: this.userConnection.userId,
+        organizations: this.userConnection.organizations
       } : null
     };
     // this.syncStrategyAnalyzer = new SyncStrategyAnalyzer(strategyContext);
@@ -180,7 +180,7 @@ export class SyncDO extends DurableObject {
       state: this.state,
       // Unified client registry and organization context access
       unifiedClientRegistry: this.unifiedClientRegistry,
-      getOrganizationContext: () => this.syncConnection ? { organizationId: this.syncConnection.organizationId } : null
+      getOrganizationContext: () => this.userConnection ? { organizationId: this.userConnection.organizationId } : null
     };
     this.messageHandlerRegistry = new MessageHandlerRegistry(handlerContext, this);
   }
@@ -222,15 +222,17 @@ export class SyncDO extends DurableObject {
    * Handle WebSocket upgrade requests with organization validation
    */
   private async handleWebSocketUpgrade(request: Request): Promise<Response> {
-    // 1. Extract client parameters
+    // 1. Extract client parameters - NOW USER-SCOPED
     const clientId = getQueryParam(request, 'clientId');
+    const userId = getQueryParam(request, 'userId');
     const organizationSlug = getQueryParam(request, 'org') || getQueryParam(request, 'organization');
-    const organizationId = getQueryParam(request, 'organizationId'); // Separate param for org ID
+    const organizationId = getQueryParam(request, 'organizationId'); // Legacy fallback
     const rawLSN = getQueryParam(request, 'lsn');
     const clientLSN = rawLSN || '0/0';
-    
-    syncLogger.info('WebSocket upgrade request parameters', {
+
+    syncLogger.info('🔗 User-scoped WebSocket upgrade request', {
       clientId,
+      userId,
       organizationSlug,
       organizationId,
       rawLSN,
@@ -244,7 +246,15 @@ export class SyncDO extends DurableObject {
       return new Response('Missing clientId parameter', { status: 400 });
     }
 
-    // 2. Validate multi-organization access BEFORE WebSocket upgrade
+    if (!userId) {
+      syncLogger.error('WebSocket upgrade rejected - missing userId', {
+        url: request.url,
+        clientId
+      }, MODULE_NAME);
+      return new Response('Missing userId parameter - user-scoped sync required', { status: 400 });
+    }
+
+    // 2. Validate user's multi-organization access BEFORE WebSocket upgrade
     const multiOrgValidation = await this.orgAwareSyncManager.validateMultiOrgSyncConnection(
       request,
       clientId
@@ -259,60 +269,42 @@ export class SyncDO extends DurableObject {
       return new Response(multiOrgValidation.error || 'Organization access denied', { status: 403 });
     }
 
-    // 3. Convert multi-org connection to single-org connection for backward compatibility
+    // 3. Store BOTH multi-org connection (for cross-org notifications) AND single-org (for backward compatibility)
     const multiOrgConnection = multiOrgValidation.connection!;
-    
-    // Determine primary organization - use the one specified in URL or the first one
-    let primaryOrg = multiOrgConnection.organizations[0]; // Default to first
-    
-    if (organizationId) {
-      // Find the organization matching the requested ID
-      const requestedOrg = multiOrgConnection.organizations.find(org => org.id === organizationId);
-      if (requestedOrg) {
-        primaryOrg = requestedOrg;
-      }
-    }
-    
-    // Convert to single-org connection for backward compatibility
-    const singleOrgConnection = {
-      clientId,
-      userId: multiOrgConnection.userId,
-      organizationId: primaryOrg.id,
-      organizationSlug: primaryOrg.slug,
-      userRole: primaryOrg.role,
-      permissions: primaryOrg.permissions,
-      sessionData: multiOrgConnection.sessionData,
-      validatedAt: multiOrgConnection.validatedAt
-    };
-    
-    this.syncConnection = singleOrgConnection;
+
+    // PURE USER-SCOPED CONNECTION - No single-org compatibility code
+    this.userConnection = multiOrgConnection;
     this.clientId = clientId;
+
+    syncLogger.info('🌍 PURE USER-SCOPED sync connection established', {
+      clientId,
+      userId,
+      totalOrganizations: multiOrgConnection.organizations.length,
+      organizations: multiOrgConnection.organizations.map(org => ({ id: org.id, name: org.name, role: org.role }))
+    }, MODULE_NAME);
     
     // Store context in WebSocket attachment for hibernation recovery
     this.storeContextInWebSocketAttachment();
     
-    // ALSO store in Durable Object storage as fallback
+    // Store user-scoped context for hibernation recovery
     this.state.storage.put('hibernationContext', {
       clientId: this.clientId,
-      syncConnection: this.syncConnection,
+      userConnection: this.userConnection,
       timestamp: Date.now()
     });
 
-    syncLogger.info('Multi-org WebSocket connection validated - using primary org', {
+    syncLogger.info('🌍 USER-SCOPED WebSocket hibernation ready', {
       clientId,
-      userId: this.syncConnection.userId,
-      primaryOrgId: this.syncConnection.organizationId,
-      primaryOrgSlug: this.syncConnection.organizationSlug,
-      primaryOrgRole: this.syncConnection.userRole,
-      totalOrganizations: multiOrgConnection.organizations.length,
-      allOrganizations: multiOrgConnection.organizations.map(org => ({ id: org.id, slug: org.slug, role: org.role })),
+      userId: this.userConnection.userId,
+      connectionType: 'USER_SCOPED',
+      totalOrganizations: this.userConnection.organizations.length,
+      allOrganizations: this.userConnection.organizations.map(org => ({ id: org.id, slug: org.slug, role: org.role })),
       rawLSN,
       clientLSN,
-      defaultedTo0: !rawLSN
+      willReceiveNotificationsFrom: 'ALL_USER_ORGANIZATIONS'
     }, MODULE_NAME);
 
-    // 4. Store connection context in persistent storage for hibernation recovery
-    await this.storeSyncConnection(this.syncConnection, clientLSN);
+    // User-scoped connection context already stored above
 
     // 5. Proceed with WebSocket upgrade
     const response = await this.webSocketManager.handleWebSocketUpgrade(request);
@@ -327,7 +319,7 @@ export class SyncDO extends DurableObject {
       this.state.waitUntil(this.startOrgAwareSyncProcess(clientId, clientLSN));
     } else {
       // WebSocket upgrade failed - clear connection context
-      this.syncConnection = null;
+      this.userConnection = null;
       this.clientId = '';
     }
     
@@ -340,7 +332,7 @@ export class SyncDO extends DurableObject {
    */
   private async startOrgAwareSyncProcess(clientId: string, clientLSN: string): Promise<void> {
     try {
-      if (!this.syncConnection) {
+      if (!this.userConnection) {
         throw new Error('No validated sync connection available');
       }
 
@@ -349,26 +341,26 @@ export class SyncDO extends DurableObject {
 
       syncLogger.info('Starting org-aware sync process', {
         clientId,
-        userId: this.syncConnection.userId,
-        organizationId: this.syncConnection.organizationId,
+        userId: this.userConnection.userId,
+        organizationId: this.userConnection.organizationId,
         clientLSN
       }, MODULE_NAME);
 
       // Register client with unified registry
       await this.unifiedClientRegistry.registerClient({
         clientId,
-        organizationId: this.syncConnection.organizationId,
-        organizationSlug: this.syncConnection.organizationSlug,
-        userId: this.syncConnection.userId,
-        userRole: this.syncConnection.userRole,
-        userEmail: this.syncConnection.userEmail,
-        userName: this.syncConnection.userName
+        organizationId: this.userConnection.organizationId,
+        organizationSlug: this.userConnection.organizationSlug,
+        userId: this.userConnection.userId,
+        userRole: this.userConnection.userRole,
+        userEmail: this.userConnection.userEmail,
+        userName: this.userConnection.userName
       });
       
       syncLogger.debug('Client registered with organization-aware registry', {
         clientId,
-        organizationId: this.syncConnection.organizationId,
-        organizationSlug: this.syncConnection.organizationSlug
+        organizationId: this.userConnection.organizationId,
+        organizationSlug: this.userConnection.organizationSlug
       }, MODULE_NAME);
 
       // Note: WebSocket is ready after successful upgrade in hibernation API
@@ -380,7 +372,7 @@ export class SyncDO extends DurableObject {
       syncLogger.info('Bypassing sync strategy determination - going straight to live sync', {
         clientId,
         clientLSN,
-        organizationId: this.syncConnection?.organizationId
+        organizationId: this.userConnection?.organizationId
       }, MODULE_NAME);
       
       // Start live sync directly (no LSN needed since we don't use change_history)
@@ -389,14 +381,14 @@ export class SyncDO extends DurableObject {
     } catch (error) {
       syncLogger.error('Organization-aware sync error', {
         clientId,
-        userId: this.syncConnection?.userId,
-        organizationId: this.syncConnection?.organizationId,
+        userId: this.userConnection?.userId,
+        organizationId: this.userConnection?.organizationId,
         lsn: clientLSN,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
 
       // Send error to client
-      if (this.syncConnection) {
+      if (this.userConnection) {
         await this.send({
           type: 'sync-error',
           error: 'Organization sync failed',
@@ -414,7 +406,7 @@ export class SyncDO extends DurableObject {
     clientId: string,
     clientLSN: string
   ): Promise<void> {
-    if (!this.syncConnection) {
+    if (!this.userConnection) {
       throw new Error('No validated sync connection for org-aware sync');
     }
 
@@ -422,7 +414,7 @@ export class SyncDO extends DurableObject {
       // Skip complex sync strategies - just start live sync for notifications
       syncLogger.info('Starting simple live sync for notifications only', {
         clientId,
-        organizationId: this.syncConnection?.organizationId
+        organizationId: this.userConnection?.organizationId
       }, MODULE_NAME);
           
       await this.send({
@@ -435,8 +427,8 @@ export class SyncDO extends DurableObject {
     } catch (error) {
       syncLogger.error('Org-aware sync strategy failed', {
         clientId,
-        userId: this.syncConnection.userId,
-        organizationId: this.syncConnection.organizationId,
+        userId: this.userConnection.userId,
+        organizationId: this.userConnection.organizationId,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
       throw error;
@@ -447,14 +439,14 @@ export class SyncDO extends DurableObject {
    * Perform organization-aware initial sync
    */
   private async performOrgAwareInitialSync(clientId: string, serverLSN: string): Promise<void> {
-    if (!this.syncConnection?.organizationId) {
+    if (!this.userConnection?.organizationId) {
       throw new Error(`Cannot perform org-aware initial sync: organization context required`);
     }
 
     syncLogger.info('Starting org-aware initial sync', {
       clientId,
-      userId: this.syncConnection.userId,
-      organizationId: this.syncConnection.organizationId,
+      userId: this.userConnection.userId,
+      organizationId: this.userConnection.organizationId,
       serverLSN
     }, MODULE_NAME);
 
@@ -464,8 +456,8 @@ export class SyncDO extends DurableObject {
 
     syncLogger.info('Org-aware initial sync completed', {
       clientId,
-      userId: this.syncConnection.userId,
-      organizationId: this.syncConnection.organizationId
+      userId: this.userConnection.userId,
+      organizationId: this.userConnection.organizationId
     }, MODULE_NAME);
   }
 
@@ -477,12 +469,12 @@ export class SyncDO extends DurableObject {
     clientLSN: string,
     serverLSN: string
   ): Promise<void> {
-    if (!this.syncConnection) return;
+    if (!this.userConnection) return;
 
     syncLogger.info('Starting org-aware catchup sync', {
       clientId,
-      userId: this.syncConnection.userId,
-      organizationId: this.syncConnection.organizationId,
+      userId: this.userConnection.userId,
+      organizationId: this.userConnection.organizationId,
       clientLSN,
       serverLSN
     }, MODULE_NAME);
@@ -496,12 +488,12 @@ export class SyncDO extends DurableObject {
    * Start organization-aware live sync
    */
   private async startOrgAwareLiveSync(clientId: string): Promise<void> {
-    if (!this.syncConnection) return;
+    if (!this.userConnection) return;
 
     syncLogger.info('Starting org-aware live sync', {
       clientId,
-      userId: this.syncConnection.userId,
-      organizationId: this.syncConnection.organizationId
+      userId: this.userConnection.userId,
+      organizationId: this.userConnection.organizationId
     }, MODULE_NAME);
 
     // Live sync is already handled by the message handlers
@@ -510,8 +502,8 @@ export class SyncDO extends DurableObject {
       syncLogger.debug('Sending srv_live_start message to client', {
         clientId,
         messageType: 'srv_live_start',
-        organizationId: this.syncConnection.organizationId,
-        userId: this.syncConnection.userId
+        organizationId: this.userConnection.organizationId,
+        userId: this.userConnection.userId
       }, MODULE_NAME);
 
       await this.send({
@@ -603,7 +595,7 @@ export class SyncDO extends DurableObject {
       }
 
       // Send table change notifications for Legend State integration
-      if (orgFilteredChanges.length > 0 && this.syncConnection?.organizationId) {
+      if (orgFilteredChanges.length > 0 && this.userConnection?.organizationId) {
         await this.sendTableChangeNotifications(orgFilteredChanges, providedLSN || '0/0');
       }
 
@@ -640,10 +632,10 @@ export class SyncDO extends DurableObject {
       }
 
       // FIXED: Restore hibernation context if missing
-      if (!this.syncConnection || !this.clientId) {
-        syncLogger.info('HIBERNATION FIX: Restoring context for table change notification', {
+      if (!this.userConnection || !this.clientId) {
+        syncLogger.info('HIBERNATION FIX: Restoring user-scoped context for table change notification', {
           clientId,
-          hasSyncConnection: !!this.syncConnection,
+          hasUserConnection: !!this.userConnection,
           hasClientId: !!this.clientId
         }, MODULE_NAME);
 
@@ -685,7 +677,7 @@ export class SyncDO extends DurableObject {
       // Frontend will handle organization permission filtering via Legend State
       syncLogger.info('🌍 UNIVERSE NOTIFICATION: Accepting cross-org change notification', {
         clientId,
-        clientPrimaryOrg: this.syncConnection?.organizationId,
+        clientPrimaryOrg: this.userConnection?.organizationId,
         notificationOrg: organizationId,
         tables,
         source,
@@ -813,7 +805,7 @@ export class SyncDO extends DurableObject {
    * Filter changes by organization access and permissions
    */
   private async filterChangesForOrganization(changes: TableChange[]): Promise<TableChange[]> {
-    if (!this.syncConnection) {
+    if (!this.userConnection) {
       // No org context - block all changes for security
       syncLogger.warn('No organization context - blocking all changes', {
         changeCount: changes.length
@@ -825,14 +817,14 @@ export class SyncDO extends DurableObject {
       // Use OrgAwareSyncManager to filter changes
       const filteredChanges = await this.orgAwareSyncManager.filterChangesByOrg(
         changes,
-        this.syncConnection,
+        this.userConnection,
         'read' // Live changes are read operations
       );
 
       if (filteredChanges.length < changes.length) {
         syncLogger.debug('Changes filtered by organization', {
-          userId: this.syncConnection.userId,
-          organizationId: this.syncConnection.organizationId,
+          userId: this.userConnection.userId,
+          organizationId: this.userConnection.organizationId,
           originalCount: changes.length,
           filteredCount: filteredChanges.length
         }, MODULE_NAME);
@@ -841,8 +833,8 @@ export class SyncDO extends DurableObject {
       return filteredChanges;
     } catch (error) {
       syncLogger.error('Failed to filter changes for organization', {
-        userId: this.syncConnection?.userId,
-        organizationId: this.syncConnection?.organizationId,
+        userId: this.userConnection?.userId,
+        organizationId: this.userConnection?.organizationId,
         changeCount: changes.length,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
@@ -869,8 +861,8 @@ export class SyncDO extends DurableObject {
       
       syncLogger.debug('Queued live changes due to processing lock', {
         clientId,
-        userId: this.syncConnection?.userId,
-        organizationId: this.syncConnection?.organizationId,
+        userId: this.userConnection?.userId,
+        organizationId: this.userConnection?.organizationId,
         changeCount: changes.length,
         queueLength: this.pendingLiveUpdates.length,
         providedLSN: providedLSN || 'none'
@@ -986,7 +978,7 @@ export class SyncDO extends DurableObject {
    * Extracts table names from changes and broadcasts org-aware notifications
    */
   private async sendTableChangeNotifications(changes: TableChange[], lsn: string): Promise<void> {
-    if (!this.syncConnection?.organizationId) {
+    if (!this.userConnection) {
       return;
     }
 
@@ -999,7 +991,7 @@ export class SyncDO extends DurableObject {
       }
 
       syncLogger.debug('Sending table change notifications for Legend State', {
-        organizationId: this.syncConnection.organizationId,
+        organizationId: this.userConnection.organizationId,
         tables: tableNames,
         lsn,
         changeCount: changes.length
@@ -1011,18 +1003,18 @@ export class SyncDO extends DurableObject {
         messageId: crypto.randomUUID(),
         timestamp: Date.now(),
         clientId: this.clientId,
-        organizationId: this.syncConnection.organizationId,
+        organizationId: this.userConnection.organizationId,
         tables: tableNames,
         lsn,
         source: 'wal'
       };
 
       // Send to all clients in this organization
-      await this.broadcastManager.broadcastToOrganization(notification, this.syncConnection.organizationId);
+      await this.broadcastManager.broadcastToOrganization(notification, this.userConnection.organizationId);
 
     } catch (error) {
       syncLogger.error('Failed to send table change notifications', {
-        organizationId: this.syncConnection?.organizationId,
+        organizationId: this.userConnection?.organizationId,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
     }
@@ -1096,33 +1088,33 @@ export class SyncDO extends DurableObject {
    * Get organization context for sync operations
    */
   getOrganizationContext(): SyncConnection | null {
-    return this.syncConnection;
+    return this.userConnection;
   }
 
   /**
    * Check if connection is valid and refresh if needed
    */
   private async validateConnection(): Promise<boolean> {
-    if (!this.syncConnection) {
+    if (!this.userConnection) {
       return false;
     }
 
     // Check if connection needs refresh
-    if (!this.orgAwareSyncManager.isConnectionValid(this.syncConnection)) {
+    if (!this.orgAwareSyncManager.isConnectionValid(this.userConnection)) {
       syncLogger.info('Refreshing expired sync connection', {
-        userId: this.syncConnection.userId,
-        organizationId: this.syncConnection.organizationId,
-        age: Date.now() - this.syncConnection.validatedAt.getTime()
+        userId: this.userConnection.userId,
+        organizationId: this.userConnection.organizationId,
+        age: Date.now() - this.userConnection.validatedAt.getTime()
       }, MODULE_NAME);
 
-      const refreshed = await this.orgAwareSyncManager.refreshConnectionValidation(this.syncConnection);
+      const refreshed = await this.orgAwareSyncManager.refreshConnectionValidation(this.userConnection);
       
       if (refreshed) {
-        this.syncConnection = refreshed;
+        this.userConnection = refreshed;
         return true;
       } else {
         // Connection refresh failed - clear connection
-        this.syncConnection = null;
+        this.userConnection = null;
         return false;
       }
     }
@@ -1217,21 +1209,21 @@ export class SyncDO extends DurableObject {
       // Context is automatically restored in constructor via hibernation API
       
       // Re-register client with unified registry after hibernation
-      if (this.clientId && this.syncConnection) {
+      if (this.clientId && this.userConnection) {
         await this.unifiedClientRegistry.registerClient({
           clientId: this.clientId,
-          organizationId: this.syncConnection.organizationId,
-          organizationSlug: this.syncConnection.organizationSlug,
-          userId: this.syncConnection.userId,
-          userRole: this.syncConnection.userRole,
-          userEmail: this.syncConnection.userEmail,
-          userName: this.syncConnection.userName
+          organizationId: this.userConnection.organizationId,
+          organizationSlug: this.userConnection.organizationSlug,
+          userId: this.userConnection.userId,
+          userRole: this.userConnection.userRole,
+          userEmail: this.userConnection.userEmail,
+          userName: this.userConnection.userName
         });
         
         syncLogger.info('Re-registered client with unified registry after hibernation', {
           clientId: this.clientId,
-          organizationId: this.syncConnection.organizationId,
-          userId: this.syncConnection.userId
+          organizationId: this.userConnection.organizationId,
+          userId: this.userConnection.userId
         }, MODULE_NAME);
       }
       
@@ -1299,10 +1291,10 @@ export class SyncDO extends DurableObject {
     this.state.waitUntil(this.stateManager.cleanupConnection());
     
     // Remove from unified registry
-    if (this.clientId && this.syncConnection) {
+    if (this.clientId && this.userConnection) {
       this.state.waitUntil(this.unifiedClientRegistry.removeClient(
         this.clientId,
-        this.syncConnection.organizationId
+        this.userConnection.organizationId
       ));
     }
 
@@ -1321,7 +1313,7 @@ export class SyncDO extends DurableObject {
     try {
       const contextData = {
         clientId: this.clientId,
-        syncConnection: {
+        userConnection: {
           userId: connection.userId,
           organizationId: connection.organizationId,
           organizationSlug: connection.organizationSlug,
@@ -1333,7 +1325,7 @@ export class SyncDO extends DurableObject {
         timestamp: Date.now()
       };
 
-      await this.state.storage.put('syncConnection', contextData);
+      await this.state.storage.put('userConnection', contextData);
       
       syncLogger.info('Stored sync connection context in persistent storage', {
         clientId: this.clientId,
@@ -1353,18 +1345,19 @@ export class SyncDO extends DurableObject {
    */
   private storeContextInWebSocketAttachment(): void {
     try {
-      if (this.syncConnection && this.clientId) {
+      if (this.userConnection && this.clientId) {
         const contextData = {
           clientId: this.clientId,
-          syncConnection: this.syncConnection
+          userConnection: this.userConnection
         };
         
         // Store in all connected WebSockets
         const webSockets = this.ctx.getWebSockets();
         
-        syncLogger.info('HIBERNATION DEBUG: Storing context in WebSocket attachments', {
+        syncLogger.info('HIBERNATION DEBUG: Storing user-scoped context in WebSocket attachments', {
           clientId: this.clientId,
-          organizationId: this.syncConnection.organizationId,
+          userId: this.userConnection.userId,
+          totalOrganizations: this.userConnection.organizations.length,
           webSocketCount: webSockets.length,
           contextDataSize: JSON.stringify(contextData).length
         }, MODULE_NAME);
@@ -1390,13 +1383,13 @@ export class SyncDO extends DurableObject {
         
         syncLogger.info('HIBERNATION DEBUG: Context storage completed', {
           clientId: this.clientId,
-          organizationId: this.syncConnection.organizationId,
+          organizationId: this.userConnection.organizationId,
           webSocketCount: webSockets.length
         }, MODULE_NAME);
       } else {
         syncLogger.warn('HIBERNATION DEBUG: Cannot store context - missing data', {
           hasClientId: !!this.clientId,
-          hasSyncConnection: !!this.syncConnection,
+          hasSyncConnection: !!this.userConnection,
           clientId: this.clientId
         }, MODULE_NAME);
       }
@@ -1434,7 +1427,7 @@ export class SyncDO extends DurableObject {
           isNull: attachment === null,
           isUndefined: attachment === undefined,
           hasClientId: attachment?.clientId,
-          hasSyncConnection: attachment?.syncConnection
+          hasSyncConnection: attachment?.userConnection
         }, MODULE_NAME);
         
         if (attachment) {
@@ -1442,22 +1435,22 @@ export class SyncDO extends DurableObject {
 
           syncLogger.info('HIBERNATION DEBUG: Parsed attachment data', {
             hasClientId: !!contextData.clientId,
-            hasSyncConnection: !!contextData.syncConnection,
+            hasSyncConnection: !!contextData.userConnection,
             hasBasicContext: !!contextData.accepted,
             clientId: contextData.clientId,
-            organizationId: contextData.organizationId || contextData.syncConnection?.organizationId
+            organizationId: contextData.organizationId || contextData.userConnection?.organizationId
           }, MODULE_NAME);
 
           // Restore client ID (available in both basic and full context)
           this.clientId = contextData.clientId || '';
 
           // Check if this is full context or basic context
-          if (contextData.syncConnection) {
+          if (contextData.userConnection) {
             // Full context with sync connection
-            this.syncConnection = contextData.syncConnection;
+            this.userConnection = contextData.userConnection;
             syncLogger.info('HIBERNATION DEBUG: Restored full sync connection context', {
               clientId: this.clientId,
-              organizationId: this.syncConnection.organizationId
+              organizationId: this.userConnection.organizationId
             }, MODULE_NAME);
           } else if (contextData.accepted && contextData.organizationId) {
             // Basic context from WebSocket acceptance - need to rebuild sync connection
@@ -1470,23 +1463,23 @@ export class SyncDO extends DurableObject {
             // This would typically require re-authentication, but for now we'll try storage fallback
           }
           
-          if (this.syncConnection) {
+          if (this.userConnection) {
             // Update StateManager with user context
             this.stateManager.setUserContext({
-              userId: this.syncConnection.userId,
-              userRole: this.syncConnection.userRole,
-              userEmail: this.syncConnection.userEmail,
-              userName: this.syncConnection.userName,
+              userId: this.userConnection.userId,
+              userRole: this.userConnection.userRole,
+              userEmail: this.userConnection.userEmail,
+              userName: this.userConnection.userName,
               timestamp: Date.now()
             });
             
             syncLogger.info('HIBERNATION DEBUG: Context successfully restored', {
               clientId: this.clientId,
-              organizationId: this.syncConnection.organizationId,
-              userId: this.syncConnection.userId
+              organizationId: this.userConnection.organizationId,
+              userId: this.userConnection.userId
             }, MODULE_NAME);
           } else {
-            syncLogger.warn('HIBERNATION DEBUG: No syncConnection in attachment data', {
+            syncLogger.warn('HIBERNATION DEBUG: No userConnection in attachment data', {
               contextData
             }, MODULE_NAME);
           }
@@ -1502,29 +1495,29 @@ export class SyncDO extends DurableObject {
       }
       
       // If WebSocket attachment didn't work, try Durable Object storage as fallback
-      if (!this.syncConnection || !this.clientId) {
+      if (!this.userConnection || !this.clientId) {
         syncLogger.info('HIBERNATION DEBUG: Trying Durable Object storage fallback', {
           syncId: this.syncId
         }, MODULE_NAME);
         
         const storedContext = await this.state.storage.get('hibernationContext') as any;
-        if (storedContext && storedContext.syncConnection) {
+        if (storedContext && storedContext.userConnection) {
           this.clientId = storedContext.clientId || '';
-          this.syncConnection = storedContext.syncConnection;
+          this.userConnection = storedContext.userConnection;
           
-          if (this.syncConnection) {
+          if (this.userConnection) {
             this.stateManager.setUserContext({
-              userId: this.syncConnection.userId,
-              userRole: this.syncConnection.userRole,
-              userEmail: this.syncConnection.userEmail,
-              userName: this.syncConnection.userName,
+              userId: this.userConnection.userId,
+              userRole: 'multi-org-user',
+              userEmail: this.userConnection.sessionData?.user?.email,
+              userName: this.userConnection.sessionData?.user?.name,
               timestamp: Date.now()
             });
             
-            syncLogger.info('HIBERNATION DEBUG: Context restored from Durable Object storage', {
+            syncLogger.info('HIBERNATION DEBUG: User-scoped context restored from Durable Object storage', {
               clientId: this.clientId,
-              organizationId: this.syncConnection.organizationId,
-              userId: this.syncConnection.userId
+              userId: this.userConnection.userId,
+              totalOrganizations: this.userConnection.organizations.length
             }, MODULE_NAME);
           }
         } else {
@@ -1547,7 +1540,7 @@ export class SyncDO extends DurableObject {
    */
   private async clearSyncConnection(): Promise<void> {
     try {
-      await this.state.storage.delete('syncConnection');
+      await this.state.storage.delete('userConnection');
       
       syncLogger.debug('Cleared sync connection context from persistent storage', {
         clientId: this.clientId
