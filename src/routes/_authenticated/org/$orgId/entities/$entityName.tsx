@@ -123,23 +123,6 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
   
-  // Show loading state during any of these conditions:
-  // 1. Universe is loading
-  // 2. No schema available yet
-  // 3. Schema exists but entity schema not found yet (prevents flash of "entity not found")
-  if (loading || !schema || !entitySchema) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">Loading Entity Data...</h2>
-          <p className="text-muted-foreground">
-            Initializing {entityName} for organization {orgId.slice(0, 8)}...
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   if (error) {
     return (
       <div className="container mx-auto py-6">
@@ -151,9 +134,8 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
     )
   }
 
-  // At this point we have schema loaded and entitySchema should be available
-  // If we still don't have entitySchema, it's a legitimate "not found" case
-  if (!entitySchema) {
+  // Only show "Entity Not Found" for legitimate missing entities after schema is fully loaded
+  if (!loading && schema && !entitySchema) {
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">
