@@ -305,7 +305,7 @@ export function createTableInteraction$(tableCore$?: any) {
           this.selectCell(cellId, false);
         }
 
-        // 3. For editable cells, start editing (this is the key missing piece)
+        // 3. For editable cells, start editing AND ensure the cell is also selected
         if (isEditable && !shiftKey) {
           // Get the actual cell value for editing
           const [rowId, columnId] = cellId.split(':');

@@ -383,15 +383,129 @@ export class EventManager {
    * Paste clipboard data to selected cells
    */
   private pasteClipboardData(data: any[][], targetCells: Set<string>): void {
-    // Implementation would depend on the specific paste strategy
-    // For now, we'll just log the operation
-    fileLog.info('📋 Pasting data', { 
+    fileLog.info('📋 Pasting data', {
       dataRows: data.length,
+      dataCols: data[0]?.length || 0,
       targetCells: targetCells.size
     });
-    
-    // TODO: Implement actual paste logic based on requirements
-    // This would involve updating cell values via onEntityUpdate callback
+
+    if (data.length === 0 || targetCells.size === 0) {
+      fileLog.warn('📋 No data or target cells for paste operation');
+      return;
+    }
+
+    // Convert target cells to array for easier processing
+    const targetCellArray = Array.from(targetCells);
+
+    // Get the first target cell to determine the starting position
+    const [startRowId, startColumnId] = targetCellArray[0].split(':');
+
+    // Get current data context for proper mapping
+    const processedRows = this.tableCore$.processedRows?.get() || [];
+    const visibleColumns = this.tableCore$.visibleColumns?.get() || [];
+
+    fileLog.debug('📋 Data context check', {
+      processedRowsCount: processedRows.length,
+      visibleColumnsCount: visibleColumns.length,
+      hasTableCore: !!this.tableCore$,
+      hasProcessedRows: !!this.tableCore$.processedRows,
+      hasVisibleColumns: !!this.tableCore$.visibleColumns
+    });
+
+    if (processedRows.length === 0 || visibleColumns.length === 0) {
+      fileLog.error('📋 No data context available for paste operation', {
+        processedRowsCount: processedRows.length,
+        visibleColumnsCount: visibleColumns.length
+      });
+      return;
+    }
+
+    // Find starting indices
+    const startRowIndex = processedRows.findIndex(row => row.id === startRowId);
+    const startColIndex = visibleColumns.findIndex(col => col.id === startColumnId);
+
+    if (startRowIndex === -1 || startColIndex === -1) {
+      fileLog.error('📋 Could not find starting position for paste', {
+        startRowId,
+        startColumnId,
+        startRowIndex,
+        startColIndex
+      });
+      return;
+    }
+
+    fileLog.info('📋 Starting paste operation', {
+      startRowIndex,
+      startColIndex,
+      dataRows: data.length,
+      dataCols: data[0].length,
+      availableRows: processedRows.length,
+      availableCols: visibleColumns.length
+    });
+
+    // Paste data cell by cell
+    let pastedCount = 0;
+    let errorCount = 0;
+
+    for (let dataRowIdx = 0; dataRowIdx < data.length; dataRowIdx++) {
+      for (let dataColIdx = 0; dataColIdx < data[dataRowIdx].length; dataColIdx++) {
+        const targetRowIdx = startRowIndex + dataRowIdx;
+        const targetColIdx = startColIndex + dataColIdx;
+
+        // Check bounds
+        if (targetRowIdx >= processedRows.length || targetColIdx >= visibleColumns.length) {
+          continue; // Skip cells that would go out of bounds
+        }
+
+        const targetRow = processedRows[targetRowIdx];
+        const targetColumn = visibleColumns[targetColIdx];
+        const pasteValue = data[dataRowIdx][dataColIdx];
+
+        // Skip selection column and non-data columns
+        if (targetColumn.id === 'selection' || !targetRow || !targetColumn) {
+          continue;
+        }
+
+        try {
+          if (this.onEntityUpdate) {
+            fileLog.debug('📋 Pasting to cell', {
+              rowId: targetRow.id,
+              columnId: targetColumn.id,
+              value: pasteValue,
+              dataPosition: `[${dataRowIdx},${dataColIdx}]`,
+              targetPosition: `[${targetRowIdx},${targetColIdx}]`
+            });
+
+            // Update the entity field with the pasted value
+            this.onEntityUpdate(targetRow.id, { [targetColumn.id]: pasteValue });
+            pastedCount++;
+          } else {
+            fileLog.warn('📋 No onEntityUpdate callback available');
+            errorCount++;
+          }
+        } catch (error) {
+          fileLog.error('📋 Failed to paste to cell', {
+            rowId: targetRow.id,
+            columnId: targetColumn.id,
+            value: pasteValue,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          errorCount++;
+        }
+      }
+    }
+
+    fileLog.info('📋 Paste operation completed', {
+      pastedCount,
+      errorCount,
+      totalAttempted: data.length * data[0].length
+    });
+
+    // Clear clipboard after successful paste (optional behavior)
+    if (pastedCount > 0 && errorCount === 0) {
+      // You can uncomment this to clear clipboard after paste
+      // this.tableInteraction$.clearClipboard();
+    }
   }
 
   /**
