@@ -2,8 +2,15 @@
 
 import { WebSocket } from 'ws';
 import { spawn } from 'child_process';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const CDP_PORT = 37279;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const configPath = join(__dirname, '../config/chrome-debug.json');
+const config = JSON.parse(readFileSync(configPath, 'utf8'));
+
+const CDP_PORT = config.remoteDebuggingPort;
 const CDP_HOST = 'localhost';
 
 class ChromeDevToolsTester {
@@ -150,7 +157,7 @@ class ChromeDevToolsTester {
   }
 
   async waitForConnection() {
-    console.log('⏳ Waiting for Chrome to be available on port 9222...');
+    console.log(`⏳ Waiting for Chrome to be available on port ${CDP_PORT}...`);
 
     const maxAttempts = 30;
     const delay = 1000;

@@ -54,6 +54,14 @@ BashOutput(bash_id="[chrome-remote-id]", filter="ERROR|WARNING")
 - **Playwright integration**: Connects directly to Playwright browser profile
 - **Color-coded output**: Different colors for log levels (error=red, warn=yellow, info=cyan)
 - **Structured data**: Formats objects and arrays from console output
+- **Consistent config**: Chrome remote debugging port managed via `config/chrome-debug.json`
+
+**Chrome Debug Configuration:**
+```bash
+# Update remote debugging port (affects both Playwright and chrome-remote)
+# Edit config/chrome-debug.json, then regenerate Playwright config
+pnpm config:playwright
+```
 
 ## Database
 

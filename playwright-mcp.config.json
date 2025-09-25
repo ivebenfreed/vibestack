@@ -6,10 +6,14 @@
     "launchOptions": {
       "headless": false,
       "args": [
-        "--remote-debugging-port=9222"
+        "--remote-debugging-port=40955"
       ]
     }
   },
   "outputDir": ".playwright/output",
-  "capabilities": ["tabs", "vision", "pdf"]
+  "capabilities": [
+    "tabs",
+    "vision",
+    "pdf"
+  ]
 }
