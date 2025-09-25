@@ -21,11 +21,7 @@ const myLog = log('routes/_authenticated/route.tsx');
 
 export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
-  beforeLoad: async ({ location }) => {
-    // Let components handle authentication redirects to avoid race conditions
-    // TanStack Router beforeLoad runs too early in the auth loading process
-    myLog.debug('[APP-INIT] _authenticated beforeLoad - letting components handle auth', { path: location.pathname })
-  },
+  // PERFORMANCE: Removed beforeLoad - any async function blocks navigation
   component: RouteComponent,
 })
 

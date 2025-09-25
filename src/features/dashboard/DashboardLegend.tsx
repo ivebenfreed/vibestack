@@ -46,34 +46,58 @@ const DashboardLegend = observer(function DashboardLegend() {
   const routeOrganization = routeOrgId ? userOrganizations.find(org => org.id === routeOrgId) : null;
   const displayOrganizationName = isUniverseMode ? 'Universe' : (routeOrganization?.name || 'Organization');
   
-  fileLog.info('DashboardLegend route analysis:', { 
-    routeOrgId, 
-    isUniverseMode, 
+  // EXACT TIMING: Mark when component starts rendering
+  React.useEffect(() => {
+    performance.mark('dashboard-render-start');
+    console.log(`⏱️ [EXACT-TIMING] Dashboard component render started at: ${performance.now().toFixed(2)}ms`);
+  }, []);
+
+  fileLog.info('DashboardLegend route analysis:', {
+    routeOrgId,
+    isUniverseMode,
     contextOrgId,
-    currentOrgId 
+    currentOrgId
   });
 
   // NEW: Use universe-based observables for dashboard (supports universe mode)
   const loading = use$(universeLoading$);
   const schema = use$(universeSchema$);
   const error = use$(universeError$);
-  
-  fileLog.info('DashboardLegend observables state:', {
-    loading,
+
+  fileLog.info('🔍 [DASHBOARD-PERF] Observable states:', {
+    universeLoading: loading,
     hasSchema: !!schema,
     hasEntities: !!schema?.entities,
     entityCount: schema?.entities ? Object.keys(schema.entities).length : 0,
-    error
+    schemaKeys: schema ? Object.keys(schema) : [],
+    error,
+    timestamp: new Date().toISOString()
   });
 
   // REACTIVE: Determine if data is ready based purely on observables
   const isDataReady = !loading && !!schema?.entities && Object.keys(schema.entities).length > 0;
+
+  fileLog.info('🔍 [DASHBOARD-PERF] Data readiness check:', {
+    isDataReady,
+    loading,
+    hasSchemaEntities: !!schema?.entities,
+    entityKeys: schema?.entities ? Object.keys(schema.entities) : [],
+    timestamp: new Date().toISOString()
+  });
 
   // Signal that the Dashboard is ready for Playwright tests
   usePlaywrightReady(!isDataReady ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
 
   // Show loading until schema data is loaded
   if (!isDataReady) {
+    fileLog.info('🔍 [DASHBOARD-PERF] Showing loading screen:', {
+      reason: 'isDataReady=false',
+      loading,
+      hasSchema: !!schema,
+      hasEntities: !!schema?.entities,
+      timestamp: new Date().toISOString()
+    });
+
     // Use UnifiedLoadingScreen for consistency
     return (
       <ContentContainer>
@@ -98,6 +122,12 @@ const DashboardLegend = observer(function DashboardLegend() {
       </ContentContainer>
     );
   }
+
+  fileLog.info('🔍 [DASHBOARD-PERF] Rendering main dashboard content:', {
+    isDataReady,
+    entityCount: schema?.entities ? Object.keys(schema.entities).length : 0,
+    timestamp: new Date().toISOString()
+  });
 
   return (
     <ContentContainer>
@@ -165,7 +195,13 @@ const DashboardContent = observer(function DashboardContent({
   error: string | null
   routeOrgId?: string
 }) {
-  fileLog.info('DashboardContent render:', { isUniverseMode, schema: !!schema, error, routeOrgId })
+  fileLog.info('🔍 [DASHBOARD-PERF] DashboardContent render start:', {
+    isUniverseMode,
+    hasSchema: !!schema,
+    error,
+    routeOrgId,
+    timestamp: new Date().toISOString()
+  })
 
   if (error) {
     return (
@@ -251,10 +287,10 @@ const EntityCardWithData = observer(function EntityCardWithData({
   orgId?: string
 }) {
   const { currentOrganization } = useUnifiedAuth()
-  
+
   // Access the entity store which triggers loading
   const entityStore = getEntity$(entityName)
-  
+
   // Debug logging
   fileLog.info(`EntityCardWithData for ${entityName}:`, {
     entityStoreExists: !!entityStore,
@@ -262,14 +298,14 @@ const EntityCardWithData = observer(function EntityCardWithData({
     hasGet: typeof entityStore?.get === 'function',
     hasPeek: typeof entityStore?.peek === 'function'
   })
-  
+
   // Get the data - entityStore is already an observable wrapped by syncedCrud
   // The issue is that syncedCrud might not trigger the initial fetch automatically
   // We need to access it in a way that triggers the fetch
   let data = null
   let isLoading = true
   let hasLoaded = false
-  
+
   if (entityStore) {
     // CRITICAL FIX: In Legend State v3, we need to force the initial load
     // by accessing the sync state and manually triggering if needed
@@ -290,7 +326,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
 
     // Use use$ to make the component reactive to the observable
     data = use$(entityStore)
-    
+
     // CRITICAL DEBUG: Log exactly what data we're getting
     fileLog.info(`Data received for ${entityName}:`, {
       data,
@@ -300,7 +336,7 @@ const EntityCardWithData = observer(function EntityCardWithData({
       isNull: data === null,
       isEmpty: data && typeof data === 'object' ? Object.keys(data).length === 0 : 'not object'
     })
-    
+
     // Check loading state based on whether data exists
     isLoading = data === undefined
     hasLoaded = data !== undefined
@@ -308,14 +344,14 @@ const EntityCardWithData = observer(function EntityCardWithData({
     isLoading = false
     hasLoaded = false
   }
-  
+
   // syncedCrud returns an object with IDs as keys, not an array
   let count = 0
   if (data && typeof data === 'object') {
     // Count the number of keys (each key is a record ID)
     count = Object.keys(data).length
   }
-  
+
   // Show loading state only if we haven't loaded data yet
   // If data is undefined (still loading), show ...
   // If data is null (no entity store) or empty object, show 0

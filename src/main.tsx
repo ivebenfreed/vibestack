@@ -58,7 +58,7 @@ function getRouter() {
     
     router = createRouter({
       routeTree,
-      context: { 
+      context: {
         setTaskAtoms: undefined!,
         setProjectAtoms: undefined!,
         setUserAtoms: undefined!,
@@ -66,21 +66,29 @@ function getRouter() {
       // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
       defaultPreload: false,  // Disabled to prevent performance issues
       defaultPreloadStaleTime: 10_000, // Cache preloaded routes for 10 seconds
-      defaultPendingMs: 100, // Show pending UI after 100ms
-      defaultPendingMinMs: 150, // ⚡ OPTIMIZED: Reduced from 500ms to 150ms for snappier feel
-      
+      defaultPendingMs: 0, // ⚡ INSTANT: No delay for pending UI
+      defaultPendingMinMs: 0, // ⚡ INSTANT: No minimum pending duration
+
       // ⚡ PERFORMANCE: Reduced aggressiveness to prevent excessive multiple route loading
-      defaultPreloadDelay: 150, // ⚡ LESS AGGRESSIVE: Increased from 25ms to 150ms to reduce accidental preloads
+      defaultPreloadDelay: 0, // ⚡ INSTANT: No preload delay
       defaultPreloadGcTime: 30_000, // Keep preloaded routes in memory for 30 seconds
+
+      // TIMING DEBUG: Hook into router events
+      onBeforeLoad: ({ location, cause }) => {
+        console.log(`⏱️ [ROUTER-TIMING] onBeforeLoad: ${performance.now().toFixed(3)}ms - ${location.pathname} (${cause})`);
+      },
+      onLoad: ({ location, cause }) => {
+        console.log(`⏱️ [ROUTER-TIMING] onLoad: ${performance.now().toFixed(3)}ms - ${location.pathname} (${cause})`);
+      }
     })
     
     const createTime = performance.now() - startTime
     mainLog.info('✅ Router instance created', {
       createTime: `${createTime.toFixed(2)}ms`,
-      preloadEnabled: true,
-      preloadDelay: 150,
-      pendingMs: 100,
-      pendingMinMs: 150,
+      preloadEnabled: false,
+      preloadDelay: 0,
+      pendingMs: 0,
+      pendingMinMs: 0,
       staleTime: 10_000,
       lazyRoutesEnabled: true
     })
