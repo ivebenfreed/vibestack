@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 import { getEntity$ } from '@/legend-state/observables';
 import { SimplePassiveRenderer } from '@/components/custom/vibegrid/renderers/core/SimplePassiveRenderer';
 import { createPureObservables } from '@/components/custom/vibegrid/stores/pure-observables';
-import { createEntityColumnsObservable } from '@/legend-state';
 import { log } from '@/logger';
 
 const fileLog = log('routes/test-passive-renderer');
@@ -30,19 +29,8 @@ function TestPassiveRenderer() {
     try {
       fileLog.info('🧪 Initializing PassiveTableRenderer test', { orgId });
 
-      // Get columns from schema - no hardcoding!
-      const columnsObservable = createEntityColumnsObservable('Task');
-      const columns = columnsObservable.get();
-      
-      if (!columns || columns.length === 0) {
-        throw new Error('No columns available for Task entity - schema may not be loaded yet');
-      }
-      
-      fileLog.info('🧪 Using schema-driven columns', { 
-        columnCount: columns.length,
-        columnIds: columns.map(c => c.id),
-        referenceFields: columns.filter(c => c.referenceType).map(c => ({ id: c.id, type: c.referenceType }))
-      });
+      // VibeGrid generates its own columns internally - this test is outdated
+      throw new Error('This test needs updating - VibeGrid now uses internal column generation');
 
       // Create the three-layer observables
       const entityType = `${orgId}_Task`;

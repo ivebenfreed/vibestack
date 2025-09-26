@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { VibeGrid } from '@/components/custom/vibegrid'
-import { createEntityColumnsObservable } from '@/legend-state/observables/table-columns'
 import { entityOperations } from '@/legend-state'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 import {
@@ -65,11 +64,7 @@ export function UniversalEntityPage({
   const archetypeConfig = ARCHETYPE_CONFIG[archetype.toLowerCase() as keyof typeof ARCHETYPE_CONFIG] || ARCHETYPE_CONFIG.record
   const Icon = archetypeConfig.icon
   
-  // Get columns from dynamic schema-driven generation - same pattern as debug pages
-  // Get columns from dynamic schema-driven generation - same pattern as debug pages
-  // Add safety check to prevent "Cannot read properties of undefined (reading 'get')" error
-  const columnsObservable = createEntityColumnsObservable(entityName);
-  const columns = columnsObservable ? columnsObservable.get() : [];
+  // VibeGrid generates columns internally from schema - no external observable needed
 
   // Event handlers - same pattern as debug pages
   const handleSelectionChange = (cells: Set<string>) => {
@@ -221,7 +216,7 @@ export function UniversalEntityPage({
 
       {/* Maximum Height Table - Every Pixel Counts */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {columns.length === 0 ? (
+        {!schema ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center">
               <Table className="h-8 w-8 mx-auto mb-2 opacity-50" />
