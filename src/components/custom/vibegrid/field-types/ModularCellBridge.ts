@@ -73,6 +73,17 @@ export class ModularCellBridge {
     position: { rowIndex: number; columnIndex: number; xPosition?: number }
   ): HTMLElement {
     try {
+      // 🚀 FAST PATH: Use pre-computed formatter if available
+      if (column.formatter) {
+        return this.createCellFast(value, column, rowData, position);
+      }
+
+      // Legacy path for columns without pre-computed metadata
+      fileLog.warn('⚠️ [FIELD-BRIDGE] Using legacy cell creation path - consider pre-computing field types', {
+        columnId: column.id,
+        fieldType: column.cellType || column.type
+      });
+
       // Ensure cell factory is initialized
       this.ensureCellFactory();
 
@@ -110,6 +121,76 @@ export class ModularCellBridge {
       // FAIL FAST - Don't fallback, surface the real issue
       throw error;
     }
+  }
+
+  /**
+   * 🚀 FAST PATH: Create cell using pre-computed formatter
+   */
+  private createCellFast(
+    value: any,
+    column: Column,
+    rowData: any,
+    position: { rowIndex: number; columnIndex: number; xPosition?: number }
+  ): HTMLElement {
+    // Create container with proper VibeGrid structure (matching CellFactory)
+    const container = document.createElement('div');
+    container.className = 'vibegridx-cell';
+    container.dataset.columnId = column.id;
+    container.dataset.field = column.field || column.id;
+
+    // Get column width (fallback to 150px if not specified)
+    const actualWidth = column.width || 150;
+
+    // Apply VibeGrid-compatible positioning (matching CellFactory structure)
+    if (position.xPosition !== undefined) {
+      container.style.cssText = `
+        position: absolute;
+        left: ${position.xPosition}px;
+        top: 0;
+        width: ${actualWidth}px;
+        height: 100%;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        border-right: 1px solid #f1f3f5;
+        overflow: hidden;
+        cursor: default;
+      `;
+    } else {
+      container.style.cssText = `
+        flex: 0 0 ${actualWidth}px;
+        height: 100%;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        border-right: 1px solid #f1f3f5;
+        overflow: hidden;
+        position: relative;
+        cursor: default;
+      `;
+    }
+
+    // Use the original field type renderer for proper styling (badges, etc.)
+    if (column.fieldType?.renderer) {
+      try {
+        const content = column.fieldType.renderer.render(value, column, rowData);
+        container.appendChild(content);
+      } catch (error) {
+        // Fallback to formatter if renderer fails
+        const displayValue = column.formatter!(value, rowData, column);
+        container.textContent = displayValue;
+      }
+    } else {
+      // Fallback to formatter
+      const displayValue = column.formatter!(value, rowData, column);
+      container.textContent = displayValue;
+    }
+
+    // 🚀 Fast path cell created successfully
+
+    return container;
   }
 
   /**

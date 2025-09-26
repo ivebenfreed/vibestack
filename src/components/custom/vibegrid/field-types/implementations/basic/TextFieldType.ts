@@ -447,6 +447,19 @@ export const TextFieldType: VibeGridFieldType = {
     hasRichDisplay: false,
     supportsValidation: true,
     supportsFormatting: true
+  },
+
+  // 🚀 NEW: Simple formatter interface for pre-computation
+  getFormatter(): (value: any, rowData?: any, column?: any) => string {
+    const formatter = new TextFormatter();
+    return (value: any, rowData?: any, column?: any) => {
+      return formatter.format(value, column);
+    };
+  },
+
+  // 🚀 NEW: Optional editor interface
+  getEditor(): any {
+    return new TextEditor();
   }
 };
 

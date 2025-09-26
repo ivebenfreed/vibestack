@@ -199,6 +199,15 @@ export interface VibeGridFieldType {
   validator?: CellValidator;
   metadata: FieldMetadata;
 
+  // 🚀 NEW: Simple formatter interface for pre-computation
+  getFormatter(): (value: any, rowData?: any, column?: any) => string;
+
+  // 🚀 NEW: Optional editor interface
+  getEditor?(): any;
+
+  // 🚀 NEW: Optional styling
+  getStyles?(value: any, column: any): Record<string, string>;
+
   // Relationship-specific properties
   relationshipConfig?: RelationshipConfig;
   rollupConfig?: RollupConfig;

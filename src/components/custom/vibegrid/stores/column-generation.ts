@@ -11,6 +11,7 @@ import type { Column } from '../types';
 import { COLUMN_DEFAULTS } from '../column-defaults';
 import type { CellType } from '../column-types';
 import { modularCellBridge } from '../field-types';
+import { fieldTypeRegistry } from '../field-types/FieldTypeRegistry';
 
 const fileLog = log('components/custom/vibegrid/stores/column-generation');
 
@@ -145,6 +146,43 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
     // Use options from schema (backend already provides colored options)
     const options = safeFieldDef.editor?.options || [];
 
+    // 🚀 PERFORMANCE: Pre-compute field type and formatter ONCE during column generation
+    let fieldTypeInstance;
+    let formatter;
+    let editor;
+
+    try {
+      // Create mock enhanced column for field type resolution
+      const mockColumn = {
+        id: fieldName,
+        field: fieldName,
+        cellType: cellType,
+        type: fieldType,
+        options: options,
+        hasOptions: options.length > 0
+      } as any;
+
+      fieldTypeInstance = fieldTypeRegistry.getFieldType(mockColumn);
+      formatter = fieldTypeInstance.formatter?.format?.bind(fieldTypeInstance.formatter);
+      editor = fieldTypeInstance.editor;
+
+      fileLog.debug('🚀 [FIELD-PRECOMPUTE] Pre-computed field type and formatter', {
+        fieldName,
+        fieldType,
+        cellType,
+        hasFormatter: !!formatter,
+        hasEditor: !!editor,
+        fieldTypeCategory: fieldTypeInstance.category
+      });
+    } catch (error) {
+      fileLog.warn('⚠️ [FIELD-PRECOMPUTE] Failed to pre-compute field type, will use fallback', {
+        fieldName,
+        fieldType,
+        cellType,
+        error: error.message
+      });
+    }
+
     // PERFORMANCE: Store field type config for optimized cell creation
     const fieldTypeConfig = {
       columnId: fieldName,
@@ -152,15 +190,12 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
       cellType: cellType,
       type: fieldType,
       hasOptions: options.length > 0,
-      options: options
+      options: options,
+      // 🚀 NEW: Pre-computed field type metadata
+      fieldTypeInstance: fieldTypeInstance,
+      precomputedFormatter: formatter,
+      precomputedEditor: editor
     };
-
-    fileLog.debug('✅ [FIELD-CACHE] Stored field type config for fast cell creation', {
-      fieldName,
-      fieldType,
-      cellType,
-      hasOptions: options.length > 0
-    });
 
     const column: Column<T> = {
       id: fieldName,
@@ -174,6 +209,13 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
       options: options,
       editor: safeFieldDef.editor || null,
       validation: safeFieldDef.validation || null,
+
+      // 🚀 NEW: Pre-computed field type metadata for instant cell rendering
+      fieldType: fieldTypeInstance,
+      formatter: formatter,
+      editorInstance: editor,
+      fieldId: safeFieldDef.id || fieldName, // For reactive options lookup
+
       // PERFORMANCE: Pre-computed field config for fast cell creation
       _cachedRenderer: {
         fieldTypeConfig: fieldTypeConfig,

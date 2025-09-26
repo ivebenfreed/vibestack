@@ -38,14 +38,7 @@ interface SelectOption {
  */
 export class SelectRenderer implements CellRenderer {
   render(value: any, column: EnhancedColumn, rowData: any): HTMLElement {
-    fileLog.info('[SelectRenderer] render called', {
-      columnId: column.id,
-      field: column.field,
-      value,
-      hasOptions: !!(column.options && column.options.length > 0),
-      optionsCount: column.options?.length || 0,
-      cellType: column.cellType
-    });
+    // 🚀 PERFORMANCE: Removed expensive logging from hot path
 
     const container = document.createElement('span');
     // Don't set classes here - let BodyRenderer handle the base classes
@@ -206,35 +199,14 @@ export class SelectRenderer implements CellRenderer {
 
   private findOption(value: any, column: EnhancedColumn): SelectOption | null {
     const stringValue = String(value);
-    const fieldName = column.field?.toLowerCase() || '';
 
-    console.log('🔍 [SELECT-RENDERER] Finding option', {
-      value,
-      stringValue,
-      fieldName,
-      columnId: column.id,
-      columnType: column.cellType || column.type,
-      hasOptions: !!(column.options && column.options.length > 0),
-      optionsCount: (column.options || []).length
-    });
+    // 🚀 PERFORMANCE: Removed expensive console logging from hot path
 
     // Use schema data
     const options = this.getOptions(column);
-    console.log('🔍 [SELECT-RENDERER] Available options', {
-      optionsCount: options.length,
-      optionValues: options.map(opt => opt.value),
-      searchingFor: stringValue
-    });
-
     const found = options.find(opt => opt.value === stringValue);
 
-    if (found) {
-      console.log('🎯 [SELECT-RENDERER] Found option', found);
-      return found;
-    }
-
-    console.log('❌ [SELECT-RENDERER] Option not found for value:', stringValue);
-    return null;
+    return found || null;
   }
 
   private getOptions(column: EnhancedColumn): SelectOption[] {
@@ -650,6 +622,35 @@ export const SelectFieldType: VibeGridFieldType = {
     hasRichDisplay: true,
     supportsValidation: true,
     supportsFormatting: true
+  },
+
+  // 🚀 NEW: Simple formatter interface for pre-computation
+  getFormatter(): (value: any, rowData?: any, column?: any) => string {
+    const formatter = new SelectFormatter();
+    return (value: any, rowData?: any, column?: any) => {
+      if (!column) return String(value || '');
+
+      // Use reactive options from schema store if available
+      if (column.fieldId && typeof window !== 'undefined' && (window as any).schemaStore) {
+        try {
+          const options = (window as any).schemaStore.getFieldOptions(column.fieldId);
+          if (options && Array.isArray(options)) {
+            // Create temporary column with reactive options
+            const tempColumn = { ...column, options };
+            return formatter.format(value, tempColumn);
+          }
+        } catch (error) {
+          // Fallback to column options
+        }
+      }
+
+      return formatter.format(value, column);
+    };
+  },
+
+  // 🚀 NEW: Optional editor interface
+  getEditor(): any {
+    return new SelectEditor();
   }
 };
 

@@ -70,15 +70,21 @@ export interface Column<T = any> extends BaseColumn<T> {
   // Legacy support
   label?: string; // Alias for name
   type?: string; // Legacy field
-  
+
   // Additional runtime options
   options?: string[] | EnumOption[]; // Allow string[] for backward compatibility
-  
+
   // Dynamic options provider for relationship fields
   relationshipOptionsProvider?: RelationshipOptionsProvider;
-  
+
   // Entity type for filtering relationship options (e.g., 'task' for StatusDefinition filtering)
   relationshipEntityType?: string;
+
+  // 🚀 NEW: Pre-computed field type metadata for instant cell rendering
+  fieldType?: any; // VibeGridFieldType instance
+  formatter?: (value: any, rowData?: any, column?: Column) => string; // Pre-bound formatter
+  editorInstance?: any; // Pre-computed editor instance
+  fieldId?: string; // For reactive options lookup
   
   // Additional display formatting
   className?: string;
