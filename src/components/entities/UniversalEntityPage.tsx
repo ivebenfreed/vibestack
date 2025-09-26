@@ -2,9 +2,33 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { VibeGrid } from '@/components/custom/vibegrid'
+// ⚡ PERFORMANCE: Lazy load VibeGrid to prevent blocking route transitions
+const VibeGrid = React.lazy(() => import('@/components/custom/vibegrid').then(m => ({ default: m.VibeGrid })))
+
+// ⚡ PERFORMANCE: Table skeleton component for loading state
+function TableSkeleton() {
+  return (
+    <div className="h-full w-full p-4 space-y-3">
+      {/* Header skeleton */}
+      <div className="flex space-x-4 border-b pb-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-4 w-24" />
+        ))}
+      </div>
+      {/* Rows skeleton */}
+      {Array.from({ length: 12 }).map((_, rowIndex) => (
+        <div key={rowIndex} className="flex space-x-4">
+          {Array.from({ length: 6 }).map((_, colIndex) => (
+            <Skeleton key={colIndex} className="h-8 w-24" />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 import { entityOperations } from '@/legend-state'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 import {
@@ -228,23 +252,25 @@ export function UniversalEntityPage({
             // Use EntityNameUtils to ensure proper prefixing without duplication
             const fullEntityName = EntityNameUtils.ensureOrgPrefix(entityName, orgId || '');
             return (
-              <VibeGrid
-                entityType={fullEntityName}
-                tableId={`${entityName}-entity-table`}
-                className="h-full"
-                height="100%"
-                width="100%"
-                enableVirtualScrolling={true}
-                enableGrouping={true}
-                enableSorting={true}
-                enableFiltering={true}
-                enableDragAndDrop={true}
-                enableSelectionColumn={true}
-                onSelectionChange={handleSelectionChange}
-                onEditingChange={handleEditingChange}
-                onEntityUpdate={handleEntityUpdate}
-                onBatchEntityUpdate={handleBatchEntityUpdate}
-              />
+              <React.Suspense fallback={<TableSkeleton />}>
+                <VibeGrid
+                  entityType={fullEntityName}
+                  tableId={`${entityName}-entity-table`}
+                  className="h-full"
+                  height="100%"
+                  width="100%"
+                  enableVirtualScrolling={true}
+                  enableGrouping={true}
+                  enableSorting={true}
+                  enableFiltering={true}
+                  enableDragAndDrop={true}
+                  enableSelectionColumn={true}
+                  onSelectionChange={handleSelectionChange}
+                  onEditingChange={handleEditingChange}
+                  onEntityUpdate={handleEntityUpdate}
+                  onBatchEntityUpdate={handleBatchEntityUpdate}
+                />
+              </React.Suspense>
             );
           })()
         )}
