@@ -246,18 +246,31 @@ export function createVisualInputs$() {
  */
 export function createVisualState$(visualInputs$: any) {
   return computed((): VisualState => {
-    const inputs = visualInputs$.get();
+    // ✅ SELECTIVE TRACKING: Only track layout properties for column calculations
+    const columnOrder = visualInputs$.columnOrder.get();
+    const columnWidths = visualInputs$.columnWidths.get();
+    const columnVisibility = visualInputs$.columnVisibility.get();
+    const columns = visualInputs$.columns.get();
+    const rowCount = visualInputs$.rowCount.get();
+    const rowHeight = visualInputs$.rowHeight.get();
+
+    // ✅ NON-TRACKING ACCESS: Don't track scroll properties in layout computation
+    const scrollLeft = visualInputs$.scrollLeft.peek();
+    const scrollTop = visualInputs$.scrollTop.peek();
+    const viewportWidth = visualInputs$.viewportWidth.peek();
+    const viewportHeight = visualInputs$.viewportHeight.peek();
 
   // Calculate column layouts with cumulative positioning
+  // This only recalculates when layout properties change, not on scroll!
   let cumulativeX = 70; // Start after drag column (30px) + row header (40px)
   const columnLayouts: ColumnLayout[] = [];
 
-  inputs.columnOrder.forEach((columnId, index) => {
-    const column = inputs.columns.find(c => c.id === columnId);
+  columnOrder.forEach((columnId, index) => {
+    const column = columns.find(c => c.id === columnId);
     if (!column) return;
 
-    const width = inputs.columnWidths[columnId] || column.width || 150;
-    const visible = inputs.columnVisibility[columnId] !== false;
+    const width = columnWidths[columnId] || column.width || 150;
+    const visible = columnVisibility[columnId] !== false;
 
     const layout: ColumnLayout = {
       id: columnId,
@@ -280,19 +293,19 @@ export function createVisualState$(visualInputs$: any) {
   // Calculate total dimensions
   const totalColumnsWidth = visibleColumns.reduce((sum, col) => sum + col.width, 0);
   const totalWidth = 70 + totalColumnsWidth; // drag column (30px) + row header (40px) + columns
-  const totalHeight = inputs.rowCount * inputs.rowHeight;
+  const totalHeight = rowCount * rowHeight;
 
   // DISABLED: Column virtualization to fix header/body sync issues after reordering
   // Always render ALL columns to maintain sync between header and body
   const startColIndex = 0;
   const endColIndex = visibleColumns.length;
 
-  // DEBUG: Log column rendering status (virtualization disabled)
-  if (inputs.scrollLeft > 0) {
+  // DEBUG: Log column rendering status (virtualization disabled) - use peeked values
+  if (scrollLeft > 0) {
     console.log('🔍 COLUMN RENDERING DEBUG (NO VIRTUALIZATION)', {
-      scrollLeft: inputs.scrollLeft,
-      viewportWidth: inputs.viewportWidth,
-      scrollRightEdge: inputs.scrollLeft + inputs.viewportWidth,
+      scrollLeft,
+      viewportWidth,
+      scrollRightEdge: scrollLeft + viewportWidth,
       startColIndex,
       endColIndex,
       visibleColumnsCount: visibleColumns.length,
@@ -303,16 +316,16 @@ export function createVisualState$(visualInputs$: any) {
     });
   }
 
-  const startRowIndex = Math.floor(inputs.scrollTop / inputs.rowHeight);
-  const endRowIndex = Math.min(inputs.rowCount,
-    Math.ceil((inputs.scrollTop + inputs.viewportHeight) / inputs.rowHeight) + 1
+  const startRowIndex = Math.floor(scrollTop / rowHeight);
+  const endRowIndex = Math.min(rowCount,
+    Math.ceil((scrollTop + viewportHeight) / rowHeight) + 1
   );
 
   const geometry: ViewportGeometry = {
-    viewportWidth: inputs.viewportWidth,
-    viewportHeight: inputs.viewportHeight,
-    scrollLeft: inputs.scrollLeft,
-    scrollTop: inputs.scrollTop,
+    viewportWidth,
+    viewportHeight,
+    scrollLeft,
+    scrollTop,
     totalWidth,
     totalHeight,
     visibleColumnRange: { start: startColIndex, end: endColIndex },
@@ -324,19 +337,22 @@ export function createVisualState$(visualInputs$: any) {
     visibleColumns,
     totalColumnsWidth,
     geometry,
-    headerScrollLeft: inputs.scrollLeft, // Header should match body
-    bodyScrollLeft: inputs.scrollLeft,
+    headerScrollLeft: scrollLeft, // Header should match body
+    bodyScrollLeft: scrollLeft,
     scrollSynchronized: true, // Always true when computed properly
-    visualRows: computeVisualRows(inputs),
+    visualRows: computeVisualRows({
+      processedRows: visualInputs$.processedRows.peek(), // Don't track processed rows changes here
+      groupConfig: visualInputs$.groupConfig.peek()
+    }),
     totalRowsHeight: totalHeight,
     columnState: {
-      columns: inputs.columns,
-      columnWidths: inputs.columnWidths,
-      columnVisibility: inputs.columnVisibility,
-      columnOrder: inputs.columnOrder,
-      entityType: inputs.entityType,
-      orgId: inputs.orgId,
-      userId: inputs.userId
+      columns,
+      columnWidths,
+      columnVisibility,
+      columnOrder,
+      entityType: visualInputs$.entityType.peek(),
+      orgId: visualInputs$.orgId.peek(),
+      userId: visualInputs$.userId.peek()
     }
   };
   });

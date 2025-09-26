@@ -96,20 +96,19 @@ export class ScrollController {
         cancelAnimationFrame(this.scrollRAF);
       }
 
-      // Throttle the expensive scroll handler to prevent excessive re-renders
+      // ✅ PERFORMANCE: Throttle the expensive scroll handler to prevent excessive re-renders
       this.scrollRAF = requestAnimationFrame(() => {
         // Call external scroll handler (triggers viewport observer)
         if (this.onScroll) {
           this.onScroll(scrollLeft, scrollTop);
         }
 
-        fileLog.info('Viewport scrolled', {
+        // ✅ PERFORMANCE: Reduced logging verbosity during scroll
+        fileLog.debug('Viewport scrolled', {
           scrollLeft,
           scrollTop,
           viewportWidth: this.viewport.clientWidth,
-          viewportHeight: this.viewport.clientHeight,
-          scrollWidth: this.viewport.scrollWidth,
-          scrollHeight: this.viewport.scrollHeight
+          viewportHeight: this.viewport.clientHeight
         });
 
         this.scrollRAF = null;
@@ -122,41 +121,18 @@ export class ScrollController {
    * Uses unified visual state for scroll synchronization
    */
   private syncHeaderScroll(scrollLeft: number): void {
-    fileLog.info('🔄 syncHeaderScroll called', {
-      scrollLeft,
-      hasHeaderViewport: !!this.headerViewport,
-      headerViewportElement: this.headerViewport
-    });
-
     if (this.headerViewport) {
-      // Cancel any pending RAF to ensure immediate sync
-      if (this.scrollRAF) {
-        cancelAnimationFrame(this.scrollRAF);
-      }
+      // ✅ PERFORMANCE: Direct synchronous transform - no RAF needed for simple CSS transform
+      const transform = `translateX(-${scrollLeft}px)`;
+      this.headerViewport.style.transform = transform;
 
-      this.scrollRAF = requestAnimationFrame(() => {
-        if (this.headerViewport) {
-          // Apply transform to sync header with body scroll
-          const transform = `translateX(-${scrollLeft}px)`;
-          this.headerViewport.style.transform = transform;
-
-          fileLog.info('🔄 Header transform applied', {
-            scrollLeft,
-            transform,
-            appliedTransform: this.headerViewport.style.transform,
-            headerViewportExists: !!this.headerViewport,
-            headerViewportClassName: this.headerViewport.className
-          });
-        } else {
-          fileLog.error('❌ Header viewport lost in RAF callback');
-        }
-        this.scrollRAF = null;
-      });
+      // ✅ PERFORMANCE: Only log sync issues, not every successful sync
+      fileLog.debug('🔄 Header scroll synced', { scrollLeft });
     } else {
+      // Log missing header viewport as it's an actual issue
       fileLog.warn('⚠️ Header viewport not found for scroll sync', {
         scrollLeft,
-        headerViewport: this.headerViewport,
-        headerViewportType: typeof this.headerViewport
+        headerViewport: this.headerViewport
       });
     }
   }

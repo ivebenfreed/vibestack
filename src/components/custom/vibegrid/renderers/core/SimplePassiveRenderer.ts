@@ -133,6 +133,11 @@ export class SimplePassiveRenderer {
   private dragSelectionObserverDisposer: (() => void) | null = null;
   private pendingRAF: number | null = null; // Track pending RAF to prevent cascades
   private observersEnabled: boolean = false; // Prevent observers from running during initialization
+
+  // ✅ PERFORMANCE: Track last values to prevent unnecessary DOM updates
+  private lastSelectedCount: number = 0;
+  private lastSelectAllChecked: boolean | undefined = undefined;
+  private lastSelectAllIndeterminate: boolean | undefined = undefined;
   private domFactory: DOMElementFactory | null = null;
   private headerRenderer: HeaderRenderer | null = null;
   
@@ -615,9 +620,26 @@ export class SimplePassiveRenderer {
         });
       }
 
-      // Only update DOM classes and overlays, no re-renders
-      this.updateDOMSelectionClasses(selectedCells);
-      this.updateSelectAllCheckboxVisual(selectAllState);
+      // ✅ PERFORMANCE: Only update when selection actually changes
+      // Check if values have actually changed before updating DOM
+      const currentSelectedCount = selectedCells.size;
+      const lastSelectedCount = this.lastSelectedCount || 0;
+
+      if (currentSelectedCount !== lastSelectedCount) {
+        this.updateDOMSelectionClasses(selectedCells);
+        this.lastSelectedCount = currentSelectedCount;
+        fileLog.debug('✅ DOM selection classes updated', { selectedCount: currentSelectedCount });
+      }
+
+      // Only update checkbox if state actually changed
+      const currentSelectAllChecked = selectAllState.checked;
+      const currentSelectAllIndeterminate = selectAllState.indeterminate;
+      if (currentSelectAllChecked !== this.lastSelectAllChecked ||
+          currentSelectAllIndeterminate !== this.lastSelectAllIndeterminate) {
+        this.updateSelectAllCheckboxVisual(selectAllState);
+        this.lastSelectAllChecked = currentSelectAllChecked;
+        this.lastSelectAllIndeterminate = currentSelectAllIndeterminate;
+      }
 
       if (this.overlayManager) {
         // Selection overlay is now handled reactively by OverlayManager via interactions observable
