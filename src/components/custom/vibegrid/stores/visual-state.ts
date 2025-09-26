@@ -372,6 +372,8 @@ function computeVisualRows(inputs: any): VirtualRow[] {
   }
 
   // If no grouping, convert raw data rows to VirtualRow format for consistency
+  // Handle both null configs and empty field configs as "no grouping"
+  // Also handle configs with undefined fields (clearing scenarios)
   if (!groupConfig || !groupConfig.fields || groupConfig.fields.length === 0) {
     fileLog.debug('🎨 Converting raw rows to VirtualRow format (no grouping)', {
       rowCount: processedRows.length
@@ -386,9 +388,21 @@ function computeVisualRows(inputs: any): VirtualRow[] {
     }));
   }
 
-  // This should not happen anymore since data-state handles grouping
-  fileLog.warn('⚠️ Unexpected state: grouping configured but processedRows not in VirtualRow format');
-  return processedRows;
+  // This can happen during transition states - convert raw rows to VirtualRow format
+  // This is a fallback for timing issues between groupConfig and processedRows updates
+  fileLog.debug('🔄 Transition state: grouping configured but processedRows in raw format, converting', {
+    groupConfig,
+    processedRowsLength: processedRows.length,
+    firstRowStructure: processedRows[0]
+  });
+
+  return processedRows.map((row: any, index: number) => ({
+    type: 'data' as const,
+    id: row.id,
+    index,
+    height: 40,
+    data: row
+  }));
 }
 
 // ====================================

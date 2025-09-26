@@ -347,14 +347,18 @@ export function VibeGrid<T extends Record<string, any> = any>(
             // Debounce the save to prevent partial updates from interfering
             groupConfigSaveTimeout = setTimeout(() => {
               // Only save if we have a complete group config or null (to clear)
+              // Accept valid group configs with fields, or any object that represents clearing
               const isValidGroupConfig = actualGroupConfig === null ||
-                (actualGroupConfig && actualGroupConfig.fields && actualGroupConfig.fields.length > 0);
+                (actualGroupConfig && typeof actualGroupConfig === 'object');
 
               fileLog.info('[PERSIST] ✅ Validation result', {
                 isValidGroupConfig,
                 isNull: actualGroupConfig === null,
                 hasFields: !!actualGroupConfig?.fields,
-                fieldsLength: actualGroupConfig?.fields?.length || 0
+                fieldsLength: actualGroupConfig?.fields?.length || 0,
+                configType: typeof actualGroupConfig,
+                configKeys: actualGroupConfig ? Object.keys(actualGroupConfig) : [],
+                fullConfig: actualGroupConfig
               });
 
               if (isValidGroupConfig) {
