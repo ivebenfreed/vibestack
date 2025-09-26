@@ -10,6 +10,7 @@ import { log } from '@/logger';
 import type { Column } from '../types';
 import { COLUMN_DEFAULTS } from '../column-defaults';
 import type { CellType } from '../column-types';
+import { modularCellBridge } from '../field-types';
 
 const fileLog = log('components/custom/vibegrid/stores/column-generation');
 
@@ -144,6 +145,23 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
     // Use options from schema (backend already provides colored options)
     const options = safeFieldDef.editor?.options || [];
 
+    // PERFORMANCE: Store field type config for optimized cell creation
+    const fieldTypeConfig = {
+      columnId: fieldName,
+      fieldType: fieldType,
+      cellType: cellType,
+      type: fieldType,
+      hasOptions: options.length > 0,
+      options: options
+    };
+
+    fileLog.debug('✅ [FIELD-CACHE] Stored field type config for fast cell creation', {
+      fieldName,
+      fieldType,
+      cellType,
+      hasOptions: options.length > 0
+    });
+
     const column: Column<T> = {
       id: fieldName,
       field: fieldName as keyof T & string,
@@ -155,7 +173,12 @@ function generateColumnsFromEntity<T = any>(entitySchema: any, entityType: strin
       // Enhanced options with colors
       options: options,
       editor: safeFieldDef.editor || null,
-      validation: safeFieldDef.validation || null
+      validation: safeFieldDef.validation || null,
+      // PERFORMANCE: Pre-computed field config for fast cell creation
+      _cachedRenderer: {
+        fieldTypeConfig: fieldTypeConfig,
+        resolvedAt: performance.now()
+      }
     };
 
     fileLog.debug('🔧 Generated column', {

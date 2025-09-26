@@ -36,6 +36,12 @@ export interface Column<T, K extends keyof T = keyof T> {
   systemOptionType?: string; // e.g., 'priority', 'status'
   systemArchetype?: string;  // e.g., 'project', 'task'
   customOptionSet?: string;
+
+  // PERFORMANCE: Pre-computed field config for optimized cell creation
+  _cachedRenderer?: {
+    fieldTypeConfig: any;
+    resolvedAt: number;
+  };
 }
 
 // Helper type to make column creation easier

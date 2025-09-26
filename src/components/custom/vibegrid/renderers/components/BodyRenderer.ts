@@ -256,7 +256,14 @@ export class BodyRenderer {
     const visualStateData = this.visualState.visualState$.get();
     const columnLayouts = visualStateData.visibleColumns;
 
-    columns.forEach((column, colIndex) => {
+    // PERFORMANCE: Progressive column rendering for faster initial load
+    // Render essential columns first (first 6), then defer remaining columns
+    const essentialColumnCount = Math.min(6, columns.length);
+    const essentialColumns = columns.slice(0, essentialColumnCount);
+    const deferredColumns = columns.slice(essentialColumnCount);
+
+    // Render essential columns immediately
+    essentialColumns.forEach((column, colIndex) => {
       this.cellRenderingStats.cellsRequested++;
 
       // Find the corresponding column layout with actual width and x-offset
@@ -270,21 +277,45 @@ export class BodyRenderer {
         return;
       }
 
-      fileLog.debug('🔧 [CELL-DEBUG] Creating cell', {
-        rowId: row.id,
-        columnId: column.id,
-        columnField: column.field,
-        colIndex,
-        xOffset: layout.xOffset,
-        cellType: column.cellType
-      });
-
       // Use the layout's xOffset for absolute positioning (already includes cumulative positioning)
       const cell = this.createCellElement(row, column, colIndex, layout.xOffset);
       rowElement.appendChild(cell);
 
       this.cellRenderingStats.cellsCreated++;
     });
+
+    // Defer remaining columns with requestIdleCallback for smoother initial render
+    if (deferredColumns.length > 0) {
+      const deferredRender = () => {
+        deferredColumns.forEach((column, relativeIndex) => {
+          const colIndex = essentialColumnCount + relativeIndex;
+          this.cellRenderingStats.cellsRequested++;
+
+          // Find the corresponding column layout
+          const layout = columnLayouts.find(l => l.id === column.id);
+          if (!layout) {
+            fileLog.warn('🚨 [CELL-DEBUG] No layout found for deferred column', {
+              columnId: column.id,
+              columnField: column.field
+            });
+            return;
+          }
+
+          // Use the layout's xOffset for absolute positioning
+          const cell = this.createCellElement(row, column, colIndex, layout.xOffset);
+          rowElement.appendChild(cell);
+
+          this.cellRenderingStats.cellsCreated++;
+        });
+      };
+
+      // Use requestIdleCallback if available, otherwise setTimeout
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(deferredRender, { timeout: 50 });
+      } else {
+        setTimeout(deferredRender, 0);
+      }
+    }
 
     // Use UNIFIED visual state's totalWidth - no duplicate calculation
     const totalRowWidth = visualStateData.geometry.totalWidth;
@@ -579,21 +610,21 @@ export class BodyRenderer {
     colIndex: number,
     xPosition?: number
   ): HTMLElement {
-    // Use the modular CellFactory if available, otherwise use basic cell creation
+    // PERFORMANCE: Simplified cell creation using ModularCellBridge efficiently
+    const rowData = row.data || row;
+    const value = rowData[column.id];
+
     if (this.modularCellBridge) {
       try {
-        // Handle virtual row structure: row.data contains the actual data
-        const rowData = row.data || row;
-        const value = rowData[column.id];
-
-        fileLog.debug('🎯 [BODY-RENDERER] Using CellFactory for cell creation', {
+        fileLog.debug('🎯 [BODY-RENDERER] Creating optimized cell', {
           columnId: column.id,
           fieldType: column.cellType || column.type || 'text',
           value: value,
-          hasXPosition: xPosition !== undefined
+          hasXPosition: xPosition !== undefined,
+          hasPreComputedConfig: !!column._cachedRenderer?.fieldTypeConfig
         });
 
-        // Use the unified CellFactory
+        // Use the unified CellFactory with column config
         const cellElement = this.modularCellBridge.createCell(
           value,
           column,

@@ -233,10 +233,29 @@ export class ModularCellBridge {
   }
 
   private enhanceColumn(column: Column): any {
-    // Create a mock backend schema for this column
+    // PERFORMANCE: Use cached enhanced column if available
+    if (column._cachedRenderer?.fieldTypeConfig?.enhancedColumn) {
+      fileLog.debug('🚀 [PERF-CACHE] Using cached enhanced column', {
+        columnId: column.id,
+        cacheAge: performance.now() - column._cachedRenderer.resolvedAt
+      });
+      return column._cachedRenderer.fieldTypeConfig.enhancedColumn;
+    }
+
+    // Fallback: Create enhanced column and cache it for future use
     const mockSchema = SchemaAdapter.createMockSchema('UnknownEntity', [column]);
     const enhancedColumns = SchemaAdapter.enhanceColumns([column], mockSchema, 'UnknownEntity');
-    return enhancedColumns[0];
+    const enhancedColumn = enhancedColumns[0];
+
+    // Cache the enhanced column for future use
+    if (column._cachedRenderer?.fieldTypeConfig) {
+      column._cachedRenderer.fieldTypeConfig.enhancedColumn = enhancedColumn;
+      fileLog.debug('💾 [PERF-CACHE] Cached enhanced column for future use', {
+        columnId: column.id
+      });
+    }
+
+    return enhancedColumn;
   }
 
   private createFallbackCell(value: any, column: Column): HTMLElement {

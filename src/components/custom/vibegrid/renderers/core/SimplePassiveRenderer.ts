@@ -43,6 +43,7 @@ import { formatFieldForDisplay } from '@/server/dataforge/fields/display-formatt
 import { createDataLoadingStage$, createStageCallbacks } from '../../stores/data-loading-stages';
 import type { VibeGridHydrationManager } from '../../stores/init-state';
 import { modularCellBridge } from '../../field-types';
+import { vibeGridProfiler } from '../../performance/PerformanceProfiler';
 
 const fileLog = log('components/custom/vibegrid/renderers/core/SimplePassiveRenderer.ts');
 
@@ -144,6 +145,10 @@ export class SimplePassiveRenderer {
   private visualState: any = null;
   
   constructor(private options: SimplePassiveRendererOptions) {
+    vibeGridProfiler.startMetric('renderer-initialization', {
+      entityType: options.tableCore$.entityType?.peek()
+    });
+
     fileLog.info('🎯 SimplePassiveRenderer: Initializing');
 
     this.container = options.container;
