@@ -418,9 +418,9 @@ export function needsVirtualization(): { rows: boolean; columns: boolean } {
   const bounds = virtualBounds$.get();
   const viewport = virtualViewport$.get();
 
-  // Threshold for enabling virtualization
-  const ROW_THRESHOLD = 100;
-  const COLUMN_THRESHOLD = 20;
+  // Threshold for enabling virtualization - very aggressive for performance
+  const ROW_THRESHOLD = 20; // Enable for >20 rows (was 100)
+  const COLUMN_THRESHOLD = 15; // Enable for >15 columns (was 20)
 
   return {
     rows: bounds.totalRows > ROW_THRESHOLD,

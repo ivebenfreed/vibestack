@@ -58,8 +58,9 @@ export class VibeGridPerformanceProfiler {
     if (!this.enabled) return;
 
     if (this.activeMetrics.has(name)) {
-      fileLog.warn('⚠️ [PERFORMANCE] Metric already active', { name });
-      return;
+      // Instead of warning, end the existing metric and start fresh
+      this.endMetric(name);
+      fileLog.debug('🔄 [PERFORMANCE] Restarting metric', { name });
     }
 
     const metric: PerformanceMetric = {

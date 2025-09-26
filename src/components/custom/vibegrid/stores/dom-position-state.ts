@@ -255,7 +255,7 @@ class ReactivePositionTracker {
 
     // Check if viewport measurements need updating (throttled to avoid excessive reads)
     const viewportUpdateNeeded = !currentViewportCache.containerRect ||
-                                 (timestamp - currentViewportCache.lastViewportUpdate) > 50; // 20fps max for viewport updates
+                                 (timestamp - currentViewportCache.lastViewportUpdate) > 100; // 10fps max for viewport updates - reduced to prevent forced reflows
 
     if (viewportContainer && viewportUpdateNeeded) {
       // PERFORMANCE FIX: Single batch of layout reads for viewport
