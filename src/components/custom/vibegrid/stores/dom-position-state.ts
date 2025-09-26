@@ -5,7 +5,7 @@
  * a single scroll-based trigger for reliable position updates.
  */
 
-import { observable, batch, ObservableHint } from '@legendapp/state';
+import { observable, batch, ObservableHint, computed } from '@legendapp/state';
 import { GRID_DIMENSIONS } from '../constants/grid-dimensions';
 import type {
   CellCoordinates,
@@ -60,6 +60,45 @@ export const domPositions$ = observable<DOMPositionState>({
   },
   lastUpdate: 0,
   isTracking: false
+});
+
+// PERFORMANCE FIX: Reference to coordinate mapping for reactive position calculation
+let coordinateMapping: any = null;
+
+// PERFORMANCE FIX: Computed observable for cell positions derived from coordinate mapping
+// This eliminates expensive DOM scanning by calculating positions mathematically
+const computedCellPositions$ = computed(() => {
+  if (!coordinateMapping || !coordinateMapping.rows || !coordinateMapping.columns) {
+    return new Map();
+  }
+
+  const positions = new Map();
+  const { rows, columns } = coordinateMapping;
+
+  // Calculate positions mathematically from coordinate mapping
+  rows.forEach((row: any) => {
+    columns.forEach((column: any) => {
+      const cellKey = `${row.rowId}:${column.columnId}`;
+      positions.set(cellKey, {
+        x: column.x,
+        y: row.y,
+        width: column.width,
+        height: row.height,
+        rowId: row.rowId,
+        columnId: column.columnId,
+        rowIndex: row.index,
+        columnIndex: column.index
+      });
+    });
+  });
+
+  fileLog.debug('🧮 COMPUTED: Calculated cell positions from coordinate mapping', {
+    totalPositions: positions.size,
+    rows: rows.length,
+    columns: columns.length
+  });
+
+  return positions;
 });
 
 // Event handlers
@@ -414,10 +453,50 @@ class ReactivePositionTracker {
 
   /**
    * Force immediate position update (useful for testing)
+   * PERFORMANCE FIX: Use computed positions instead of DOM scanning
    */
   forceUpdate(): void {
-    fileLog.info('🔄 forceUpdate called - updating positions immediately');
-    this.updatePositions();
+    fileLog.info('🔄 forceUpdate called - using computed positions instead of DOM scanning');
+    this.updateFromComputedPositions();
+  }
+
+  /**
+   * PERFORMANCE FIX: Update coordinate mapping reference for computed positions
+   */
+  updateCoordinateMapping(mapping: any): void {
+    coordinateMapping = mapping;
+    fileLog.debug('🎯 COORDINATE: Updated coordinate mapping reference for computed positions', {
+      hasRows: !!mapping?.rows,
+      hasColumns: !!mapping?.columns,
+      rowCount: mapping?.rows?.length || 0,
+      columnCount: mapping?.columns?.length || 0
+    });
+  }
+
+  /**
+   * PERFORMANCE FIX: Update positions from computed observable instead of DOM scanning
+   */
+  private updateFromComputedPositions(): void {
+    if (this.isUpdating) return;
+    this.isUpdating = true;
+
+    try {
+      const computedPositions = computedCellPositions$.get();
+
+      if (computedPositions.size > 0) {
+        batch(() => {
+          domPositions$.cellPositions.set(computedPositions);
+          domPositions$.lastUpdate.set(Date.now());
+        });
+
+        fileLog.debug('✅ COMPUTED: Updated positions from coordinate mapping', {
+          positionCount: computedPositions.size,
+          usesDOMScanning: false
+        });
+      }
+    } finally {
+      this.isUpdating = false;
+    }
   }
 
   /**

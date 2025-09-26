@@ -473,29 +473,15 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
         // Group config persistence is now handled by reactive persistence wrapper
 
-        // Wait for container ref to be available for renderer initialization (optimized)
-        let retryCount = 0;
-        const maxRetries = 5; // Reduced retries - if it doesn't work quickly, skip the validation
-
-        const checkReadyToInitializeRenderer = () => {
-        // First check if container ref is available
-        if (!containerRef.current) {
-          retryCount++;
-          if (retryCount < maxRetries) {
-            fileLog.debug(`🔄 Container ref not ready, using RAF (attempt ${retryCount}/${maxRetries})`);
-            requestAnimationFrame(checkReadyToInitializeRenderer);
-            return;
-          } else {
-            // Don't fail - just proceed without container validation
-            fileLog.warn('⚠️ Container ref not available after retries, proceeding anyway');
-            // initManager.markError('containerReady', 'Container element not available for VibeGrid initialization', true);
-            // return;
-          }
-        }
-
-        // PERFORMANCE: Skip dimension check during initialization to prevent forced reflows
-        // The container will get dimensions during the rendering process
+        // PERFORMANCE FIX: Remove unnecessary container ref polling
+        // With proper initialization flow, container ref should be available immediately
         const containerElement = containerRef.current;
+
+        if (!containerElement) {
+          fileLog.warn('⚠️ Container ref not available during initialization - this indicates a timing issue');
+          initManager.markError('containerReady', 'Container element not available for VibeGrid initialization', true);
+          return;
+        }
         fileLog.debug('🔄 Container ref ready, proceeding with initialization', {
           hasContainer: !!containerElement,
           className: containerElement.className
@@ -582,11 +568,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
             });
           }
         });
-        }; // Close checkReadyToInitializeRenderer function
 
-        // Start checking for container readiness after a small delay to allow React to render
-        // Use RAF instead of setTimeout for better performance
-        requestAnimationFrame(checkReadyToInitializeRenderer);
+        // PERFORMANCE FIX: Direct initialization without RAF polling - renderer already created above
 
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error';

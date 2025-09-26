@@ -169,9 +169,9 @@ export class SimplePassiveRenderer {
     this.initPhase2Managers();
     this.initOverlayManager();
     this.initHeaderRenderer();
-    fileLog.debug('🎯 About to call initFocusedObservers - this should appear during construction');
-    this.initFocusedObservers();
-    fileLog.debug('🎯 initFocusedObservers completed - observers should be created');
+    fileLog.debug('🎯 DEFERRED: Skipping initFocusedObservers during construction - will attach after initialization');
+    // this.initFocusedObservers(); // MOVED: Now called after observersEnabled = true
+    fileLog.debug('🎯 Observer attachment deferred to prevent RAF violations during init');
     this.postInitialization();
   }
   
@@ -938,6 +938,11 @@ export class SimplePassiveRenderer {
               visualObserverExists: !!this.visualObserverDisposer
             });
 
+            // NOW attach reactive observers AFTER initialization is complete
+            fileLog.info('🎯 Attaching focused observers after initialization complete');
+            this.initFocusedObservers();
+            fileLog.info('✅ Reactive observers attached - performance optimized');
+
             fileLog.info('✅ Post-initialization complete');
           });
         });
@@ -1223,10 +1228,16 @@ export class SimplePassiveRenderer {
       callStack: stack
     });
 
-    this.bodyContainer.innerHTML = '';
-    
+    // PERFORMANCE FIX: Use DocumentFragment for batched DOM operations instead of innerHTML clearing
+    const fragment = document.createDocumentFragment();
+
     // Clear active rows in RowRenderer
     this.bodyRenderer.clearActiveRows();
+
+    // PERFORMANCE FIX: Clear body container more efficiently
+    while (this.bodyContainer.firstChild) {
+      this.bodyContainer.removeChild(this.bodyContainer.firstChild);
+    }
     
     // Update content dimensions in visual state
     const totalHeight = rows.length * 40; // ROW_HEIGHT
@@ -1290,9 +1301,13 @@ export class SimplePassiveRenderer {
       } else {
         rowElement = this.bodyRenderer.createRowElement(row, actualRowIndex, virtualColumns, columnVisibility, startX);
       }
-      
-      this.bodyContainer.appendChild(rowElement);
+
+      // PERFORMANCE FIX: Append to DocumentFragment instead of directly to DOM
+      fragment.appendChild(rowElement);
     });
+
+    // PERFORMANCE FIX: Single DOM operation instead of multiple appendChild calls
+    this.bodyContainer.appendChild(fragment);
     
     // Build complete coordinate mapping for all rows (needed for overlays)
     const newRows: any[] = [];
@@ -1336,15 +1351,19 @@ export class SimplePassiveRenderer {
 
       // CRITICAL: OverlayManager still needs coordinate mapping for positioning overlays
       this.overlayManager?.updateCoordinateMapping(this.coordinateMapping);
+
+      // PERFORMANCE FIX: Update position tracker with coordinate mapping for computed positions
+      positionTracker.updateCoordinateMapping(this.coordinateMapping);
     }
 
-    // Schedule DOM position tracker update in next frame to avoid forced reflow
-    // This prevents measuring DOM immediately after modifying it
-    // Only force update if initialization is complete
+    // PERFORMANCE FIX: Remove expensive DOM position tracking during render
+    // Position tracking should be derived from coordinate mapping, not DOM scanning
+    // The coordinate mapping already contains all position information needed
+    // TODO: Refactor position tracker to use computed observables from coordinateMapping
     if (this.initManager.isFullyHydrated$.get(true)) {
-      requestAnimationFrame(() => {
-        positionTracker.forceUpdate();
-      });
+      // Coordinate mapping is already updated above - position tracker should react to that
+      // instead of doing expensive DOM scanning
+      fileLog.debug('🚀 PERF: Skipping expensive DOM position update - using coordinate mapping instead');
     }
 
     fileLog.info('✅ Body rendered with Phase 2 managers');
