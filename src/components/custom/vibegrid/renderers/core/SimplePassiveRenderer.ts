@@ -958,7 +958,7 @@ export class SimplePassiveRenderer {
 
             // Wait for browser to actually paint before marking as ready
             const paintCompleteTime = performance.now();
-            fileLog.info('🎨 DOM PAINT COMPLETE', {
+            fileLog.debug('🎨 DOM PAINT COMPLETE', {
               event: 'renderBody_complete',
               timestamp: paintCompleteTime,
               rendererState: 'dom_ready_waiting_for_paint'
@@ -969,7 +969,7 @@ export class SimplePassiveRenderer {
               const actualPaintTime = performance.now();
               this.initManager.markReady('rendererInitialized');
 
-              fileLog.info('🖼️ BROWSER PAINT COMPLETE - SKELETON CAN HIDE', {
+              fileLog.debug('🖼️ BROWSER PAINT COMPLETE - SKELETON CAN HIDE', {
                 event: 'browser_paint_complete',
                 timestamp: actualPaintTime,
                 paintDuration: actualPaintTime - paintCompleteTime,
@@ -1244,7 +1244,7 @@ export class SimplePassiveRenderer {
     if (!this.bodyContainer || !this.bodyRenderer) return;
 
     const renderStartTime = performance.now();
-    fileLog.info('🎨 DOM RENDER START', {
+    fileLog.debug('🎨 DOM RENDER START', {
       event: 'renderBody_start',
       timestamp: renderStartTime
     });

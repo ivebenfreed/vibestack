@@ -129,8 +129,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
   // Log skeleton visibility changes
   useEffect(() => {
-    const skeletonVisible = !isReady;
-    fileLog.info('💀 SKELETON VISIBILITY', {
+    const skeletonVisible = !isReady || !isRendered;
+    fileLog.debug('💀 SKELETON VISIBILITY', {
       event: 'skeleton_visibility_change',
       visible: skeletonVisible,
       isReady,
@@ -728,8 +728,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
       )}
 
 
-      {/* Header with menu components - completely block until everything is done */}
-      {false && isReady && !hasErrors && observablesRef.current && isRendered && (
+      {/* Header with menu components - wait for complete rendering */}
+      {isReady && !hasErrors && observablesRef.current && isRendered && (
         <VibeGridXHeaderPure
           tableCore$={observablesRef.current.tableCore$}
           tableInteraction$={observablesRef.current.tableInteraction$}
