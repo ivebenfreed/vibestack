@@ -252,12 +252,12 @@ export function createVisualState$(visualInputs$: any) {
   let cumulativeX = 70; // Start after drag column (30px) + row header (40px)
   const columnLayouts: ColumnLayout[] = [];
 
-  layoutInputs.columnOrder.forEach((columnId, index) => {
-    const column = layoutInputs.columns.find(c => c.id === columnId);
+  inputs.columnOrder.forEach((columnId, index) => {
+    const column = inputs.columns.find(c => c.id === columnId);
     if (!column) return;
 
-    const width = layoutInputs.columnWidths[columnId] || column.width || 150;
-    const visible = layoutInputs.columnVisibility[columnId] !== false;
+    const width = inputs.columnWidths[columnId] || column.width || 150;
+    const visible = inputs.columnVisibility[columnId] !== false;
 
     const layout: ColumnLayout = {
       id: columnId,
@@ -324,19 +324,19 @@ export function createVisualState$(visualInputs$: any) {
     visibleColumns,
     totalColumnsWidth,
     geometry,
-    headerScrollLeft: layoutInputs.scrollLeft, // Header should match body
-    bodyScrollLeft: layoutInputs.scrollLeft,
+    headerScrollLeft: inputs.scrollLeft, // Header should match body
+    bodyScrollLeft: inputs.scrollLeft,
     scrollSynchronized: true, // Always true when computed properly
-    visualRows: computeVisualRows(layoutInputs),
+    visualRows: computeVisualRows(inputs),
     totalRowsHeight: totalHeight,
     columnState: {
-      columns: layoutInputs.columns,
-      columnWidths: layoutInputs.columnWidths,
-      columnVisibility: layoutInputs.columnVisibility,
-      columnOrder: layoutInputs.columnOrder,
-      entityType: layoutInputs.entityType,
-      orgId: layoutInputs.orgId,
-      userId: layoutInputs.userId
+      columns: inputs.columns,
+      columnWidths: inputs.columnWidths,
+      columnVisibility: inputs.columnVisibility,
+      columnOrder: inputs.columnOrder,
+      entityType: inputs.entityType,
+      orgId: inputs.orgId,
+      userId: inputs.userId
     }
   };
   });
