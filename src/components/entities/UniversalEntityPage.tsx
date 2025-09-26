@@ -8,26 +8,45 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // ⚡ PERFORMANCE: Lazy load VibeGrid to prevent blocking route transitions
 const VibeGrid = React.lazy(() => import('@/components/custom/vibegrid').then(m => ({ default: m.VibeGrid })))
 
-// ⚡ PERFORMANCE: Table skeleton component for loading state
+// ⚡ PERFORMANCE: Simple skeleton that matches VibeGrid structure
 function TableSkeleton() {
   return (
-    <div className="h-full w-full p-4 space-y-3">
-      {/* Header skeleton */}
-      <div className="flex space-x-4 border-b pb-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-4 w-24" />
-        ))}
-      </div>
-      {/* Rows skeleton */}
-      {Array.from({ length: 12 }).map((_, rowIndex) => (
-        <div key={rowIndex} className="flex space-x-4">
-          {Array.from({ length: 6 }).map((_, colIndex) => (
-            <Skeleton key={colIndex} className="h-8 w-24" />
+    <div className="w-full h-full bg-background rounded-lg overflow-hidden">
+      <div className="relative w-full h-full border border-border">
+        {/* Header */}
+        <div className="sticky top-0 z-20 bg-background border-b border-border">
+          <div className="flex h-10">
+            <div className="w-12 px-3 py-2 border-r border-border">
+              <div className="h-4 w-4 bg-muted rounded animate-pulse"></div>
+            </div>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex-1 px-3 py-2 border-r border-border min-w-[120px]">
+                <div className="h-4 bg-muted rounded w-3/4 animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Body */}
+        <div className="relative">
+          {Array.from({ length: 10 }).map((_, rowIndex) => (
+            <div key={rowIndex} className="flex h-10 border-b border-border">
+              <div className="w-12 px-3 py-2 border-r border-border">
+                <div className="h-4 w-4 bg-muted/50 rounded animate-pulse"></div>
+              </div>
+              {Array.from({ length: 6 }).map((_, colIndex) => (
+                <div key={colIndex} className="flex-1 px-3 py-2 border-r border-border min-w-[120px]">
+                  <div
+                    className="h-4 bg-muted/50 rounded animate-pulse"
+                    style={{ width: `${Math.floor(Math.random() * 30 + 50)}%` }}
+                  ></div>
+                </div>
+              ))}
+            </div>
           ))}
         </div>
-      ))}
+      </div>
     </div>
-  )
+  );
 }
 import { entityOperations } from '@/legend-state'
 import { EntityNameUtils } from '@/lib/entity-name-utils'

@@ -9,6 +9,7 @@ import React from 'react';
 import { Loader2, AlertTriangle, RefreshCw, CheckCircle } from 'lucide-react';
 import { useSelector } from '@legendapp/state/react';
 import type { VibeGridHydrationManager } from '../stores/init-state';
+import { TableSkeleton } from './TableSkeleton';
 
 // ====================================
 // COMPONENT PROPS
@@ -38,10 +39,10 @@ export function VibeGridLoadingOverlay({
   const hasErrors = useSelector(initManager.hasErrors$);
   const criticalErrors = useSelector(initManager.criticalErrors$);
 
-  // Don't render if already initialized
-  if (isFullyInitialized) {
-    return null;
-  }
+  // Always render - let parent control visibility to prevent flash
+  // if (isFullyInitialized) {
+  //   return null;
+  // }
 
   const hasCriticalErrors = criticalErrors.length > 0;
 
@@ -51,7 +52,7 @@ export function VibeGridLoadingOverlay({
       style={{ height, width }}
     >
       {/* Clean Table Skeleton */}
-      <TableSkeleton />
+      <TableSkeleton columns={6} rows={8} />
 
       {/* Only show error indicator if there are critical errors */}
       {hasCriticalErrors && (
@@ -89,69 +90,6 @@ export function VibeGridLoadingOverlay({
   );
 }
 
-// ====================================
-// TABLE SKELETON COMPONENT
-// ====================================
-
-function TableSkeleton() {
-  const columns = Array.from({ length: 6 }, (_, i) => i);
-  const rows = Array.from({ length: 8 }, (_, i) => i);
-
-  return (
-    <div className="w-full h-full flex flex-col">
-      {/* Header Components Row Skeleton - matches VibeGridXHeaderPure */}
-      <div className="flex items-center justify-between p-2 border-b bg-muted/50">
-        <div className="flex items-center gap-2">
-          {/* "Table View" text skeleton */}
-          <div className="h-4 w-20 bg-gray-300 rounded animate-pulse" />
-          {/* Hidden columns indicator skeleton */}
-          <div className="h-3 w-16 bg-gray-200 rounded animate-pulse" />
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Group dropdown skeleton */}
-          <div className="h-8 w-24 bg-gray-300 rounded animate-pulse" />
-          {/* Column visibility dropdown skeleton */}
-          <div className="h-8 w-20 bg-gray-300 rounded animate-pulse" />
-        </div>
-      </div>
-
-      {/* Table Content Skeleton */}
-      <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
-        {/* Column Headers Skeleton */}
-        <div className="border-b border-gray-200 bg-gray-50 p-2">
-          <div className="flex space-x-2">
-            {columns.map((col) => (
-              <div
-                key={col}
-                className="flex-1 h-8 bg-gray-300 rounded animate-pulse"
-                style={{ minWidth: '120px' }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Table Rows Skeleton */}
-        <div className="p-2 space-y-2">
-          {rows.map((row) => (
-            <div key={row} className="flex space-x-2">
-              {columns.map((col) => (
-                <div
-                  key={col}
-                  className="flex-1 h-6 bg-gray-200 rounded animate-pulse"
-                  style={{
-                    minWidth: '120px',
-                    animationDelay: `${(row * columns.length + col) * 100}ms`
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ====================================
 // LOADING STATE HOOK

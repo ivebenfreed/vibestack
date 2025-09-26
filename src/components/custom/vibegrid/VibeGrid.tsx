@@ -12,6 +12,7 @@ import { createHydrationManager, type VibeGridHydrationManager } from './stores/
 import { VibeGridLoadingOverlay, useVibeGridLoadingState } from './components/VibeGridLoadingOverlay';
 import { createVibeGridPreferences } from './stores/simple-persistence';
 import { syncState, when } from '@legendapp/state';
+import { useSelector } from '@legendapp/state/react';
 
 // Import VibeGrid CSS styles
 import './vibegridx.css';
@@ -122,6 +123,21 @@ export function VibeGrid<T extends Record<string, any> = any>(
 
   // Use init manager hook for loading state
   const { isLoading, isReady, hasErrors, retry } = useVibeGridLoadingState(initManager);
+
+  // Track when actual DOM rendering is complete
+  const isRendered = useSelector(initManager.hydrationState$.rendererInitialized);
+
+  // Log skeleton visibility changes
+  useEffect(() => {
+    const skeletonVisible = !isReady;
+    fileLog.info('💀 SKELETON VISIBILITY', {
+      event: 'skeleton_visibility_change',
+      visible: skeletonVisible,
+      isReady,
+      isRendered,
+      timestamp: performance.now()
+    });
+  }, [isReady, isRendered]);
 
   // ====================================
   // INITIALIZATION
@@ -692,8 +708,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
         flexDirection: 'column'
       }}
     >
-      {/* Show loading overlay while initializing */}
-      {isLoading && (
+      {/* Show loading overlay until both init and rendering are complete */}
+      {(!isReady || !isRendered) && (
         <div className="absolute inset-0 z-10">
           <VibeGridLoadingOverlay
             initManager={initManager}
@@ -712,8 +728,8 @@ export function VibeGrid<T extends Record<string, any> = any>(
       )}
 
 
-      {/* Header with menu components */}
-      {isReady && !hasErrors && observablesRef.current && (
+      {/* Header with menu components - completely block until everything is done */}
+      {false && isReady && !hasErrors && observablesRef.current && isRendered && (
         <VibeGridXHeaderPure
           tableCore$={observablesRef.current.tableCore$}
           tableInteraction$={observablesRef.current.tableInteraction$}

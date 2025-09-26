@@ -62,15 +62,6 @@ export function TableSkeleton({
             </div>
           ))}
         </div>
-        
-        {/* Simple loading indicator */}
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm">Loading...</span>
-          </div>
-        </div>
-        
       </div>
     </div>
   );

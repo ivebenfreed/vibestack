@@ -956,10 +956,26 @@ export class SimplePassiveRenderer {
               this.lastVisibleRows = this.visualState.visualState$.geometry.visibleRowRange.get();
             });
 
-            // Mark renderer as initialized after body render completes
-            this.initManager.markReady('rendererInitialized');
+            // Wait for browser to actually paint before marking as ready
+            const paintCompleteTime = performance.now();
+            fileLog.info('🎨 DOM PAINT COMPLETE', {
+              event: 'renderBody_complete',
+              timestamp: paintCompleteTime,
+              rendererState: 'dom_ready_waiting_for_paint'
+            });
 
-            fileLog.info('✅ Renderer marked as initialized after initial render');
+            // Mark renderer as initialized AFTER browser paint is complete
+            requestAnimationFrame(() => {
+              const actualPaintTime = performance.now();
+              this.initManager.markReady('rendererInitialized');
+
+              fileLog.info('🖼️ BROWSER PAINT COMPLETE - SKELETON CAN HIDE', {
+                event: 'browser_paint_complete',
+                timestamp: actualPaintTime,
+                paintDuration: actualPaintTime - paintCompleteTime,
+                rendererState: 'fully_rendered'
+              });
+            });
 
             // Enable observers after initialization is complete
             this.observersEnabled = true;
@@ -1226,6 +1242,12 @@ export class SimplePassiveRenderer {
    */
   private renderBody(): void {
     if (!this.bodyContainer || !this.bodyRenderer) return;
+
+    const renderStartTime = performance.now();
+    fileLog.info('🎨 DOM RENDER START', {
+      event: 'renderBody_start',
+      timestamp: renderStartTime
+    });
 
     // GUARD: Only render if grid is fully initialized OR if this is the initial render call
     const isFullyInitialized = this.initManager.isFullyHydrated$.get(true);
