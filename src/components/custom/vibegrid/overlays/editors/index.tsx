@@ -10,6 +10,7 @@ import { MultiRelationshipEditor } from './MultiRelationshipEditor';
 import { ReferenceSelectEditor } from './ReferenceSelectEditor';
 import { ReferenceMultiEditor } from './ReferenceMultiEditor';
 import { ModalTextEditor } from './ModalTextEditor';
+import { RelationshipEditor } from './RelationshipEditor';
 import type { CellRef, Column } from '../../types';
 
 // Helper function to detect if a field should be treated as tags
@@ -56,7 +57,8 @@ export {
   MultiRelationshipEditor,
   ReferenceSelectEditor,
   ReferenceMultiEditor,
-  ModalTextEditor
+  ModalTextEditor,
+  RelationshipEditor
 };
 
 // Editor props interface
@@ -194,16 +196,16 @@ export function createEditor(props: EditorProps): React.ReactElement {
       console.log('🔧 createEditor: Creating SelectEditor for system option type', cellType);
       return <SelectEditor {...props} />;
 
-    // User and entity reference types
+    // User and entity reference types - use dedicated RelationshipEditor
     case 'user_reference':
     case 'custom_user_reference':
-      console.log('🔧 createEditor: Creating SelectEditor for user reference', cellType);
-      return <SelectEditor {...props} />;
+      console.log('🔧 createEditor: Creating RelationshipEditor for user reference', cellType);
+      return <RelationshipEditor {...props} />;
 
     case 'entity_reference':
     case 'custom_entity_reference':
-      console.log('🔧 createEditor: Creating SelectEditor for entity reference', cellType);
-      return <SelectEditor {...props} />;
+      console.log('🔧 createEditor: Creating RelationshipEditor for entity reference', cellType);
+      return <RelationshipEditor {...props} />;
 
     default:
       // Default to text editor for unknown types

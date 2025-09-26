@@ -76,25 +76,43 @@ export class UserDataLoader implements AsyncDataLoader {
     const orgId = this.getOrgId();
 
     try {
-      const searchParams = new URLSearchParams({
-        q: query,
-        limit: String(limit),
-        fields: 'name,email'
-      });
+      // Load user data from Legend State observables
+      const { getEntity$ } = require('@/legend-state/observables');
+      const userEntityName = `${orgId}_User`;
+      const userEntity$ = getEntity$(userEntityName);
+      const userData = userEntity$.peek();
 
-      const response = await fetch(`/api/dataforge/orgs/${orgId}/users/search?${searchParams}`);
-
-      if (!response.ok) {
-        throw new Error(`User search failed: ${response.status}`);
+      if (!userData || typeof userData !== 'object') {
+        fileLog.warn('No user data available for search', { orgId, userEntityName });
+        return [];
       }
 
-      const results = await response.json();
-
-      return results.data.map((user: any) => ({
+      // Convert user data to search suggestions and filter by query
+      const allUsers = Object.values(userData).map((user: any) => ({
         value: user.id,
-        label: `${user.name || 'Unknown'} (${user.email || 'No email'})`,
+        label: user.name || user.email || user.id,
         metadata: user
       }));
+
+      // Filter by query if provided
+      const filteredUsers = query
+        ? allUsers.filter(user =>
+            user.label.toLowerCase().includes(query.toLowerCase()) ||
+            (user.metadata.email && user.metadata.email.toLowerCase().includes(query.toLowerCase()))
+          )
+        : allUsers;
+
+      // Apply limit
+      const limitedUsers = filteredUsers.slice(0, limit);
+
+      fileLog.debug('User search completed', {
+        query,
+        totalUsers: allUsers.length,
+        filteredUsers: filteredUsers.length,
+        returnedUsers: limitedUsers.length
+      });
+
+      return limitedUsers;
 
     } catch (error) {
       fileLog.error('Failed to search users', { error, query });
@@ -112,8 +130,9 @@ export class UserDataLoader implements AsyncDataLoader {
   }
 
   private getOrgId(): string {
-    // TODO: Get from app context
-    return '01920000-1000-7000-8000-000000000001';
+    // Get from Legend State universe context
+    const { universeOrgId$ } = require('@/legend-state/observables');
+    return universeOrgId$.peek() || '01920000-1000-7000-8000-000000000001';
   }
 }
 
@@ -233,19 +252,23 @@ export class UserReferenceRenderer implements CellRenderer {
 
   private async loadAndRenderUser(container: HTMLElement, userId: string, column: EnhancedColumn) {
     try {
-      // This would use the RelationshipDataManager in a real implementation
-      // For now, simulate loading
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Load user data from Legend State observables
+      const orgId = this.getOrgId();
+      const { getEntity$ } = require('@/legend-state/observables');
+      const userEntityName = `${orgId}_User`;
+      const userEntity$ = getEntity$(userEntityName);
+      const userData = userEntity$.peek();
 
-      // Mock user data for demonstration
-      const mockUserData = {
-        id: userId,
-        name: `User ${userId.slice(-4)}`,
-        email: `user${userId.slice(-4)}@widecorp.com`
-      };
-
-      container.innerHTML = this.createUserBadge(mockUserData, userId);
-      container.style.opacity = '1';
+      if (userData && typeof userData === 'object' && userData[userId]) {
+        const user = userData[userId];
+        container.innerHTML = this.createUserBadge(user, userId);
+        container.style.opacity = '1';
+      } else {
+        // Fallback if user not found
+        container.textContent = `User ${userId.slice(-4)}`;
+        container.style.opacity = '0.6';
+        container.style.fontStyle = 'italic';
+      }
 
     } catch (error) {
       fileLog.error('Failed to load user data', { error, userId });
@@ -257,59 +280,66 @@ export class UserReferenceRenderer implements CellRenderer {
 }
 
 /**
- * User Reference Cell Editor
+ * User Reference Cell Editor - Uses ComboboxEditor with user data
  */
 export class UserReferenceEditor implements CellEditor {
-  private currentElement: HTMLElement | null = null;
-  private onSaveCallback: ((value: any) => void) | null = null;
   private dataLoader = new UserDataLoader();
 
   create(value: any, column: EnhancedColumn, onSave: (value: any) => void): HTMLElement {
-    this.onSaveCallback = onSave;
-
-    // Create a searchable select input
+    // Create React ComboboxEditor with user options
     const container = document.createElement('div');
-    container.className = 'vibegridx-user-editor';
+    container.className = 'vibegridx-user-editor-container';
     container.style.cssText = `
       width: 100%;
       height: 100%;
       position: relative;
     `;
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Search users...';
-    input.className = 'vibegridx-user-search-input';
-    input.style.cssText = `
-      width: 100%;
-      height: 100%;
-      border: none;
-      outline: none;
-      background: transparent;
-      font-family: inherit;
-      font-size: inherit;
-      padding: 0 8px;
-      margin: 0;
-    `;
-
-    this.currentElement = container;
-
-    // Set initial value
-    if (value) {
-      input.value = `User ${String(value).slice(-4)}`; // Placeholder display
-    }
-
-    // Event handlers
-    input.addEventListener('input', (e) => this.handleSearch((e.target as HTMLInputElement).value, column, container));
-    input.addEventListener('blur', () => this.handleSave());
-    input.addEventListener('keydown', (e) => this.handleKeyDown(e));
-
-    container.appendChild(input);
-
-    // Auto-focus
-    setTimeout(() => input.focus(), 0);
+    // Load user options synchronously
+    this.loadUserOptionsAndRender(container, value, column, onSave);
 
     return container;
+  }
+
+  private async loadUserOptionsAndRender(
+    container: HTMLElement,
+    value: any,
+    column: EnhancedColumn,
+    onSave: (value: any) => void
+  ) {
+    try {
+      const userOptions = await this.dataLoader.getSearchSuggestions('', column, 100);
+
+      // Create enhanced column with user options
+      const enhancedColumn = {
+        ...column,
+        options: userOptions,
+        enumOptions: userOptions
+      };
+
+      // Create the ComboboxEditor as a React component
+      const React = require('react');
+      const ReactDOM = require('react-dom/client');
+      const { ComboboxEditor } = require('../../overlays/editors/ComboboxEditor');
+
+      const editorProps = {
+        cell: { id: 'temp-cell' },
+        column: enhancedColumn,
+        initialValue: value,
+        onCommit: onSave,
+        onCancel: () => {},
+        placeholder: "Select user...",
+        searchPlaceholder: "Search users..."
+      };
+
+      const root = ReactDOM.createRoot(container);
+      root.render(React.createElement(ComboboxEditor, editorProps));
+
+    } catch (error) {
+      console.error('Failed to create user reference editor', error);
+      // Fallback to simple input
+      container.innerHTML = `<input type="text" value="${value || ''}" placeholder="Search users..." style="width:100%;height:100%;border:none;outline:none;padding:0 8px;" />`;
+    }
   }
 
   getValue(element: HTMLElement): any {

@@ -14,6 +14,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check } from 'lucide-react'
 import type { CellRef, Column, RelationshipContext, EnumOption } from '../../types'
 import { getOptionIconDisplay } from '../../utils/icon-mapping'
+import { use$ } from '@legendapp/state/react'
+import { getEntity$, universeOrgId$ } from '@/legend-state/observables'
 
 export interface ComboboxEditorProps {
   cell: CellRef
@@ -99,7 +101,7 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
   // Get options from column configuration or dynamic provider
   const options = React.useMemo(() => {
     let rawOptions: any[] = []
-    
+
     // Use dynamic options if available, otherwise fall back to static options
     if (column.relationshipOptionsProvider && dynamicOptions.length > 0) {
       rawOptions = dynamicOptions
@@ -190,7 +192,7 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
         case 'Escape':
           e.preventDefault()
           e.stopPropagation() // Stop the event from reaching KeyboardNavigationController
-          handleCancel()
+          onCancel() // Call onCancel directly instead of handleCancel to avoid setting hasCommitted
           break
         case 'Tab':
           e.preventDefault()
@@ -238,8 +240,16 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
 
   const handleCommit = (value: any) => {
     if (hasCommitted) return
-    setHasCommitted(true)
-    onCommit(value)
+
+    // Only commit if the value actually changed
+    if (value !== initialValue) {
+      setHasCommitted(true)
+      onCommit(value)
+    } else {
+      // Value didn't change, just cancel the edit
+      setHasCommitted(true)
+      onCancel()
+    }
   }
 
   const handleCancel = () => {

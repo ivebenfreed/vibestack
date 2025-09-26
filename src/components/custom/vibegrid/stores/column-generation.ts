@@ -301,12 +301,19 @@ function mapFieldTypeToVibeGridCellType(fieldType: string, fieldName?: string): 
  * Format field name for display
  */
 function formatFieldName(fieldName: string): string {
-  return fieldName
+  let formatted = fieldName
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
+
+  // Remove "Id" suffix from relationship field names for better UX
+  if (formatted.endsWith(' Id')) {
+    formatted = formatted.slice(0, -3);
+  }
+
+  return formatted;
 }
 
 // Note: Fallback columns removed - schema must provide entity definitions

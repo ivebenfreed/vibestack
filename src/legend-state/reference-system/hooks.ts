@@ -5,6 +5,7 @@
 import React from 'react'
 import { use$ } from '@legendapp/state/react'
 import { OptionsManager, type SystemOption, type CustomOption } from './options-manager'
+import { getEntity$, universeOrgId$ } from '../observables'
 import { log } from '@/logger';
 const fileLog = log('legend-state/reference-system/hooks.ts');
 
@@ -106,15 +107,25 @@ export function useReferenceOptions(config: {
 }
 
 /**
- * Hook for entity reference options using virtual entities
+ * Hook for entity reference options using entity observables
  */
 export function useEntityReferenceOptions(referenceEntity: string, organizationId?: string) {
-  const { getEntity$ } = require('../observables')
-  
-  // Use the virtual entity for the reference (e.g., VirtualUser, VirtualProject)  
-  const virtualEntityName = `Virtual${referenceEntity}`
-  const entityObs$ = getEntity$(virtualEntityName)
+  // Get current org ID
+  const currentOrgId = organizationId || use$(universeOrgId$)
+
+  // Use org-prefixed entity name (e.g., 01920000-1000-7000-8000-000000000001_User)
+  const orgEntityName = `${currentOrgId}_${referenceEntity}`
+  const entityObs$ = getEntity$(orgEntityName)
   const entityData = use$(entityObs$)
+
+  fileLog.info('🔍 [useEntityReferenceOptions] Loading entity data', {
+    referenceEntity,
+    orgEntityName,
+    hasEntityObs: !!entityObs$,
+    hasEntityData: !!entityData,
+    entityDataType: typeof entityData,
+    entityDataKeys: entityData && typeof entityData === 'object' ? Object.keys(entityData).length : 0
+  });
   
   // Convert entity records to dropdown options
   const options = React.useMemo(() => {

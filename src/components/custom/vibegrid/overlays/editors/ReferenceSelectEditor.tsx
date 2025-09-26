@@ -6,6 +6,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useReferenceOptions } from '@/legend-state/reference-system/hooks';
 import type { EditorProps } from './index';
 
+/**
+ * Infer entity type from field name for entity references
+ * Examples: portfolio_id -> Portfolio, milestone_id -> Milestone
+ */
+function inferEntityFromFieldName(fieldName: string): string {
+  if (fieldName.endsWith('_id')) {
+    const baseName = fieldName.slice(0, -3);
+    // Convert snake_case to PascalCase for entity names
+    return baseName.split('_').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join('');
+  }
+  return 'Entity';
+}
+
 export function ReferenceSelectEditor({ 
   cell, 
   column, 
@@ -18,14 +33,37 @@ export function ReferenceSelectEditor({
   const [value, setValue] = useState<string>(initialValue || '');
   const selectRef = useRef<HTMLSelectElement>(null);
 
+  // Determine reference configuration based on field type
+  const getReferenceConfig = () => {
+    const cellType = column.cellType || column.type;
+
+    if (cellType === 'user_reference' || cellType === 'custom_user_reference') {
+      return {
+        referenceType: 'user_reference' as const,
+        referenceEntity: 'User'
+      };
+    }
+
+    if (cellType === 'entity_reference' || cellType === 'custom_entity_reference') {
+      // Infer entity type from field name (e.g., portfolio_id -> Portfolio)
+      const entityType = column.referenceEntity || inferEntityFromFieldName(column.id);
+      return {
+        referenceType: 'entity_reference' as const,
+        referenceEntity: entityType
+      };
+    }
+
+    return {
+      referenceType: column.referenceType || 'system',
+      systemOptionType: column.systemOptionType,
+      systemArchetype: column.systemArchetype,
+      customOptionSet: column.customOptionSet,
+      referenceEntity: column.referenceEntity
+    };
+  };
+
   // Get options using the universal hook
-  const { options, isLoading, error } = useReferenceOptions({
-    referenceType: column.referenceType || 'system',
-    systemOptionType: column.systemOptionType,
-    systemArchetype: column.systemArchetype,
-    customOptionSet: column.customOptionSet,
-    referenceEntity: column.referenceEntity  // NEW: Pass entity reference info
-  });
+  const { options, isLoading, error } = useReferenceOptions(getReferenceConfig());
 
   useEffect(() => {
     // Focus the select element when mounted

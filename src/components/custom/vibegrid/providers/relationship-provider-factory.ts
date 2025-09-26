@@ -7,6 +7,7 @@
 
 import type { RelationshipOptionsProvider, EnumOption } from '../types';
 import { log } from '@/logger';
+import { getEntity$, universeOrgId$ } from '@/legend-state/observables';
 const fileLog = log('components/custom/vibegrid/providers/relationship-provider-factory.ts');
 
 /**
@@ -131,21 +132,65 @@ export function addRelationshipProvidersToColumns(
   getStore: () => any
 ): any[] {
   return columns.map(column => {
-    // Check if this is a relationship column
     const cellType = column.cellType || column.type;
+
+    // Handle relationship fields that start with 'relationship'
     if (cellType?.startsWith('relationship') && column.relationshipTable) {
-      // Add the provider if not already present
       if (!column.relationshipOptionsProvider) {
         return {
           ...column,
           relationshipOptionsProvider: createStoreRelationshipProvider(
             column.relationshipTable,
             getStore,
-            column.relationshipFilter // Pass the filter if present
+            column.relationshipFilter
           )
         };
       }
     }
+
+    // Handle user_reference fields
+    if ((cellType === 'user_reference' || cellType === 'custom_user_reference') && !column.relationshipOptionsProvider) {
+      return {
+        ...column,
+        relationshipTable: 'users',
+        relationshipOptionsProvider: createStoreRelationshipProvider(
+          'users',
+          getStore
+        )
+      };
+    }
+
+    // Handle entity_reference fields
+    if ((cellType === 'entity_reference' || cellType === 'custom_entity_reference') && !column.relationshipOptionsProvider) {
+      // For entity references, we need to determine the target entity type
+      // This could be inferred from the field name or set explicitly
+      const targetEntity = column.relationshipEntityType || inferEntityTypeFromFieldName(column.id);
+      if (targetEntity) {
+        return {
+          ...column,
+          relationshipTable: targetEntity,
+          relationshipEntityType: targetEntity,
+          relationshipOptionsProvider: createStoreRelationshipProvider(
+            targetEntity,
+            getStore
+          )
+        };
+      }
+    }
+
     return column;
   });
+}
+
+/**
+ * Infer entity type from field name
+ * Examples: portfolio_id -> portfolio, milestone_id -> milestone
+ */
+function inferEntityTypeFromFieldName(fieldName: string): string | null {
+  if (fieldName.endsWith('_id')) {
+    const baseName = fieldName.slice(0, -3);
+    // Convert snake_case to kebab-case for entity names
+    return baseName.replace(/_/g, '-');
+  }
+  return null;
 }

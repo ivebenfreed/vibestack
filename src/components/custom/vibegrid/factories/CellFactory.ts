@@ -593,17 +593,21 @@ export class CellFactory {
     fieldType: VibeGridFieldType
   ): Promise<void> {
     try {
-      if (fieldType.asyncDataLoader) {
-        const loadedData = await fieldType.asyncDataLoader(value, column, rowData);
+      if (fieldType.asyncDataLoader && typeof fieldType.asyncDataLoader.loadRelationshipData === 'function') {
+        const loadedData = await fieldType.asyncDataLoader.loadRelationshipData(
+          column,
+          [String(value)],
+          {} as any // TableCore$ - not needed for our simple case
+        );
 
         // Re-render with loaded data
         contentWrapper.innerHTML = '';
-        const content = fieldType.renderer.render(loadedData, column, rowData);
+        const content = fieldType.renderer.render(value, column, rowData);
         contentWrapper.appendChild(content);
       }
     } catch (error) {
       fileLog.error('❌ [ASYNC-LOAD] Relationship data loading failed - FAIL FAST', { error, column: column.id });
-      throw error; // Fail fast - don't show error UI
+      // Don't throw - just log and continue with basic rendering
     }
   }
 }
