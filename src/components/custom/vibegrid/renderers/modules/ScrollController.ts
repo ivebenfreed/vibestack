@@ -91,18 +91,28 @@ export class ScrollController {
       // Sync header scroll immediately (lightweight operation)
       this.syncHeaderScroll(scrollLeft);
 
-      // Call external scroll handler (triggers viewport observer)
-      if (this.onScroll) {
-        this.onScroll(scrollLeft, scrollTop);
+      // Cancel any pending scroll update to debounce rapid scroll events
+      if (this.scrollRAF) {
+        cancelAnimationFrame(this.scrollRAF);
       }
 
-      fileLog.info('Viewport scrolled', {
-        scrollLeft,
-        scrollTop,
-        viewportWidth: this.viewport.clientWidth,
-        viewportHeight: this.viewport.clientHeight,
-        scrollWidth: this.viewport.scrollWidth,
-        scrollHeight: this.viewport.scrollHeight
+      // Throttle the expensive scroll handler to prevent excessive re-renders
+      this.scrollRAF = requestAnimationFrame(() => {
+        // Call external scroll handler (triggers viewport observer)
+        if (this.onScroll) {
+          this.onScroll(scrollLeft, scrollTop);
+        }
+
+        fileLog.info('Viewport scrolled', {
+          scrollLeft,
+          scrollTop,
+          viewportWidth: this.viewport.clientWidth,
+          viewportHeight: this.viewport.clientHeight,
+          scrollWidth: this.viewport.scrollWidth,
+          scrollHeight: this.viewport.scrollHeight
+        });
+
+        this.scrollRAF = null;
       });
     }
   }

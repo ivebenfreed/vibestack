@@ -496,12 +496,16 @@ export class SimplePassiveRenderer {
       // CRITICAL: Don't use .get(true) here as it bypasses dependency tracking!
       const visualState = this.visualState.visualState$.get();
 
-      // IMPORTANT: Read ALL visual inputs to track changes - this triggers the observer
+      // IMPORTANT: Read ONLY layout-related inputs to avoid scroll position changes
       const columnOrder = this.visualState.visualInputs$.columnOrder.get();
       const columnVisibility = this.visualState.visualInputs$.columnVisibility.get();
       const columnWidths = this.visualState.visualInputs$.columnWidths.get();
 
-      fileLog.info('[RESIZE] 🔍 VISUAL OBSERVER TRIGGERED - columnWidths change detected', {
+      // Don't read scroll position here - it causes unnecessary re-renders on scroll
+      // const scrollLeft = this.visualState.visualInputs$.scrollLeft.get();
+      // const scrollTop = this.visualState.visualInputs$.scrollTop.get();
+
+      fileLog.info('[RESIZE] 🔍 VISUAL OBSERVER TRIGGERED - layout change detected', {
         columnWidths,
         columnOrderLength: columnOrder.length,
         timestamp: Date.now(),
