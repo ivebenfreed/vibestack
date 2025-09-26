@@ -177,7 +177,7 @@ export function createVibeGridVisualState(entityType?: string) {
       // Create computed observable that uses the correct visualInputs$ instance from this scope
       const thisVisualInputs$ = visualInputs$; // Capture the correct reference
       return computed(() => {
-        const rawProcessedRows = tableCore$.processedRows.get();
+        const rawProcessedRows = tableCore$.processedRows.get(true);
         // Access sortBy from the captured visual inputs instance
         const sortBy = thisVisualInputs$.sortBy.get();
         fileLog.info('🔄 createSortedProcessedRows$ computed triggered', {

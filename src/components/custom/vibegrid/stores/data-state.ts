@@ -236,8 +236,8 @@ export function createTableCore$(entityType: string, visualInputs$?: any, initMa
       let data = {};
       if (entityObs) {
         try {
-          // Direct .get() call like atomic bridge
-          data = entityObs.get() || {};
+          // Shallow .get(true) to only track structural changes, not individual field changes
+          data = entityObs.get(true) || {};
           fileLog.debug(' Got entity data', {
             entityType,
             recordCount: Object.keys(data || {}).length

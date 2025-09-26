@@ -17,6 +17,91 @@ import { createDatabaseConnection, getKysely } from '../lib/database-manager';
 
 export const dataforgeRouter = new Hono<AppContext>();
 
+// Helper function to populate relationship field UUIDs from relationship table
+async function populateRelationshipFields(
+  records: any[],
+  orgId: string,
+  entityName: string,
+  kysely: any
+): Promise<any[]> {
+  if (!records || records.length === 0) return records;
+
+  const relationshipTable = `org_${orgId.replace(/-/g, '_')}_relationships`;
+
+  try {
+    // Get all relationships for these entities
+    const entityIds = records.map(r => r.id);
+
+    console.log(`🔍 [populateRelationshipFields] Querying relationships for ${entityName} with IDs:`, entityIds);
+
+    const relationships = await kysely
+      .selectFrom(relationshipTable)
+      .select([
+        'source_entity_id',
+        'target_entity_id',
+        'relationship_type',
+        'properties'
+      ])
+      .where('source_entity_type', '=', entityName)
+      .where('source_entity_id', 'in', entityIds)
+      .where('valid_until', 'is', null)
+      .execute();
+
+    console.log(`🔍 [populateRelationshipFields] Found ${relationships.length} relationships:`, relationships);
+
+    // Create a map of entity_id -> field_name -> target_id
+    const relationshipMap = new Map<string, Record<string, string>>();
+
+    for (const rel of relationships) {
+      if (!relationshipMap.has(rel.source_entity_id)) {
+        relationshipMap.set(rel.source_entity_id, {});
+      }
+
+      // Extract field_name from properties if available
+      let fieldName: string | undefined;
+      try {
+        const properties = typeof rel.properties === 'string'
+          ? JSON.parse(rel.properties)
+          : rel.properties;
+        fieldName = properties?.field_name;
+      } catch (error) {
+        console.log(`⚠️ [populateRelationshipFields] Failed to parse properties:`, rel.properties);
+        fieldName = undefined;
+      }
+      console.log(`🔍 [populateRelationshipFields] Processing relationship:`, {
+        source_entity_id: rel.source_entity_id,
+        target_entity_id: rel.target_entity_id,
+        relationship_type: rel.relationship_type,
+        properties: rel.properties,
+        extracted_field_name: fieldName
+      });
+
+      if (fieldName) {
+        relationshipMap.get(rel.source_entity_id)![fieldName] = rel.target_entity_id;
+        console.log(`🔗 [populateRelationshipFields] Mapped ${fieldName} = ${rel.target_entity_id} for entity ${rel.source_entity_id}`);
+      } else {
+        console.log(`⚠️ [populateRelationshipFields] No field_name found in properties for relationship ${rel.relationship_type}`);
+      }
+    }
+
+    // Populate relationship fields in records
+    const populatedRecords = records.map(record => {
+      const entityRelationships = relationshipMap.get(record.id);
+      if (entityRelationships) {
+        return { ...record, ...entityRelationships };
+      }
+      return record;
+    });
+
+    console.log(`🔗 [populateRelationshipFields] Populated ${relationships.length} relationship field values for ${records.length} ${entityName} records`);
+
+    return populatedRecords;
+  } catch (error) {
+    console.error(`🔗 [populateRelationshipFields] Failed to populate relationship fields for ${entityName}:`, error);
+    return records; // Return original records on error
+  }
+}
+
 // Helper function to resolve relationship field IDs to display names
 async function resolveRelationships(
   records: any[],
@@ -103,22 +188,38 @@ async function resolveRelationships(
   
   for (const [targetEntityType, { ids: idsToResolve, displayField }] of entityTypeInfo) {
     if (idsToResolve.size === 0) continue;
-    
-    const tableName = `org_${orgId.replace(/-/g, '_')}_${targetEntityType.toLowerCase()}`;
-    
+
     try {
-      // Use the specific display field from relationship configuration
-      const selectColumns = ['id', displayField];
-      
-      const referencedEntities = await kysely
-        .selectFrom(tableName)
-        .select(selectColumns)
-        .where('id', 'in', Array.from(idsToResolve))
-        .execute();
+      let referencedEntities: any[] = [];
+
+      if (targetEntityType === 'User') {
+        // Handle User entities specially - they're system entities, not org-specific
+        referencedEntities = await kysely
+          .selectFrom('organization_members as om')
+          .innerJoin('user as u', 'u.id', 'om.user_id')
+          .select([
+            'u.id',
+            'u.name',
+            'u.email'
+          ])
+          .where('om.organization_id', '=', orgId)
+          .where('u.id', 'in', Array.from(idsToResolve))
+          .execute();
+      } else {
+        // Handle regular entities - org-specific tables
+        const tableName = `org_${orgId.replace(/-/g, '_')}_${targetEntityType.toLowerCase()}`;
+        const selectColumns = ['id', displayField];
+
+        referencedEntities = await kysely
+          .selectFrom(tableName)
+          .select(selectColumns)
+          .where('id', 'in', Array.from(idsToResolve))
+          .execute();
+      }
 
       // Add to lookup map using the configured display field
       for (const entity of referencedEntities) {
-        const displayName = entity[displayField] || entity.id;
+        const displayName = entity[displayField] || entity.name || entity.title || entity.id;
         lookupMap.set(entity.id, displayName);
       }
     } catch (error) {
@@ -135,9 +236,9 @@ async function resolveRelationships(
         const value = record[fieldName];
         
         if (value && typeof value === 'string' && lookupMap.has(value)) {
-          // Replace the ID with resolved name, but keep original ID for reference
-          resolvedRecord[fieldName] = lookupMap.get(value);
-          resolvedRecord[`${fieldName}_id`] = value; // Keep original ID
+          // Keep original UUID in the field for saving, add resolved name to separate field for display
+          resolvedRecord[fieldName] = value; // Keep original UUID
+          resolvedRecord[`${fieldName}_resolved`] = lookupMap.get(value); // Add resolved display name
         }
       }
       
@@ -590,8 +691,11 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName',
     
     console.log(`[Container Permissions] ${archetype} filter: ${result.data?.length || 0} → ${filteredData.length} records accessible`);
     
-    // Resolve relationship fields to show actual entity names instead of IDs
-    const resolvedData = await resolveRelationships(filteredData, orgId, entityName, kysely);
+    // First populate relationship field UUIDs from relationship table
+    const dataWithRelationships = await populateRelationshipFields(filteredData, orgId, entityName, kysely);
+
+    // Then resolve relationship fields to show actual entity names instead of IDs
+    const resolvedData = await resolveRelationships(dataWithRelationships, orgId, entityName, kysely);
     
     return c.json({ 
       success: true, 
@@ -684,12 +788,16 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName/:id',
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
     const result = await entityManager.getRecord(orgId, entityName, id);
-    
+
     if (!result.success) {
       return c.json({ error: result.errors?.[0] || 'Record not found' }, 404);
     }
-    
-    return c.json({ success: true, data: result.data });
+
+    // Populate relationship field UUIDs and resolve display names for single record
+    const dataWithRelationships = await populateRelationshipFields([result.data], orgId, entityName, kysely);
+    const resolvedData = await resolveRelationships(dataWithRelationships, orgId, entityName, kysely);
+
+    return c.json({ success: true, data: resolvedData[0] });
   }
 );
 
@@ -751,14 +859,101 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
     const rulesEngine = new JsonRulesEngine();
     const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
     
-    console.log(`⚡ [DataForge API] Calling EntityManager.updateRecord with:`, {
+    // Get entity schema to identify relationship fields
+    const entityDetails = await entityManager.getEntityDetails(orgId, entityName);
+    if (!entityDetails.success) {
+      return c.json({ error: 'Entity not found', details: entityDetails.errors }, 404);
+    }
+
+    // Identify relationship fields from the entity schema
+    const relationshipFields = new Set<string>();
+    const entity = entityDetails.data;
+
+    if (entity.fields) {
+      for (const [fieldName, fieldDef] of Object.entries(entity.fields)) {
+        const fieldType = typeof fieldDef === 'string' ? fieldDef : (fieldDef as any)?.type;
+        if (fieldType === 'user_reference' || fieldType === 'entity_reference' ||
+            fieldType === 'custom_user_reference' || fieldType === 'custom_entity_reference') {
+          relationshipFields.add(fieldName);
+        }
+      }
+    }
+
+    // Separate regular fields from relationship fields
+    const regularFields: any = {};
+    const relationshipUpdates: any = {};
+
+    for (const [key, value] of Object.entries(updateData)) {
+      if (relationshipFields.has(key)) {
+        relationshipUpdates[key] = value;
+      } else {
+        regularFields[key] = value;
+      }
+    }
+
+    console.log(`⚡ [DataForge API] Separated update data:`, {
       orgId,
       entityName,
       id,
-      updateDataKeys: Object.keys(updateData)
+      regularFieldsKeys: Object.keys(regularFields),
+      relationshipFieldsKeys: Object.keys(relationshipUpdates)
     });
-    
-    const result = await entityManager.updateRecord(orgId, entityName, id, updateData);
+
+    // Update regular fields if any exist
+    let result: any = { success: true, data: {} };
+    if (Object.keys(regularFields).length > 0) {
+      result = await entityManager.updateRecord(orgId, entityName, id, regularFields);
+
+      if (!result.success) {
+        console.log(`❌ [DataForge API] Regular fields update failed:`, result.errors);
+        return c.json({ error: 'Failed to update record', errors: result.errors }, 400);
+      }
+    }
+
+    // Handle relationship field updates if any exist
+    if (Object.keys(relationshipUpdates).length > 0) {
+      console.log(`🔗 [DataForge API] Processing relationship field updates:`, relationshipUpdates);
+
+      try {
+        const relationshipTable = `org_${orgId.replace(/-/g, '_')}_relationships`;
+
+        // Process each relationship field update
+        for (const [fieldName, targetEntityId] of Object.entries(relationshipUpdates)) {
+          if (targetEntityId) {
+            // Get relationship configuration for this field
+            const relationshipConfig = await kysely
+              .selectFrom('dataforge_relationship_fields')
+              .select(['relationship_type', 'target_entity_type'])
+              .where('org_id', '=', orgId)
+              .where('entity_type', '=', entityName)
+              .where('field_name', '=', fieldName)
+              .executeTakeFirst();
+
+            if (relationshipConfig) {
+              // Create new relationship (simplified - no invalidation for now)
+              await kysely
+                .insertInto(relationshipTable)
+                .values({
+                  source_entity_type: entityName,
+                  source_entity_id: id,
+                  target_entity_type: relationshipConfig.target_entity_type,
+                  target_entity_id: String(targetEntityId),
+                  relationship_type: relationshipConfig.relationship_type,
+                  properties: JSON.stringify({ field_name: fieldName }),
+                  created_by: security.userId,
+                  created_at: new Date()
+                })
+                .execute();
+
+              console.log(`🔗 [DataForge API] Created relationship: ${entityName}/${id} -> ${relationshipConfig.target_entity_type}/${targetEntityId} (${fieldName})`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`🔗 [DataForge API] Failed to process relationship updates:`, error);
+        // Don't fail the entire request for relationship errors
+      }
+    }
     
     console.log(`📊 [DataForge API] EntityManager.updateRecord result:`, {
       success: result.success,
@@ -1578,6 +1773,146 @@ dataforgeRouter.get('/orgs/:orgId/members',
       return c.json({
         success: false,
         error: 'Failed to fetch organization members',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// =============================================================================
+// 7. RELATIONSHIP ENDPOINTS - For VibeGrid relationship field data loading
+// =============================================================================
+
+// Get relationship data for users (for user_reference fields)
+dataforgeRouter.get('/orgs/:orgId/relationships/users',
+  requirePermission('entities:read'),
+  async (c) => {
+    const { orgId } = c.req.param();
+    const security = c.get('security');
+    const rowIds = c.req.query('rowIds')?.split(',') || [];
+
+    if (orgId !== security.organizationId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+
+    try {
+      // Create database connection
+      createDatabaseConnection(c.env);
+      const db = getKysely();
+
+      // Get organization members with user data for the specified user IDs
+      let query = db
+        .selectFrom('organization_members as om')
+        .innerJoin('user as u', 'u.id', 'om.user_id')
+        .select([
+          'u.id',
+          'u.name',
+          'u.email',
+          'om.role',
+          'om.created_at',
+          'om.updated_at'
+        ])
+        .where('om.organization_id', '=', orgId);
+
+      // Filter by specific user IDs if provided
+      if (rowIds.length > 0) {
+        query = query.where('u.id', 'in', rowIds);
+      }
+
+      const users = await query
+        .orderBy('u.name', 'asc')
+        .execute();
+
+      // Format for VibeGrid relationship data structure
+      const userData: Record<string, any> = {};
+      users.forEach(user => {
+        userData[user.id] = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        };
+      });
+
+      return c.json({
+        success: true,
+        data: {
+          users: userData
+        }
+      });
+    } catch (error) {
+      console.error('[Relationships] Failed to fetch user relationship data:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to fetch user relationship data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// Get relationship data for entities (for entity_reference fields)
+dataforgeRouter.get('/orgs/:orgId/relationships/:entityType',
+  requirePermission('entities:read'),
+  async (c) => {
+    const { orgId, entityType } = c.req.param();
+    const security = c.get('security');
+    const rowIds = c.req.query('rowIds')?.split(',') || [];
+
+    if (orgId !== security.organizationId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+
+    try {
+      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+      const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
+      const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
+
+      const kysely = createKyselyForPersistentUse();
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+
+      // Query the target entity type data
+      let queryOptions: any = {
+        limit: 1000, // Default limit for relationship data
+        orderBy: 'name'
+      };
+
+      // Filter by specific entity IDs if provided
+      if (rowIds.length > 0) {
+        queryOptions.filters = {
+          id: { in: rowIds }
+        };
+      }
+
+      const result = await entityManager.queryRecords(orgId, entityType, queryOptions);
+
+      if (!result.success) {
+        return c.json({
+          error: `Failed to query ${entityType} relationship data`,
+          details: result.errors
+        }, 500);
+      }
+
+      // Format for VibeGrid relationship data structure
+      const entityData: Record<string, any> = {};
+      const records = result.data || [];
+
+      records.forEach(record => {
+        entityData[record.id] = record;
+      });
+
+      return c.json({
+        success: true,
+        data: {
+          [entityType.toLowerCase()]: entityData
+        }
+      });
+    } catch (error) {
+      console.error(`[Relationships] Failed to fetch ${entityType} relationship data:`, error);
+      return c.json({
+        success: false,
+        error: `Failed to fetch ${entityType} relationship data`,
         details: error instanceof Error ? error.message : 'Unknown error'
       }, 500);
     }

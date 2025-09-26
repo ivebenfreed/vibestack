@@ -87,7 +87,17 @@ export class EntityDataLoader implements AsyncDataLoader {
   }
 
   private getOrgId(): string {
-    return '01920000-1000-7000-8000-000000000001';
+    try {
+      const path = window.location.pathname;
+      const orgMatch = path.match(/\/org\/([^\/]+)/);
+      if (orgMatch) {
+        return orgMatch[1];
+      }
+      return '01920000-1000-7000-8000-000000000001';
+    } catch (error) {
+      console.warn('Failed to get org ID from URL:', error);
+      return '01920000-1000-7000-8000-000000000001';
+    }
   }
 }
 

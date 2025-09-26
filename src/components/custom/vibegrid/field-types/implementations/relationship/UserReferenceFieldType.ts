@@ -20,6 +20,7 @@ import type {
 } from '../../FieldTypeRegistry';
 import type { TableCore$ } from '../../../stores/data-state';
 import { log } from '@/logger';
+import { getEntity$, universeOrgId$ } from '@/legend-state/observables';
 
 const fileLog = log('components/custom/vibegrid/field-types/implementations/relationship/UserReferenceFieldType.ts');
 
@@ -76,14 +77,14 @@ export class UserDataLoader implements AsyncDataLoader {
     const orgId = this.getOrgId();
 
     try {
-      // Load user data from Legend State observables
-      const { getEntity$ } = require('@/legend-state/observables');
+      // Use existing observables to get user data
+      const orgId = universeOrgId$.peek() || window.location.pathname.match(/\/org\/([^\/]+)/)?.[1] || '';
       const userEntityName = `${orgId}_User`;
       const userEntity$ = getEntity$(userEntityName);
-      const userData = userEntity$.peek();
+      const userData = userEntity$?.peek();
 
       if (!userData || typeof userData !== 'object') {
-        fileLog.warn('No user data available for search', { orgId, userEntityName });
+        fileLog.warn('No user data available for search', { orgId });
         return [];
       }
 
@@ -130,9 +131,7 @@ export class UserDataLoader implements AsyncDataLoader {
   }
 
   private getOrgId(): string {
-    // Get from Legend State universe context
-    const { universeOrgId$ } = require('@/legend-state/observables');
-    return universeOrgId$.peek() || '01920000-1000-7000-8000-000000000001';
+    return universeOrgId$.peek() || window.location.pathname.match(/\/org\/([^\/]+)/)?.[1] || '';
   }
 }
 
@@ -154,18 +153,23 @@ export class UserReferenceRenderer implements CellRenderer {
       return container;
     }
 
-    // Check for pre-resolved display value from backend
-    const resolvedValue = rowData[`__resolved_${column.id}`];
+    // Check for resolved display value from backend
+    const resolvedFieldName = `${column.id}_resolved`;
+    const resolvedValue = rowData[resolvedFieldName];
     if (resolvedValue) {
-      container.innerHTML = this.createUserBadge(resolvedValue, value);
+      container.innerHTML = this.createUserBadgeFromName(resolvedValue);
       return container;
     }
 
-    // Show loading state
+    // If value is already a display name (not a UUID), show it as a badge
+    if (typeof value === 'string' && !value.match(/^[0-9a-f-]{36}$/i)) {
+      container.innerHTML = this.createUserBadgeFromName(value);
+      return container;
+    }
+
+    // If it's a UUID, show loading and try to resolve
     container.textContent = 'Loading...';
     container.style.opacity = '0.7';
-
-    // Load data asynchronously
     this.loadAndRenderUser(container, value, column);
 
     return container;
@@ -204,6 +208,15 @@ export class UserReferenceRenderer implements CellRenderer {
     const displayName = userData.name || userData.email || `User ${userId}`;
     const initials = this.getInitials(userData.name || displayName);
 
+    return this.createUserBadgeHTML(displayName, initials);
+  }
+
+  private createUserBadgeFromName(displayName: string): string {
+    const initials = this.getInitials(displayName);
+    return this.createUserBadgeHTML(displayName, initials);
+  }
+
+  private createUserBadgeHTML(displayName: string, initials: string): string {
     return `
       <div class="vibegridx-user-badge" style="
         display: flex;
@@ -252,12 +265,11 @@ export class UserReferenceRenderer implements CellRenderer {
 
   private async loadAndRenderUser(container: HTMLElement, userId: string, column: EnhancedColumn) {
     try {
-      // Load user data from Legend State observables
-      const orgId = this.getOrgId();
-      const { getEntity$ } = require('@/legend-state/observables');
+      // Use existing observables to get user data
+      const orgId = universeOrgId$.peek() || window.location.pathname.match(/\/org\/([^\/]+)/)?.[1] || '';
       const userEntityName = `${orgId}_User`;
       const userEntity$ = getEntity$(userEntityName);
-      const userData = userEntity$.peek();
+      const userData = userEntity$?.peek();
 
       if (userData && typeof userData === 'object' && userData[userId]) {
         const user = userData[userId];
@@ -308,37 +320,37 @@ export class UserReferenceEditor implements CellEditor {
     onSave: (value: any) => void
   ) {
     try {
-      const userOptions = await this.dataLoader.getSearchSuggestions('', column, 100);
+      // Create simple input editor without React dependencies
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Search users...';
+      input.value = value || '';
+      input.style.cssText = 'width:100%;height:100%;border:none;outline:none;padding:0 8px;';
 
-      // Create enhanced column with user options
-      const enhancedColumn = {
-        ...column,
-        options: userOptions,
-        enumOptions: userOptions
-      };
+      input.addEventListener('blur', () => onSave(input.value || null));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onSave(input.value || null);
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          input.blur();
+        }
+      });
 
-      // Create the ComboboxEditor as a React component
-      const React = require('react');
-      const ReactDOM = require('react-dom/client');
-      const { ComboboxEditor } = require('../../overlays/editors/ComboboxEditor');
-
-      const editorProps = {
-        cell: { id: 'temp-cell' },
-        column: enhancedColumn,
-        initialValue: value,
-        onCommit: onSave,
-        onCancel: () => {},
-        placeholder: "Select user...",
-        searchPlaceholder: "Search users..."
-      };
-
-      const root = ReactDOM.createRoot(container);
-      root.render(React.createElement(ComboboxEditor, editorProps));
+      container.appendChild(input);
+      setTimeout(() => input.focus(), 0);
 
     } catch (error) {
       console.error('Failed to create user reference editor', error);
       // Fallback to simple input
-      container.innerHTML = `<input type="text" value="${value || ''}" placeholder="Search users..." style="width:100%;height:100%;border:none;outline:none;padding:0 8px;" />`;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = value || '';
+      input.placeholder = 'Search users...';
+      input.style.cssText = 'width:100%;height:100%;border:none;outline:none;padding:0 8px;';
+      container.appendChild(input);
     }
   }
 
