@@ -1,0 +1,71 @@
+/* VibeGantt - Using Tailwind classes for proper theme integration */
+
+/* Only position-specific styles that can't be done with Tailwind */
+.vibegantt-task-bar {
+  position: absolute;
+  height: 24px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.vibegantt-dependencies {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vibegantt-dependency-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.vibegantt-dependency-line {
+  stroke-width: 2;
+  fill: none;
+  cursor: pointer;
+  pointer-events: visibleStroke;
+  transition: stroke 0.2s ease;
+}
+
+.vibegantt-grid-line {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+}
+
+.vibegantt-row-line {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1px;
+}
+
+.vibegantt-task-bar-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  pointer-events: none;
+}
+
+.vibegantt-spinner {
+  animation: vibegantt-spin 1s linear infinite;
+}
+
+@keyframes vibegantt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

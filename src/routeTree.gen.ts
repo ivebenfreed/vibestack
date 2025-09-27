@@ -50,6 +50,8 @@ import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_a
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
+import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_authenticated/debug/vibegantt-test'
+import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugSystemOptionsRouteImport } from './routes/_authenticated/debug/system-options'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugLocalStorageSyncRouteImport } from './routes/_authenticated/debug/local-storage-sync'
@@ -295,6 +297,18 @@ const AuthenticatedDebugVibegridLegendStateRoute =
     path: '/vibegrid-legend-state',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugVibeganttTestRoute =
+  AuthenticatedDebugVibeganttTestRouteImport.update({
+    id: '/vibegantt-test',
+    path: '/vibegantt-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugVibeganttRoute =
+  AuthenticatedDebugVibeganttRouteImport.update({
+    id: '/vibegantt',
+    path: '/vibegantt',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugSystemOptionsRoute =
   AuthenticatedDebugSystemOptionsRouteImport.update({
     id: '/system-options',
@@ -368,6 +382,8 @@ export interface FileRoutesByFullPath {
   '/debug/local-storage-sync': typeof AuthenticatedDebugLocalStorageSyncRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
+  '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -416,6 +432,8 @@ export interface FileRoutesByTo {
   '/debug/local-storage-sync': typeof AuthenticatedDebugLocalStorageSyncRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
+  '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -468,6 +486,8 @@ export interface FileRoutesById {
   '/_authenticated/debug/local-storage-sync': typeof AuthenticatedDebugLocalStorageSyncRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/system-options': typeof AuthenticatedDebugSystemOptionsRoute
+  '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
+  '/_authenticated/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -520,6 +540,8 @@ export interface FileRouteTypes {
     | '/debug/local-storage-sync'
     | '/debug/state-machine-test'
     | '/debug/system-options'
+    | '/debug/vibegantt'
+    | '/debug/vibegantt-test'
     | '/debug/vibegrid-legend-state'
     | '/projects/$projectId'
     | '/settings/account'
@@ -568,6 +590,8 @@ export interface FileRouteTypes {
     | '/debug/local-storage-sync'
     | '/debug/state-machine-test'
     | '/debug/system-options'
+    | '/debug/vibegantt'
+    | '/debug/vibegantt-test'
     | '/debug/vibegrid-legend-state'
     | '/projects/$projectId'
     | '/settings/account'
@@ -619,6 +643,8 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/local-storage-sync'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/system-options'
+    | '/_authenticated/debug/vibegantt'
+    | '/_authenticated/debug/vibegantt-test'
     | '/_authenticated/debug/vibegrid-legend-state'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
@@ -955,6 +981,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugVibegridLegendStateRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/vibegantt-test': {
+      id: '/_authenticated/debug/vibegantt-test'
+      path: '/vibegantt-test'
+      fullPath: '/debug/vibegantt-test'
+      preLoaderRoute: typeof AuthenticatedDebugVibeganttTestRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/vibegantt': {
+      id: '/_authenticated/debug/vibegantt'
+      path: '/vibegantt'
+      fullPath: '/debug/vibegantt'
+      preLoaderRoute: typeof AuthenticatedDebugVibeganttRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/system-options': {
       id: '/_authenticated/debug/system-options'
       path: '/system-options'
@@ -1019,6 +1059,8 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugLocalStorageSyncRoute: typeof AuthenticatedDebugLocalStorageSyncRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugSystemOptionsRoute: typeof AuthenticatedDebugSystemOptionsRoute
+  AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
+  AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
   AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
   AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -1034,6 +1076,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugSystemOptionsRoute: AuthenticatedDebugSystemOptionsRoute,
+    AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
+    AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
     AuthenticatedDebugVibegridLegendStateRoute:
       AuthenticatedDebugVibegridLegendStateRoute,
     AuthenticatedDebugEntityOperationsLazyRoute:
