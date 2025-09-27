@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { getAuth } from '../lib/auth.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requireUser, requireUserAndOrg } from '../middleware/auth.js';
 import type { Env } from '../types/env.js';
 import { apiLogger } from '../middleware/logger.js';
 
@@ -375,6 +376,244 @@ app.put('/:id', requireUserAndOrg(), zValidator('json', updateOrganizationSchema
       error: 'Failed to update organization',
       details: error instanceof Error ? error.message : 'Unknown error',
       code: 'UPDATE_FAILED',
+      requestId
+    }, 500);
+  }
+});
+
+/**
+ * GET ORGANIZATION INVITATIONS
+ * GET /organizations/:id/invitations
+ */
+app.get('/:id/invitations', requireUserAndOrg(), async (c) => {
+  const requestId = c.get('requestId');
+  const userContext = c.get('userContext');
+  const orgContext = c.get('orgContext')!;
+
+  try {
+    const organizationId = c.req.param('id');
+
+    // Verify the requested organization matches the context
+    if (organizationId !== orgContext.organizationId) {
+      return c.json({
+        success: false,
+        error: 'Organization ID mismatch',
+        code: 'INVALID_ORG_ID',
+        requestId
+      }, 400);
+    }
+
+    // Check admin/owner access
+    if (!['admin', 'owner'].includes(orgContext.userOrgRole)) {
+      return c.json({
+        success: false,
+        error: 'Administrative access required',
+        code: 'INSUFFICIENT_PERMISSIONS',
+        requestId
+      }, 403);
+    }
+
+    apiLogger.info('Fetching organization invitations', {
+      organizationId,
+      userId: userContext.userId,
+      requestId
+    }, MODULE_NAME);
+
+    // Use the OrganizationInvitationService to list invitations
+    const { OrganizationInvitationService } = await import('../services/organization/OrganizationInvitationService.js');
+    const invitationService = new OrganizationInvitationService(c.env.DB, c.env);
+
+    const result = await invitationService.listInvitations({
+      organization_id: organizationId,
+      status: 'pending' // Only show pending invitations
+    });
+
+    if (!result.success) {
+      return c.json({
+        success: false,
+        error: result.error || 'Failed to fetch invitations',
+        code: 'FETCH_FAILED',
+        requestId
+      }, 400);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        invitations: result.data
+      },
+      requestId
+    });
+
+  } catch (error) {
+    apiLogger.error('Error fetching invitations', {
+      error: error instanceof Error ? error.message : String(error),
+      organizationId: c.req.param('id'),
+      requestId
+    }, MODULE_NAME);
+
+    return c.json({
+      success: false,
+      error: 'Failed to fetch invitations',
+      code: 'FETCH_FAILED',
+      requestId
+    }, 500);
+  }
+});
+
+/**
+ * RESEND INVITATION
+ * POST /organizations/:id/invitations/:invitationId/resend
+ */
+app.post('/:id/invitations/:invitationId/resend', requireUserAndOrg(), async (c) => {
+  const requestId = c.get('requestId');
+  const userContext = c.get('userContext');
+  const orgContext = c.get('orgContext')!;
+
+  try {
+    const organizationId = c.req.param('id');
+    const invitationId = c.req.param('invitationId');
+
+    // Verify the requested organization matches the context
+    if (organizationId !== orgContext.organizationId) {
+      return c.json({
+        success: false,
+        error: 'Organization ID mismatch',
+        code: 'INVALID_ORG_ID',
+        requestId
+      }, 400);
+    }
+
+    // Check admin/owner access
+    if (!['admin', 'owner'].includes(orgContext.userOrgRole)) {
+      return c.json({
+        success: false,
+        error: 'Administrative access required',
+        code: 'INSUFFICIENT_PERMISSIONS',
+        requestId
+      }, 403);
+    }
+
+    apiLogger.info('Resending invitation', {
+      organizationId,
+      invitationId,
+      userId: userContext.userId,
+      requestId
+    }, MODULE_NAME);
+
+    // Use the OrganizationInvitationService to resend invitation
+    const { OrganizationInvitationService } = await import('../services/organization/OrganizationInvitationService.js');
+    const invitationService = new OrganizationInvitationService(c.env.DB, c.env);
+
+    const result = await invitationService.resendInvitation(invitationId, userContext.userId);
+
+    if (!result.success) {
+      return c.json({
+        success: false,
+        error: result.error || 'Failed to resend invitation',
+        code: 'RESEND_FAILED',
+        requestId
+      }, 400);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        invitation: result.data
+      },
+      requestId
+    });
+
+  } catch (error) {
+    apiLogger.error('Error resending invitation', {
+      error: error instanceof Error ? error.message : String(error),
+      organizationId: c.req.param('id'),
+      invitationId: c.req.param('invitationId'),
+      requestId
+    }, MODULE_NAME);
+
+    return c.json({
+      success: false,
+      error: 'Failed to resend invitation',
+      code: 'RESEND_FAILED',
+      requestId
+    }, 500);
+  }
+});
+
+/**
+ * CANCEL INVITATION
+ * DELETE /organizations/:id/invitations/:invitationId
+ */
+app.delete('/:id/invitations/:invitationId', requireUserAndOrg(), async (c) => {
+  const requestId = c.get('requestId');
+  const userContext = c.get('userContext');
+  const orgContext = c.get('orgContext')!;
+
+  try {
+    const organizationId = c.req.param('id');
+    const invitationId = c.req.param('invitationId');
+
+    // Verify the requested organization matches the context
+    if (organizationId !== orgContext.organizationId) {
+      return c.json({
+        success: false,
+        error: 'Organization ID mismatch',
+        code: 'INVALID_ORG_ID',
+        requestId
+      }, 400);
+    }
+
+    // Check admin/owner access
+    if (!['admin', 'owner'].includes(orgContext.userOrgRole)) {
+      return c.json({
+        success: false,
+        error: 'Administrative access required',
+        code: 'INSUFFICIENT_PERMISSIONS',
+        requestId
+      }, 403);
+    }
+
+    apiLogger.info('Cancelling invitation', {
+      organizationId,
+      invitationId,
+      userId: userContext.userId,
+      requestId
+    }, MODULE_NAME);
+
+    // Use the OrganizationInvitationService to cancel invitation
+    const { OrganizationInvitationService } = await import('../services/organization/OrganizationInvitationService.js');
+    const invitationService = new OrganizationInvitationService(c.env.DB, c.env);
+
+    const result = await invitationService.cancelInvitation(invitationId, userContext.userId);
+
+    if (!result.success) {
+      return c.json({
+        success: false,
+        error: result.error || 'Failed to cancel invitation',
+        code: 'CANCEL_FAILED',
+        requestId
+      }, 400);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Invitation cancelled successfully',
+      requestId
+    });
+
+  } catch (error) {
+    apiLogger.error('Error cancelling invitation', {
+      error: error instanceof Error ? error.message : String(error),
+      organizationId: c.req.param('id'),
+      invitationId: c.req.param('invitationId'),
+      requestId
+    }, MODULE_NAME);
+
+    return c.json({
+      success: false,
+      error: 'Failed to cancel invitation',
+      code: 'CANCEL_FAILED',
       requestId
     }, 500);
   }

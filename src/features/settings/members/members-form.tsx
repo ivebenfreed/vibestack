@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-compatibility'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -31,7 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Users, UserPlus, Mail, MoreHorizontal, UserX, Crown, Shield, User, Eye } from 'lucide-react'
+import { Users, UserPlus, Mail, MoreHorizontal, UserX, Crown, Shield, User, Eye, Clock, RefreshCw, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,21 @@ interface OrganizationMember {
   role: 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
   status: 'active' | 'pending' | 'suspended'
   joinedAt: string
+}
+
+interface OrganizationInvitation {
+  id: string
+  email: string
+  role: 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
+  status: 'pending' | 'accepted' | 'cancelled' | 'expired'
+  created_at: string
+  expires_at: string
+  personal_message?: string
+  inviter?: {
+    id: string
+    name: string
+    email: string
+  }
 }
 
 const roleIcons = {
@@ -67,9 +83,12 @@ const roleLabels = {
 export function MembersForm() {
   const { currentOrganization, effectiveUserRole, user } = useAuth()
   const [members, setMembers] = useState<OrganizationMember[]>([])
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<string>('member')
+  const [inviteMessage, setInviteMessage] = useState('')
   const [isInviting, setIsInviting] = useState(false)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -80,6 +99,7 @@ export function MembersForm() {
   useEffect(() => {
     if (currentOrganization?.id) {
       fetchMembers()
+      fetchInvitations()
     }
   }, [currentOrganization?.id])
 
@@ -99,6 +119,22 @@ export function MembersForm() {
     }
   }
 
+  const fetchInvitations = async () => {
+    try {
+      const response = await fetch(`/api/organizations/${currentOrganization?.id}/invitations`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch invitations')
+      }
+      const data = await response.json()
+      setInvitations(data.invitations || [])
+    } catch (error) {
+      console.error('Failed to fetch invitations:', error)
+      // Don't set general error for invitations - this is optional functionality
+    } finally {
+      setIsLoadingInvitations(false)
+    }
+  }
+
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!inviteEmail.trim() || !currentOrganization?.id) return
@@ -115,6 +151,7 @@ export function MembersForm() {
         body: JSON.stringify({
           email: inviteEmail.trim(),
           role: inviteRole,
+          message: inviteMessage.trim() || undefined,
         }),
       })
 
@@ -125,10 +162,12 @@ export function MembersForm() {
 
       setInviteSuccess(`Invitation sent to ${inviteEmail}`)
       setInviteEmail('')
+      setInviteMessage('')
       setTimeout(() => setInviteSuccess(null), 5000)
-      
-      // Refresh the members list
+
+      // Refresh both members and invitations
       fetchMembers()
+      fetchInvitations()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to send invitation')
     } finally {
@@ -169,6 +208,42 @@ export function MembersForm() {
       fetchMembers()
     } catch (error) {
       setError('Failed to remove member')
+    }
+  }
+
+  const handleResendInvitation = async (invitationId: string) => {
+    try {
+      const response = await fetch(`/api/organizations/${currentOrganization?.id}/invitations/${invitationId}/resend`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to resend invitation')
+      }
+
+      setInviteSuccess('Invitation resent successfully')
+      setTimeout(() => setInviteSuccess(null), 5000)
+      fetchInvitations()
+    } catch (error) {
+      setError('Failed to resend invitation')
+    }
+  }
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    try {
+      const response = await fetch(`/api/organizations/${currentOrganization?.id}/invitations/${invitationId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel invitation')
+      }
+
+      setInviteSuccess('Invitation cancelled successfully')
+      setTimeout(() => setInviteSuccess(null), 5000)
+      fetchInvitations()
+    } catch (error) {
+      setError('Failed to cancel invitation')
     }
   }
 
@@ -221,29 +296,38 @@ export function MembersForm() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleInviteMember} className="flex gap-4">
-              <Input
-                type="email"
-                placeholder="member@example.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="flex-1"
-                required
+            <form onSubmit={handleInviteMember} className="space-y-4">
+              <div className="flex gap-4">
+                <Input
+                  type="email"
+                  placeholder="member@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="flex-1"
+                  required
+                />
+                <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isOwner && <SelectItem value="admin">Admin</SelectItem>}
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button type="submit" disabled={isInviting}>
+                  {isInviting ? 'Inviting...' : 'Invite'}
+                </Button>
+              </div>
+              <Textarea
+                placeholder="Optional personal message to include with the invitation..."
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+                className="resize-none"
+                rows={2}
               />
-              <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {isOwner && <SelectItem value="admin">Admin</SelectItem>}
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button type="submit" disabled={isInviting}>
-                {isInviting ? 'Inviting...' : 'Invite'}
-              </Button>
             </form>
           </CardContent>
         </Card>
@@ -436,6 +520,104 @@ export function MembersForm() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pending Invitations Section */}
+      {isOwnerOrAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Pending Invitations ({invitations.length})
+            </CardTitle>
+            <CardDescription>
+              Manage pending invitations to your world.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingInvitations ? (
+              <div className="text-center py-4">Loading invitations...</div>
+            ) : invitations.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No pending invitations.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Sent</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead className="w-16"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invitations.map((invitation) => {
+                    const isExpired = new Date(invitation.expires_at) < new Date()
+                    const timeLeft = new Date(invitation.expires_at).getTime() - new Date().getTime()
+                    const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60))
+
+                    return (
+                      <TableRow key={invitation.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{invitation.email}</div>
+                            {invitation.personal_message && (
+                              <div className="text-xs text-muted-foreground mt-1 italic">
+                                "{invitation.personal_message}"
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {roleIcons[invitation.role]}
+                            <span>{roleLabels[invitation.role]}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(invitation.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {isExpired ? (
+                            <Badge variant="destructive">Expired</Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {hoursLeft > 24 ? `${Math.floor(hoursLeft / 24)}d left` : `${hoursLeft}h left`}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleResendInvitation(invitation.id)}>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Resend
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleCancelInvitation(invitation.id)}
+                                className="text-destructive"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Cancel
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
