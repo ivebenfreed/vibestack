@@ -14,6 +14,7 @@ export type AppBindings = {
   Variables: AuthType['Variables'] & {
     requestCache?: RequestCache;
     security?: HybridSecurityContext | SimpleSecurityContext;
+    authInstance?: any; // Better Auth instance cached per request
   };
 };
 

@@ -22,10 +22,9 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
         sessionToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : 'no-token';
       }
       
-      const sessionData = await EnhancedSessionCache.getCachedSessionPersistent(
-        sessionToken,
-        () => auth.api.getSession({ headers: c.req.raw.headers })
-      );
+      // Disable cross-request session cache to avoid Workers I/O context violations
+      // Use fresh session lookup for each request instead of sharing cached auth data
+      const sessionData = await auth.api.getSession({ headers: c.req.raw.headers });
       
       if (sessionData && sessionData.user) {
         // Session found, set user and session in context

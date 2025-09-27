@@ -231,18 +231,16 @@ export const auth = (() => {
 
 // --- Runtime initialization for Hono ---
 
-// HTTP isolate auth cache - persists across requests within same isolate
-let httpAuthInstance: any = null;
-let httpAuthTimestamp = 0;
-const AUTH_CACHE_TTL = 300000; // 5 minutes in milliseconds
+// REMOVED: HTTP isolate auth cache - this was causing I/O context violations
+// by sharing database connections across different request contexts in Cloudflare Workers
 
-// WebSocket isolate auth cache - separate from HTTP isolate
-let wsAuthInstance: any = null;
-let wsAuthTimestamp = 0;
+// REMOVED: WebSocket isolate auth cache - same issue as HTTP cache
 
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
+  // Create a fresh Kysely instance for each auth initialization to avoid
+  // Cloudflare Workers I/O context violations from sharing connections across requests
   const kyselyInstance = createKyselyForPersistentUse();
   
   // Database connection is already established by middleware
@@ -606,8 +604,14 @@ export function initializeAuth(env: Env, request?: Request) {
         }
 
         try {
-          // Get Kysely instance from the auth instance
-          const db = ctx.context.env?.database?.db || kyselyInstance;
+          // Use the database instance from Better Auth context, avoiding shared connections
+          const db = ctx.context.env?.database?.db;
+
+          if (!db) {
+            // No database available in context - skip org enrichment to avoid connection sharing
+            console.warn('[Custom Session] No database available in context, skipping organization data');
+            return { user, session };
+          }
           
           // Get user's organization context, prioritizing last_used over default
           const userContext = await db
@@ -826,35 +830,24 @@ export function initializeAuth(env: Env, request?: Request) {
 }
 
 // Export a function that initializes auth based on Hono context for runtime use
+// Use request-scoped cache to avoid creating multiple instances within the same request
 export const getAuth = (c: HonoAuthContext) => {
-    const now = Date.now();
-
-    // Check if we have a valid cached auth instance for this HTTP isolate
-    if (httpAuthInstance && (now - httpAuthTimestamp) < AUTH_CACHE_TTL) {
-        return httpAuthInstance;
+    // Check if auth instance already exists in this request context
+    const existingAuth = c.get('authInstance');
+    if (existingAuth) {
+        return existingAuth;
     }
 
-    // Create new auth instance and cache it at isolate level
-    console.log('[HTTP Auth] Creating new auth instance for isolate');
-    httpAuthInstance = initializeAuth(c.env);
-    httpAuthTimestamp = now;
+    console.log('[HTTP Auth] Creating fresh auth instance for request to avoid Workers I/O context violations');
+    const authInstance = initializeAuth(c.env);
 
-    return httpAuthInstance;
+    // Store in request context to avoid recreating within the same request
+    c.set('authInstance', authInstance);
+    return authInstance;
 }
 
-// WebSocket isolate auth cache function - separate from HTTP to avoid cross-isolate issues
+// WebSocket auth function - create fresh instances to avoid I/O context violations
 export function getWebSocketAuth(env: Env): any {
-    const now = Date.now();
-
-    // Check if we have a valid cached auth instance for this WebSocket isolate
-    if (wsAuthInstance && (now - wsAuthTimestamp) < AUTH_CACHE_TTL) {
-        return wsAuthInstance;
-    }
-
-    // Create new auth instance and cache it at WebSocket isolate level
-    console.log('[WebSocket Auth] Creating new auth instance for isolate');
-    wsAuthInstance = initializeAuth(env);
-    wsAuthTimestamp = now;
-
-    return wsAuthInstance;
+    console.log('[WebSocket Auth] Creating fresh auth instance for WebSocket connection to avoid Workers I/O context violations');
+    return initializeAuth(env);
 } 
