@@ -254,9 +254,10 @@ export function createVisualState$(visualInputs$: any) {
     const rowCount = visualInputs$.rowCount.get();
     const rowHeight = visualInputs$.rowHeight.get();
 
-    // ✅ TRACKING ACCESS: Track scroll properties for virtual scrolling
-    const scrollLeft = visualInputs$.scrollLeft.get();
-    const scrollTop = visualInputs$.scrollTop.get();
+    // ✅ NON-TRACKING ACCESS: Don't track scroll properties in layout computation
+    // Layout computation should only react to layout changes, not scroll changes
+    const scrollLeft = visualInputs$.scrollLeft.peek();
+    const scrollTop = visualInputs$.scrollTop.peek();
     const viewportWidth = visualInputs$.viewportWidth.peek();
     const viewportHeight = visualInputs$.viewportHeight.peek();
 

@@ -765,28 +765,34 @@ export class SimplePassiveRenderer {
       }
     });
 
-    // VIRTUAL SCROLL OBSERVER: Watch for visible row range changes due to scrolling
-    this.virtualScrollObserverDisposer = this.visualState.visualState$.geometry.visibleRowRange.onChange((newRange, prevRange) => {
+    // VIRTUAL SCROLL OBSERVER: Watch ONLY scroll inputs to avoid layout observer cascade
+    this.virtualScrollObserverDisposer = this.visualState.visualInputs$.scrollTop.onChange(() => {
       if (!this.observersEnabled) return;
-      fileLog.info('🚀 VIRTUAL SCROLL: visibleRowRange changed reactively', {
-        newRange,
-        prevRange,
-        timestamp: Date.now()
-      });
 
-      // Call with proper context - get current ranges manually
-      const visualState = this.visualState.visualState$.get(true);
-      const currentColumnRange = {
-        start: 0,
-        end: visualState.visibleColumns?.length - 1 || 0
-      };
-      const currentRowRange = visualState.geometry.visibleRowRange;
+
+      // Get current scroll position directly (avoid parameter issues)
+      const newScrollTop = this.visualState.visualInputs$.scrollTop.peek();
+      const rowHeight = this.visualState.visualInputs$.rowHeight.peek();
+      const viewportHeight = this.visualState.visualInputs$.viewportHeight.peek();
+      const rowCount = this.visualState.visualInputs$.rowCount.peek();
+
+      const startRowIndex = Math.floor(newScrollTop / rowHeight);
+      const endRowIndex = Math.min(rowCount, Math.ceil((newScrollTop + Math.max(viewportHeight, 400)) / rowHeight) + 1);
+
+      const currentRowRange = { start: startRowIndex, end: endRowIndex };
       const previousRowRange = this.lastVisibleRows || { start: -1, end: -1 };
 
       // Only proceed if row range actually changed
       const rowRangeChanged = currentRowRange.start !== previousRowRange.start || currentRowRange.end !== previousRowRange.end;
 
       if (rowRangeChanged) {
+        fileLog.info('🚀 VIRTUAL SCROLL: Direct scroll-based update', {
+          newScrollTop,
+          currentRange: `${currentRowRange.start}-${currentRowRange.end}`,
+          previousRange: `${previousRowRange.start}-${previousRowRange.end}`,
+          timestamp: Date.now()
+        });
+
         this.updateVirtualRows(previousRowRange, currentRowRange);
         this.lastVisibleRows = currentRowRange;
       }
@@ -1089,28 +1095,19 @@ export class SimplePassiveRenderer {
       currentRowRange.start !== previousRowRange.start ||
       currentRowRange.end !== previousRowRange.end;
 
-    // Re-render body if virtual ranges changed (heavy operation)
-    if (columnRangeChanged || rowRangeChanged) {
-      fileLog.info('🔄 Virtual range changed - triggering body re-render', {
+    // Only handle column range changes (row changes handled by direct scroll observer)
+    if (columnRangeChanged) {
+      fileLog.info('🔄 Column range changed - triggering body re-render', {
         columnRangeChanged,
-        rowRangeChanged,
         oldColumnRange: `${previousColumnRange.start}-${previousColumnRange.end}`,
-        newColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`,
-        oldRowRange: `${previousRowRange.start}-${previousRowRange.end}`,
-        newRowRange: `${currentRowRange.start}-${currentRowRange.end}`
+        newColumnRange: `${currentColumnRange.start}-${currentColumnRange.end}`
       });
 
       // Update tracking
       this.lastVisibleColumns = currentColumnRange;
-      this.lastVisibleRows = currentRowRange;
 
-      // Use incremental updates instead of full re-render
-      if (rowRangeChanged) {
-        this.updateVirtualRows(previousRowRange, currentRowRange);
-      } else {
-        // For column changes, still need full re-render for now
-        this.renderBody();
-      }
+      // For column changes, need full re-render
+      this.renderBody();
     }
   }
 
