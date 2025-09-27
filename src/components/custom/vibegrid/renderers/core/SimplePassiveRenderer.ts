@@ -1171,19 +1171,26 @@ export class SimplePassiveRenderer {
 
     // Add new rows that became visible
     if (currentRange.start < previousRange.start) {
+      // Insert new rows at the top in correct order
+      const fragment = document.createDocumentFragment();
       for (let i = currentRange.start; i < previousRange.start && i < rows.length; i++) {
         const rowElement = this.bodyRenderer.createRowElement(rows[i], i, columns, columnVisibility, baseOffset);
-        this.bodyContainer.appendChild(rowElement);
+        fragment.appendChild(rowElement);
         fileLog.debug('➕ ADDED row (top)', { rowIndex: i, rowId: rows[i]?.id });
       }
+      // Insert at the beginning of the container
+      this.bodyContainer.insertBefore(fragment, this.bodyContainer.firstChild);
     }
 
     if (currentRange.end > previousRange.end) {
+      const fragment = document.createDocumentFragment();
       for (let i = previousRange.end + 1; i <= currentRange.end && i < rows.length; i++) {
         const rowElement = this.bodyRenderer.createRowElement(rows[i], i, columns, columnVisibility, baseOffset);
-        this.bodyContainer.appendChild(rowElement);
+        fragment.appendChild(rowElement);
         fileLog.debug('➕ ADDED row (bottom)', { rowIndex: i, rowId: rows[i]?.id });
       }
+      // Append to the end of the container
+      this.bodyContainer.appendChild(fragment);
     }
 
     fileLog.info('✅ INCREMENTAL UPDATE: Complete', {
@@ -1405,7 +1412,7 @@ export class SimplePassiveRenderer {
     }
     
     // Update content dimensions in visual state
-    const totalHeight = rows.length * 40; // ROW_HEIGHT
+    const totalHeight = rows.length * ROW_HEIGHT;
     this.visualState.visualOperations.setRowCount(rows.length);
 
     // Update row coordinate mapping
@@ -1419,6 +1426,8 @@ export class SimplePassiveRenderer {
     if (this.bodyContainer) {
       this.bodyContainer.style.width = `${visualState.geometry.totalWidth}px`;
       this.bodyContainer.style.minWidth = `${visualState.geometry.totalWidth}px`;
+      // CRITICAL FIX: Set correct height to maintain scroll position during virtual scrolling
+      this.bodyContainer.style.height = `${totalHeight}px`;
     }
     const visibleRange = visualState.geometry.visibleRowRange;
     const startIndex = Math.max(0, visibleRange.start);
