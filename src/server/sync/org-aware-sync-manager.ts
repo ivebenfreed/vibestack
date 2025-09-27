@@ -11,6 +11,9 @@ import type { MinimalContext } from '../types/hono';
 import { initializeAuth } from '../lib/auth';
 import { OrgAccessService } from '../services/org-access-service';
 import { createKyselyForPersistentUse, withKysely } from '../lib/database-manager';
+
+// Cache auth instance per DO instance (correct pattern for Durable Objects)
+let cachedAuthInstance: any = null;
 import type { TableChange } from '@/types/sync';
 import { syncLogger } from '../middleware/logger';
 
@@ -500,8 +503,11 @@ export class OrgAwareSyncManager {
    */
   private async extractSession(request: Request): Promise<any> {
     try {
-      // Initialize Better Auth for session validation
-      const auth = initializeAuth(this.env);
+      // Initialize Better Auth for session validation (cache within DO instance)
+      if (!cachedAuthInstance) {
+        cachedAuthInstance = initializeAuth(this.env);
+      }
+      const auth = cachedAuthInstance;
 
       // Get session from request (handles both cookie and Authorization header)
       const session = await auth.api.getSession({

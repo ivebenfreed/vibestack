@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { dbLogger } from './logger';
-import { getKysely } from '../lib/database-manager';
+import { withKysely } from '../lib/database-manager';
 
 /**
  * Middleware to enforce trial expiration and subscription access
@@ -132,63 +132,63 @@ async function checkTrialStatus(c: Context, organizationId: string): Promise<{
   daysExpired?: number;
   daysRemaining?: number;
 }> {
-  const db = getKysely();
+  return await withKysely(async (db) => {
+    // Get organization's trial status
+    const organization = await db
+      .selectFrom('organizations')
+      .select(['subscription_tier', 'subscription_status', 'trial_ends_at'])
+      .where('id', '=', organizationId)
+      .executeTakeFirst();
 
-  // Get organization's trial status
-  const organization = await db
-    .selectFrom('organizations')
-    .select(['subscription_tier', 'subscription_status', 'trial_ends_at'])
-    .where('id', '=', organizationId)
-    .executeTakeFirst();
+    if (!organization) {
+      throw new Error('Organization not found');
+    }
 
-  if (!organization) {
-    throw new Error('Organization not found');
-  }
+    const tier = organization.subscription_tier || 'trial';
+    const now = new Date();
 
-  const tier = organization.subscription_tier || 'trial';
-  const now = new Date();
-  
-  // If not on trial, always allow access
-  if (tier !== 'trial') {
-    return {
-      expired: false,
-      needsUpgrade: false,
-      tier
-    };
-  }
+    // If not on trial, always allow access
+    if (tier !== 'trial') {
+      return {
+        expired: false,
+        needsUpgrade: false,
+        tier
+      };
+    }
 
-  // Check if trial has expired
-  const trialEndsAt = organization.trial_ends_at;
-  if (!trialEndsAt) {
-    // No trial end date set, assume active trial
-    return {
-      expired: false,
-      needsUpgrade: false,
-      tier,
-      daysRemaining: 14
-    };
-  }
+    // Check if trial has expired
+    const trialEndsAt = organization.trial_ends_at;
+    if (!trialEndsAt) {
+      // No trial end date set, assume active trial
+      return {
+        expired: false,
+        needsUpgrade: false,
+        tier,
+        daysRemaining: 14
+      };
+    }
 
-  const trialExpired = now > trialEndsAt;
-  const timeDiff = Math.abs(now.getTime() - trialEndsAt.getTime());
-  const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    const trialExpired = now > trialEndsAt;
+    const timeDiff = Math.abs(now.getTime() - trialEndsAt.getTime());
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
-  if (trialExpired) {
-    return {
-      expired: true,
-      needsUpgrade: true,
-      tier,
-      trialEndedAt: trialEndsAt,
-      daysExpired: daysDiff
-    };
-  } else {
-    return {
-      expired: false,
-      needsUpgrade: false,
-      tier,
-      daysRemaining: daysDiff
-    };
-  }
+    if (trialExpired) {
+      return {
+        expired: true,
+        needsUpgrade: true,
+        tier,
+        trialEndedAt: trialEndsAt,
+        daysExpired: daysDiff
+      };
+    } else {
+      return {
+        expired: false,
+        needsUpgrade: false,
+        tier,
+        daysRemaining: daysDiff
+      };
+    }
+  });
 }
 
 /**

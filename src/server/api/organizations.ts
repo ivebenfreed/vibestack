@@ -11,7 +11,7 @@ import {
   requireAdmin,
   requireOwner
 } from '../middleware/hybrid-rls-org-actor';
-import { withKysely, createKyselyForPersistentUse } from '../lib/database-manager';
+import { withKysely } from '../lib/database-manager';
 import type { 
   CreateOrganizationInput, 
   UpdateOrganizationInput,
@@ -39,53 +39,51 @@ organizationsRouter.post('/switch', async (c) => {
       return c.json({ error: 'Organization ID is required.' }, 400);
     }
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
+    return await withKysely(async (db) => {
+      // Verify user is a member of the organization
+      const membership = await db
+        .selectFrom('organization_members')
+        .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
+        .select([
+          'organization_members.role',
+          'organizations.id',
+          'organizations.name',
+          'organizations.slug'
+        ])
+        .where('organization_members.user_id', '=', user.id)
+        .where('organization_members.organization_id', '=', organizationId)
+        .executeTakeFirst();
 
-    // Verify user is a member of the organization
-    const membership = await db
-      .selectFrom('organization_members')
-      .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
-      .select([
-        'organization_members.role',
-        'organizations.id',
-        'organizations.name',
-        'organizations.slug'
-      ])
-      .where('organization_members.user_id', '=', user.id)
-      .where('organization_members.organization_id', '=', organizationId)
-      .executeTakeFirst();
-
-    if (!membership) {
-      return c.json({ error: 'You are not a member of this organization.' }, 403);
-    }
-
-    // Update user's last used organization
-    await db
-      .updateTable('user')
-      .set({
-        last_used_organization_id: organizationId,
-        last_org_access_at: new Date()
-      })
-      .where('id', '=', user.id)
-      .execute();
-
-    dbLogger.info('User switched organizations', {
-      userId: user.id,
-      userEmail: user.email,
-      organizationId: organizationId,
-      organizationName: membership.name
-    });
-
-    return c.json({
-      message: "Organization switched successfully.",
-      organization: {
-        id: membership.id,
-        name: membership.name,
-        slug: membership.slug,
-        role: membership.role
+      if (!membership) {
+        return c.json({ error: 'You are not a member of this organization.' }, 403);
       }
+
+      // Update user's last used organization
+      await db
+        .updateTable('user')
+        .set({
+          last_used_organization_id: organizationId,
+          last_org_access_at: new Date()
+        })
+        .where('id', '=', user.id)
+        .execute();
+
+      dbLogger.info('User switched organizations', {
+        userId: user.id,
+        userEmail: user.email,
+        organizationId: organizationId,
+        organizationName: membership.name
+      });
+
+      return c.json({
+        message: "Organization switched successfully.",
+        organization: {
+          id: membership.id,
+          name: membership.name,
+          slug: membership.slug,
+          role: membership.role
+        }
+      });
     });
 
   } catch (error) {
@@ -108,54 +106,52 @@ organizationsRouter.post('/set-default', async (c) => {
       return c.json({ error: 'Organization ID is required.' }, 400);
     }
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
+    return await withKysely(async (db) => {
+      // Verify user is a member of the organization
+      const membership = await db
+        .selectFrom('organization_members')
+        .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
+        .select([
+          'organization_members.role',
+          'organizations.id',
+          'organizations.name',
+          'organizations.slug'
+        ])
+        .where('organization_members.user_id', '=', user.id)
+        .where('organization_members.organization_id', '=', organizationId)
+        .executeTakeFirst();
 
-    // Verify user is a member of the organization
-    const membership = await db
-      .selectFrom('organization_members')
-      .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
-      .select([
-        'organization_members.role',
-        'organizations.id',
-        'organizations.name',
-        'organizations.slug'
-      ])
-      .where('organization_members.user_id', '=', user.id)
-      .where('organization_members.organization_id', '=', organizationId)
-      .executeTakeFirst();
-
-    if (!membership) {
-      return c.json({ error: 'You are not a member of this organization.' }, 403);
-    }
-
-    // Update user's default organization
-    await db
-      .updateTable('user')
-      .set({
-        default_organization_id: organizationId,
-        last_used_organization_id: organizationId,
-        last_org_access_at: new Date()
-      })
-      .where('id', '=', user.id)
-      .execute();
-
-    dbLogger.info('User set default organization', {
-      userId: user.id,
-      userEmail: user.email,
-      organizationId: organizationId,
-      organizationName: membership.name
-    });
-
-    return c.json({
-      message: "Default organization set successfully.",
-      organization: {
-        id: membership.id,
-        name: membership.name,
-        slug: membership.slug,
-        role: membership.role
+      if (!membership) {
+        return c.json({ error: 'You are not a member of this organization.' }, 403);
       }
+
+      // Update user's default organization
+      await db
+        .updateTable('user')
+        .set({
+          default_organization_id: organizationId,
+          last_used_organization_id: organizationId,
+          last_org_access_at: new Date()
+        })
+        .where('id', '=', user.id)
+        .execute();
+
+      dbLogger.info('User set default organization', {
+        userId: user.id,
+        userEmail: user.email,
+        organizationId: organizationId,
+        organizationName: membership.name
+      });
+
+      return c.json({
+        message: "Default organization set successfully.",
+        organization: {
+          id: membership.id,
+          name: membership.name,
+          slug: membership.slug,
+          role: membership.role
+        }
+      });
     });
 
   } catch (error) {
@@ -425,7 +421,7 @@ organizationsRouter.get('/:orgId/stats',
  * GET /api/organizations/:orgId/members
  * List organization members
  */
-organizationsRouter.get('/:orgId/members', 
+organizationsRouter.get('/:orgId/members',
   requireRole('viewer'),
   async (c) => {
   try {
@@ -438,25 +434,23 @@ organizationsRouter.get('/:orgId/members',
     const status = c.req.query('status');
     const search = c.req.query('search');
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const memberService = new OrganizationMemberService(db);
-    const result = await memberService.listMembers({
-      organization_id: orgId,
-      role,
-      status,
-      search,
-      limit,
-      offset
+    return await withKysely(async (db) => {
+      const memberService = new OrganizationMemberService(db);
+      const result = await memberService.listMembers({
+        organization_id: orgId,
+        role,
+        status,
+        search,
+        limit,
+        offset
+      });
+
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
+
+      return c.json(result.data);
     });
-
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
-
-    return c.json(result.data);
 
   } catch (error) {
     dbLogger.error('Error in GET /organizations/:orgId/members', error);
@@ -468,7 +462,7 @@ organizationsRouter.get('/:orgId/members',
  * POST /api/organizations/:orgId/members
  * Add member to organization
  */
-organizationsRouter.post('/:orgId/members', 
+organizationsRouter.post('/:orgId/members',
   requireAdmin,
   async (c) => {
   try {
@@ -482,18 +476,16 @@ organizationsRouter.post('/:orgId/members',
       return c.json({ error: 'user_id and role are required' }, 400);
     }
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const memberService = new OrganizationMemberService(db);
-    const result = await memberService.addMember(orgId, body.user_id, body.role, user.id);
+    return await withKysely(async (db) => {
+      const memberService = new OrganizationMemberService(db);
+      const result = await memberService.addMember(orgId, body.user_id, body.role, user.id);
 
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
 
-    return c.json(result.data, 201);
+      return c.json(result.data, 201);
+    });
 
   } catch (error) {
     dbLogger.error('Error in POST /organizations/:orgId/members', error);
@@ -505,7 +497,7 @@ organizationsRouter.post('/:orgId/members',
  * PUT /api/organizations/:orgId/members/:userId
  * Update member role or details
  */
-organizationsRouter.put('/:orgId/members/:userId', 
+organizationsRouter.put('/:orgId/members/:userId',
   requireAdmin,
   async (c) => {
   try {
@@ -524,18 +516,16 @@ organizationsRouter.put('/:orgId/members/:userId',
       notes: body.notes
     };
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const memberService = new OrganizationMemberService(db);
-    const result = await memberService.updateMember(orgId, userId, updates, user.id);
+    return await withKysely(async (db) => {
+      const memberService = new OrganizationMemberService(db);
+      const result = await memberService.updateMember(orgId, userId, updates, user.id);
 
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
 
-    return c.json(result.data);
+      return c.json(result.data);
+    });
 
   } catch (error) {
     dbLogger.error('Error in PUT /organizations/:orgId/members/:userId', error);
@@ -547,7 +537,7 @@ organizationsRouter.put('/:orgId/members/:userId',
  * DELETE /api/organizations/:orgId/members/:userId
  * Remove member from organization
  */
-organizationsRouter.delete('/:orgId/members/:userId', 
+organizationsRouter.delete('/:orgId/members/:userId',
   requireAdmin,
   async (c) => {
   try {
@@ -557,18 +547,16 @@ organizationsRouter.delete('/:orgId/members/:userId',
     const orgId = security.organizationId;
     const userId = c.req.param('userId');
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const memberService = new OrganizationMemberService(db);
-    const result = await memberService.removeMember(orgId, userId, user.id);
+    return await withKysely(async (db) => {
+      const memberService = new OrganizationMemberService(db);
+      const result = await memberService.removeMember(orgId, userId, user.id);
 
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
 
-    return c.json({ message: 'Member removed successfully' });
+      return c.json({ message: 'Member removed successfully' });
+    });
 
   } catch (error) {
     dbLogger.error('Error in DELETE /organizations/:orgId/members/:userId', error);
@@ -584,7 +572,7 @@ organizationsRouter.delete('/:orgId/members/:userId',
  * POST /api/organizations/:orgId/invitations
  * Create invitation
  */
-organizationsRouter.post('/:orgId/invitations', 
+organizationsRouter.post('/:orgId/invitations',
   requireAdmin,
   async (c) => {
   try {
@@ -602,23 +590,21 @@ organizationsRouter.post('/:orgId/invitations',
       expires_in_hours: body.expires_in_hours
     };
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const invitationService = new OrganizationInvitationService(db, c.env);
-    const result = await invitationService.createInvitation(data, user.id);
+    return await withKysely(async (db) => {
+      const invitationService = new OrganizationInvitationService(db, c.env);
+      const result = await invitationService.createInvitation(data, user.id);
 
-    if (!result.success) {
-      return c.json({ 
-        error: result.error,
-        errors: result.errors 
-      }, 400);
-    }
+      if (!result.success) {
+        return c.json({
+          error: result.error,
+          errors: result.errors
+        }, 400);
+      }
 
-    // Don't return the token in the response for security
-    const { token, ...invitation } = result.data!;
-    return c.json(invitation, 201);
+      // Don't return the token in the response for security
+      const { token, ...invitation } = result.data!;
+      return c.json(invitation, 201);
+    });
 
   } catch (error) {
     dbLogger.error('Error in POST /organizations/:orgId/invitations', error);
@@ -630,7 +616,7 @@ organizationsRouter.post('/:orgId/invitations',
  * GET /api/organizations/:orgId/invitations
  * List organization invitations
  */
-organizationsRouter.get('/:orgId/invitations', 
+organizationsRouter.get('/:orgId/invitations',
   requireAdmin,
   async (c) => {
   try {
@@ -642,30 +628,28 @@ organizationsRouter.get('/:orgId/invitations',
     const status = c.req.query('status');
     const role = c.req.query('role') as OrganizationRole;
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const invitationService = new OrganizationInvitationService(db, c.env);
-    const result = await invitationService.listInvitations({
-      organization_id: orgId,
-      status,
-      role,
-      limit,
-      offset
+    return await withKysely(async (db) => {
+      const invitationService = new OrganizationInvitationService(db, c.env);
+      const result = await invitationService.listInvitations({
+        organization_id: orgId,
+        status,
+        role,
+        limit,
+        offset
+      });
+
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
+
+      // Remove tokens from response for security
+      const sanitizedInvitations = result.data!.map(inv => {
+        const { token, ...invitation } = inv;
+        return invitation;
+      });
+
+      return c.json(sanitizedInvitations);
     });
-
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
-
-    // Remove tokens from response for security
-    const sanitizedInvitations = result.data!.map(inv => {
-      const { token, ...invitation } = inv;
-      return invitation;
-    });
-
-    return c.json(sanitizedInvitations);
 
   } catch (error) {
     dbLogger.error('Error in GET /organizations/:orgId/invitations', error);
@@ -677,7 +661,7 @@ organizationsRouter.get('/:orgId/invitations',
  * DELETE /api/organizations/:orgId/invitations/:invitationId
  * Cancel invitation
  */
-organizationsRouter.delete('/:orgId/invitations/:invitationId', 
+organizationsRouter.delete('/:orgId/invitations/:invitationId',
   requireAdmin,
   async (c) => {
   try {
@@ -685,18 +669,16 @@ organizationsRouter.delete('/:orgId/invitations/:invitationId',
     const user = c.get('user');
     const invitationId = c.req.param('invitationId');
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const invitationService = new OrganizationInvitationService(db, c.env);
-    const result = await invitationService.cancelInvitation(invitationId, user.id);
+    return await withKysely(async (db) => {
+      const invitationService = new OrganizationInvitationService(db, c.env);
+      const result = await invitationService.cancelInvitation(invitationId, user.id);
 
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
 
-    return c.json({ message: 'Invitation cancelled successfully' });
+      return c.json({ message: 'Invitation cancelled successfully' });
+    });
 
   } catch (error) {
     dbLogger.error('Error in DELETE /organizations/:orgId/invitations/:invitationId', error);
@@ -708,7 +690,7 @@ organizationsRouter.delete('/:orgId/invitations/:invitationId',
  * POST /api/organizations/:orgId/invitations/:invitationId/resend
  * Resend invitation
  */
-organizationsRouter.post('/:orgId/invitations/:invitationId/resend', 
+organizationsRouter.post('/:orgId/invitations/:invitationId/resend',
   requireAdmin,
   async (c) => {
   try {
@@ -716,20 +698,18 @@ organizationsRouter.post('/:orgId/invitations/:invitationId/resend',
     const user = c.get('user');
     const invitationId = c.req.param('invitationId');
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const invitationService = new OrganizationInvitationService(db, c.env);
-    const result = await invitationService.resendInvitation(invitationId, user.id);
+    return await withKysely(async (db) => {
+      const invitationService = new OrganizationInvitationService(db, c.env);
+      const result = await invitationService.resendInvitation(invitationId, user.id);
 
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
 
-    // Don't return the token
-    const { token, ...invitation } = result.data!;
-    return c.json(invitation);
+      // Don't return the token
+      const { token, ...invitation } = result.data!;
+      return c.json(invitation);
+    });
 
   } catch (error) {
     dbLogger.error('Error in POST /organizations/:orgId/invitations/:invitationId/resend', error);
@@ -756,18 +736,16 @@ organizationsRouter.post('/invitations/accept', async (c) => {
       return c.json({ error: 'Invitation token is required' }, 400);
     }
 
-    // Get Kysely instance
-    createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const invitationService = new OrganizationInvitationService(db, c.env);
-    const result = await invitationService.acceptInvitation(body.token, user.id);
+    return await withKysely(async (db) => {
+      const invitationService = new OrganizationInvitationService(db, c.env);
+      const result = await invitationService.acceptInvitation(body.token, user.id);
 
-    if (!result.success) {
-      return c.json({ error: result.error }, 400);
-    }
+      if (!result.success) {
+        return c.json({ error: result.error }, 400);
+      }
 
-    return c.json(result.data);
+      return c.json(result.data);
+    });
 
   } catch (error) {
     dbLogger.error('Error in POST /invitations/accept', error);

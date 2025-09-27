@@ -13,7 +13,7 @@ import {
 } from '../middleware/hybrid-rls-org-actor';
 import { archetypePermissionService } from '../dataforge/ArchetypePermissionService';
 import { ArchetypeRegistry, type ArchetypeType } from '../dataforge/ArchetypeRegistry';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { createDatabaseConnection, getKysely, withKysely } from '../lib/database-manager';
 
 export const dataforgeRouter = new Hono<AppContext>();
 
@@ -258,44 +258,44 @@ dataforgeRouter.use('/orgs/:orgId/*', hybridRLSOrgActorMiddleware);
 // Get system options for field types (used by frontend components)
 dataforgeRouter.get('/system-options/:optionType', async (c) => {
   const { optionType } = c.req.param();
-  
+
   try {
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-    const kysely = createKyselyForPersistentUse();
-    
-    // Get system options for the specified type
-    const options = await kysely
-      .selectFrom('system_options')
-      .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
-      .select([
-        'system_options.value as option_key',
-        'system_options.label',
-        'system_options.description',
-        'system_options.color',
-        'system_options.icon',
-        'system_options.sort_order',
-        'system_options.is_active'
-      ])
-      .where('system_option_sets.option_set_type', '=', optionType)
-      .where('system_options.is_active', '=', true)
-      .orderBy('system_options.sort_order', 'asc')
-      .execute();
-    
-    return c.json({
-      success: true,
-      data: options,
-      metadata: {
-        optionType,
-        count: options.length,
-        source: 'system'
-      }
+    const { withKysely } = await import('../lib/database-manager');
+    return await withKysely(async (kysely) => {
+      // Get system options for the specified type
+      const options = await kysely
+        .selectFrom('system_options')
+        .innerJoin('system_option_sets', 'system_options.option_set_id', 'system_option_sets.id')
+        .select([
+          'system_options.value as option_key',
+          'system_options.label',
+          'system_options.description',
+          'system_options.color',
+          'system_options.icon',
+          'system_options.sort_order',
+          'system_options.is_active'
+        ])
+        .where('system_option_sets.option_set_type', '=', optionType)
+        .where('system_options.is_active', '=', true)
+        .orderBy('system_options.sort_order', 'asc')
+        .execute();
+
+      return c.json({
+        success: true,
+        data: options,
+        metadata: {
+          optionType,
+          count: options.length,
+          source: 'system'
+        }
+      });
     });
   } catch (error) {
     console.error(`[SystemOptions] Failed to fetch system options for ${optionType}:`, error);
-    return c.json({ 
-      success: false, 
+    return c.json({
+      success: false,
       error: 'Failed to fetch system options',
-      optionType 
+      optionType
     }, 500);
   }
 });
@@ -346,67 +346,70 @@ dataforgeRouter.get('/orgs/:orgId/entities',
   async (c) => {
     const { orgId } = c.req.param();
     const security = c.get('security');
-    
+
     if (orgId !== security.organizationId) {
       return c.json({ error: 'Access denied' }, 403);
     }
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    const result = await entityManager.listEntities(orgId);
-    
-    if (result.success === false) {
-      return c.json({ error: result.error, details: result.details }, 500);
-    }
-    
-    return c.json({ success: true, data: result });
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+
+      const result = await entityManager.listEntities(orgId);
+
+      if (result.success === false) {
+        return c.json({ error: result.error, details: result.details }, 500);
+      }
+
+      return c.json({ success: true, data: result });
+    });
   }
 );
 
-dataforgeRouter.post('/orgs/:orgId/entities', 
-  requirePermission('entities:write'), 
+dataforgeRouter.post('/orgs/:orgId/entities',
+  requirePermission('entities:write'),
   async (c) => {
     const body = await c.req.json();
     const security = c.get('security');
     const user = c.get('user');
-    
+
     console.log(`[DataForge] User ${user?.email || 'anonymous'} creating entity in org ${security.organizationId}`);
-    
+
     const { entityName, archetype, customFields = {} } = body;
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    const result = await entityManager.createEntity(
-      security.organizationId,
-      entityName,
-      archetype,
-      customFields || {}
-    );
-    
-    if (!result.success) {
-      const hasNestedDefinition = body && typeof body === 'object' && 'definition' in body;
-      const errorMessage = hasNestedDefinition 
-        ? 'entityName and archetype must be at the top level, not nested under "definition"'
-        : result.errors?.[0] || 'Failed to create entity';
-      
-      return c.json({ error: errorMessage, errors: result.errors }, 400);
-    }
-    
-    // Cache layer removed - using direct PostgreSQL queries with WAL real-time updates
-    console.log(`[EntityCreation] Created entity: ${entityName} (no cache invalidation needed)`);
-    
-    return c.json({ success: true, data: result.data });
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+
+      const result = await entityManager.createEntity(
+        security.organizationId,
+        entityName,
+        archetype,
+        customFields || {}
+      );
+
+      if (!result.success) {
+        const hasNestedDefinition = body && typeof body === 'object' && 'definition' in body;
+        const errorMessage = hasNestedDefinition
+          ? 'entityName and archetype must be at the top level, not nested under "definition"'
+          : result.errors?.[0] || 'Failed to create entity';
+
+        return c.json({ error: errorMessage, errors: result.errors }, 400);
+      }
+
+      // Cache layer removed - using direct PostgreSQL queries with WAL real-time updates
+      console.log(`[EntityCreation] Created entity: ${entityName} (no cache invalidation needed)`);
+
+      return c.json({ success: true, data: result.data });
+    });
   }
 );
 
@@ -415,26 +418,27 @@ dataforgeRouter.get('/orgs/:orgId/entities/:entityName',
   async (c) => {
     const { orgId, entityName } = c.req.param();
     const security = c.get('security');
-    
+
     if (orgId !== security.organizationId) {
       return c.json({ error: 'Access denied' }, 403);
     }
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.getEntityDetails(orgId, entityName);
-    
-    if (!result.success) {
-      return c.json({ error: result.error }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    return c.json({ success: true, data: result.data });
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.getEntityDetails(orgId, entityName);
+
+      if (!result.success) {
+        return c.json({ error: result.error }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      return c.json({ success: true, data: result.data });
+    });
   }
 );
 
@@ -444,35 +448,36 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     console.log(`[Schema Cache] 🚀 Schema request started for org`);
     const startTime = Date.now();
     const security = c.get('security');
-    
+
     // Check if cache busting is requested
     const bustCache = c.req.query('bustCache') === 'true';
     // Direct PostgreSQL query (no caching complexity)
     console.log(`[Schema Loading] 📡 Loading schema from PostgreSQL`);
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.getSchema(security.organizationId);
-    
-    if (!result.success) {
-      return c.json({ error: result.error }, 500);
-    }
-    
-    const responseTime = Date.now() - startTime;
-    console.log(`[Schema Loading] ✅ PostgreSQL response completed (${responseTime}ms) with ${result.data?.length || 0} entities`);
-    
-    return c.json({
-      success: true,
-      schema: result.data,
-      cached: false,
-      source: 'postgresql_direct',
-      responseTime: responseTime
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.getSchema(security.organizationId);
+
+      if (!result.success) {
+        return c.json({ error: result.error }, 500);
+      }
+
+      const responseTime = Date.now() - startTime;
+      console.log(`[Schema Loading] ✅ PostgreSQL response completed (${responseTime}ms) with ${result.data?.length || 0} entities`);
+
+      return c.json({
+        success: true,
+        schema: result.data,
+        cached: false,
+        source: 'postgresql_direct',
+        responseTime: responseTime
+      });
     });
   }
 );
@@ -482,29 +487,30 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
   async (c) => {
     const { orgId, entityName } = c.req.param();
     const security = c.get('security');
-    
+
     if (orgId !== security.organizationId) {
       return c.json({ error: 'Access denied' }, 403);
     }
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.deleteEntity(orgId, entityName);
-    
-    if (!result.success) {
-      return c.json({ error: result.error }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    // Cache layer removed - using direct PostgreSQL queries with WAL real-time updates
-    console.log(`[EntityDeletion] Deleted entity: ${entityName} (no cache invalidation needed)`);
-    
-    return c.json({ success: true, message: result.message });
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.deleteEntity(orgId, entityName);
+
+      if (!result.success) {
+        return c.json({ error: result.error }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      // Cache layer removed - using direct PostgreSQL queries with WAL real-time updates
+      console.log(`[EntityDeletion] Deleted entity: ${entityName} (no cache invalidation needed)`);
+
+      return c.json({ success: true, message: result.message });
+    });
   }
 );
 
@@ -518,79 +524,80 @@ dataforgeRouter.get('/orgs/:orgId/sync/:entityName',
   async (c) => {
     const { orgId, entityName } = c.req.param();
     const security = c.get('security');
-    
+
     if (orgId !== security.organizationId) {
       return c.json({ error: 'Access denied' }, 403);
     }
-    
+
     // Get query parameters for differential sync
     const changesSince = c.req.query('changesSince'); // ISO timestamp from Legend State
     const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 1000;
     const includeDeleted = c.req.query('includeDeleted') === 'true';
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    // Build filters for differential sync
-    const filters: Record<string, any> = {};
-    
-    // Add changesSince filter if provided (core differential sync functionality)
-    if (changesSince) {
-      filters.updated_at = { gte: new Date(changesSince) };
-    }
-    
-    // Handle soft deletes
-    if (!includeDeleted) {
-      filters.deleted = { neq: true }; // Exclude soft-deleted records
-    }
-    
-    const result = await entityManager.queryRecords(orgId, entityName, {
-      limit,
-      orderBy: 'updated_at',
-      orderDirection: 'asc', // Chronological order for sync
-      filters: Object.keys(filters).length > 0 ? filters : undefined
-    });
-    
-    if (!result.success) {
-      return c.json({ error: 'Failed to sync records', details: result.errors }, 500);
-    }
-    
-    // Resolve relationship fields for sync data
-    const data = result.data || [];
-    const resolvedData = await resolveRelationships(data, orgId, entityName, kysely);
-    
-    // Calculate maxUpdatedAt for Legend State's next changesSince
-    const maxUpdatedAt = resolvedData.length > 0
-      ? Math.max(...resolvedData.map((r: any) => new Date(r.updated_at || r.created_at || 0).getTime()))
-      : changesSince 
-        ? new Date(changesSince).getTime()
-        : Date.now();
-    
-    return c.json({ 
-      success: true, 
-      data: resolvedData,
-      // Metadata for Legend State sync tracking
-      metadata: {
-        totalCount: result.total || resolvedData.length,
-        returnedCount: resolvedData.length,
-        hasMore: (result.total || resolvedData.length) > resolvedData.length,
-        maxUpdatedAt,
-        changesSince,
-        includeDeleted,
-        limit
-      },
-      // Legend State sync info
-      syncInfo: {
-        fieldUpdatedAt: 'updated_at',
-        fieldCreatedAt: 'created_at', 
-        fieldDeleted: 'deleted',
-        nextChangesSince: maxUpdatedAt
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+
+      // Build filters for differential sync
+      const filters: Record<string, any> = {};
+
+      // Add changesSince filter if provided (core differential sync functionality)
+      if (changesSince) {
+        filters.updated_at = { gte: new Date(changesSince) };
       }
+
+      // Handle soft deletes
+      if (!includeDeleted) {
+        filters.deleted = { neq: true }; // Exclude soft-deleted records
+      }
+
+      const result = await entityManager.queryRecords(orgId, entityName, {
+        limit,
+        orderBy: 'updated_at',
+        orderDirection: 'asc', // Chronological order for sync
+        filters: Object.keys(filters).length > 0 ? filters : undefined
+      });
+
+      if (!result.success) {
+        return c.json({ error: 'Failed to sync records', details: result.errors }, 500);
+      }
+
+      // Resolve relationship fields for sync data
+      const data = result.data || [];
+      const resolvedData = await resolveRelationships(data, orgId, entityName, kysely);
+
+      // Calculate maxUpdatedAt for Legend State's next changesSince
+      const maxUpdatedAt = resolvedData.length > 0
+        ? Math.max(...resolvedData.map((r: any) => new Date(r.updated_at || r.created_at || 0).getTime()))
+        : changesSince
+          ? new Date(changesSince).getTime()
+          : Date.now();
+
+      return c.json({
+        success: true,
+        data: resolvedData,
+        // Metadata for Legend State sync tracking
+        metadata: {
+          totalCount: result.total || resolvedData.length,
+          returnedCount: resolvedData.length,
+          hasMore: (result.total || resolvedData.length) > resolvedData.length,
+          maxUpdatedAt,
+          changesSince,
+          includeDeleted,
+          limit
+        },
+        // Legend State sync info
+        syncInfo: {
+          fieldUpdatedAt: 'updated_at',
+          fieldCreatedAt: 'created_at',
+          fieldDeleted: 'deleted',
+          nextChangesSince: maxUpdatedAt
+        }
+      });
     });
   }
 );
@@ -650,59 +657,60 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName',
         filters[field][operator] = value;
       }
     }
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    // Get entity's archetype for permission checking
-    const entity = await entityManager.getEntityDetails(orgId, entityName);
-    if (!entity.success || !entity.data) {
-      return c.json({ error: 'Entity not found', details: entity.errors }, 404);
-    }
 
-    const archetype = entity.data.archetype as ArchetypeType;
-    
-    // Query all records first
-    const result = await entityManager.queryRecords(orgId, entityName, {
-      limit,
-      offset,
-      orderBy,
-      orderDirection,
-      filters: Object.keys(filters).length > 0 ? filters : undefined
-    });
-    
-    if (!result.success) {
-      return c.json({ error: 'Failed to query records', details: result.errors }, 500);
-    }
-    
-    // Apply archetype-specific container permissions
-    console.log(`[Container Permissions] Applying ${archetype} archetype permissions for ${result.data?.length || 0} records`);
-    
-    const filteredData = await archetypePermissionService.filterReadableEntities(
-      archetype,
-      result.data || [],
-      security
-    );
-    
-    console.log(`[Container Permissions] ${archetype} filter: ${result.data?.length || 0} → ${filteredData.length} records accessible`);
-    
-    // First populate relationship field UUIDs from relationship table
-    const dataWithRelationships = await populateRelationshipFields(filteredData, orgId, entityName, kysely);
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
-    // Then resolve relationship fields to show actual entity names instead of IDs
-    const resolvedData = await resolveRelationships(dataWithRelationships, orgId, entityName, kysely);
-    
-    return c.json({ 
-      success: true, 
-      data: resolvedData,
-      total: resolvedData.length,
-      archetype: archetype,
-      containerModel: archetypePermissionService.getArchetypePermissionSummary(archetype)?.model
+      // Get entity's archetype for permission checking
+      const entity = await entityManager.getEntityDetails(orgId, entityName);
+      if (!entity.success || !entity.data) {
+        return c.json({ error: 'Entity not found', details: entity.errors }, 404);
+      }
+
+      const archetype = entity.data.archetype as ArchetypeType;
+
+      // Query all records first
+      const result = await entityManager.queryRecords(orgId, entityName, {
+        limit,
+        offset,
+        orderBy,
+        orderDirection,
+        filters: Object.keys(filters).length > 0 ? filters : undefined
+      });
+
+      if (!result.success) {
+        return c.json({ error: 'Failed to query records', details: result.errors }, 500);
+      }
+
+      // Apply archetype-specific container permissions
+      console.log(`[Container Permissions] Applying ${archetype} archetype permissions for ${result.data?.length || 0} records`);
+
+      const filteredData = await archetypePermissionService.filterReadableEntities(
+        archetype,
+        result.data || [],
+        security
+      );
+
+      console.log(`[Container Permissions] ${archetype} filter: ${result.data?.length || 0} → ${filteredData.length} records accessible`);
+
+      // First populate relationship field UUIDs from relationship table
+      const dataWithRelationships = await populateRelationshipFields(filteredData, orgId, entityName, kysely);
+
+      // Then resolve relationship fields to show actual entity names instead of IDs
+      const resolvedData = await resolveRelationships(dataWithRelationships, orgId, entityName, kysely);
+
+      return c.json({
+        success: true,
+        data: resolvedData,
+        total: resolvedData.length,
+        archetype: archetype,
+        containerModel: archetypePermissionService.getArchetypePermissionSummary(archetype)?.model
+      });
     });
   }
 );
@@ -718,53 +726,54 @@ dataforgeRouter.post('/orgs/:orgId/data/:entityName',
     }
     
     const createData = await c.req.json();
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    // Get entity's archetype for permission checking
-    const entity = await entityManager.getEntityDetails(orgId, entityName);
-    if (!entity.success || !entity.data) {
-      return c.json({ error: 'Entity not found', details: entity.errors }, 404);
-    }
 
-    const archetype = entity.data.archetype as ArchetypeType;
-    
-    // Check archetype-specific create permissions
-    const permissionCheck = await archetypePermissionService.canCreate(
-      archetype,
-      createData,
-      security
-    );
-    
-    if (!permissionCheck.allowed) {
-      console.log(`[Container Permissions] Create denied for ${archetype}: ${permissionCheck.reason}`);
-      return c.json({ 
-        error: 'Insufficient permissions to create this record',
-        details: permissionCheck.reason,
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+
+      // Get entity's archetype for permission checking
+      const entity = await entityManager.getEntityDetails(orgId, entityName);
+      if (!entity.success || !entity.data) {
+        return c.json({ error: 'Entity not found', details: entity.errors }, 404);
+      }
+
+      const archetype = entity.data.archetype as ArchetypeType;
+
+      // Check archetype-specific create permissions
+      const permissionCheck = await archetypePermissionService.canCreate(
+        archetype,
+        createData,
+        security
+      );
+
+      if (!permissionCheck.allowed) {
+        console.log(`[Container Permissions] Create denied for ${archetype}: ${permissionCheck.reason}`);
+        return c.json({
+          error: 'Insufficient permissions to create this record',
+          details: permissionCheck.reason,
+          archetype,
+          containerModel: archetypePermissionService.getArchetypePermissionSummary(archetype)?.model
+        }, 403);
+      }
+
+      console.log(`[Container Permissions] Create allowed for ${archetype}: ${permissionCheck.reason}`);
+
+      const result = await entityManager.createRecord(orgId, entityName, createData, security.userId);
+
+      if (!result.success) {
+        return c.json({ error: 'Failed to create record', errors: result.errors }, 400);
+      }
+
+      return c.json({
+        success: true,
+        data: result.data,
         archetype,
         containerModel: archetypePermissionService.getArchetypePermissionSummary(archetype)?.model
-      }, 403);
-    }
-    
-    console.log(`[Container Permissions] Create allowed for ${archetype}: ${permissionCheck.reason}`);
-    
-    const result = await entityManager.createRecord(orgId, entityName, createData, security.userId);
-    
-    if (!result.success) {
-      return c.json({ error: 'Failed to create record', errors: result.errors }, 400);
-    }
-    
-    return c.json({ 
-      success: true, 
-      data: result.data,
-      archetype,
-      containerModel: archetypePermissionService.getArchetypePermissionSummary(archetype)?.model
+      });
     });
   }
 );
@@ -779,25 +788,26 @@ dataforgeRouter.get('/orgs/:orgId/data/:entityName/:id',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    const result = await entityManager.getRecord(orgId, entityName, id);
 
-    if (!result.success) {
-      return c.json({ error: result.errors?.[0] || 'Record not found' }, 404);
-    }
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
-    // Populate relationship field UUIDs and resolve display names for single record
-    const dataWithRelationships = await populateRelationshipFields([result.data], orgId, entityName, kysely);
-    const resolvedData = await resolveRelationships(dataWithRelationships, orgId, entityName, kysely);
+      const result = await entityManager.getRecord(orgId, entityName, id);
 
-    return c.json({ success: true, data: resolvedData[0] });
+      if (!result.success) {
+        return c.json({ error: result.errors?.[0] || 'Record not found' }, 404);
+      }
+
+      // Populate relationship field UUIDs and resolve display names for single record
+      const dataWithRelationships = await populateRelationshipFields([result.data], orgId, entityName, kysely);
+      const resolvedData = await resolveRelationships(dataWithRelationships, orgId, entityName, kysely);
+
+      return c.json({ success: true, data: resolvedData[0] });
+    });
   }
 );
 
@@ -851,124 +861,125 @@ dataforgeRouter.put('/orgs/:orgId/data/:entityName/:id',
       return c.json({ error: 'Invalid JSON in request body' }, 400);
     }
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    // Get entity schema to identify relationship fields
-    const entityDetails = await entityManager.getEntityDetails(orgId, entityName);
-    if (!entityDetails.success) {
-      return c.json({ error: 'Entity not found', details: entityDetails.errors }, 404);
-    }
 
-    // Identify relationship fields from the entity schema
-    const relationshipFields = new Set<string>();
-    const entity = entityDetails.data;
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
-    if (entity.fields) {
-      for (const [fieldName, fieldDef] of Object.entries(entity.fields)) {
-        const fieldType = typeof fieldDef === 'string' ? fieldDef : (fieldDef as any)?.type;
-        if (fieldType === 'user_reference' || fieldType === 'entity_reference' ||
-            fieldType === 'custom_user_reference' || fieldType === 'custom_entity_reference') {
-          relationshipFields.add(fieldName);
-        }
+      // Get entity schema to identify relationship fields
+      const entityDetails = await entityManager.getEntityDetails(orgId, entityName);
+      if (!entityDetails.success) {
+        return c.json({ error: 'Entity not found', details: entityDetails.errors }, 404);
       }
-    }
 
-    // Separate regular fields from relationship fields
-    const regularFields: any = {};
-    const relationshipUpdates: any = {};
+      // Identify relationship fields from the entity schema
+      const relationshipFields = new Set<string>();
+      const entity = entityDetails.data;
 
-    for (const [key, value] of Object.entries(updateData)) {
-      if (relationshipFields.has(key)) {
-        relationshipUpdates[key] = value;
-      } else {
-        regularFields[key] = value;
-      }
-    }
-
-    console.log(`⚡ [DataForge API] Separated update data:`, {
-      orgId,
-      entityName,
-      id,
-      regularFieldsKeys: Object.keys(regularFields),
-      relationshipFieldsKeys: Object.keys(relationshipUpdates)
-    });
-
-    // Update regular fields if any exist
-    let result: any = { success: true, data: {} };
-    if (Object.keys(regularFields).length > 0) {
-      result = await entityManager.updateRecord(orgId, entityName, id, regularFields);
-
-      if (!result.success) {
-        console.log(`❌ [DataForge API] Regular fields update failed:`, result.errors);
-        return c.json({ error: 'Failed to update record', errors: result.errors }, 400);
-      }
-    }
-
-    // Handle relationship field updates if any exist
-    if (Object.keys(relationshipUpdates).length > 0) {
-      console.log(`🔗 [DataForge API] Processing relationship field updates:`, relationshipUpdates);
-
-      try {
-        const relationshipTable = `org_${orgId.replace(/-/g, '_')}_relationships`;
-
-        // Process each relationship field update
-        for (const [fieldName, targetEntityId] of Object.entries(relationshipUpdates)) {
-          if (targetEntityId) {
-            // Get relationship configuration for this field
-            const relationshipConfig = await kysely
-              .selectFrom('dataforge_relationship_fields')
-              .select(['relationship_type', 'target_entity_type'])
-              .where('org_id', '=', orgId)
-              .where('entity_type', '=', entityName)
-              .where('field_name', '=', fieldName)
-              .executeTakeFirst();
-
-            if (relationshipConfig) {
-              // Create new relationship (simplified - no invalidation for now)
-              await kysely
-                .insertInto(relationshipTable)
-                .values({
-                  source_entity_type: entityName,
-                  source_entity_id: id,
-                  target_entity_type: relationshipConfig.target_entity_type,
-                  target_entity_id: String(targetEntityId),
-                  relationship_type: relationshipConfig.relationship_type,
-                  properties: JSON.stringify({ field_name: fieldName }),
-                  created_by: security.userId,
-                  created_at: new Date()
-                })
-                .execute();
-
-              console.log(`🔗 [DataForge API] Created relationship: ${entityName}/${id} -> ${relationshipConfig.target_entity_type}/${targetEntityId} (${fieldName})`);
-            }
+      if (entity.fields) {
+        for (const [fieldName, fieldDef] of Object.entries(entity.fields)) {
+          const fieldType = typeof fieldDef === 'string' ? fieldDef : (fieldDef as any)?.type;
+          if (fieldType === 'user_reference' || fieldType === 'entity_reference' ||
+              fieldType === 'custom_user_reference' || fieldType === 'custom_entity_reference') {
+            relationshipFields.add(fieldName);
           }
         }
-      } catch (error) {
-        console.error(`🔗 [DataForge API] Failed to process relationship updates:`, error);
-        // Don't fail the entire request for relationship errors
       }
-    }
-    
-    console.log(`📊 [DataForge API] EntityManager.updateRecord result:`, {
-      success: result.success,
-      hasData: !!result.data,
-      errors: result.errors,
-      statusCode: result.success ? 200 : 400
+
+      // Separate regular fields from relationship fields
+      const regularFields: any = {};
+      const relationshipUpdates: any = {};
+
+      for (const [key, value] of Object.entries(updateData)) {
+        if (relationshipFields.has(key)) {
+          relationshipUpdates[key] = value;
+        } else {
+          regularFields[key] = value;
+        }
+      }
+
+      console.log(`⚡ [DataForge API] Separated update data:`, {
+        orgId,
+        entityName,
+        id,
+        regularFieldsKeys: Object.keys(regularFields),
+        relationshipFieldsKeys: Object.keys(relationshipUpdates)
+      });
+
+      // Update regular fields if any exist
+      let result: any = { success: true, data: {} };
+      if (Object.keys(regularFields).length > 0) {
+        result = await entityManager.updateRecord(orgId, entityName, id, regularFields);
+
+        if (!result.success) {
+          console.log(`❌ [DataForge API] Regular fields update failed:`, result.errors);
+          return c.json({ error: 'Failed to update record', errors: result.errors }, 400);
+        }
+      }
+
+      // Handle relationship field updates if any exist
+      if (Object.keys(relationshipUpdates).length > 0) {
+        console.log(`🔗 [DataForge API] Processing relationship field updates:`, relationshipUpdates);
+
+        try {
+          const relationshipTable = `org_${orgId.replace(/-/g, '_')}_relationships`;
+
+          // Process each relationship field update
+          for (const [fieldName, targetEntityId] of Object.entries(relationshipUpdates)) {
+            if (targetEntityId) {
+              // Get relationship configuration for this field
+              const relationshipConfig = await kysely
+                .selectFrom('dataforge_relationship_fields')
+                .select(['relationship_type', 'target_entity_type'])
+                .where('org_id', '=', orgId)
+                .where('entity_type', '=', entityName)
+                .where('field_name', '=', fieldName)
+                .executeTakeFirst();
+
+              if (relationshipConfig) {
+                // Create new relationship (simplified - no invalidation for now)
+                await kysely
+                  .insertInto(relationshipTable)
+                  .values({
+                    source_entity_type: entityName,
+                    source_entity_id: id,
+                    target_entity_type: relationshipConfig.target_entity_type,
+                    target_entity_id: String(targetEntityId),
+                    relationship_type: relationshipConfig.relationship_type,
+                    properties: JSON.stringify({ field_name: fieldName }),
+                    created_by: security.userId,
+                    created_at: new Date()
+                  })
+                  .execute();
+
+                console.log(`🔗 [DataForge API] Created relationship: ${entityName}/${id} -> ${relationshipConfig.target_entity_type}/${targetEntityId} (${fieldName})`);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`🔗 [DataForge API] Failed to process relationship updates:`, error);
+          // Don't fail the entire request for relationship errors
+        }
+      }
+
+      console.log(`📊 [DataForge API] EntityManager.updateRecord result:`, {
+        success: result.success,
+        hasData: !!result.data,
+        errors: result.errors,
+        statusCode: result.success ? 200 : 400
+      });
+
+      if (!result.success) {
+        console.log(`❌ [DataForge API] Update failed with errors:`, result.errors);
+        return c.json({ error: 'Failed to update record', errors: result.errors }, 400);
+      }
+
+      console.log(`✅ [DataForge API] Update successful for ${entityName}/${id}`);
+      return c.json({ success: true, data: result.data });
     });
-    
-    if (!result.success) {
-      console.log(`❌ [DataForge API] Update failed with errors:`, result.errors);
-      return c.json({ error: 'Failed to update record', errors: result.errors }, 400);
-    }
-    
-    console.log(`✅ [DataForge API] Update successful for ${entityName}/${id}`);
-    return c.json({ success: true, data: result.data });
   }
 );
 
@@ -983,22 +994,23 @@ dataforgeRouter.delete('/orgs/:orgId/data/:entityName/:id',
     }
     
     const permanent = c.req.query('permanent') === 'true';
-    
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
-    
-    const result = await entityManager.deleteRecord(orgId, entityName, id, permanent);
-    
-    if (!result.success) {
-      return c.json({ error: result.errors?.[0] || 'Failed to delete record' }, 400);
-    }
-    
-    return c.json({ success: true, data: result.data });
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+
+      const result = await entityManager.deleteRecord(orgId, entityName, id, permanent);
+
+      if (!result.success) {
+        return c.json({ error: result.errors?.[0] || 'Failed to delete record' }, 400);
+      }
+
+      return c.json({ success: true, data: result.data });
+    });
   }
 );
 
@@ -1022,21 +1034,22 @@ dataforgeRouter.post('/orgs/:orgId/bulk/:entityName/create',
     }
 
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
 
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
-    const result = await entityManager.bulkCreateRecords(
-      security.organizationId,
-      entityName,
-      records,
-      options
-    );
+      const result = await entityManager.bulkCreateRecords(
+        security.organizationId,
+        entityName,
+        records,
+        options
+      );
 
-    return c.json(result);
+      return c.json(result);
+    });
   }
 );
 
@@ -1056,21 +1069,22 @@ dataforgeRouter.put('/orgs/:orgId/bulk/:entityName/update',
     }
 
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
 
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
-    const result = await entityManager.bulkUpdateRecords(
-      security.organizationId,
-      entityName,
-      filter,
-      updates
-    );
+      const result = await entityManager.bulkUpdateRecords(
+        security.organizationId,
+        entityName,
+        filter,
+        updates
+      );
 
-    return c.json(result);
+      return c.json(result);
+    });
   }
 );
 
@@ -1090,19 +1104,20 @@ dataforgeRouter.delete('/orgs/:orgId/bulk/:entityName/delete',
     }
 
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
 
-    const kysely = createKyselyForPersistentUse();
-    const entityManager = new DataForgeEntityManager({ kysely, env: c.env } as any);
+    return await withKysely(async (kysely) => {
+      const entityManager = new DataForgeEntityManager({ kysely, env: c.env } as any);
 
-    const result = await entityManager.bulkDeleteRecords(
-      security.organizationId,
-      entityName,
-      filter,
-      permanent
-    );
+      const result = await entityManager.bulkDeleteRecords(
+        security.organizationId,
+        entityName,
+        filter,
+        permanent
+      );
 
-    return c.json(result);
+      return c.json(result);
+    });
   }
 );
 
@@ -1129,26 +1144,27 @@ dataforgeRouter.post('/orgs/:orgId/entities/:entityName/fields',
       return c.json({ error: 'fields array is required and must not be empty' }, 400);
     }
 
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.addFields(orgId, entityName, fields);
-    
-    if (!result.success) {
-      return c.json({ error: result.error, errors: result.errors, details: result.details }, 400);
-    }
-    
-    // Include warnings if there were any partial failures
-    const response: any = { success: true, message: result.message };
-    if (result.addedFields) response.addedFields = result.addedFields;
-    if (result.warnings) response.warnings = result.warnings;
-    
-    return c.json(response);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.addFields(orgId, entityName, fields);
+
+      if (!result.success) {
+        return c.json({ error: result.error, errors: result.errors, details: result.details }, 400);
+      }
+
+      // Include warnings if there were any partial failures
+      const response: any = { success: true, message: result.message };
+      if (result.addedFields) response.addedFields = result.addedFields;
+      if (result.warnings) response.warnings = result.warnings;
+
+      return c.json(response);
+    });
   }
 );
 
@@ -1162,21 +1178,22 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName/fields/:fieldName',
       return c.json({ error: 'Access denied' }, 403);
     }
 
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.removeField(orgId, entityName, fieldName);
-    
-    if (!result.success) {
-      return c.json({ error: result.error, details: result.details }, result.error?.includes('not found') ? 404 : 400);
-    }
-    
-    return c.json({ success: true, message: result.message });
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.removeField(orgId, entityName, fieldName);
+
+      if (!result.success) {
+        return c.json({ error: result.error, details: result.details }, result.error?.includes('not found') ? 404 : 400);
+      }
+
+      return c.json({ success: true, message: result.message });
+    });
   }
 );
 
@@ -1196,21 +1213,22 @@ dataforgeRouter.get('/orgs/:orgId/trash',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.listTrash(orgId);
-    
-    if (!result.success) {
-      return c.json({ error: result.error, details: result.details }, 500);
-    }
-    
-    return c.json(result);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.listTrash(orgId);
+
+      if (!result.success) {
+        return c.json({ error: result.error, details: result.details }, 500);
+      }
+
+      return c.json(result);
+    });
   }
 );
 
@@ -1228,24 +1246,25 @@ dataforgeRouter.post('/orgs/:orgId/trash/:entityName/restore',
     
     console.log(`[DataForge] User ${user?.email} restoring entity ${entityName} from trash`);
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.restoreEntity(orgId, entityName);
-    
-    if (!result.success) {
-      return c.json({ 
-        error: result.error, 
-        details: result.details 
-      }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    return c.json(result);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.restoreEntity(orgId, entityName);
+
+      if (!result.success) {
+        return c.json({
+          error: result.error,
+          details: result.details
+        }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      return c.json(result);
+    });
   }
 );
 
@@ -1263,24 +1282,25 @@ dataforgeRouter.delete('/orgs/:orgId/trash/:entityName/permanent',
     
     console.log(`[DataForge] User ${user?.email} permanently deleting entity ${entityName} and its table`);
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.permanentDeleteEntity(orgId, entityName);
-    
-    if (!result.success) {
-      return c.json({ 
-        error: result.error, 
-        details: result.details 
-      }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    return c.json(result);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.permanentDeleteEntity(orgId, entityName);
+
+      if (!result.success) {
+        return c.json({
+          error: result.error,
+          details: result.details
+        }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      return c.json(result);
+    });
   }
 );
 
@@ -1299,24 +1319,25 @@ dataforgeRouter.get('/orgs/:orgId/entities/:entityName/fields/trash',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.listFieldTrash(orgId, entityName);
-    
-    if (!result.success) {
-      return c.json({ 
-        error: result.error, 
-        details: result.details 
-      }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    return c.json(result);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.listFieldTrash(orgId, entityName);
+
+      if (!result.success) {
+        return c.json({
+          error: result.error,
+          details: result.details
+        }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      return c.json(result);
+    });
   }
 );
 
@@ -1334,24 +1355,25 @@ dataforgeRouter.post('/orgs/:orgId/entities/:entityName/fields/:fieldName/restor
     
     console.log(`[DataForge] User ${user?.email} restoring field ${fieldName} from trash in entity ${entityName}`);
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.restoreField(orgId, entityName, fieldName);
-    
-    if (!result.success) {
-      return c.json({ 
-        error: result.error, 
-        details: result.details 
-      }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    return c.json(result);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.restoreField(orgId, entityName, fieldName);
+
+      if (!result.success) {
+        return c.json({
+          error: result.error,
+          details: result.details
+        }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      return c.json(result);
+    });
   }
 );
 
@@ -1369,24 +1391,25 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName/fields/:fieldName/perm
     
     console.log(`[DataForge] User ${user?.email} permanently deleting field ${fieldName} from entity ${entityName}`);
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+    const { withKysely } = await import('../lib/database-manager');
     const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
     const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
-    
-    const kysely = createKyselyForPersistentUse();
-    const rulesEngine = new JsonRulesEngine();
-    const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
-    
-    const result = await entityManager.permanentDeleteField(orgId, entityName, fieldName);
-    
-    if (!result.success) {
-      return c.json({ 
-        error: result.error, 
-        details: result.details 
-      }, result.error?.includes('not found') ? 404 : 500);
-    }
-    
-    return c.json(result);
+
+    return await withKysely(async (kysely) => {
+      const rulesEngine = new JsonRulesEngine();
+      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env });
+
+      const result = await entityManager.permanentDeleteField(orgId, entityName, fieldName);
+
+      if (!result.success) {
+        return c.json({
+          error: result.error,
+          details: result.details
+        }, result.error?.includes('not found') ? 404 : 500);
+      }
+
+      return c.json(result);
+    });
   }
 );
 
@@ -1410,39 +1433,39 @@ dataforgeRouter.get('/orgs/:orgId/options/:optionType',
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-    const kysely = createKyselyForPersistentUse();
-    
+    const { withKysely } = await import('../lib/database-manager');
+
     try {
-      const options = await kysely
-        .selectFrom('custom_options')
-        .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
-        .select([
-          'custom_options.value as option_key',
-          'custom_options.label',
-          'custom_options.description', 
-          'custom_options.color',
-          'custom_options.icon',
-          'custom_options.sort_order',
-          'custom_options.is_active'
-        ])
-        .where('custom_option_sets.org_id', '=', orgId)
-        .where('custom_option_sets.option_set_type', '=', optionType)
-        .where('custom_options.is_active', '=', true)
-        .orderBy('custom_options.sort_order', 'asc')
-        .orderBy('custom_options.label', 'asc')
-        .execute();
-        
-      return c.json({
-        success: true,
-        data: options,
-        metadata: {
-          organizationId: orgId,
-          optionType,
-          count: options.length
-        }
+      return await withKysely(async (kysely) => {
+        const options = await kysely
+          .selectFrom('custom_options')
+          .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+          .select([
+            'custom_options.value as option_key',
+            'custom_options.label',
+            'custom_options.description',
+            'custom_options.color',
+            'custom_options.icon',
+            'custom_options.sort_order',
+            'custom_options.is_active'
+          ])
+          .where('custom_option_sets.org_id', '=', orgId)
+          .where('custom_option_sets.option_set_type', '=', optionType)
+          .where('custom_options.is_active', '=', true)
+          .orderBy('custom_options.sort_order', 'asc')
+          .orderBy('custom_options.label', 'asc')
+          .execute();
+
+        return c.json({
+          success: true,
+          data: options,
+          metadata: {
+            organizationId: orgId,
+            optionType,
+            count: options.length
+          }
+        });
       });
-      
     } catch (error) {
       console.error('[Options] Failed to fetch options:', error);
       return c.json({
@@ -1470,8 +1493,8 @@ dataforgeRouter.post('/orgs/:orgId/options/:optionType',
         }, 400);
       }
 
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse();
+      const { withKysely } = await import('../lib/database-manager');
+      return await withKysely(async (kysely) => {
 
       // Get or create the custom option set
       let optionSet = await kysely
@@ -1545,12 +1568,13 @@ dataforgeRouter.post('/orgs/:orgId/options/:optionType',
         ])
         .executeTakeFirst();
 
-      console.log(`[Options] Created custom option '${value}' in ${optionType} set for org ${orgId}`);
+        console.log(`[Options] Created custom option '${value}' in ${optionType} set for org ${orgId}`);
 
-      return c.json({
-        success: true,
-        data: newOption,
-        message: `Option '${label}' created successfully`
+        return c.json({
+          success: true,
+          data: newOption,
+          message: `Option '${label}' created successfully`
+        });
       });
 
     } catch (error) {
@@ -1573,8 +1597,8 @@ dataforgeRouter.put('/orgs/:orgId/options/:optionType/:optionValue',
       const body = await c.req.json();
       const { label, description, color, icon, sort_order, is_active } = body;
 
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse();
+      const { withKysely } = await import('../lib/database-manager');
+      return await withKysely(async (kysely) => {
 
       // CRITICAL: Prevent modification of system option values
       const systemOptionExists = await kysely
@@ -1635,12 +1659,13 @@ dataforgeRouter.put('/orgs/:orgId/options/:optionType/:optionValue',
         ])
         .executeTakeFirst();
 
-      console.log(`[Options] Updated custom option '${optionValue}' in ${optionType} set for org ${orgId}`);
+        console.log(`[Options] Updated custom option '${optionValue}' in ${optionType} set for org ${orgId}`);
 
-      return c.json({
-        success: true,
-        data: updatedOption,
-        message: `Option '${optionValue}' updated successfully`
+        return c.json({
+          success: true,
+          data: updatedOption,
+          message: `Option '${optionValue}' updated successfully`
+        });
       });
 
     } catch (error) {
@@ -1661,8 +1686,8 @@ dataforgeRouter.delete('/orgs/:orgId/options/:optionType/:optionValue',
     try {
       const { orgId, optionType, optionValue } = c.req.param();
 
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
-      const kysely = createKyselyForPersistentUse();
+      const { withKysely } = await import('../lib/database-manager');
+      return await withKysely(async (kysely) => {
 
       // CRITICAL: Prevent deletion of system option values
       // This is the key protection you requested
@@ -1711,12 +1736,13 @@ dataforgeRouter.delete('/orgs/:orgId/options/:optionType/:optionValue',
         .where('id', '=', option.id)
         .execute();
 
-      console.log(`[Options] Deleted custom option '${optionValue}' from ${optionType} set for org ${orgId}`);
+        console.log(`[Options] Deleted custom option '${optionValue}' from ${optionType} set for org ${orgId}`);
 
-      return c.json({
-        success: true,
-        message: `Option '${option.label}' deleted successfully`,
-        warning: usageWarning ? 'This option may have been referenced by existing records. Those records will need to be updated.' : undefined
+        return c.json({
+          success: true,
+          message: `Option '${option.label}' deleted successfully`,
+          warning: usageWarning ? 'This option may have been referenced by existing records. Those records will need to be updated.' : undefined
+        });
       });
 
     } catch (error) {
@@ -1864,13 +1890,13 @@ dataforgeRouter.get('/orgs/:orgId/relationships/:entityType',
     }
 
     try {
-      const { createKyselyForPersistentUse } = await import('../lib/database-manager');
+      const { withKysely } = await import('../lib/database-manager');
       const { DataForgeEntityManager } = await import('../dataforge/entity-operations/EntityManager');
       const { JsonRulesEngine } = await import('../dataforge/json-rules-engine');
 
-      const kysely = createKyselyForPersistentUse();
-      const rulesEngine = new JsonRulesEngine();
-      const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
+      return await withKysely(async (kysely) => {
+        const rulesEngine = new JsonRulesEngine();
+        const entityManager = new DataForgeEntityManager({ kysely, rulesEngine, env: c.env } as any);
 
       // Query the target entity type data
       let queryOptions: any = {
@@ -1902,11 +1928,12 @@ dataforgeRouter.get('/orgs/:orgId/relationships/:entityType',
         entityData[record.id] = record;
       });
 
-      return c.json({
-        success: true,
-        data: {
-          [entityType.toLowerCase()]: entityData
-        }
+        return c.json({
+          success: true,
+          data: {
+            [entityType.toLowerCase()]: entityData
+          }
+        });
       });
     } catch (error) {
       console.error(`[Relationships] Failed to fetch ${entityType} relationship data:`, error);

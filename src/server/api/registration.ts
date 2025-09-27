@@ -4,7 +4,7 @@ import { getAuth } from '../lib/auth';
 import { dbLogger } from '../middleware/logger';
 import type { AuthType } from '../lib/auth';
 import { uuidv7 } from 'uuidv7';
-import { createDatabaseConnection, getKysely } from '../lib/database-manager';
+import { createDatabaseConnection, withKysely } from '../lib/database-manager';
 import { getPolarService } from '../services/polar-service';
 
 const registrationRouter = new Hono<AuthType>();
@@ -48,169 +48,170 @@ registrationRouter.post('/register', async (c) => {
       subscriptionTier: data.subscriptionTier 
     });
     
-    // Check if user already exists
+    // Check if user already exists and handle registration
     createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const existingUser = await db
-      .selectFrom('user')
-      .select('id')
-      .where('email', '=', data.email)
-      .executeTakeFirst();
-    
-    if (existingUser) {
-      return c.json({ 
-        error: 'An account with this email already exists' 
-      }, 409);
-    }
-    
-    // Create user via Better Auth
-    const authInstance = getAuth(c);
-    const userResult = await authInstance.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: data.password,
-        name: data.name
-      }
-    });
-    
-    if (!userResult || !userResult.user) {
-      throw new Error('Failed to create user account');
-    }
-    
-    // Create organization for the user
-    const organizationId = uuidv7();
-    const organization = {
-      id: organizationId,
-      name: data.organizationName,
-      slug: data.organizationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-      subscription_tier: data.subscriptionTier,
-      subscription_status: data.subscriptionTier === 'trial' ? 'trial' : 'pending_payment',
-      billing_cycle: data.billingCycle,
-      billing_email: data.email,
-      created_at: new Date(),
-      updated_at: new Date(),
-      trial_ends_at: data.subscriptionTier === 'trial' 
-        ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days trial
-        : null
-    };
-    
-    await db
-      .insertInto('organizations')
-      .values(organization)
-      .execute();
-    
-    // Add user as owner of the organization
-    await db
-      .insertInto('organization_members')
-      .values({
-        id: uuidv7(),
-        organization_id: organizationId,
-        user_id: userResult.user.id,
-        role: 'owner',
-        created_at: new Date(),
-        updated_at: new Date()
-      })
-      .execute();
-    
-    // Set as user's active organization
-    await db
-      .updateTable('user')
-      .set({
-        active_organization_id: organizationId,
-        updated_at: new Date()
-      })
-      .where('id', '=', userResult.user.id)
-      .execute();
-    
-    dbLogger.info('Registration successful', {
-      userId: userResult.user.id,
-      organizationId: organizationId,
-      subscriptionTier: data.subscriptionTier
-    });
-    
-    // Prepare response based on subscription tier
-    let nextStep = {};
-    
-    if (data.subscriptionTier === 'trial' || !data.polarPriceId) {
-      // Trial users can start immediately with 14-day trial
-      nextStep = {
-        action: 'verify_email',
-        message: 'Your 14-day trial has started! Please check your email to verify your account',
-        redirect: '/onboarding'
-      };
-    } else {
-      // Paid tiers need to go through Polar checkout
-      try {
-        const polarService = getPolarService(c.env);
-        const session = await polarService.createCheckoutSession({
-          product_price_id: data.polarPriceId,
-          customer_email: data.email,
-          customer_name: data.name,
-          success_url: `${c.req.header('Origin') || 'http://localhost:4000'}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-          metadata: {
-            organization_id: organizationId,
-            user_id: userResult.user.id,
-            billing_cycle: data.billingCycle,
-            subscription_tier: data.subscriptionTier
-          }
-        });
 
-        // Update organization with pending checkout
-        await db
-          .updateTable('organizations')
-          .set({
-            billing_settings: db.raw(`
-              COALESCE(billing_settings, '{}'::jsonb) || 
-              '{"pending_checkout_id": "${session.id}", "pending_checkout_url": "${session.url}", "polar_price_id": "${data.polarPriceId}"}'::jsonb
-            `),
-            updated_at: new Date()
-          })
-          .where('id', '=', organizationId)
-          .execute();
+    return await withKysely(async (db) => {
+      const existingUser = await db
+        .selectFrom('user')
+        .select('id')
+        .where('email', '=', data.email)
+        .executeTakeFirst();
 
-        nextStep = {
-          action: 'complete_payment',
-          message: 'Complete your payment to activate your subscription',
-          redirect: session.url,
-          checkoutData: {
-            sessionId: session.id,
-            checkoutUrl: session.url,
-            organizationId: organizationId,
-            expiresAt: session.expires_at
-          }
-        };
-      } catch (error) {
-        dbLogger.error('Failed to create Polar checkout session during registration', error);
-        // Fall back to manual billing setup
-        nextStep = {
-          action: 'setup_billing',
-          message: 'Please complete billing setup to activate your subscription',
-          redirect: '/billing/checkout',
-          checkoutData: {
-            organizationId: organizationId,
-            tier: data.subscriptionTier,
-            cycle: data.billingCycle,
-            email: data.email,
-            priceId: data.polarPriceId
-          }
-        };
+      if (existingUser) {
+        return c.json({
+          error: 'An account with this email already exists'
+        }, 409);
       }
-    }
-    
-    return c.json({
-      success: true,
-      user: {
-        id: userResult.user.id,
-        email: userResult.user.email,
-        name: userResult.user.name
-      },
-      organization: {
+
+      // Create user via Better Auth
+      const authInstance = getAuth(c);
+      const userResult = await authInstance.api.signUpEmail({
+        body: {
+          email: data.email,
+          password: data.password,
+          name: data.name
+        }
+      });
+
+      if (!userResult || !userResult.user) {
+        throw new Error('Failed to create user account');
+      }
+
+      // Create organization for the user
+      const organizationId = uuidv7();
+      const organization = {
         id: organizationId,
-        name: organization.name,
-        subscriptionTier: organization.subscription_tier
-      },
-      nextStep
+        name: data.organizationName,
+        slug: data.organizationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        subscription_tier: data.subscriptionTier,
+        subscription_status: data.subscriptionTier === 'trial' ? 'trial' : 'pending_payment',
+        billing_cycle: data.billingCycle,
+        billing_email: data.email,
+        created_at: new Date(),
+        updated_at: new Date(),
+        trial_ends_at: data.subscriptionTier === 'trial'
+          ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days trial
+          : null
+      };
+
+      await db
+        .insertInto('organizations')
+        .values(organization)
+        .execute();
+
+      // Add user as owner of the organization
+      await db
+        .insertInto('organization_members')
+        .values({
+          id: uuidv7(),
+          organization_id: organizationId,
+          user_id: userResult.user.id,
+          role: 'owner',
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+        .execute();
+
+      // Set as user's active organization
+      await db
+        .updateTable('user')
+        .set({
+          active_organization_id: organizationId,
+          updated_at: new Date()
+        })
+        .where('id', '=', userResult.user.id)
+        .execute();
+
+      dbLogger.info('Registration successful', {
+        userId: userResult.user.id,
+        organizationId: organizationId,
+        subscriptionTier: data.subscriptionTier
+      });
+
+      // Prepare response based on subscription tier
+      let nextStep = {};
+
+      if (data.subscriptionTier === 'trial' || !data.polarPriceId) {
+        // Trial users can start immediately with 14-day trial
+        nextStep = {
+          action: 'verify_email',
+          message: 'Your 14-day trial has started! Please check your email to verify your account',
+          redirect: '/onboarding'
+        };
+      } else {
+        // Paid tiers need to go through Polar checkout
+        try {
+          const polarService = getPolarService(c.env);
+          const session = await polarService.createCheckoutSession({
+            product_price_id: data.polarPriceId,
+            customer_email: data.email,
+            customer_name: data.name,
+            success_url: `${c.req.header('Origin') || 'http://localhost:4000'}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+            metadata: {
+              organization_id: organizationId,
+              user_id: userResult.user.id,
+              billing_cycle: data.billingCycle,
+              subscription_tier: data.subscriptionTier
+            }
+          });
+
+          // Update organization with pending checkout
+          await db
+            .updateTable('organizations')
+            .set({
+              billing_settings: db.raw(`
+                COALESCE(billing_settings, '{}'::jsonb) ||
+                '{"pending_checkout_id": "${session.id}", "pending_checkout_url": "${session.url}", "polar_price_id": "${data.polarPriceId}"}'::jsonb
+              `),
+              updated_at: new Date()
+            })
+            .where('id', '=', organizationId)
+            .execute();
+
+          nextStep = {
+            action: 'complete_payment',
+            message: 'Complete your payment to activate your subscription',
+            redirect: session.url,
+            checkoutData: {
+              sessionId: session.id,
+              checkoutUrl: session.url,
+              organizationId: organizationId,
+              expiresAt: session.expires_at
+            }
+          };
+        } catch (error) {
+          dbLogger.error('Failed to create Polar checkout session during registration', error);
+          // Fall back to manual billing setup
+          nextStep = {
+            action: 'setup_billing',
+            message: 'Please complete billing setup to activate your subscription',
+            redirect: '/billing/checkout',
+            checkoutData: {
+              organizationId: organizationId,
+              tier: data.subscriptionTier,
+              cycle: data.billingCycle,
+              email: data.email,
+              priceId: data.polarPriceId
+            }
+          };
+        }
+      }
+
+      return c.json({
+        success: true,
+        user: {
+          id: userResult.user.id,
+          email: userResult.user.email,
+          name: userResult.user.name
+        },
+        organization: {
+          id: organizationId,
+          name: organization.name,
+          subscriptionTier: organization.subscription_tier
+        },
+        nextStep
+      });
     });
     
   } catch (error) {
@@ -432,17 +433,18 @@ registrationRouter.post('/check-email', async (c) => {
     }
     
     createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const existingUser = await db
-      .selectFrom('user')
-      .select('id')
-      .where('email', '=', email)
-      .executeTakeFirst();
-    
-    return c.json({ 
-      available: !existingUser,
-      message: existingUser ? 'Email already in use' : 'Email available'
+
+    return await withKysely(async (db) => {
+      const existingUser = await db
+        .selectFrom('user')
+        .select('id')
+        .where('email', '=', email)
+        .executeTakeFirst();
+
+      return c.json({
+        available: !existingUser,
+        message: existingUser ? 'Email already in use' : 'Email available'
+      });
     });
     
   } catch (error) {
@@ -469,18 +471,19 @@ registrationRouter.post('/check-organization', async (c) => {
     }
     
     createDatabaseConnection(c.env);
-    const db = getKysely();
-    
-    const existingOrg = await db
-      .selectFrom('organizations')
-      .select('id')
-      .where('slug', '=', slug)
-      .executeTakeFirst();
-    
-    return c.json({ 
-      available: !existingOrg,
-      slug,
-      message: existingOrg ? 'Organization name already taken' : 'Organization name available'
+
+    return await withKysely(async (db) => {
+      const existingOrg = await db
+        .selectFrom('organizations')
+        .select('id')
+        .where('slug', '=', slug)
+        .executeTakeFirst();
+
+      return c.json({
+        available: !existingOrg,
+        slug,
+        message: existingOrg ? 'Organization name already taken' : 'Organization name available'
+      });
     });
     
   } catch (error) {

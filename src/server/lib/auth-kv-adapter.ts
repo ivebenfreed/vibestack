@@ -1,7 +1,7 @@
 import { SessionKVService, type SessionData } from '../services/session/SessionKVService';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
-import { getKysely } from './database-manager';
+import { withKysely } from './database-manager';
 import { uuidv7 } from 'uuidv7';
 import type { Adapter } from 'better-auth';
 
@@ -42,36 +42,36 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely();
-    
-    switch (model) {
-      case 'user':
-        const user = await db
-          .insertInto('user')
-          .values(inputData)
-          .returningAll()
-          .executeTakeFirst();
-        return user;
-        
-      case 'account':
-        const account = await db
-          .insertInto('account')
-          .values(inputData)
-          .returningAll()
-          .executeTakeFirst();
-        return account;
-        
-      case 'verification':
-        const verification = await db
-          .insertInto('verification')
-          .values(inputData)
-          .returningAll()
-          .executeTakeFirst();
-        return verification;
-        
-      default:
-        throw new Error(`Unsupported model: ${model}`);
-    }
+    return await withKysely(async (db) => {
+      switch (model) {
+        case 'user':
+          const user = await db
+            .insertInto('user')
+            .values(inputData)
+            .returningAll()
+            .executeTakeFirst();
+          return user;
+
+        case 'account':
+          const account = await db
+            .insertInto('account')
+            .values(inputData)
+            .returningAll()
+            .executeTakeFirst();
+          return account;
+
+        case 'verification':
+          const verification = await db
+            .insertInto('verification')
+            .values(inputData)
+            .returningAll()
+            .executeTakeFirst();
+          return verification;
+
+        default:
+          throw new Error(`Unsupported model: ${model}`);
+      }
+    });
   }
 
   async findOne(data: { 
@@ -96,53 +96,53 @@ export class BetterAuthKVAdapter implements Adapter {
     }
     
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely();
-    
-    switch (model) {
-      case 'user':
-        const user = await db
-          .selectFrom('user')
-          .selectAll()
-          .where((eb) => {
-            const conditions = [];
-            if (where.id) conditions.push(eb('id', '=', where.id));
-            if (where.email) conditions.push(eb('email', '=', where.email));
-            return conditions.length > 0 ? eb.and(conditions) : eb.val(true);
-          })
-          .executeTakeFirst();
-        return user || null;
-        
-      case 'account':
-        const account = await db
-          .selectFrom('account')
-          .selectAll()
-          .where((eb) => {
-            const conditions = [];
-            if (where.id) conditions.push(eb('id', '=', where.id));
-            if (where.userId) conditions.push(eb('userId', '=', where.userId));
-            if (where.providerId) conditions.push(eb('providerId', '=', where.providerId));
-            return conditions.length > 0 ? eb.and(conditions) : eb.val(true);
-          })
-          .executeTakeFirst();
-        return account || null;
-        
-      case 'verification':
-        const verification = await db
-          .selectFrom('verification')
-          .selectAll()
-          .where((eb) => {
-            const conditions = [];
-            if (where.id) conditions.push(eb('id', '=', where.id));
-            if (where.token) conditions.push(eb('token', '=', where.token));
-            if (where.identifier) conditions.push(eb('identifier', '=', where.identifier));
-            return conditions.length > 0 ? eb.and(conditions) : eb.val(true);
-          })
-          .executeTakeFirst();
-        return verification || null;
-        
-      default:
-        throw new Error(`Unsupported model: ${model}`);
-    }
+    return await withKysely(async (db) => {
+      switch (model) {
+        case 'user':
+          const user = await db
+            .selectFrom('user')
+            .selectAll()
+            .where((eb) => {
+              const conditions = [];
+              if (where.id) conditions.push(eb('id', '=', where.id));
+              if (where.email) conditions.push(eb('email', '=', where.email));
+              return conditions.length > 0 ? eb.and(conditions) : eb.val(true);
+            })
+            .executeTakeFirst();
+          return user || null;
+
+        case 'account':
+          const account = await db
+            .selectFrom('account')
+            .selectAll()
+            .where((eb) => {
+              const conditions = [];
+              if (where.id) conditions.push(eb('id', '=', where.id));
+              if (where.userId) conditions.push(eb('userId', '=', where.userId));
+              if (where.providerId) conditions.push(eb('providerId', '=', where.providerId));
+              return conditions.length > 0 ? eb.and(conditions) : eb.val(true);
+            })
+            .executeTakeFirst();
+          return account || null;
+
+        case 'verification':
+          const verification = await db
+            .selectFrom('verification')
+            .selectAll()
+            .where((eb) => {
+              const conditions = [];
+              if (where.id) conditions.push(eb('id', '=', where.id));
+              if (where.token) conditions.push(eb('token', '=', where.token));
+              if (where.identifier) conditions.push(eb('identifier', '=', where.identifier));
+              return conditions.length > 0 ? eb.and(conditions) : eb.val(true);
+            })
+            .executeTakeFirst();
+          return verification || null;
+
+        default:
+          throw new Error(`Unsupported model: ${model}`);
+      }
+    });
   }
 
   async findMany(data: {
@@ -153,149 +153,149 @@ export class BetterAuthKVAdapter implements Adapter {
     orderBy?: any;
   }): Promise<any[]> {
     const { model, where = {}, limit, offset } = data;
-    
+
     if (model === 'session') {
       // Find sessions in KV
       if (where.userId) {
         const sessions = await this.sessionService.listForUser(where.userId);
         return sessions.map(s => this.mapSessionToAdapter(s));
       }
-      
+
       // General session listing not supported efficiently in KV
       dbLogger.warn('General session listing not supported in KV adapter');
       return [];
     }
-    
+
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely();
-    
-    let query: any;
-    
-    switch (model) {
-      case 'user':
-        query = db.selectFrom('user').selectAll();
-        break;
-      case 'account':
-        query = db.selectFrom('account').selectAll();
-        if (where.userId) query = query.where('userId', '=', where.userId);
-        break;
-      case 'verification':
-        query = db.selectFrom('verification').selectAll();
-        if (where.identifier) query = query.where('identifier', '=', where.identifier);
-        break;
-      default:
-        throw new Error(`Unsupported model: ${model}`);
-    }
-    
-    if (limit) query = query.limit(limit);
-    if (offset) query = query.offset(offset);
-    
-    return await query.execute();
+    return await withKysely(async (db) => {
+      let query: any;
+
+      switch (model) {
+        case 'user':
+          query = db.selectFrom('user').selectAll();
+          break;
+        case 'account':
+          query = db.selectFrom('account').selectAll();
+          if (where.userId) query = query.where('userId', '=', where.userId);
+          break;
+        case 'verification':
+          query = db.selectFrom('verification').selectAll();
+          if (where.identifier) query = query.where('identifier', '=', where.identifier);
+          break;
+        default:
+          throw new Error(`Unsupported model: ${model}`);
+      }
+
+      if (limit) query = query.limit(limit);
+      if (offset) query = query.offset(offset);
+
+      return await query.execute();
+    });
   }
 
-  async update(data: { 
+  async update(data: {
     model: 'session' | 'user' | 'account' | 'verification';
     where: any;
     data: any;
   }): Promise<any> {
     const { model, where, data: updateData } = data;
-    
+
     if (model === 'session') {
       // Update session in KV
       if (where.token) {
         const session = await this.sessionService.update(where.token, updateData);
         return session ? this.mapSessionToAdapter(session) : null;
       }
-      
+
       dbLogger.warn('Session update by non-token field not supported in KV adapter');
       return null;
     }
-    
+
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely();
-    
-    switch (model) {
-      case 'user':
-        const user = await db
-          .updateTable('user')
-          .set(updateData)
-          .where('id', '=', where.id)
-          .returningAll()
-          .executeTakeFirst();
-        return user;
-        
-      case 'account':
-        const account = await db
-          .updateTable('account')
-          .set(updateData)
-          .where('id', '=', where.id)
-          .returningAll()
-          .executeTakeFirst();
-        return account;
-        
-      case 'verification':
-        const verification = await db
-          .updateTable('verification')
-          .set(updateData)
-          .where('id', '=', where.id)
-          .returningAll()
-          .executeTakeFirst();
-        return verification;
-        
-      default:
-        throw new Error(`Unsupported model: ${model}`);
-    }
+    return await withKysely(async (db) => {
+      switch (model) {
+        case 'user':
+          const user = await db
+            .updateTable('user')
+            .set(updateData)
+            .where('id', '=', where.id)
+            .returningAll()
+            .executeTakeFirst();
+          return user;
+
+        case 'account':
+          const account = await db
+            .updateTable('account')
+            .set(updateData)
+            .where('id', '=', where.id)
+            .returningAll()
+            .executeTakeFirst();
+          return account;
+
+        case 'verification':
+          const verification = await db
+            .updateTable('verification')
+            .set(updateData)
+            .where('id', '=', where.id)
+            .returningAll()
+            .executeTakeFirst();
+          return verification;
+
+        default:
+          throw new Error(`Unsupported model: ${model}`);
+      }
+    });
   }
 
-  async delete(data: { 
+  async delete(data: {
     model: 'session' | 'user' | 'account' | 'verification';
     where: any;
   }): Promise<boolean> {
     const { model, where } = data;
-    
+
     if (model === 'session') {
       // Delete session from KV
       if (where.token) {
         return await this.sessionService.delete(where.token);
       }
-      
+
       if (where.userId) {
         const count = await this.sessionService.deleteAllForUser(where.userId);
         return count > 0;
       }
-      
+
       dbLogger.warn('Session deletion by non-token/userId field not supported in KV adapter');
       return false;
     }
-    
+
     // For other models, use PostgreSQL via Kysely
-    const db = getKysely();
-    
-    switch (model) {
-      case 'user':
-        const userResult = await db
-          .deleteFrom('user')
-          .where('id', '=', where.id)
-          .execute();
-        return userResult.length > 0;
-        
-      case 'account':
-        const accountResult = await db
-          .deleteFrom('account')
-          .where('id', '=', where.id)
-          .execute();
-        return accountResult.length > 0;
-        
-      case 'verification':
-        const verificationResult = await db
-          .deleteFrom('verification')
-          .where('id', '=', where.id)
-          .execute();
-        return verificationResult.length > 0;
-        
-      default:
-        throw new Error(`Unsupported model: ${model}`);
-    }
+    return await withKysely(async (db) => {
+      switch (model) {
+        case 'user':
+          const userResult = await db
+            .deleteFrom('user')
+            .where('id', '=', where.id)
+            .execute();
+          return userResult.length > 0;
+
+        case 'account':
+          const accountResult = await db
+            .deleteFrom('account')
+            .where('id', '=', where.id)
+            .execute();
+          return accountResult.length > 0;
+
+        case 'verification':
+          const verificationResult = await db
+            .deleteFrom('verification')
+            .where('id', '=', where.id)
+            .execute();
+          return verificationResult.length > 0;
+
+        default:
+          throw new Error(`Unsupported model: ${model}`);
+      }
+    });
   }
 
   /**
@@ -324,64 +324,65 @@ export class BetterAuthKVAdapter implements Adapter {
   async getUserWithSession(token: string): Promise<{ user: any; session: any } | null> {
     // Get session from KV
     const session = await this.sessionService.getByToken(token);
-    
+
     if (!session) {
       return null;
     }
-    
+
     // Get user from PostgreSQL
-    const db = getKysely();
-    const user = await db
-      .selectFrom('user')
-      .selectAll()
-      .where('id', '=', session.userId)
-      .executeTakeFirst();
-    
-    if (!user) {
-      // User not found, delete orphaned session
-      await this.sessionService.delete(token);
-      return null;
-    }
-    
-    // Get organization context if available
-    let organization = null;
-    if (session.activeOrganizationId || user.last_used_organization_id) {
-      const orgId = session.activeOrganizationId || user.last_used_organization_id;
-      
-      const orgData = await db
-        .selectFrom('organizations')
-        .leftJoin('organization_members', (join) => join
-          .onRef('organization_members.organization_id', '=', 'organizations.id')
-          .on('organization_members.user_id', '=', user.id)
-        )
-        .select([
-          'organizations.id as org_id',
-          'organizations.name as org_name',
-          'organizations.slug as org_slug',
-          'organization_members.role as org_role'
-        ])
-        .where('organizations.id', '=', orgId)
+    return await withKysely(async (db) => {
+      const user = await db
+        .selectFrom('user')
+        .selectAll()
+        .where('id', '=', session.userId)
         .executeTakeFirst();
-      
-      if (orgData) {
-        organization = {
-          id: orgData.org_id,
-          name: orgData.org_name,
-          slug: orgData.org_slug,
-          role: orgData.org_role
-        };
+
+      if (!user) {
+        // User not found, delete orphaned session
+        await this.sessionService.delete(token);
+        return null;
       }
-    }
-    
-    return {
-      user: {
-        ...user,
-        // Add any additional user context
-      },
-      session: {
-        ...this.mapSessionToAdapter(session),
-        organization // Include organization in session
+
+      // Get organization context if available
+      let organization = null;
+      if (session.activeOrganizationId || user.last_used_organization_id) {
+        const orgId = session.activeOrganizationId || user.last_used_organization_id;
+
+        const orgData = await db
+          .selectFrom('organizations')
+          .leftJoin('organization_members', (join) => join
+            .onRef('organization_members.organization_id', '=', 'organizations.id')
+            .on('organization_members.user_id', '=', user.id)
+          )
+          .select([
+            'organizations.id as org_id',
+            'organizations.name as org_name',
+            'organizations.slug as org_slug',
+            'organization_members.role as org_role'
+          ])
+          .where('organizations.id', '=', orgId)
+          .executeTakeFirst();
+
+        if (orgData) {
+          organization = {
+            id: orgData.org_id,
+            name: orgData.org_name,
+            slug: orgData.org_slug,
+            role: orgData.org_role
+          };
+        }
       }
-    };
+
+      return {
+        user: {
+          ...user,
+          // Add any additional user context
+        },
+        session: {
+          ...this.mapSessionToAdapter(session),
+          organization // Include organization in session
+        }
+      };
+    });
   }
 }

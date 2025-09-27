@@ -12,6 +12,7 @@ import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
 import { createKyselyForPersistentUse, withKysely } from './database-manager';
+
 // import { createKVSessionInterceptor } from './kv-session-adapter'; // Replaced with Better Auth native secondaryStorage
 
 // Helper function to get allowed origins for unified worker
@@ -810,5 +811,12 @@ export function initializeAuth(env: Env, request?: Request) {
 
 // Export a function that initializes auth based on Hono context for runtime use
 export const getAuth = (c: HonoAuthContext) => {
-    return initializeAuth(c.env);
+    // Check if auth instance is already cached in request context
+    let authInstance = c.get('authInstance');
+    if (!authInstance) {
+        // Create auth instance once per request and cache it
+        authInstance = initializeAuth(c.env);
+        c.set('authInstance', authInstance);
+    }
+    return authInstance;
 } 

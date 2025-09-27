@@ -1118,20 +1118,21 @@ export class OrganizationActor extends DurableObject {
       }
 
       // Use kysely to fetch fresh role data
-      const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+      const { createDatabaseConnection, withKysely } = await import('../lib/database-manager');
       createDatabaseConnection(this.env);
-      const kysely = getKysely();
-      
-      const members = await kysely
-        .selectFrom('organization_members as m')
-        .innerJoin('user as u', 'u.id', 'm.user_id')
-        .select([
-          'm.user_id',
-          'm.role',
-          'u.email as user_email'
-        ])
-        .where('m.organization_id', '=', this.organizationId.replace(/_/g, '-'))
-        .execute();
+
+      const members = await withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('organization_members as m')
+          .innerJoin('user as u', 'u.id', 'm.user_id')
+          .select([
+            'm.user_id',
+            'm.role',
+            'u.email as user_email'
+          ])
+          .where('m.organization_id', '=', this.organizationId.replace(/_/g, '-'))
+          .execute();
+      });
       
       // Bulk refresh all role caches
       const roles = members.map(member => ({
@@ -1809,8 +1810,28 @@ export class OrganizationActor extends DurableObject {
     if (actorId.startsWith('org:')) {
       return actorId.substring(4);
     }
-    
+
     // Fallback - use the full actor ID
     return actorId;
+  }
+
+  /**
+   * Get role permissions based on role name
+   */
+  private getRolePermissions(role: string): string[] {
+    switch (role) {
+      case 'owner':
+        return ['read', 'write', 'delete', 'admin', 'manage_members', 'manage_billing'];
+      case 'admin':
+        return ['read', 'write', 'delete', 'manage_members'];
+      case 'manager':
+        return ['read', 'write', 'delete'];
+      case 'member':
+        return ['read', 'write'];
+      case 'viewer':
+        return ['read'];
+      default:
+        return ['read']; // Default to read-only
+    }
   }
 }

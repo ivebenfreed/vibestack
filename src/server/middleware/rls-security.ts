@@ -4,7 +4,7 @@
  */
 
 import { Context, Next } from 'hono';
-import { getKysely } from '../lib/database-manager';
+import { withKysely } from '../lib/database-manager';
 import { dbLogger } from './logger';
 import { sql } from 'kysely';
 
@@ -82,13 +82,14 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
   }
 
   // Check user's membership in this organization
-  const db = getKysely();
-  const membership = await db
-    .selectFrom('organization_members')
-    .select(['role'])
-    .where('organization_id', '=', organizationId)
-    .where('user_id', '=', user.id)
-    .executeTakeFirst();
+  const membership = await withKysely(async (db) => {
+    return await db
+      .selectFrom('organization_members')
+      .select(['role'])
+      .where('organization_id', '=', organizationId)
+      .where('user_id', '=', user.id)
+      .executeTakeFirst();
+  });
 
   if (!membership) {
     dbLogger.warn('User attempted to access organization without membership', {
@@ -112,17 +113,17 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
  * Set RLS context in database session
  */
 async function setRLSContext(c: Context, context: RLSContext): Promise<void> {
-  const db = getKysely();
-  
   try {
     // Set RLS context variables
-    await db.executeQuery(
-      sql`SELECT set_rls_context(
-        ${context.organizationId}::uuid,
-        ${context.userId},
-        ${context.userRole}
-      )`.compile(db)
-    );
+    await withKysely(async (db) => {
+      await db.executeQuery(
+        sql`SELECT set_rls_context(
+          ${context.organizationId}::uuid,
+          ${context.userId},
+          ${context.userRole}
+        )`.compile(db)
+      );
+    });
 
     dbLogger.debug('RLS context set successfully', {
       organizationId: context.organizationId,
@@ -147,12 +148,12 @@ async function setRLSContext(c: Context, context: RLSContext): Promise<void> {
  * Clear RLS context after request
  */
 async function clearRLSContext(c: Context): Promise<void> {
-  const db = getKysely();
-  
   try {
-    await db.executeQuery(
-      sql`SELECT clear_rls_context()`.compile(db)
-    );
+    await withKysely(async (db) => {
+      await db.executeQuery(
+        sql`SELECT clear_rls_context()`.compile(db)
+      );
+    });
 
     dbLogger.debug('RLS context cleared', {
       path: c.req.path
@@ -355,13 +356,13 @@ export async function setManualRLSContext(
  * Validate RLS is working correctly
  */
 export async function validateRLSSecurity(c: Context): Promise<boolean> {
-  const db = getKysely();
-  
   try {
     // Test that RLS is enforcing isolation
-    const result = await db.executeQuery(
-      sql`SELECT test_rls_isolation()`.compile(db)
-    );
+    const result = await withKysely(async (db) => {
+      return await db.executeQuery(
+        sql`SELECT test_rls_isolation()`.compile(db)
+      );
+    });
     
     dbLogger.info('RLS security validation completed', {
       result: result.rows
