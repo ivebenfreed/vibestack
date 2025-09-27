@@ -45,8 +45,9 @@ interface OrganizationMember {
   name: string
   email: string
   role: 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
-  status: 'active' | 'pending' | 'suspended'
-  joinedAt: string
+  status?: 'active' | 'pending' | 'suspended'
+  created_at: string
+  updated_at: string
 }
 
 interface OrganizationInvitation {
@@ -81,11 +82,12 @@ const roleLabels = {
 }
 
 export function MembersForm() {
-  const { currentOrganization, effectiveUserRole, user } = useAuth()
+  const { user, userOrganizations } = useAuth()
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingInvitations, setIsLoadingInvitations] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<string>('member')
   const [inviteMessage, setInviteMessage] = useState('')
@@ -93,19 +95,34 @@ export function MembersForm() {
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Find selected organization and user's role in it
+  const selectedOrganization = userOrganizations?.find(org => org.id === selectedOrgId)
+  const effectiveUserRole = selectedOrganization?.role || null
   const isOwnerOrAdmin = effectiveUserRole === 'owner' || effectiveUserRole === 'admin'
   const isOwner = effectiveUserRole === 'owner'
 
+  // Auto-select first admin/owner organization if available
   useEffect(() => {
-    if (currentOrganization?.id) {
+    if (!selectedOrgId && userOrganizations && userOrganizations.length > 0) {
+      const adminOrg = userOrganizations.find(org => org.role === 'owner' || org.role === 'admin')
+      if (adminOrg) {
+        setSelectedOrgId(adminOrg.id)
+      }
+    }
+  }, [userOrganizations, selectedOrgId])
+
+  useEffect(() => {
+    if (selectedOrgId) {
       fetchMembers()
       fetchInvitations()
     }
-  }, [currentOrganization?.id])
+  }, [selectedOrgId])
 
   const fetchMembers = async () => {
+    if (!selectedOrgId) return
+    setIsLoading(true)
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization?.id}/members`)
+      const response = await fetch(`/api/organizations/${selectedOrgId}/members`)
       if (!response.ok) {
         throw new Error('Failed to fetch members')
       }
@@ -143,7 +160,7 @@ export function MembersForm() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization.id}/members/invite`, {
+      const response = await fetch(`/api/organizations/${selectedOrgId}/members/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +194,7 @@ export function MembersForm() {
 
   const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization?.id}/members/${memberId}`, {
+      const response = await fetch(`/api/organizations/${selectedOrgId}/members/${memberId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +214,7 @@ export function MembersForm() {
 
   const handleRemoveMember = async (memberId: string) => {
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization?.id}/members/${memberId}`, {
+      const response = await fetch(`/api/organizations/${selectedOrgId}/members/${memberId}`, {
         method: 'DELETE',
       })
 
@@ -213,7 +230,7 @@ export function MembersForm() {
 
   const handleResendInvitation = async (invitationId: string) => {
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization?.id}/invitations/${invitationId}/resend`, {
+      const response = await fetch(`/api/organizations/${selectedOrgId}/invitations/${invitationId}/resend`, {
         method: 'POST',
       })
 
@@ -231,7 +248,7 @@ export function MembersForm() {
 
   const handleCancelInvitation = async (invitationId: string) => {
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization?.id}/invitations/${invitationId}`, {
+      const response = await fetch(`/api/organizations/${selectedOrgId}/invitations/${invitationId}`, {
         method: 'DELETE',
       })
 
@@ -254,22 +271,77 @@ export function MembersForm() {
     return true
   }
 
-  if (!currentOrganization) {
+  // Show world selector if no org selected or user has no admin access
+  if (!userOrganizations || userOrganizations.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No world selected in your AI Universe</p>
+        <p className="text-muted-foreground">No worlds available</p>
+      </div>
+    )
+  }
+
+  const adminOrgs = userOrganizations.filter(org => org.role === 'owner' || org.role === 'admin')
+
+  if (adminOrgs.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">You need admin or owner access to manage world members</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">World Members</h3>
-        <p className="text-sm text-muted-foreground">
-          Manage who has access to your world within your AI Universe and their roles.
-        </p>
-      </div>
+      {/* World Selector */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Select World to Manage</CardTitle>
+              <CardDescription>
+                Choose which world you want to manage members for
+              </CardDescription>
+            </div>
+            <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select a world..." />
+              </SelectTrigger>
+              <SelectContent>
+                {adminOrgs.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {org.role === 'owner' ? (
+                          <Crown className="h-3 w-3 text-yellow-600" />
+                        ) : (
+                          <Shield className="h-3 w-3 text-blue-600" />
+                        )}
+                        <span className="text-xs text-muted-foreground">{org.role}</span>
+                      </div>
+                      <span>{org.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {!selectedOrganization && (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Select a world above to manage its members</p>
+        </div>
+      )}
+
+      {selectedOrganization && (
+        <>
+          <div>
+            <h3 className="text-lg font-medium">World Members - {selectedOrganization.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              Manage who has access to this world and their roles. Your role: {effectiveUserRole}
+            </p>
+          </div>
 
       {error && (
         <Alert variant="destructive">
@@ -377,18 +449,12 @@ export function MembersForm() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant={
-                          member.status === 'active' ? 'default' : 
-                          member.status === 'pending' ? 'secondary' : 
-                          'destructive'
-                        }
-                      >
-                        {member.status}
+                      <Badge variant="default">
+                        {member.status || 'active'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(member.joinedAt).toLocaleDateString()}
+                      {new Date(member.created_at).toLocaleDateString()}
                     </TableCell>
                     {isOwnerOrAdmin && (
                       <TableCell>
@@ -617,6 +683,8 @@ export function MembersForm() {
             )}
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   )

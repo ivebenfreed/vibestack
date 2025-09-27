@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-compatibility'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Form,
   FormControl,
@@ -18,7 +25,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { Building2, AlertTriangle, Save, Trash2 } from 'lucide-react'
+import { Building2, AlertTriangle, Save, Trash2, Crown, Shield } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,26 +48,54 @@ const organizationFormSchema = z.object({
 type OrganizationFormValues = z.infer<typeof organizationFormSchema>
 
 export function OrganizationForm() {
-  const { currentOrganization, effectiveUserRole } = useAuth()
+  const { user, userOrganizations } = useAuth()
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateSuccess, setUpdateSuccess] = useState(false)
 
+  // Find selected organization and user's role in it
+  const selectedOrganization = userOrganizations?.find(org => org.id === selectedOrgId)
+  const effectiveUserRole = selectedOrganization?.role || null
   const isOwner = effectiveUserRole === 'owner'
+
+  // Auto-select first owner organization if available
+  useEffect(() => {
+    if (!selectedOrgId && userOrganizations && userOrganizations.length > 0) {
+      const ownerOrg = userOrganizations.find(org => org.role === 'owner')
+      if (ownerOrg) {
+        setSelectedOrgId(ownerOrg.id)
+      }
+    }
+  }, [userOrganizations, selectedOrgId])
 
   const form = useForm<OrganizationFormValues>({
     resolver: zodResolver(organizationFormSchema),
     defaultValues: {
-      name: currentOrganization?.name || '',
-      domain: currentOrganization?.domain || '',
-      lore: currentOrganization?.lore || '',
-      canon: typeof currentOrganization?.canon === 'string' 
-        ? currentOrganization.canon 
-        : JSON.stringify(currentOrganization?.canon || {}, null, 2),
+      name: selectedOrganization?.name || '',
+      domain: selectedOrganization?.domain || '',
+      lore: selectedOrganization?.lore || '',
+      canon: typeof selectedOrganization?.canon === 'string'
+        ? selectedOrganization.canon
+        : JSON.stringify(selectedOrganization?.canon || {}, null, 2),
     },
   })
 
+  // Update form when selected organization changes
+  useEffect(() => {
+    if (selectedOrganization) {
+      form.reset({
+        name: selectedOrganization.name || '',
+        domain: selectedOrganization.domain || '',
+        lore: selectedOrganization.lore || '',
+        canon: typeof selectedOrganization.canon === 'string'
+          ? selectedOrganization.canon
+          : JSON.stringify(selectedOrganization.canon || {}, null, 2),
+      })
+    }
+  }, [selectedOrganization, form])
+
   const onSubmit = async (data: OrganizationFormValues) => {
-    if (!currentOrganization) return
+    if (!selectedOrganization) return
     
     setIsUpdating(true)
     setUpdateSuccess(false)
@@ -77,7 +112,7 @@ export function OrganizationForm() {
         }
       }
 
-      const response = await fetch(`/api/organizations/${currentOrganization.id}`, {
+      const response = await fetch(`/api/organizations/${selectedOrganization.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -105,10 +140,10 @@ export function OrganizationForm() {
   }
 
   const handleDeleteOrganization = async () => {
-    if (!currentOrganization) return
+    if (!selectedOrganization) return
 
     try {
-      const response = await fetch(`/api/organizations/${currentOrganization.id}`, {
+      const response = await fetch(`/api/organizations/${selectedOrganization.id}`, {
         method: 'DELETE',
       })
 
@@ -123,22 +158,71 @@ export function OrganizationForm() {
     }
   }
 
-  if (!currentOrganization) {
+  // Show world selector if no org selected or user has no owner access
+  if (!userOrganizations || userOrganizations.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No world selected in your AI Universe</p>
+        <p className="text-muted-foreground">No worlds available</p>
+      </div>
+    )
+  }
+
+  const ownerOrgs = userOrganizations.filter(org => org.role === 'owner')
+
+  if (ownerOrgs.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">You need owner access to manage world settings</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">World Settings</h3>
-        <p className="text-sm text-muted-foreground">
-          Manage your world's basic information and framework within your AI Universe.
-        </p>
-      </div>
+      {/* World Selector */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Select World to Manage</CardTitle>
+              <CardDescription>
+                Choose which world you want to manage settings for
+              </CardDescription>
+            </div>
+            <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select a world..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ownerOrgs.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-3 w-3 text-yellow-600" />
+                      <span className="text-xs text-muted-foreground">owner</span>
+                      <span>{org.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {!selectedOrganization && (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Select a world above to manage its settings</p>
+        </div>
+      )}
+
+      {selectedOrganization && (
+        <>
+          <div>
+            <h3 className="text-lg font-medium">World Settings - {selectedOrganization.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              Manage this world's basic information and framework. Your role: owner
+            </p>
+          </div>
 
       {updateSuccess && (
         <Alert>
@@ -270,7 +354,7 @@ export function OrganizationForm() {
                       Delete World
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently delete the world "{currentOrganization.name}" and all its data from your AI Universe. 
+                      This will permanently delete the world "{selectedOrganization.name}" and all its data from your AI Universe. 
                       This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -297,6 +381,8 @@ export function OrganizationForm() {
             You need world owner permissions to delete the world.
           </AlertDescription>
         </Alert>
+      )}
+        </>
       )}
     </div>
   )

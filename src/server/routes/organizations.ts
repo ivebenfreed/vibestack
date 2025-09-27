@@ -620,6 +620,88 @@ app.delete('/:id/invitations/:invitationId', requireUserAndOrg(), async (c) => {
 });
 
 /**
+ * GET ORGANIZATION MEMBERS
+ * GET /organizations/:id/members
+ */
+app.get('/:id/members', requireUserAndOrg(), async (c) => {
+  const requestId = c.get('requestId');
+  const userContext = c.get('userContext');
+  const orgContext = c.get('orgContext')!;
+
+  try {
+    const organizationId = c.req.param('id');
+
+    // Verify the requested organization matches the context
+    if (organizationId !== orgContext.organizationId) {
+      return c.json({
+        success: false,
+        error: 'Organization ID mismatch',
+        code: 'INVALID_ORG_ID',
+        requestId
+      }, 400);
+    }
+
+    // Check admin/owner access for viewing members
+    if (!['admin', 'owner'].includes(orgContext.userOrgRole)) {
+      return c.json({
+        success: false,
+        error: 'Administrative access required',
+        code: 'INSUFFICIENT_PERMISSIONS',
+        requestId
+      }, 403);
+    }
+
+    const auth = getAuth(c);
+
+    apiLogger.info('Fetching organization members', {
+      organizationId,
+      userId: userContext.userId,
+      requestId
+    }, MODULE_NAME);
+
+    // Query members directly from database
+    const members = await c.env.DB
+      .prepare(`
+        SELECT
+          om.user_id as id,
+          u.name,
+          u.email,
+          om.role,
+          om.created_at,
+          om.updated_at
+        FROM organization_members om
+        JOIN user u ON u.id = om.user_id
+        WHERE om.organization_id = ? AND om.status = 'active'
+        ORDER BY u.name ASC
+      `)
+      .bind(organizationId)
+      .all();
+
+    return c.json({
+      success: true,
+      data: {
+        members: members.results || []
+      },
+      requestId
+    });
+
+  } catch (error) {
+    apiLogger.error('Error fetching members', {
+      error: error instanceof Error ? error.message : String(error),
+      organizationId: c.req.param('id'),
+      requestId
+    }, MODULE_NAME);
+
+    return c.json({
+      success: false,
+      error: 'Failed to fetch members',
+      code: 'FETCH_FAILED',
+      requestId
+    }, 500);
+  }
+});
+
+/**
  * INVITE MEMBER TO ORGANIZATION
  * POST /organizations/:id/members
  */

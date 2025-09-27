@@ -15,9 +15,24 @@ const authLog = log('lib/auth-compatibility.ts');
 export function useAuth() {
   const unifiedAuth = useUnifiedAuth();
 
+  // Debug current auth state
+  authLog.debug('[useAuth] Current auth state:', {
+    hasUser: !!unifiedAuth.user,
+    hasOrganization: !!unifiedAuth.organization,
+    organizationName: unifiedAuth.organization?.name,
+    userRole: unifiedAuth.user?.role,
+    userOrganizationsCount: unifiedAuth.userOrganizations?.length || 0
+  });
+
   return {
     // Pass through all unified auth properties
     ...unifiedAuth,
+
+    // Map organization to currentOrganization for compatibility
+    currentOrganization: unifiedAuth.organization,
+
+    // Map user's role in current organization
+    effectiveUserRole: unifiedAuth.organization?.role || unifiedAuth.user?.role || null,
 
     // Stub implementations for missing auth actions
     createOrganization: (organizationData: { name: string; domain?: string }) => {
@@ -42,7 +57,6 @@ export function useAuth() {
 
     // Additional legacy properties that might be needed
     organizationError: null,
-    effectiveUserRole: unifiedAuth.user?.role || null,
   };
 }
 
