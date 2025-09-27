@@ -100,7 +100,14 @@ const cliNeonDialect = dbUrlForCli
 // Top-level auth instance for CLI schema generation and potentially type inference.
 // Provide minimal config required for the CLI to detect the database type.
 // The actual runtime configuration happens in initializeAuth below.
-export const auth = betterAuth({
+// LAZY: Only create when needed for CLI, not on module load
+export const auth = (() => {
+  // Skip creation entirely in Worker runtime to avoid module-load overhead
+  if (typeof process === 'undefined') {
+    return null as any; // Worker environment - return null placeholder
+  }
+
+  return betterAuth({
     // Wrap dialect in an object and specify the type for CLI
     database: cliNeonDialect ? {
       dialect: cliNeonDialect as unknown as Dialect,
@@ -218,15 +225,24 @@ export const auth = betterAuth({
         theme: "default", // Use default theme
       }),
     ],
-});
+  });
+})(); // End IIFE - only execute in CLI (Node.js) environment
 
 
 // --- Runtime initialization for Hono ---
 
+// HTTP isolate auth cache - persists across requests within same isolate
+let httpAuthInstance: any = null;
+let httpAuthTimestamp = 0;
+const AUTH_CACHE_TTL = 300000; // 5 minutes in milliseconds
+
+// WebSocket isolate auth cache - separate from HTTP isolate
+let wsAuthInstance: any = null;
+let wsAuthTimestamp = 0;
+
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
-  console.log('[Auth Init] Creating Better Auth instance with org plugin...');
   const kyselyInstance = createKyselyForPersistentUse();
   
   // Database connection is already established by middleware
@@ -811,12 +827,34 @@ export function initializeAuth(env: Env, request?: Request) {
 
 // Export a function that initializes auth based on Hono context for runtime use
 export const getAuth = (c: HonoAuthContext) => {
-    // Check if auth instance is already cached in request context
-    let authInstance = c.get('authInstance');
-    if (!authInstance) {
-        // Create auth instance once per request and cache it
-        authInstance = initializeAuth(c.env);
-        c.set('authInstance', authInstance);
+    const now = Date.now();
+
+    // Check if we have a valid cached auth instance for this HTTP isolate
+    if (httpAuthInstance && (now - httpAuthTimestamp) < AUTH_CACHE_TTL) {
+        return httpAuthInstance;
     }
-    return authInstance;
+
+    // Create new auth instance and cache it at isolate level
+    console.log('[HTTP Auth] Creating new auth instance for isolate');
+    httpAuthInstance = initializeAuth(c.env);
+    httpAuthTimestamp = now;
+
+    return httpAuthInstance;
+}
+
+// WebSocket isolate auth cache function - separate from HTTP to avoid cross-isolate issues
+export function getWebSocketAuth(env: Env): any {
+    const now = Date.now();
+
+    // Check if we have a valid cached auth instance for this WebSocket isolate
+    if (wsAuthInstance && (now - wsAuthTimestamp) < AUTH_CACHE_TTL) {
+        return wsAuthInstance;
+    }
+
+    // Create new auth instance and cache it at WebSocket isolate level
+    console.log('[WebSocket Auth] Creating new auth instance for isolate');
+    wsAuthInstance = initializeAuth(env);
+    wsAuthTimestamp = now;
+
+    return wsAuthInstance;
 } 

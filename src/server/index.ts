@@ -18,7 +18,7 @@ import { ReplicationDO } from './replication/ReplicationDO';
 // OrgSchemaDO functionality removed - using direct PostgreSQL queries
 // SuperAdminDO removed - will handle super admin differently
 // OrgOpsDO archived - sync system is now pull-based
-import { getAuth, AuthType, initializeAuth } from './lib/auth';
+import { getAuth, AuthType, initializeAuth, getWebSocketAuth } from './lib/auth';
 import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
 import { databaseInit } from './middleware/database-init'; // <-- Import database initialization middleware
@@ -671,7 +671,7 @@ const worker = {
         const { createDatabaseConnection } = await import('./lib/database-manager');
         createDatabaseConnection(env);
         
-        const auth = initializeAuth(env); // Initialize auth with fresh DB connection
+        const auth = getWebSocketAuth(env); // Use cached auth instance for WebSocket isolate
         
         // Debug: Log all headers and cookies
         console.log(`[${requestId}] [Sync Auth DEBUG] Request headers:`, Object.fromEntries(request.headers.entries()));
