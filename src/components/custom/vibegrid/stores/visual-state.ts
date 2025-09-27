@@ -254,9 +254,9 @@ export function createVisualState$(visualInputs$: any) {
     const rowCount = visualInputs$.rowCount.get();
     const rowHeight = visualInputs$.rowHeight.get();
 
-    // ✅ NON-TRACKING ACCESS: Don't track scroll properties in layout computation
-    const scrollLeft = visualInputs$.scrollLeft.peek();
-    const scrollTop = visualInputs$.scrollTop.peek();
+    // ✅ TRACKING ACCESS: Track scroll properties for virtual scrolling
+    const scrollLeft = visualInputs$.scrollLeft.get();
+    const scrollTop = visualInputs$.scrollTop.get();
     const viewportWidth = visualInputs$.viewportWidth.peek();
     const viewportHeight = visualInputs$.viewportHeight.peek();
 
@@ -318,8 +318,21 @@ export function createVisualState$(visualInputs$: any) {
 
   const startRowIndex = Math.floor(scrollTop / rowHeight);
   const endRowIndex = Math.min(rowCount,
-    Math.ceil((scrollTop + viewportHeight) / rowHeight) + 1
+    Math.ceil((scrollTop + Math.max(viewportHeight, 400)) / rowHeight) + 1  // Ensure minimum viewport
   );
+
+  // DEBUG: Log visible range calculation to identify initial load issues
+  if (scrollTop === 0) {
+    console.log('🔍 VISIBLE RANGE DEBUG (initial load)', {
+      scrollTop,
+      viewportHeight,
+      rowHeight,
+      rowCount,
+      startRowIndex,
+      endRowIndex,
+      expectedMinimumRows: Math.ceil(400 / rowHeight)
+    });
+  }
 
   const geometry: ViewportGeometry = {
     viewportWidth,

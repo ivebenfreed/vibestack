@@ -128,6 +128,7 @@ export class SimplePassiveRenderer {
   private columnVisibilityObserverDisposer: (() => void) | null = null;
   private columnOrderObserverDisposer: (() => void) | null = null;
   private columnWidthsObserverDisposer: (() => void) | null = null; // Add dedicated observer for column widths
+  private virtualScrollObserverDisposer: (() => void) | null = null; // Add dedicated observer for virtual scrolling
   private interactionObserverDisposer: (() => void) | null = null;
   private scrollObserverDisposer: (() => void) | null = null;
   private dragSelectionObserverDisposer: (() => void) | null = null;
@@ -764,6 +765,33 @@ export class SimplePassiveRenderer {
       }
     });
 
+    // VIRTUAL SCROLL OBSERVER: Watch for visible row range changes due to scrolling
+    this.virtualScrollObserverDisposer = this.visualState.visualState$.geometry.visibleRowRange.onChange((newRange, prevRange) => {
+      if (!this.observersEnabled) return;
+      fileLog.info('🚀 VIRTUAL SCROLL: visibleRowRange changed reactively', {
+        newRange,
+        prevRange,
+        timestamp: Date.now()
+      });
+
+      // Call with proper context - get current ranges manually
+      const visualState = this.visualState.visualState$.get(true);
+      const currentColumnRange = {
+        start: 0,
+        end: visualState.visibleColumns?.length - 1 || 0
+      };
+      const currentRowRange = visualState.geometry.visibleRowRange;
+      const previousRowRange = this.lastVisibleRows || { start: -1, end: -1 };
+
+      // Only proceed if row range actually changed
+      const rowRangeChanged = currentRowRange.start !== previousRowRange.start || currentRowRange.end !== previousRowRange.end;
+
+      if (rowRangeChanged) {
+        this.updateVirtualRows(previousRowRange, currentRowRange);
+        this.lastVisibleRows = currentRowRange;
+      }
+    });
+
     fileLog.info('✅ Focused observers initialized');
   }
 
@@ -1076,9 +1104,96 @@ export class SimplePassiveRenderer {
       this.lastVisibleColumns = currentColumnRange;
       this.lastVisibleRows = currentRowRange;
 
-      // Trigger body re-render with new virtual columns
-      this.renderBody();
+      // Use incremental updates instead of full re-render
+      if (rowRangeChanged) {
+        this.updateVirtualRows(previousRowRange, currentRowRange);
+      } else {
+        // For column changes, still need full re-render for now
+        this.renderBody();
+      }
     }
+  }
+
+  /**
+   * Incremental virtual scrolling - only add/remove rows that changed
+   */
+  private updateVirtualRows(
+    previousRange: { start: number; end: number },
+    currentRange: { start: number; end: number }
+  ): void {
+    if (!this.bodyContainer || !this.bodyRenderer) return;
+
+    const rows = this.sortedProcessedRows$ ? this.sortedProcessedRows$.get(true) : this.tableCore$.processedRows.get(true);
+    const columns = this.tableCore$.columns.get(true);
+    const columnVisibility = this.visualState.visualInputs$.columnVisibility.get(true);
+    const visualState = this.visualState.visualState$.get(true);
+    const allVisibleColumnLayouts = visualState.visibleColumns;
+    const baseOffset = this.calculateBaseOffset();
+
+    fileLog.info('🚀 INCREMENTAL UPDATE: Virtual rows changed', {
+      previousRange: `${previousRange.start}-${previousRange.end}`,
+      currentRange: `${currentRange.start}-${currentRange.end}`,
+      totalRows: rows.length,
+      action: 'incremental_update'
+    });
+
+    // If this is the first render (previous was -1 to -1), create all visible rows
+    if (previousRange.start === -1) {
+      fileLog.info('🎯 INITIAL RENDER: Creating all visible rows', {
+        range: `${currentRange.start}-${currentRange.end}`,
+        count: currentRange.end - currentRange.start + 1
+      });
+
+      for (let i = currentRange.start; i <= currentRange.end && i < rows.length; i++) {
+        const rowElement = this.bodyRenderer.createRowElement(rows[i], i, columns, columnVisibility, baseOffset);
+        this.bodyContainer.appendChild(rowElement);
+      }
+      return;
+    }
+
+    // Remove rows that are no longer visible
+    if (currentRange.start > previousRange.start) {
+      for (let i = previousRange.start; i < currentRange.start && i <= previousRange.end; i++) {
+        const rowElement = this.bodyContainer.querySelector(`[data-row-id="${rows[i]?.id}"]`);
+        if (rowElement) {
+          this.bodyContainer.removeChild(rowElement);
+          fileLog.debug('🗑️ REMOVED row', { rowIndex: i, rowId: rows[i]?.id });
+        }
+      }
+    }
+
+    if (currentRange.end < previousRange.end) {
+      for (let i = currentRange.end + 1; i <= previousRange.end && i < rows.length; i++) {
+        const rowElement = this.bodyContainer.querySelector(`[data-row-id="${rows[i]?.id}"]`);
+        if (rowElement) {
+          this.bodyContainer.removeChild(rowElement);
+          fileLog.debug('🗑️ REMOVED row', { rowIndex: i, rowId: rows[i]?.id });
+        }
+      }
+    }
+
+    // Add new rows that became visible
+    if (currentRange.start < previousRange.start) {
+      for (let i = currentRange.start; i < previousRange.start && i < rows.length; i++) {
+        const rowElement = this.bodyRenderer.createRowElement(rows[i], i, columns, columnVisibility, baseOffset);
+        this.bodyContainer.appendChild(rowElement);
+        fileLog.debug('➕ ADDED row (top)', { rowIndex: i, rowId: rows[i]?.id });
+      }
+    }
+
+    if (currentRange.end > previousRange.end) {
+      for (let i = previousRange.end + 1; i <= currentRange.end && i < rows.length; i++) {
+        const rowElement = this.bodyRenderer.createRowElement(rows[i], i, columns, columnVisibility, baseOffset);
+        this.bodyContainer.appendChild(rowElement);
+        fileLog.debug('➕ ADDED row (bottom)', { rowIndex: i, rowId: rows[i]?.id });
+      }
+    }
+
+    fileLog.info('✅ INCREMENTAL UPDATE: Complete', {
+      previousRange: `${previousRange.start}-${previousRange.end}`,
+      currentRange: `${currentRange.start}-${currentRange.end}`,
+      totalRowsNow: this.bodyContainer.children.length
+    });
   }
 
   /**
@@ -1687,6 +1802,10 @@ export class SimplePassiveRenderer {
     if (this.columnWidthsObserverDisposer) {
       this.columnWidthsObserverDisposer();
       this.columnWidthsObserverDisposer = null;
+    }
+    if (this.virtualScrollObserverDisposer) {
+      this.virtualScrollObserverDisposer();
+      this.virtualScrollObserverDisposer = null;
     }
     if (this.interactionObserverDisposer) {
       this.interactionObserverDisposer();
