@@ -72,6 +72,7 @@ export interface OrganizationContext {
   teams: Team[];
   businessWorlds: World[];
   personalWorlds: World[]; // Personal worlds in this organization
+  enabledFeatures: Record<string, boolean>; // Feature flags controlled by platform admin
 }
 
 // User-configurable entities (still managed by DataForge)
@@ -183,7 +184,8 @@ export const universeContext$: Observable<UniverseContextData> = observable(() =
         universe: orgData.universe,
         teams: orgData.teams || [],
         businessWorlds: orgData.businessWorlds || [],
-        personalWorlds: orgData.personalWorlds || []
+        personalWorlds: orgData.personalWorlds || [],
+        enabledFeatures: orgData.enabled_features || { universe_mode: true }
       };
     });
   }

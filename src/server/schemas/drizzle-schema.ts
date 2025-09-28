@@ -19,6 +19,11 @@ export const organizations = pgTable('organizations', {
   billing_cycle: varchar('billing_cycle', { length: 20 }),
   next_billing_date: timestamp('next_billing_date'),
   billing_settings: jsonb('billing_settings'),
+
+  // Platform feature flags controlled by SaaS admin
+  enabled_features: jsonb('enabled_features').default('{"universe_mode": true}'),
+  feature_overrides: jsonb('feature_overrides'),
+
   updated_at: timestamp('updated_at').defaultNow(),
   created_at: timestamp('created_at').defaultNow(),
 });
@@ -40,6 +45,36 @@ export const users = pgTable('users', {
   updated_at: timestamp('updated_at').defaultNow(),
 });
 
+// Platform feature flags table for global feature management
+export const platformFeatureFlags = pgTable('platform_feature_flags', {
+  id: uuid('id').primaryKey(),
+  feature_key: varchar('feature_key', { length: 100 }).notNull().unique(),
+  description: text('description'),
+  default_enabled: varchar('default_enabled', { length: 10 }).default('false'),
+  rollout_percentage: varchar('rollout_percentage', { length: 10 }).default('0'),
+  target_plans: jsonb('target_plans').default('["pro", "enterprise"]'),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// Admin audit log for platform actions
+export const adminAuditLog = pgTable('admin_audit_log', {
+  id: uuid('id').primaryKey(),
+  admin_user_id: uuid('admin_user_id').notNull(),
+  admin_email: varchar('admin_email', { length: 255 }).notNull(),
+  admin_role: varchar('admin_role', { length: 50 }).notNull(),
+  action: varchar('action', { length: 100 }).notNull(),
+  resource_type: varchar('resource_type', { length: 50 }),
+  resource_id: varchar('resource_id', { length: 255 }),
+  details: jsonb('details'),
+  ip_address: varchar('ip_address', { length: 45 }),
+  user_agent: text('user_agent'),
+  status: varchar('status', { length: 20 }).default('success'),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
 export type Organization = typeof organizations.$inferSelect;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
 export type User = typeof users.$inferSelect;
+export type PlatformFeatureFlag = typeof platformFeatureFlags.$inferSelect;
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;

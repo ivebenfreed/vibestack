@@ -34,6 +34,7 @@ import { Route as AuthenticatedDebugRouteRouteImport } from './routes/_authentic
 import { Route as AuthenticatedUniverseIndexRouteImport } from './routes/_authenticated/universe/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedPlatformAdminIndexRouteImport } from './routes/_authenticated/platform-admin/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedEntitiesIndexRouteImport } from './routes/_authenticated/entities/index'
 import { Route as AuthenticatedDebugIndexRouteImport } from './routes/_authenticated/debug/index'
@@ -49,6 +50,9 @@ import { Route as AuthenticatedSettingsBillingRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedPlatformAdminUsersRouteImport } from './routes/_authenticated/platform-admin/users'
+import { Route as AuthenticatedPlatformAdminOrganizationsRouteImport } from './routes/_authenticated/platform-admin/organizations'
+import { Route as AuthenticatedPlatformAdminFeatureFlagsRouteImport } from './routes/_authenticated/platform-admin/feature-flags'
 import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_authenticated/debug/vibegantt-test'
 import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authenticated/debug/vibegantt'
@@ -186,6 +190,12 @@ const AuthenticatedSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedPlatformAdminIndexRoute =
+  AuthenticatedPlatformAdminIndexRouteImport.update({
+    id: '/platform-admin/',
+    path: '/platform-admin/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
@@ -291,6 +301,24 @@ const AuthenticatedProjectsProjectIdRoute =
     path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPlatformAdminUsersRoute =
+  AuthenticatedPlatformAdminUsersRouteImport.update({
+    id: '/platform-admin/users',
+    path: '/platform-admin/users',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPlatformAdminOrganizationsRoute =
+  AuthenticatedPlatformAdminOrganizationsRouteImport.update({
+    id: '/platform-admin/organizations',
+    path: '/platform-admin/organizations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPlatformAdminFeatureFlagsRoute =
+  AuthenticatedPlatformAdminFeatureFlagsRouteImport.update({
+    id: '/platform-admin/feature-flags',
+    path: '/platform-admin/feature-flags',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDebugVibegridLegendStateRoute =
   AuthenticatedDebugVibegridLegendStateRouteImport.update({
     id: '/vibegrid-legend-state',
@@ -385,6 +413,9 @@ export interface FileRoutesByFullPath {
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
+  '/platform-admin/feature-flags': typeof AuthenticatedPlatformAdminFeatureFlagsRoute
+  '/platform-admin/organizations': typeof AuthenticatedPlatformAdminOrganizationsRoute
+  '/platform-admin/users': typeof AuthenticatedPlatformAdminUsersRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -402,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/debug/': typeof AuthenticatedDebugIndexRoute
   '/entities': typeof AuthenticatedEntitiesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/platform-admin': typeof AuthenticatedPlatformAdminIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
@@ -435,6 +467,9 @@ export interface FileRoutesByTo {
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
+  '/platform-admin/feature-flags': typeof AuthenticatedPlatformAdminFeatureFlagsRoute
+  '/platform-admin/organizations': typeof AuthenticatedPlatformAdminOrganizationsRoute
+  '/platform-admin/users': typeof AuthenticatedPlatformAdminUsersRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -452,6 +487,7 @@ export interface FileRoutesByTo {
   '/debug': typeof AuthenticatedDebugIndexRoute
   '/entities': typeof AuthenticatedEntitiesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/platform-admin': typeof AuthenticatedPlatformAdminIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
@@ -489,6 +525,9 @@ export interface FileRoutesById {
   '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/_authenticated/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
+  '/_authenticated/platform-admin/feature-flags': typeof AuthenticatedPlatformAdminFeatureFlagsRoute
+  '/_authenticated/platform-admin/organizations': typeof AuthenticatedPlatformAdminOrganizationsRoute
+  '/_authenticated/platform-admin/users': typeof AuthenticatedPlatformAdminUsersRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -506,6 +545,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
   '/_authenticated/entities/': typeof AuthenticatedEntitiesIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
+  '/_authenticated/platform-admin/': typeof AuthenticatedPlatformAdminIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/universe/': typeof AuthenticatedUniverseIndexRoute
@@ -543,6 +583,9 @@ export interface FileRouteTypes {
     | '/debug/vibegantt'
     | '/debug/vibegantt-test'
     | '/debug/vibegrid-legend-state'
+    | '/platform-admin/feature-flags'
+    | '/platform-admin/organizations'
+    | '/platform-admin/users'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -560,6 +603,7 @@ export interface FileRouteTypes {
     | '/debug/'
     | '/entities'
     | '/help-center'
+    | '/platform-admin'
     | '/settings/'
     | '/tasks'
     | '/universe'
@@ -593,6 +637,9 @@ export interface FileRouteTypes {
     | '/debug/vibegantt'
     | '/debug/vibegantt-test'
     | '/debug/vibegrid-legend-state'
+    | '/platform-admin/feature-flags'
+    | '/platform-admin/organizations'
+    | '/platform-admin/users'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -610,6 +657,7 @@ export interface FileRouteTypes {
     | '/debug'
     | '/entities'
     | '/help-center'
+    | '/platform-admin'
     | '/settings'
     | '/tasks'
     | '/universe'
@@ -646,6 +694,9 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/vibegantt'
     | '/_authenticated/debug/vibegantt-test'
     | '/_authenticated/debug/vibegrid-legend-state'
+    | '/_authenticated/platform-admin/feature-flags'
+    | '/_authenticated/platform-admin/organizations'
+    | '/_authenticated/platform-admin/users'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -663,6 +714,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/'
     | '/_authenticated/entities/'
     | '/_authenticated/help-center/'
+    | '/_authenticated/platform-admin/'
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
     | '/_authenticated/universe/'
@@ -855,6 +907,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/platform-admin/': {
+      id: '/_authenticated/platform-admin/'
+      path: '/platform-admin'
+      fullPath: '/platform-admin'
+      preLoaderRoute: typeof AuthenticatedPlatformAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
       path: '/help-center'
@@ -972,6 +1031,27 @@ declare module '@tanstack/react-router' {
       path: '/projects/$projectId'
       fullPath: '/projects/$projectId'
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/platform-admin/users': {
+      id: '/_authenticated/platform-admin/users'
+      path: '/platform-admin/users'
+      fullPath: '/platform-admin/users'
+      preLoaderRoute: typeof AuthenticatedPlatformAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/platform-admin/organizations': {
+      id: '/_authenticated/platform-admin/organizations'
+      path: '/platform-admin/organizations'
+      fullPath: '/platform-admin/organizations'
+      preLoaderRoute: typeof AuthenticatedPlatformAdminOrganizationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/platform-admin/feature-flags': {
+      id: '/_authenticated/platform-admin/feature-flags'
+      path: '/platform-admin/feature-flags'
+      fullPath: '/platform-admin/feature-flags'
+      preLoaderRoute: typeof AuthenticatedPlatformAdminFeatureFlagsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/debug/vibegrid-legend-state': {
@@ -1123,6 +1203,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDebugRouteRoute: typeof AuthenticatedDebugRouteRouteWithChildren
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedPlatformAdminFeatureFlagsRoute: typeof AuthenticatedPlatformAdminFeatureFlagsRoute
+  AuthenticatedPlatformAdminOrganizationsRoute: typeof AuthenticatedPlatformAdminOrganizationsRoute
+  AuthenticatedPlatformAdminUsersRoute: typeof AuthenticatedPlatformAdminUsersRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
   AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
   AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
@@ -1131,6 +1214,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedEntitiesIndexRoute: typeof AuthenticatedEntitiesIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
+  AuthenticatedPlatformAdminIndexRoute: typeof AuthenticatedPlatformAdminIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUniverseIndexRoute: typeof AuthenticatedUniverseIndexRoute
   AuthenticatedOrgOrgIdDashboardRoute: typeof AuthenticatedOrgOrgIdDashboardRoute
@@ -1143,6 +1227,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDebugRouteRoute: AuthenticatedDebugRouteRouteWithChildren,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedPlatformAdminFeatureFlagsRoute:
+    AuthenticatedPlatformAdminFeatureFlagsRoute,
+  AuthenticatedPlatformAdminOrganizationsRoute:
+    AuthenticatedPlatformAdminOrganizationsRoute,
+  AuthenticatedPlatformAdminUsersRoute: AuthenticatedPlatformAdminUsersRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
   AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
   AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
@@ -1151,6 +1240,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedEntitiesIndexRoute: AuthenticatedEntitiesIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
+  AuthenticatedPlatformAdminIndexRoute: AuthenticatedPlatformAdminIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUniverseIndexRoute: AuthenticatedUniverseIndexRoute,
   AuthenticatedOrgOrgIdDashboardRoute: AuthenticatedOrgOrgIdDashboardRoute,

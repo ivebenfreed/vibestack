@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict g21GrkpfKQGmbTg5s7EFcTTIsLehoRvz9DpoME96XXq8tRrjUW4eEXg3H2cMawY
+\restrict MdpqXAHHOQo8bNhWCJwTv8qxGfqfNOuUEzdpsl1SgQFldIH79pbRgKqafXngazK
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict g21GrkpfKQGmbTg5s7EFcTTIsLehoRvz9DpoME96XXq8tRrjUW4eEXg3H2cMawY
+\unrestrict MdpqXAHHOQo8bNhWCJwTv8qxGfqfNOuUEzdpsl1SgQFldIH79pbRgKqafXngazK
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict ZerdkH5DAQECtH7VeKAkJc55x312uq1axTkGhqFgiBuQKMb3nKO3O8AZytY4oQr
+\restrict 9T2znyA6L5uKhx4sbTSvgkp408svPnIp4bbLgrDrwOPaNkoZvSNMqz993j0mQk4
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZerdkH5DAQECtH7VeKAkJc55x312uq1axTkGhqFgiBuQKMb3nKO3O8AZytY4oQr
+\unrestrict 9T2znyA6L5uKhx4sbTSvgkp408svPnIp4bbLgrDrwOPaNkoZvSNMqz993j0mQk4
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
+\restrict wWYtM1Wv2CXV41hMDR5aE291diBpD0cnbCFuXYtBrOj3o2DMxQoZJw4ubFqDqzj
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
+\unrestrict wWYtM1Wv2CXV41hMDR5aE291diBpD0cnbCFuXYtBrOj3o2DMxQoZJw4ubFqDqzj
 \connect elevra_dev
-\restrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
+\restrict wWYtM1Wv2CXV41hMDR5aE291diBpD0cnbCFuXYtBrOj3o2DMxQoZJw4ubFqDqzj
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -3546,7 +3546,8 @@ CREATE TABLE public.organizations (
     billing_cycle text DEFAULT 'monthly'::text,
     billing_email text,
     trial_ends_at timestamp with time zone,
-    billing_settings jsonb DEFAULT '{}'::jsonb
+    billing_settings jsonb DEFAULT '{}'::jsonb,
+    enabled_features jsonb DEFAULT '{"universe_mode": true}'::jsonb
 );
 
 ALTER TABLE ONLY public.organizations REPLICA IDENTITY FULL;
@@ -5610,7 +5611,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
+\unrestrict wWYtM1Wv2CXV41hMDR5aE291diBpD0cnbCFuXYtBrOj3o2DMxQoZJw4ubFqDqzj
 
 --
 -- Database "postgres" dump
@@ -5622,7 +5623,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict mEO6Op1m59eJ5TXpuCe30UDwQwEoej8sAlNGYrvHaJm3Y4fGrsq1yEZReMZTI2G
+\restrict 2LbrnjaekwBetuiEMntCbeeWuIUTToitys0UzPztDsg7sCQqClecmOalnpF77o2
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5643,7 +5644,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mEO6Op1m59eJ5TXpuCe30UDwQwEoej8sAlNGYrvHaJm3Y4fGrsq1yEZReMZTI2G
+\unrestrict 2LbrnjaekwBetuiEMntCbeeWuIUTToitys0UzPztDsg7sCQqClecmOalnpF77o2
 
 --
 -- PostgreSQL database cluster dump complete

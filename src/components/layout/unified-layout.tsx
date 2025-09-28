@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { Outlet, useLocation } from '@tanstack/react-router'
-import { UnifiedSidebar } from './unified-sidebar'
+import { ConditionalPowerSidebar } from '@/components/power-sidebar/ConditionalPowerSidebar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -168,9 +168,8 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                 <SheetHeader className="sr-only">
                   <SheetTitle>Navigation Menu</SheetTitle>
                 </SheetHeader>
-                <UnifiedSidebar 
+                <ConditionalPowerSidebar
                   isCollapsed={false}
-                  onToggle={() => setMobileSidebarOpen(false)}
                 />
               </SheetContent>
             </Sheet>
@@ -229,9 +228,8 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
             )}
           >
             {/* Desktop Sidebar */}
-            <UnifiedSidebar 
+            <ConditionalPowerSidebar
               isCollapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
             
             {/* Desktop Main Content */}
