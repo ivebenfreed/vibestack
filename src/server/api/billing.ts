@@ -104,7 +104,7 @@ billingRouter.post('/billing/create-checkout', async (c) => {
     // Get organization details
     createDatabaseConnection(c.env);
     const db = getKysely();
-    
+
     const organization = await db
       .selectFrom('organizations')
       .select(['id', 'name', 'billing_email'])
@@ -134,7 +134,7 @@ billingRouter.post('/billing/create-checkout', async (c) => {
       .updateTable('organizations')
       .set({
         billing_settings: db.raw(`
-          COALESCE(billing_settings, '{}'::jsonb) || 
+          COALESCE(billing_settings, '{}'::jsonb) ||
           '{"pending_checkout_id": "${session.id}", "pending_checkout_url": "${session.url}"}'::jsonb
         `),
         updated_at: new Date()
