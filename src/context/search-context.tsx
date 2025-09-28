@@ -35,11 +35,11 @@ export function SearchProvider({ children }: Props) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const useSearch = () => {
+export const useCommandSearch = () => {
   const searchContext = React.useContext(SearchContext)
 
   if (!searchContext) {
-    throw new Error('useSearch has to be used within <SearchContext.Provider>')
+    throw new Error('useCommandSearch has to be used within <SearchContext.Provider>')
   }
 
   return searchContext

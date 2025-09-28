@@ -26,31 +26,32 @@ export const getCurrentOrgId = () => {
 }
 
 export const currentOrgFeatureFlags$ = computed(() => {
-  const organizations = currentOrganizations$.get()
+  const organizations = currentOrganizations$.get() || []
   const currentOrgId = getCurrentOrgId()
 
   if (currentOrgId) {
-    const currentOrg = organizations.find(org => org.info.id === currentOrgId)
+    const currentOrg = organizations.find(org => org?.info?.id === currentOrgId)
 
-    // For testing: manually override Wide Corp to traditional mode
-    if (currentOrgId === '01920000-1000-7000-8000-000000000001') {
+    // Use organization's actual feature flags if available, otherwise use defaults
+    if (currentOrg?.enabledFeatures) {
       return {
-        universe_mode: false, // Traditional mode for testing
-        advanced_analytics: true,
-        custom_fields_v2: false,
-        ai_assistance: true,
-        advanced_search: false,
-        workflow_automation: false,
-        enterprise_sso: false,
-        audit_logs: false,
+        ...getDefaultFeatureFlags(false), // Default to traditional mode for orgs
+        ...currentOrg.enabledFeatures,
       }
     }
 
-    return currentOrg?.enabledFeatures || {}
+    // Fallback for organizations without explicit feature flags
+    return getDefaultFeatureFlags(false) // Traditional mode by default
   }
 
+  // Universe view (no specific org) - use universe mode
+  return getDefaultFeatureFlags(true) // Universe mode by default
+})
+
+// Helper function to get default feature flags
+function getDefaultFeatureFlags(universeMode: boolean): OrganizationFeatureFlags {
   return {
-    universe_mode: true,
+    universe_mode: universeMode,
     advanced_analytics: false,
     custom_fields_v2: false,
     ai_assistance: false,
@@ -59,7 +60,7 @@ export const currentOrgFeatureFlags$ = computed(() => {
     enterprise_sso: false,
     audit_logs: false,
   }
-})
+}
 
 export const useFeatureFlag = (flag: FeatureFlagKey): boolean => {
   return use$(computed(() => {

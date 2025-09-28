@@ -8,6 +8,7 @@
 
 import { observable, computed, type Observable } from '@legendapp/state';
 import { log } from '@/logger';
+import { unifiedAuth$ } from '../unified-auth';
 
 const fileLog = log('legend-state/universe-context.ts');
 
@@ -225,11 +226,8 @@ export const universeContext$: Observable<UniverseContextData> = observable(() =
   return context;
 });
 
-// Computed observables for common use cases - now working with synced data
-export const userOrganizations$ = computed(() => {
-  const context = universeContext$.get();
-  return Object.values(context.organizations);
-});
+// Use the unified auth organizations as the authoritative source
+export const userOrganizations$ = unifiedAuth$.userOrganizations;
 
 // Keep currentOrganizations$ for backward compatibility, but it's deprecated
 export const currentOrganizations$ = userOrganizations$;
@@ -269,9 +267,10 @@ export const allTeams$ = computed(() => {
   return allTeams;
 });
 
-// New computed observable for loading state
+// New computed observable for loading state - simplified for better reliability
 export const isUniverseLoading$ = computed(() => {
-  return universeWorkspace$.isLoading?.get() || false;
+  const workspace = universeWorkspace$.get();
+  return workspace?.isLoading === true;
 });
 
 // Computed observable for initialization state
@@ -287,6 +286,7 @@ export const universeHelpers = {
     const context = universeContext$.get();
     return context.isInitialized && !isUniverseLoading$.get();
   },
+
 
   // Set authentication state (data loading handled separately by universe-loader)
   setAuthenticated: async (isAuth: boolean, userId?: string, sessionToken?: string) => {

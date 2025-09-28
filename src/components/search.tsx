@@ -1,6 +1,6 @@
 import { IconSearch } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
-import { useSearch } from '@/context/search-context'
+import { useCommandSearch } from '@/context/search-context'
 import { Button } from './ui/button'
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function Search({ className = '', placeholder = 'Search' }: Props) {
-  const { setOpen } = useSearch()
+  const { setOpen } = useCommandSearch()
   return (
     <Button
       variant='outline'

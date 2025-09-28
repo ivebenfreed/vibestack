@@ -24,10 +24,10 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
   }
 
   const orgId = getCurrentOrgId()
-  const currentOrg = organizations.find(org => org.info.id === orgId)
+  const currentOrg = organizations?.find(org => org?.info?.id === orgId)
 
   console.log('[TraditionalSidebar] Universe loaded:', universeHelpers.isLoaded())
-  console.log('[TraditionalSidebar] Organizations:', organizations.length)
+  console.log('[TraditionalSidebar] Organizations:', organizations?.length || 0)
   console.log('[TraditionalSidebar] Current org ID:', orgId)
   console.log('[TraditionalSidebar] Current org:', currentOrg?.info?.name)
 
@@ -38,7 +38,8 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
     })
   }
 
-  if (!universeHelpers.isLoaded()) {
+  // Check if organizations are available (more direct than universeHelpers.isLoaded)
+  if (!organizations || organizations.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground">
         Loading organizations...
@@ -56,14 +57,14 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
             <SelectValue placeholder="Choose organization..." />
           </SelectTrigger>
           <SelectContent>
-            {organizations.map(org => (
+            {organizations?.filter(org => org?.info?.id).map(org => (
               <SelectItem key={org.info.id} value={org.info.id}>
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
                   <span>{org.info.name}</span>
                 </div>
               </SelectItem>
-            ))}
+            )) || []}
           </SelectContent>
         </Select>
       </div>

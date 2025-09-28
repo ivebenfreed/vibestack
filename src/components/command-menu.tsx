@@ -26,7 +26,7 @@ import {
 import { searchEntities, type SearchResult } from '@/legend-state/observables/search'
 import { observer, use$ } from '@legendapp/state/react'
 import { universeSchema$, universeLoading$, createEntityGroups } from '@/legend-state'
-import { useSearch } from '@/context/search-context'
+import { useCommandSearch } from '@/context/search-context'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 
 // Base navigation items that match the unified sidebar structure
@@ -76,7 +76,7 @@ export const CommandMenu = observer(function CommandMenu() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, userOrganizations } = useUnifiedAuth()
-  const { open, setOpen } = useSearch()
+  const { open, setOpen } = useCommandSearch()
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
