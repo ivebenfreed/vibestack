@@ -18,15 +18,12 @@ export const UnifiedPowerSidebar = observer(function UnifiedPowerSidebar({
 }) {
   const organizations = use$(currentOrganizations$)
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null) // null = universe view
-  
-  // Show loading state if data isn't ready
-  if (!universeHelpers.isLoaded()) {
-    return <div className="p-4 text-sm text-muted-foreground">Loading universe...</div>
-  }
+
+  // App initialization phases handle all loading - sidebar should always render
 
   // Get the currently selected organization
-  const currentOrg = selectedOrgId 
-    ? organizations.find(org => org.info.id === selectedOrgId) || null
+  const currentOrg = selectedOrgId
+    ? organizations?.find(org => org?.info?.id === selectedOrgId) || null
     : null
 
   const handleOrgSelect = (orgId: string | null) => {

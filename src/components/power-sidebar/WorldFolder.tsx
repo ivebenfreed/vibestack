@@ -46,9 +46,9 @@ export const WorldFolder = observer(function WorldFolder({
       const allRecords = Object.values(entityObs.get())
       
       const worldRecords = allRecords.filter((record: any) => {
-        return record.world_id === world.id ||
-               record.parent_world_id === world.id ||
-               (isPersonal && record.universe_id === world.universe_id)
+        return record?.world_id === world?.id ||
+               record?.parent_world_id === world?.id ||
+               (isPersonal && record?.universe_id === world?.universe_id)
       })
       
       if (worldRecords.length > 0) {
@@ -61,7 +61,7 @@ export const WorldFolder = observer(function WorldFolder({
     })
     
     return entitiesByType
-  }, [schema, world.id, world.universe_id, isPersonal])
+  }, [schema, world?.id, world?.universe_id, isPersonal])
   
   const totalCount = Object.values(worldEntities).reduce(
     (sum, group) => sum + group.count, 
@@ -95,9 +95,9 @@ export const WorldFolder = observer(function WorldFolder({
           ) : (
             <Building2 className="h-3 w-3 mr-2" />
           )}
-          <span className="flex-1 text-left text-sm">{world.name}</span>
-          <Badge variant={getStateBadgeVariant(world.state)} className="ml-1 px-1 py-0 text-xs">
-            {world.state}
+          <span className="flex-1 text-left text-sm">{world?.name}</span>
+          <Badge variant={getStateBadgeVariant(world?.state || 'active')} className="ml-1 px-1 py-0 text-xs">
+            {world?.state}
           </Badge>
           <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
             {totalCount}
@@ -122,7 +122,7 @@ export const WorldFolder = observer(function WorldFolder({
                 key={entityName}
                 entityName={entityName}
                 data={data}
-                worldId={world.id}
+                worldId={world?.id || ''}
               />
             ))
         ) : (

@@ -66,15 +66,15 @@ export const OrgContextHeader = observer(function OrgContextHeader({
   }
 
   // Calculate total worlds count for current org
-  const currentOrgWorldsCount = currentOrg 
-    ? (currentOrg.personalWorlds?.length || 0) + (currentOrg.businessWorlds?.length || 0)
+  const currentOrgWorldsCount = currentOrg
+    ? (currentOrg?.personalWorlds?.length || 0) + (currentOrg?.businessWorlds?.length || 0)
     : 0
 
   // Calculate universe totals
   const universeTotals = organizations.reduce((acc, org) => {
-    acc.personalWorlds += org.personalWorlds?.length || 0
-    acc.businessWorlds += org.businessWorlds?.length || 0
-    acc.teams += org.teams?.length || 0
+    acc.personalWorlds += org?.personalWorlds?.length || 0
+    acc.businessWorlds += org?.businessWorlds?.length || 0
+    acc.teams += org?.teams?.length || 0
     return acc
   }, { personalWorlds: 0, businessWorlds: 0, teams: 0 })
 
@@ -97,14 +97,14 @@ export const OrgContextHeader = observer(function OrgContextHeader({
                 </>
               ) : (
                 <>
-                  {getOrgIcon(currentOrg.info.type || 'business')}
+                  {getOrgIcon(currentOrg?.info?.type || 'business')}
                   <div className="flex flex-col items-start">
-                    <span className="font-medium text-sm">{currentOrg.info.name}</span>
+                    <span className="font-medium text-sm">{currentOrg?.info?.name}</span>
                     <div className="flex items-center gap-1">
-                      <div className={cn("flex items-center", getRoleColor(currentOrg.info.role))}>
-                        {getRoleIcon(currentOrg.info.role)}
+                      <div className={cn("flex items-center", getRoleColor(currentOrg?.info?.role || ''))}>
+                        {getRoleIcon(currentOrg?.info?.role || '')}
                       </div>
-                      <span className="text-xs text-muted-foreground">{currentOrg.info.role}</span>
+                      <span className="text-xs text-muted-foreground">{currentOrg?.info?.role}</span>
                     </div>
                   </div>
                 </>
@@ -138,53 +138,53 @@ export const OrgContextHeader = observer(function OrgContextHeader({
           )}
 
           {/* Personal Organizations */}
-          {organizations.filter(org => org.info.type === 'personal').map(org => (
+          {organizations.filter(org => org?.info?.type === 'personal').map(org => (
             <DropdownMenuItem
-              key={org.info.id}
-              onClick={() => onOrgSelect(org.info.id)}
+              key={org?.info?.id || 'unknown'}
+              onClick={() => onOrgSelect(org?.info?.id || null)}
               className={cn(
                 "flex items-center gap-3 p-3",
-                currentOrg?.info.id === org.info.id && "bg-accent"
+                currentOrg?.info?.id === org?.info?.id && "bg-accent"
               )}
             >
               <User className="h-4 w-4" />
               <div className="flex-1">
-                <div className="font-medium text-sm">{org.info.name}</div>
+                <div className="font-medium text-sm">{org?.info?.name}</div>
                 <div className="text-xs text-muted-foreground">
-                  Personal • {(org.personalWorlds?.length || 0) + (org.businessWorlds?.length || 0)} worlds
+                  Personal • {(org?.personalWorlds?.length || 0) + (org?.businessWorlds?.length || 0)} worlds
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <div className={cn("flex items-center", getRoleColor(org.info.role))}>
-                  {getRoleIcon(org.info.role)}
+                <div className={cn("flex items-center", getRoleColor(org?.info?.role || ''))}>
+                  {getRoleIcon(org?.info?.role || '')}
                 </div>
               </div>
             </DropdownMenuItem>
           ))}
 
           {/* Business Organizations */}
-          {organizations.filter(org => org.info.type !== 'personal').length > 0 && (
+          {organizations.filter(org => org?.info?.type !== 'personal').length > 0 && (
             <>
               <DropdownMenuSeparator />
-              {organizations.filter(org => org.info.type !== 'personal').map(org => (
+              {organizations.filter(org => org?.info?.type !== 'personal').map(org => (
                 <DropdownMenuItem
-                  key={org.info.id}
-                  onClick={() => onOrgSelect(org.info.id)}
+                  key={org?.info?.id || 'unknown'}
+                  onClick={() => onOrgSelect(org?.info?.id || null)}
                   className={cn(
                     "flex items-center gap-3 p-3",
-                    currentOrg?.info.id === org.info.id && "bg-accent"
+                    currentOrg?.info?.id === org?.info?.id && "bg-accent"
                   )}
                 >
                   <Building className="h-4 w-4" />
                   <div className="flex-1">
-                    <div className="font-medium text-sm">{org.info.name}</div>
+                    <div className="font-medium text-sm">{org?.info?.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      Business • {(org.personalWorlds?.length || 0) + (org.businessWorlds?.length || 0)} worlds • {org.teams?.length || 0} teams
+                      Business • {(org?.personalWorlds?.length || 0) + (org?.businessWorlds?.length || 0)} worlds • {org?.teams?.length || 0} teams
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className={cn("flex items-center", getRoleColor(org.info.role))}>
-                      {getRoleIcon(org.info.role)}
+                    <div className={cn("flex items-center", getRoleColor(org?.info?.role || ''))}>
+                      {getRoleIcon(org?.info?.role || '')}
                     </div>
                   </div>
                 </DropdownMenuItem>
@@ -225,11 +225,11 @@ export const OrgContextHeader = observer(function OrgContextHeader({
                 {currentOrgWorldsCount}
               </Badge>
             </div>
-            {currentOrg && currentOrg.teams && currentOrg.teams.length > 0 && (
+            {currentOrg && currentOrg?.teams && currentOrg?.teams?.length > 0 && (
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Teams</span>
                 <Badge variant="outline" className="text-xs">
-                  {currentOrg.teams.length}
+                  {currentOrg?.teams?.length}
                 </Badge>
               </div>
             )}

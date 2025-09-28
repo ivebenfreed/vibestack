@@ -66,7 +66,7 @@ export const BusinessWorldsSection = observer(function BusinessWorldsSection({
         {worlds.length > 0 ? (
           worlds.map(world => (
             <WorldFolder 
-              key={world.id} 
+              key={world?.id} 
               world={world}
               isPersonal={false}
             />

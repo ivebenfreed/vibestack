@@ -23,7 +23,7 @@ export const OrgWorldsSection = observer(function OrgWorldsSection({
   const [isTeamsOpen, setIsTeamsOpen] = useState(true)
   
   const { personalWorlds = [], businessWorlds = [], teams = [] } = organization
-  const isPersonalOrg = organization.info.type === 'personal'
+  const isPersonalOrg = organization?.info?.type === 'personal'
   
   if (isCollapsed) {
     return (
@@ -35,7 +35,7 @@ export const OrgWorldsSection = observer(function OrgWorldsSection({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            {organization.info.name} ({personalWorlds.length + businessWorlds.length} worlds)
+            {organization?.info?.name} ({personalWorlds.length + businessWorlds.length} worlds)
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -68,7 +68,7 @@ export const OrgWorldsSection = observer(function OrgWorldsSection({
           <CollapsibleContent className="ml-2">
             {personalWorlds.map(world => (
               <WorldFolder 
-                key={world.id}
+                key={world?.id}
                 world={world}
                 isPersonal={true}
               />
@@ -98,15 +98,15 @@ export const OrgWorldsSection = observer(function OrgWorldsSection({
           </CollapsibleTrigger>
           <CollapsibleContent className="ml-2">
             {businessWorlds.map(world => (
-              <div key={world.id} className="space-y-1">
+              <div key={world?.id} className="space-y-1">
                 <WorldFolder 
                   world={world}
                   isPersonal={false}
                 />
-                {world.team_name && (
+                {world?.team_name && (
                   <div className="px-6 text-xs text-muted-foreground flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {world.team_name}
+                    {world?.team_name}
                   </div>
                 )}
               </div>
@@ -143,9 +143,9 @@ export const OrgWorldsSection = observer(function OrgWorldsSection({
               >
                 <Users className="h-3 w-3 mr-2" />
                 <div className="flex flex-col items-start flex-1">
-                  <span className="font-medium">{team.team_name}</span>
+                  <span className="font-medium">{team?.team_name}</span>
                   <span className="text-xs text-muted-foreground">
-                    {team.team_role} • {team.team_type}
+                    {team?.team_role} • {team?.team_type}
                   </span>
                 </div>
               </Button>

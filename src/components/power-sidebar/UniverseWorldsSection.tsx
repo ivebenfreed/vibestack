@@ -26,18 +26,18 @@ export const UniverseWorldsSection = observer(function UniverseWorldsSection({
   const allBusinessWorlds: (World & { orgName?: string; orgType?: string })[] = []
   
   organizations.forEach(org => {
-    org.personalWorlds?.forEach(world => {
+    org?.personalWorlds?.forEach(world => {
       allPersonalWorlds.push({
         ...world,
-        orgName: org.info.name,
-        orgType: org.info.type || 'business'
+        orgName: org?.info?.name,
+        orgType: org?.info?.type || 'business'
       })
     })
-    org.businessWorlds?.forEach(world => {
+    org?.businessWorlds?.forEach(world => {
       allBusinessWorlds.push({
         ...world,
-        orgName: org.info.name,
-        orgType: org.info.type || 'business'
+        orgName: org?.info?.name,
+        orgType: org?.info?.type || 'business'
       })
     })
   })
@@ -82,7 +82,7 @@ export const UniverseWorldsSection = observer(function UniverseWorldsSection({
           </CollapsibleTrigger>
           <CollapsibleContent className="ml-2">
             {allPersonalWorlds.map(world => (
-              <div key={world.id} className="space-y-1">
+              <div key={world?.id} className="space-y-1">
                 <WorldFolder 
                   world={world}
                   isPersonal={true}
@@ -124,7 +124,7 @@ export const UniverseWorldsSection = observer(function UniverseWorldsSection({
           </CollapsibleTrigger>
           <CollapsibleContent className="ml-2">
             {allBusinessWorlds.map(world => (
-              <div key={world.id} className="space-y-1">
+              <div key={world?.id} className="space-y-1">
                 <WorldFolder 
                   world={world}
                   isPersonal={false}
@@ -137,7 +137,7 @@ export const UniverseWorldsSection = observer(function UniverseWorldsSection({
                       <Building className="h-3 w-3" />
                     )}
                     {world.orgName}
-                    {world.team_name && ` • ${world.team_name}`}
+                    {world?.team_name && ` • ${world?.team_name}`}
                   </div>
                 )}
               </div>

@@ -55,23 +55,23 @@ export const EntitiesSection = observer(function EntitiesSection({
     // Add personal worlds as entity contexts
     personalWorlds.forEach(world => {
       contexts.push({
-        id: `personal-${world.id}`,
-        name: world.name,
+        id: `personal-${world?.id}`,
+        name: world?.name || 'Unnamed World',
         type: 'personal',
         context: 'Personal',
-        totalEntities: world.entity_count || 0
+        totalEntities: world?.entity_count || 0
       })
     })
     
     // Add organization contexts
     organizations.forEach(org => {
-      const totalBusinessWorlds = org.businessWorlds?.length || 0
-      const totalPersonalWorlds = org.personalWorlds?.length || 0
+      const totalBusinessWorlds = org?.businessWorlds?.length || 0
+      const totalPersonalWorlds = org?.personalWorlds?.length || 0
       const totalWorlds = totalBusinessWorlds + totalPersonalWorlds
-      
+
       contexts.push({
-        id: `org-${org.info.id}`,
-        name: org.info.name,
+        id: `org-${org?.info?.id}`,
+        name: org?.info?.name || 'Unknown Organization',
         type: 'business',
         context: 'Organization',
         worldCount: totalWorlds,
@@ -81,8 +81,8 @@ export const EntitiesSection = observer(function EntitiesSection({
     
     // Sort by type (personal first) then by entity count
     return contexts.sort((a, b) => {
-      if (a.type !== b.type) {
-        return a.type === 'personal' ? -1 : 1
+      if (a?.type !== b?.type) {
+        return a?.type === 'personal' ? -1 : 1
       }
       return (b.totalEntities || 0) - (a.totalEntities || 0)
     })
@@ -138,16 +138,16 @@ export const EntitiesSection = observer(function EntitiesSection({
               <div className="text-xs text-muted-foreground px-2 mb-1">Personal Contexts</div>
               {personalWorlds.map(world => (
                 <Button
-                  key={world.id}
+                  key={world?.id}
                   variant="ghost"
                   className="w-full justify-start px-4 py-1 h-auto font-normal"
-                  onClick={() => navigate({ to: `/worlds/${world.id}/entities` })}
+                  onClick={() => navigate({ to: `/worlds/${world?.id}/entities` })}
                 >
                   <Globe className="h-3 w-3 mr-2 text-blue-500" />
-                  <span className="flex-1 text-left text-sm truncate">{world.name}</span>
-                  {world.entity_count !== undefined && (
+                  <span className="flex-1 text-left text-sm truncate">{world?.name}</span>
+                  {world?.entity_count !== undefined && (
                     <Badge variant="outline" className="text-xs ml-1">
-                      {world.entity_count}
+                      {world?.entity_count}
                     </Badge>
                   )}
                 </Button>
@@ -161,16 +161,16 @@ export const EntitiesSection = observer(function EntitiesSection({
               {personalWorlds.length > 0 && <div className="h-2" />}
               <div className="text-xs text-muted-foreground px-2 mb-1">Organization Contexts</div>
               {organizations.map(org => {
-                const totalWorlds = (org.businessWorlds?.length || 0) + (org.personalWorlds?.length || 0)
+                const totalWorlds = (org?.businessWorlds?.length || 0) + (org?.personalWorlds?.length || 0)
                 return (
                   <Button
-                    key={org.info.id}
+                    key={org?.info?.id}
                     variant="ghost"
                     className="w-full justify-start px-4 py-1 h-auto font-normal"
-                    onClick={() => navigate({ to: `/organizations/${org.info.id}/entities` })}
+                    onClick={() => navigate({ to: `/organizations/${org?.info?.id}/entities` })}
                   >
                     <Building className="h-3 w-3 mr-2 text-green-600" />
-                    <span className="flex-1 text-left text-sm truncate">{org.info.name}</span>
+                    <span className="flex-1 text-left text-sm truncate">{org?.info?.name}</span>
                     <Badge variant="outline" className="text-xs ml-1">
                       {totalWorlds}w
                     </Badge>

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { observer, use$ } from '@legendapp/state/react'
 import { createEntityGroups, getEntity$ } from '@/legend-state'
 import {
@@ -59,7 +60,8 @@ function getIconComponent(iconName: string): React.ElementType {
 
 interface SidebarProps {
   isCollapsed: boolean
-  onToggle: () => void
+  onToggle?: () => void
+  isUniverseMode?: boolean
 }
 
 interface NavItem {
@@ -76,18 +78,29 @@ const bottomNavigation: NavItem[] = [
   { id: 'debug', label: 'Debug', icon: Bug, href: '/debug' },
 ]
 
-export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
+export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, onToggle, isUniverseMode = true }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useUnifiedAuth()
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
   const isSuperAdmin = user?.role === 'super_admin'
-  
+
   // Determine current context from URL instead of observables
-  const routeOrgId = location.pathname.startsWith('/org/') 
+  const routeOrgId = location.pathname.startsWith('/org/')
     ? location.pathname.split('/')[2] // Extract orgId from /org/{orgId}/...
     : null
   const isUniverseView = !routeOrgId
+
+  // Store current org when navigating to org routes (for persistence)
+  React.useEffect(() => {
+    if (routeOrgId && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('lastSelectedOrganization', routeOrgId)
+      } catch (error) {
+        console.warn('Failed to store organization preference:', error)
+      }
+    }
+  }, [routeOrgId])
   
   const isActive = (href: string) => {
     if (href === '/') {
@@ -175,9 +188,10 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
               onEnterOrg={(orgId: string) => navigate({ to: `/org/${orgId}` })}
             />
           ) : (
-            <OrganizationView 
-              orgId={routeOrgId!} 
+            <OrganizationView
+              orgId={routeOrgId!}
               isCollapsed={isCollapsed}
+              isUniverseMode={isUniverseMode}
               onBackToUniverse={() => navigate({ to: '/universe' })}
             />
           )}
@@ -371,12 +385,14 @@ function UniverseView({ isCollapsed, onEnterOrg }: {
 }
 
 // Organization View Component - Level 2  
-function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
+function OrganizationView({ orgId, isCollapsed, isUniverseMode = true, onBackToUniverse }: {
   orgId: string
   isCollapsed: boolean
+  isUniverseMode?: boolean
   onBackToUniverse: () => void
 }) {
   const { userOrganizations } = useUnifiedAuth()
+  const navigate = useNavigate()
   // Create organization-specific entity groups
   const orgEntityGroups$ = React.useMemo(() => createEntityGroups(orgId), [orgId])
   const entityNavGroups = use$(orgEntityGroups$)
@@ -417,22 +433,24 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
     return (
       <TooltipProvider>
         <div className="space-y-1">
-          {/* Back to Universe */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-full justify-center p-2"
-                onClick={onBackToUniverse}
-              >
-                <Globe className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              Back to Universe
-            </TooltipContent>
-          </Tooltip>
+          {/* Back to Universe (only in universe mode) */}
+          {isUniverseMode && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-full justify-center p-2"
+                  onClick={onBackToUniverse}
+                >
+                  <Globe className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                Back to Universe
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Organization Dashboard */}
           <Separator className="my-2" />
@@ -464,28 +482,68 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
       {/* Enhanced Breadcrumb Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 px-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBackToUniverse}
-            className="text-xs text-muted-foreground hover:text-foreground p-1 h-auto"
-          >
-            <Globe className="h-3 w-3 mr-1" />
-            Universe
-          </Button>
-          <ChevronRight className="h-3 w-3 text-muted-foreground" />
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium truncate">{currentOrg.name}</span>
-            <span className="text-xs text-muted-foreground truncate">World</span>
-          </div>
+          {isUniverseMode && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBackToUniverse}
+                className="text-xs text-muted-foreground hover:text-foreground p-1 h-auto"
+              >
+                <Globe className="h-3 w-3 mr-1" />
+                Universe
+              </Button>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            </>
+          )}
+          {!isUniverseMode ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex-1 justify-between p-2 h-auto">
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-sm font-medium truncate">{currentOrg.name}</span>
+                    <span className="text-xs text-muted-foreground truncate">Organization</span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 shrink-0 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                {userOrganizations?.map(org => (
+                  <DropdownMenuItem
+                    key={org?.id || 'unknown'}
+                    onClick={() => {
+                      if (org?.id) {
+                        // Store selected org in localStorage
+                        try {
+                          localStorage.setItem('lastSelectedOrganization', org.id)
+                        } catch (error) {
+                          console.warn('Failed to store organization preference:', error)
+                        }
+                        navigate({ to: '/org/$orgId/dashboard', params: { orgId: org.id } })
+                      }
+                    }}
+                    className="flex items-center gap-3"
+                  >
+                    <Building className="h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{org?.name}</span>
+                      <span className="text-xs text-muted-foreground">{org?.role}</span>
+                    </div>
+                  </DropdownMenuItem>
+                )) || []}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-medium truncate">{currentOrg.name}</span>
+              <span className="text-xs text-muted-foreground truncate">World</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* World Dashboard */}
       <div className="space-y-1">
-        <div className="text-xs text-muted-foreground px-2 mb-2">
-          <span>Dashboard</span>
-        </div>
         <Link
           to={`/org/${orgId}/dashboard`}
           className={cn(
@@ -497,7 +555,7 @@ function OrganizationView({ orgId, isCollapsed, onBackToUniverse }: {
           )}
         >
           <BarChart3 className="h-4 w-4" />
-          <span className="truncate">{currentOrg.name} Overview</span>
+          <span className="truncate">Dashboard</span>
         </Link>
       </div>
 

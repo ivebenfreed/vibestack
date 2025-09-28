@@ -56,15 +56,15 @@ export const TeamsSection = observer(function TeamsSection({
         {teams.length > 0 ? (
           teams.map(team => (
             <Button
-              key={team.id}
+              key={team?.id}
               variant="ghost"
               className="w-full justify-start px-6 py-1.5 h-auto font-normal text-xs"
             >
               <div className="flex items-center w-full">
-                <span className="flex-1 text-left">{team.name}</span>
-                {team.member_count && (
+                <span className="flex-1 text-left">{team?.name}</span>
+                {team?.member_count && (
                   <Badge variant="outline" className="ml-auto text-xs">
-                    {team.member_count}
+                    {team?.member_count}
                   </Badge>
                 )}
               </div>

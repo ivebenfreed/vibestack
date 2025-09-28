@@ -5,22 +5,23 @@ import { ContentContainer } from '@/components/layout/content-container'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  Globe, 
-  Building2, 
-  Folder, 
-  Plus, 
-  TrendingUp, 
-  Users, 
+import {
+  Globe,
+  Building2,
+  Folder,
+  Plus,
+  TrendingUp,
+  Users,
   BookOpen,
   Sparkles,
   Calendar,
   Target
 } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
-import { universeSchema$, getEntity$ } from '@/legend-state'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { universeSchema$, getEntity$, currentOrganizations$ } from '@/legend-state'
+import { currentOrgFeatureFlags$ } from '@/legend-state/observables/feature-flags'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { performanceTracker } from '@/utils/performance-tracker'
 
 export const Route = createFileRoute('/_authenticated/universe/')({
@@ -28,8 +29,41 @@ export const Route = createFileRoute('/_authenticated/universe/')({
     // Data loading handled by components
     return null
   },
-  component: observer(UniversePage),
+  component: observer(UniversePageRouter),
 })
+
+function UniversePageRouter() {
+  const navigate = useNavigate()
+  const featureFlags = use$(currentOrgFeatureFlags$)
+  const organizations = use$(currentOrganizations$)
+
+  useEffect(() => {
+    // If traditional mode and we have organizations, redirect to first org
+    if (featureFlags.universe_mode === false && organizations?.length > 0) {
+      navigate({
+        to: '/org/$orgId/dashboard',
+        params: { orgId: organizations[0].info.id },
+        replace: true
+      })
+    }
+  }, [featureFlags.universe_mode, organizations, navigate])
+
+  // If in traditional mode, show loading while redirect happens
+  if (featureFlags.universe_mode === false) {
+    return (
+      <ContentContainer>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Building2 className="h-8 w-8 mx-auto text-primary mb-2" />
+            <p className="text-muted-foreground">Redirecting to organization...</p>
+          </div>
+        </div>
+      </ContentContainer>
+    )
+  }
+
+  return <UniversePage />
+}
 
 function UniversePage() {
   const { user, userOrganizations } = useUnifiedAuth()

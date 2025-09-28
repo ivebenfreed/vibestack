@@ -64,14 +64,14 @@ export const EntityGroupInWorld = observer(function EntityGroupInWorld({
       <div className="space-y-0.5 ml-2">
         {data.records.map(record => (
           <Button
-            key={record.id}
+            key={record?.id}
             variant="ghost"
             className="w-full justify-start px-2 py-0.5 h-auto font-normal"
-            onClick={() => navigate({ to: `/entities/${entityName}/${record.id}` })}
+            onClick={() => navigate({ to: `/entities/${entityName}/${record?.id}` })}
           >
             <Icon className="h-3 w-3 mr-2" />
             <span className="text-xs truncate">
-              {record.name || record.title || `${entityName} ${record.id.slice(0, 8)}`}
+              {record?.name || record?.title || `${entityName} ${record?.id?.slice(0, 8) || 'unknown'}`}
             </span>
           </Button>
         ))}
@@ -101,17 +101,17 @@ export const EntityGroupInWorld = observer(function EntityGroupInWorld({
       <CollapsibleContent className="ml-4 space-y-0.5">
         {data.records.slice(0, 10).map(record => (
           <Button
-            key={record.id}
+            key={record?.id}
             variant="ghost"
             className="w-full justify-start px-2 py-0.5 h-auto font-normal"
-            onClick={() => navigate({ to: `/entities/${entityName}/${record.id}` })}
+            onClick={() => navigate({ to: `/entities/${entityName}/${record?.id}` })}
           >
             <span className="text-xs truncate">
-              {record.name || record.title || 'Unnamed'}
+              {record?.name || record?.title || 'Unnamed'}
             </span>
-            {record.status && (
+            {record?.status && (
               <Badge variant="outline" className="ml-auto px-1 py-0 text-xs">
-                {record.status}
+                {record?.status}
               </Badge>
             )}
           </Button>

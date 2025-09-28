@@ -28,20 +28,32 @@ import {
 } from '@/components/ui/dialog';
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth';
 import { CreateOrganizationForm } from '@/features/auth/components/CreateOrganizationForm';
+import { useNavigate } from '@tanstack/react-router';
 
 export function OrganizationSwitcher() {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const { 
-    organization: currentOrganization, 
-    userOrganizations
-  } = useUnifiedAuth();
-  
+  const navigate = useNavigate();
+  const { userOrganizations } = useUnifiedAuth();
+
+  // Get org ID from URL path - same pattern as TraditionalOrgSidebar
+  const getCurrentOrgId = () => {
+    if (typeof window === 'undefined') return null;
+    const path = window.location.pathname;
+    const orgMatch = path.match(/\/org\/([^\/]+)/);
+    return orgMatch ? orgMatch[1] : null;
+  };
+
+  const currentOrgId = getCurrentOrgId();
+  const currentOrganization = userOrganizations?.find(org => org.id === currentOrgId);
+
   const hasMultipleOrganizations = userOrganizations && userOrganizations.length > 1;
-  
-  // For organization switching, we'll need to implement this in Legend State
+
   const switchOrganization = (orgId: string) => {
-    console.log('Organization switching not yet implemented in Legend State:', orgId);
+    navigate({
+      to: '/org/$orgId/dashboard',
+      params: { orgId }
+    });
   };
 
   const handleSelectOrganization = async (orgId: string) => {

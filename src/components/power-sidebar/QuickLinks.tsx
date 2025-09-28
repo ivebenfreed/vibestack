@@ -28,8 +28,8 @@ export const QuickLinks = observer(function WorkContext({
   
   // Get high priority worlds
   const highPriorityWorlds = [
-    ...personalWorlds.filter(w => w.priority === 'high' || w.priority === 'critical'),
-    ...businessWorlds.filter(w => w.priority === 'high' || w.priority === 'critical')
+    ...personalWorlds.filter(w => w?.priority === 'high' || w?.priority === 'critical'),
+    ...businessWorlds.filter(w => w?.priority === 'high' || w?.priority === 'critical')
   ]
   
   // Essential navigation items
@@ -114,14 +114,14 @@ export const QuickLinks = observer(function WorkContext({
           </div>
           {activeWorlds.slice(0, 5).map(world => (
             <Button
-              key={world.id}
+              key={world?.id}
               variant="ghost"
               className="w-full justify-start px-2 py-1 h-auto font-normal"
-              onClick={() => navigate({ to: `/worlds/${world.id}` })}
+              onClick={() => navigate({ to: `/worlds/${world?.id}` })}
             >
               <Globe className="h-3 w-3 mr-2" />
-              <span className="text-xs flex-1 text-left truncate">{world.name}</span>
-              {world.priority === 'high' || world.priority === 'critical' ? (
+              <span className="text-xs flex-1 text-left truncate">{world?.name}</span>
+              {world?.priority === 'high' || world?.priority === 'critical' ? (
                 <AlertCircle className="h-3 w-3 text-orange-500" />
               ) : null}
             </Button>
@@ -149,15 +149,15 @@ export const QuickLinks = observer(function WorkContext({
           </div>
           {highPriorityWorlds.slice(0, 3).map(world => (
             <Button
-              key={world.id}
+              key={world?.id}
               variant="ghost"
               className="w-full justify-start px-2 py-1 h-auto font-normal"
-              onClick={() => navigate({ to: `/worlds/${world.id}` })}
+              onClick={() => navigate({ to: `/worlds/${world?.id}` })}
             >
               <AlertCircle className="h-3 w-3 mr-2 text-orange-500" />
-              <span className="text-xs flex-1 text-left truncate">{world.name}</span>
+              <span className="text-xs flex-1 text-left truncate">{world?.name}</span>
               <Badge variant="outline" className="text-xs">
-                {world.priority}
+                {world?.priority}
               </Badge>
             </Button>
           ))}
@@ -175,15 +175,15 @@ export const QuickLinks = observer(function WorkContext({
           </div>
           {allTeams.slice(0, 3).map(team => (
             <Button
-              key={team.id}
+              key={team?.id}
               variant="ghost"
               className="w-full justify-start px-2 py-1 h-auto font-normal"
-              onClick={() => navigate({ to: `/teams/${team.id}` })}
+              onClick={() => navigate({ to: `/teams/${team?.id}` })}
             >
               <Users className="h-3 w-3 mr-2" />
-              <span className="text-xs flex-1 text-left truncate">{team.name}</span>
+              <span className="text-xs flex-1 text-left truncate">{team?.name}</span>
               <Badge variant="outline" className="text-xs">
-                {team.user_role || 'member'}
+                {team?.user_role || 'member'}
               </Badge>
             </Button>
           ))}

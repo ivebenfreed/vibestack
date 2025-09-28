@@ -57,7 +57,7 @@ export const PersonalSection = observer(function PersonalSection({
         {personalWorlds.length > 0 ? (
           personalWorlds.map(world => (
             <WorldFolder 
-              key={world.id} 
+              key={world?.id} 
               world={world}
               isPersonal={true}
             />

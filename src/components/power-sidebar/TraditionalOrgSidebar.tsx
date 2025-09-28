@@ -47,8 +47,13 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
     )
   }
 
-  // If no current org, show org selector
-  if (!currentOrg) {
+  // If no current org but we have orgId from URL, show simplified header and continue with sidebar
+  if (!currentOrg && orgId) {
+    // Continue with normal sidebar rendering but show simplified org header
+  }
+
+  // If no current org and no orgId, show org selector
+  if (!currentOrg && !orgId) {
     return (
       <div className="p-4 space-y-4">
         <div className="text-sm font-medium">Select Organization</div>
@@ -58,10 +63,10 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
           </SelectTrigger>
           <SelectContent>
             {organizations?.filter(org => org?.info?.id).map(org => (
-              <SelectItem key={org.info.id} value={org.info.id}>
+              <SelectItem key={org?.info?.id} value={org?.info?.id || ''}>
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
-                  <span>{org.info.name}</span>
+                  <span>{org?.info?.name}</span>
                 </div>
               </SelectItem>
             )) || []}
@@ -77,7 +82,7 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
         <Building2 className="h-6 w-6 mx-auto text-primary" />
         {currentOrg && (
           <div className="text-xs text-center text-muted-foreground">
-            {currentOrg.info.name.slice(0, 3)}
+            {currentOrg?.info?.name?.slice(0, 3)}
           </div>
         )}
       </div>
@@ -93,33 +98,39 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
           <span className="font-semibold text-sm">Organization</span>
         </div>
 
-        <Select value={orgId || ''} onValueChange={handleOrgChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select organization">
-              {currentOrg && (
+        {currentOrg ? (
+          <Select value={orgId || ''} onValueChange={handleOrgChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select organization">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
-                  <span>{currentOrg.info.name}</span>
+                  <span>{currentOrg?.info?.name}</span>
                 </div>
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {organizations.map(org => (
-              <SelectItem key={org.info.id} value={org.info.id}>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {organizations.map(org => (
+                <SelectItem key={org?.info?.id} value={org?.info?.id || ''}>
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
-                    <span>{org.info.name}</span>
+                    <span>{org?.info?.name}</span>
                   </div>
                   <Badge variant="outline" className="ml-2 text-xs">
-                    {org.info.type === 'personal' ? 'Personal' : 'Business'}
+                    {org?.info?.type === 'personal' ? 'Personal' : 'Business'}
                   </Badge>
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
-        </Select>
+          </Select>
+        ) : (
+          // Show simplified header when orgId exists but currentOrg data isn't loaded yet
+          <div className="flex items-center gap-2 px-2 py-1 border rounded-md">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Current Organization</span>
+          </div>
+        )}
 
         <Badge variant="secondary" className="text-xs w-fit">
           Traditional Mode
@@ -133,11 +144,11 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Current Context</span>
               <Badge variant="outline" className="text-xs capitalize">
-                {currentOrg.info.role}
+                {currentOrg?.info?.role}
               </Badge>
             </div>
             <div className="text-xs text-muted-foreground">
-              Member since {new Date(currentOrg.info.joinedAt).toLocaleDateString()}
+              Member since {currentOrg?.info?.joinedAt ? new Date(currentOrg?.info?.joinedAt).toLocaleDateString() : 'Unknown'}
             </div>
           </div>
         </div>
@@ -147,14 +158,14 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
       <ScrollArea className="flex-1">
         {currentOrg && (
           <EntitiesSection
-            organizationId={currentOrg.info.id}
+            organizationId={currentOrg?.info?.id || ''}
             isCollapsed={false}
           />
         )}
       </ScrollArea>
 
       {/* Organization Actions */}
-      {currentOrg && ['admin', 'owner'].includes(currentOrg.info.role) && (
+      {currentOrg && ['admin', 'owner'].includes(currentOrg?.info?.role || '') && (
         <div className="p-3 border-t space-y-2">
           <div className="text-xs font-medium text-muted-foreground mb-2">
             Organization Settings
@@ -165,7 +176,7 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
             className="w-full justify-start"
             onClick={() => navigate({
               to: '/settings/organization',
-              search: { orgId: currentOrg.info.id }
+              search: { orgId: currentOrg?.info?.id }
             })}
           >
             <Settings className="h-4 w-4 mr-2" />
@@ -177,7 +188,7 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
             className="w-full justify-start"
             onClick={() => navigate({
               to: '/settings/members',
-              search: { orgId: currentOrg.info.id }
+              search: { orgId: currentOrg?.info?.id }
             })}
           >
             <Users className="h-4 w-4 mr-2" />
@@ -189,7 +200,7 @@ export const TraditionalOrgSidebar = observer(({ isCollapsed }: { isCollapsed?: 
             className="w-full justify-start"
             onClick={() => navigate({
               to: '/settings/billing',
-              search: { orgId: currentOrg.info.id }
+              search: { orgId: currentOrg?.info?.id }
             })}
           >
             <CreditCard className="h-4 w-4 mr-2" />

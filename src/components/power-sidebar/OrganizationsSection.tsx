@@ -82,18 +82,18 @@ export const OrganizationsSection = observer(function OrganizationsSection({
         {organizations.length > 0 ? (
           organizations.map(org => (
             <Button
-              key={org.info.id}
+              key={org?.info?.id}
               variant="ghost"
               className="w-full justify-start px-6 py-1.5 h-auto font-normal text-xs"
             >
               <div className="flex items-center w-full">
-                <span className="flex-1 text-left">{org.info.name}</span>
+                <span className="flex-1 text-left">{org?.info?.name}</span>
                 <div className="flex items-center gap-1 ml-auto">
-                  <div className={cn("flex items-center", getRoleColor(org.info.role))}>
-                    {getRoleIcon(org.info.role)}
+                  <div className={cn("flex items-center", getRoleColor(org?.info?.role || ''))}>
+                    {getRoleIcon(org?.info?.role || '')}
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    {(org.businessWorlds?.length || 0) + (org.personalWorlds?.length || 0)}
+                    {(org?.businessWorlds?.length || 0) + (org?.personalWorlds?.length || 0)}
                   </Badge>
                 </div>
               </div>
