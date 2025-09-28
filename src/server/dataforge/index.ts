@@ -143,7 +143,7 @@ export interface DataForgeConfig {
 
 export class DataForgeService {
   private config: DataForgeConfig;
-  private entityManager: ArchetypeEntityManager | null = null;
+  private entityManager: DataForgeEntityManager | null = null;
   private migrationService: ArchetypeMigrationService | null = null;
   
   constructor(config: DataForgeConfig) {
@@ -160,19 +160,20 @@ export class DataForgeService {
    * Initialize DataForge services
    */
   async initialize(env: any): Promise<void> {
-    // Initialize entity manager
-    const { createDatabaseConnection, getKysely } = await import('../lib/database-manager');
+    // Initialize database connection
+    const { createDatabaseConnection } = await import('../lib/database-manager');
     createDatabaseConnection(env);
-    const kysely = getKysely();
-    
-    this.entityManager = new ArchetypeEntityManager({
-      kysely,
+
+    // Initialize entity manager with direct reference
+    this.entityManager = new DataForgeEntityManager({
+      kysely: null, // Will use withKysely pattern internally
       organizationId: this.config.organizationId
     });
-    
+
     // Initialize migration service if enabled
     if (this.config.enableDebouncedMigrations) {
-      this.migrationService = new ArchetypeMigrationService(kysely, {
+      // Migration service should also use withKysely pattern
+      this.migrationService = new ArchetypeMigrationService(null, {
         debounceMs: this.config.migrationDebounceMs
       });
     }
@@ -181,7 +182,7 @@ export class DataForgeService {
   /**
    * Get entity manager
    */
-  getEntityManager(): ArchetypeEntityManager {
+  getEntityManager(): DataForgeEntityManager {
     if (!this.entityManager) {
       throw new Error('DataForge not initialized. Call initialize() first.');
     }

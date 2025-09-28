@@ -19,10 +19,12 @@ export class BulkOperationsManager {
   private config: DataForgeEntityManagerConfig;
   private configCache: Map<string, OrgEntityDefinition>;
   private bulkOperationsService: BulkOperationsService;
+  private entityManager: any;
 
-  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>) {
+  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>, entityManager: any) {
     this.config = config;
     this.configCache = configCache;
+    this.entityManager = entityManager;
     
     // Initialize bulk operations service
     this.bulkOperationsService = new BulkOperationsService({
@@ -59,13 +61,15 @@ export class BulkOperationsManager {
       console.log(`[BulkOperationsManager] Getting entity config: ${normalizedEntityName} (original: ${entityName}) for org: ${orgId}`);
       
       // Get entity from entity_schemas table
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', normalizedEntityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', normalizedEntityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         console.log(`[BulkOperationsManager] Entity ${normalizedEntityName} not found for org ${orgId}`);

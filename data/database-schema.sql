@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict 1LoU8RCFN3cMhK3UrD8GpMUbzMZCRzzBMitKAqBgCIYfqbNCO667lQ0ps7ftc09
+\restrict g21GrkpfKQGmbTg5s7EFcTTIsLehoRvz9DpoME96XXq8tRrjUW4eEXg3H2cMawY
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict 1LoU8RCFN3cMhK3UrD8GpMUbzMZCRzzBMitKAqBgCIYfqbNCO667lQ0ps7ftc09
+\unrestrict g21GrkpfKQGmbTg5s7EFcTTIsLehoRvz9DpoME96XXq8tRrjUW4eEXg3H2cMawY
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict w4abQFLL6mFc49vjNOfa6aw3CWSacReXkfsyETbRV4rtDspASJJpPjhINLocwp0
+\restrict ZerdkH5DAQECtH7VeKAkJc55x312uq1axTkGhqFgiBuQKMb3nKO3O8AZytY4oQr
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict w4abQFLL6mFc49vjNOfa6aw3CWSacReXkfsyETbRV4rtDspASJJpPjhINLocwp0
+\unrestrict ZerdkH5DAQECtH7VeKAkJc55x312uq1axTkGhqFgiBuQKMb3nKO3O8AZytY4oQr
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict TeNyxEhrvIji51ExW3zzUUoOvk76H2wai1uqhADhfbpR1Anvzcp0DcSyh9g07g2
+\restrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict TeNyxEhrvIji51ExW3zzUUoOvk76H2wai1uqhADhfbpR1Anvzcp0DcSyh9g07g2
+\unrestrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
 \connect elevra_dev
-\restrict TeNyxEhrvIji51ExW3zzUUoOvk76H2wai1uqhADhfbpR1Anvzcp0DcSyh9g07g2
+\restrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2889,6 +2889,52 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_collection REPL
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_collection OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_computedtestentity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_computedtestentity (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    base_price numeric NOT NULL,
+    quantity numeric DEFAULT 1,
+    total_price text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_computedtestentity REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_computedtestentity OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_computedtestentity2; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_computedtestentity2 (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    base_price numeric NOT NULL,
+    quantity numeric DEFAULT 1,
+    total_price text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_computedtestentity2 REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_computedtestentity2 OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_deliverable; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2971,6 +3017,28 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_enhancedfieldsd
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_enhancedfieldsdemo OWNER TO postgres;
 
 --
+-- Name: org_01920000_1000_7000_8000_000000000001_finalperformancetest; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_finalperformancetest (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    title text NOT NULL,
+    description text,
+    priority text,
+    status text DEFAULT 'not_started'::text NOT NULL,
+    due_date timestamp without time zone,
+    task_priority numeric DEFAULT 1
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_finalperformancetest REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_finalperformancetest OWNER TO postgres;
+
+--
 -- Name: org_01920000_1000_7000_8000_000000000001_invoice; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3027,6 +3095,27 @@ ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_lorecanontestpr
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_lorecanontestproject OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_performancetest; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_performancetest (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    test_field text
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_performancetest REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_performancetest OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_phase; Type: TABLE; Schema: public; Owner: postgres
@@ -3147,6 +3236,27 @@ CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_relationships (
 
 
 ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_relationships OWNER TO postgres;
+
+--
+-- Name: org_01920000_1000_7000_8000_000000000001_stabilitytest; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.org_01920000_1000_7000_8000_000000000001_stabilitytest (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    name text NOT NULL,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    data jsonb,
+    test_name text NOT NULL
+);
+
+ALTER TABLE ONLY public.org_01920000_1000_7000_8000_000000000001_stabilitytest REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.org_01920000_1000_7000_8000_000000000001_stabilitytest OWNER TO postgres;
 
 --
 -- Name: org_01920000_1000_7000_8000_000000000001_teammember; Type: TABLE; Schema: public; Owner: postgres
@@ -5500,7 +5610,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TeNyxEhrvIji51ExW3zzUUoOvk76H2wai1uqhADhfbpR1Anvzcp0DcSyh9g07g2
+\unrestrict GddaMkQqj41lvAAYafOZDs7aoYWdLCls6EihB3iV4hJyprk5OAGRSi4zEvEBVap
 
 --
 -- Database "postgres" dump
@@ -5512,7 +5622,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict aO7zORHfBXSMGeMVBmSA7PXLf10DKObd10wPpse8M6Il35M61mv5NfG3CnbnPjS
+\restrict mEO6Op1m59eJ5TXpuCe30UDwQwEoej8sAlNGYrvHaJm3Y4fGrsq1yEZReMZTI2G
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5533,7 +5643,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aO7zORHfBXSMGeMVBmSA7PXLf10DKObd10wPpse8M6Il35M61mv5NfG3CnbnPjS
+\unrestrict mEO6Op1m59eJ5TXpuCe30UDwQwEoej8sAlNGYrvHaJm3Y4fGrsq1yEZReMZTI2G
 
 --
 -- PostgreSQL database cluster dump complete

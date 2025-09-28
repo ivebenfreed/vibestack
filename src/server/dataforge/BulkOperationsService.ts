@@ -10,7 +10,7 @@ import type { HardcodedDatabase } from '../../base/hardcoded-database';
 import type { JsonRulesEngine, EntityConfig } from '../../rules/json-rules-engine';
 
 export interface BulkOperationsConfig {
-  kysely: Kysely<HardcodedDatabase>;
+  entityManager: any; // EntityManager instance for withKysely access
   rulesEngine: JsonRulesEngine;
   getEntityConfig: (orgId: string, entityName: string) => Promise<EntityConfig | null>;
   saveEntityData: (orgId: string, entityName: string, data: any) => Promise<{ success: boolean; data?: any; errors?: string[] }>;
@@ -41,7 +41,11 @@ export interface BulkDeleteResult {
 }
 
 export class BulkOperationsService {
-  constructor(private config: BulkOperationsConfig) {}
+  private entityManager: any;
+
+  constructor(private config: BulkOperationsConfig) {
+    this.entityManager = config.entityManager;
+  }
 
   /**
    * Bulk create multiple records for an entity
@@ -77,11 +81,13 @@ export class BulkOperationsService {
       }));
 
       // Use Kysely bulk insert - MUCH FASTER!
-      const insertedRecords = await this.config.kysely
-        .insertInto(config.tableName as any)
-        .values(preparedRecords as any)
-        .returning(['id', 'created_at', 'updated_at'])
-        .execute();
+      const insertedRecords = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .insertInto(config.tableName as any)
+          .values(preparedRecords as any)
+          .returning(['id', 'created_at', 'updated_at'])
+          .execute();
+      });
 
       // Build results from inserted records
       for (let i = 0; i < insertedRecords.length; i++) {
@@ -146,20 +152,22 @@ export class BulkOperationsService {
     }
 
     // Build query using Kysely query builder
-    let query = this.config.kysely
-      .updateTable(config.tableName as any)
-      .set({
-        ...updates,
-        updated_at: new Date().toISOString()
-      } as any)
-      .where('organization_id', '=', orgId);
+    const result = await this.entityManager.withKysely(async (kysely) => {
+      let query = kysely
+        .updateTable(config.tableName as any)
+        .set({
+          ...updates,
+          updated_at: new Date().toISOString()
+        } as any)
+        .where('organization_id', '=', orgId);
 
-    // Apply filters
-    query = this.applyFiltersToQuery(query, filter);
+      // Apply filters
+      query = this.applyFiltersToQuery(query, filter);
 
-    const result = await query
-      .returning(['id', 'name', 'updated_at'])
-      .execute();
+      return await query
+        .returning(['id', 'name', 'updated_at'])
+        .execute();
+    });
 
     return {
       success: true,
@@ -187,31 +195,33 @@ export class BulkOperationsService {
       throw new Error(`Entity ${entityName} not found for org ${orgId}`);
     }
 
-    let query: any;
+    const result = await this.entityManager.withKysely(async (kysely) => {
+      let query: any;
 
-    if (permanent) {
-      // Hard delete
-      query = this.config.kysely
-        .deleteFrom(config.tableName as any)
-        .where('organization_id', '=', orgId);
-    } else {
-      // Soft delete (update status to 'deleted')
-      query = this.config.kysely
-        .updateTable(config.tableName as any)
-        .set({
-          status: 'deleted',
-          updated_at: new Date().toISOString()
-        } as any)
-        .where('organization_id', '=', orgId)
-        .where('status', '!=', 'deleted');
-    }
+      if (permanent) {
+        // Hard delete
+        query = kysely
+          .deleteFrom(config.tableName as any)
+          .where('organization_id', '=', orgId);
+      } else {
+        // Soft delete (update status to 'deleted')
+        query = kysely
+          .updateTable(config.tableName as any)
+          .set({
+            status: 'deleted',
+            updated_at: new Date().toISOString()
+          } as any)
+          .where('organization_id', '=', orgId)
+          .where('status', '!=', 'deleted');
+      }
 
-    // Apply filters
-    query = this.applyFiltersToQuery(query, filter);
+      // Apply filters
+      query = this.applyFiltersToQuery(query, filter);
 
-    const result = await query
-      .returning(['id', 'name'])
-      .execute();
+      return await query
+        .returning(['id', 'name'])
+        .execute();
+    });
 
     return {
       success: true,

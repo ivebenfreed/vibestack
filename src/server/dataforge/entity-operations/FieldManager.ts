@@ -18,10 +18,12 @@ export interface DataForgeEntityManagerConfig {
 export class FieldManager {
   private config: DataForgeEntityManagerConfig;
   private configCache: Map<string, OrgEntityDefinition>;
+  private entityManager: any; // EntityManager instance for withKysely access
 
-  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>) {
+  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>, entityManager: any) {
     this.config = config;
     this.configCache = configCache;
+    this.entityManager = entityManager;
   }
 
   /**
@@ -36,20 +38,24 @@ export class FieldManager {
       const { getEntityDefinition, storeEntityDefinition } = await import('./entity-storage');
 
       // Get entity details and current definition
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype', 'business_metadata'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['table_name as tableName', 'archetype', 'business_metadata'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         return { success: false, error: 'Entity not found' };
       }
 
       // Get current entity definition
-      const currentDefinition = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      const currentDefinition = await this.entityManager.withKysely(async (kysely) => {
+        return await getEntityDefinition(kysely, orgId, entityName);
+      });
       if (!currentDefinition) {
         return { success: false, error: 'Entity definition not found' };
       }
@@ -79,10 +85,12 @@ export class FieldManager {
 
           // Generate ADD COLUMN DDL
           const alterSql = DDLGenerator.generateAddColumnDDL(entity.tableName, field.name, field);
-          
-          await this.config.kysely.executeQuery({
-            sql: alterSql,
-            parameters: []
+
+          await this.entityManager.withKysely(async (kysely) => {
+            await kysely.executeQuery({
+              sql: alterSql,
+              parameters: []
+            });
           });
           
           addedFields.push(field.name);
@@ -111,38 +119,42 @@ export class FieldManager {
           };
 
           // Store updated definition in entity_schemas
-          await this.config.kysely
-            .updateTable('entity_schemas')
-            .set({
-              business_metadata: updatedDefinition,
-              updated_at: new Date().toISOString()
-            })
-            .where('org_id', '=', orgId)
-            .where('entity_name', '=', entityName)
-            .execute();
+          await this.entityManager.withKysely(async (kysely) => {
+            await kysely
+              .updateTable('entity_schemas')
+              .set({
+                business_metadata: updatedDefinition,
+                updated_at: new Date().toISOString()
+              })
+              .where('org_id', '=', orgId)
+              .where('entity_name', '=', entityName)
+              .execute();
+          });
 
           console.log(`[FieldManager] Updated entity definition for ${entityName}`);
 
           // Update schema_metadata to trigger WAL events for cache invalidation
-          await this.config.kysely
-            .insertInto('schema_metadata')
-            .values({
-              key: `entity_${orgId}_${entityName}_fields_modified`,
-              value: JSON.stringify({
-                action: 'add_fields',
-                entityName,
-                addedFields,
-                timestamp: new Date().toISOString()
-              }),
-              updated_at: new Date()
-            })
-            .onConflict((oc) => 
-              oc.column('key').doUpdateSet({
-                value: (eb) => eb.ref('excluded.value'),
-                updated_at: (eb) => eb.ref('excluded.updated_at')
+          await this.entityManager.withKysely(async (kysely) => {
+            await kysely
+              .insertInto('schema_metadata')
+              .values({
+                key: `entity_${orgId}_${entityName}_fields_modified`,
+                value: JSON.stringify({
+                  action: 'add_fields',
+                  entityName,
+                  addedFields,
+                  timestamp: new Date().toISOString()
+                }),
+                updated_at: new Date()
               })
-            )
-            .execute();
+              .onConflict((oc) =>
+                oc.column('key').doUpdateSet({
+                  value: (eb) => eb.ref('excluded.value'),
+                  updated_at: (eb) => eb.ref('excluded.updated_at')
+                })
+              )
+              .execute();
+          });
 
           console.log(`[FieldManager] Updated schema tracking for ${entityName} field additions`);
         } catch (error) {
@@ -203,20 +215,24 @@ export class FieldManager {
       const { getEntityDefinition } = await import('./entity-storage');
 
       // Get entity details and current definition
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype', 'business_metadata'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['table_name as tableName', 'archetype', 'business_metadata'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         return { success: false, error: 'Entity not found' };
       }
 
       // Get current entity definition
-      const currentDefinition = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      const currentDefinition = await this.entityManager.withKysely(async (kysely) => {
+        return await getEntityDefinition(kysely, orgId, entityName);
+      });
       if (!currentDefinition) {
         return { success: false, error: 'Entity definition not found' };
       }
@@ -236,13 +252,15 @@ export class FieldManager {
       }
 
       // Check if field is already soft deleted
-      const existingFieldsTrash = await this.config.kysely
-        .selectFrom('fields_trash')
-        .select(['field_name'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('field_name', '=', fieldName)
-        .executeTakeFirst();
+      const existingFieldsTrash = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('fields_trash')
+          .select(['field_name'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('field_name', '=', fieldName)
+          .executeTakeFirst();
+      });
 
       if (existingFieldsTrash) {
         return { success: false, error: `Field '${fieldName}' is already in trash` };
@@ -253,21 +271,23 @@ export class FieldManager {
 
       // SOFT DELETE ONLY - column and data are preserved for recovery
       // Add entry to fields_trash table
-      await this.config.kysely
-        .insertInto('fields_trash')
-        .values({
-          id: crypto.randomUUID(),
-          org_id: orgId,
-          entity_name: entityName,
-          field_name: fieldName,
-          field_definition: fieldDef,
-          table_name: entity.tableName,
-          deleted_by: userId || 'system',
-          deleted_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .execute();
+      await this.entityManager.withKysely(async (kysely) => {
+        await kysely
+          .insertInto('fields_trash')
+          .values({
+            id: crypto.randomUUID(),
+            org_id: orgId,
+            entity_name: entityName,
+            field_name: fieldName,
+            field_definition: fieldDef,
+            table_name: entity.tableName,
+            deleted_by: userId || 'system',
+            deleted_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .execute();
+      });
 
       // Update entity definition to mark field as deleted (but preserve in trash)
       try {
@@ -283,38 +303,42 @@ export class FieldManager {
         };
 
         // Store updated definition in entity_schemas
-        await this.config.kysely
-          .updateTable('entity_schemas')
-          .set({
-            business_metadata: updatedDefinition,
-            updated_at: new Date().toISOString()
-          })
-          .where('org_id', '=', orgId)
-          .where('entity_name', '=', entityName)
-          .execute();
+        await this.entityManager.withKysely(async (kysely) => {
+          await kysely
+            .updateTable('entity_schemas')
+            .set({
+              business_metadata: updatedDefinition,
+              updated_at: new Date().toISOString()
+            })
+            .where('org_id', '=', orgId)
+            .where('entity_name', '=', entityName)
+            .execute();
+        });
 
         console.log(`[FieldManager] Updated entity definition after soft deleting field ${fieldName}`);
 
         // Update schema_metadata to trigger WAL events for cache invalidation
-        await this.config.kysely
-          .insertInto('schema_metadata')
-          .values({
-            key: `entity_${orgId}_${entityName}_fields_modified`,
-            value: JSON.stringify({
-              action: 'soft_delete_field',
-              entityName,
-              deletedField: fieldName,
-              timestamp: new Date().toISOString()
-            }),
-            updated_at: new Date()
-          })
-          .onConflict((oc) => 
-            oc.column('key').doUpdateSet({
-              value: (eb) => eb.ref('excluded.value'),
-              updated_at: (eb) => eb.ref('excluded.updated_at')
+        await this.entityManager.withKysely(async (kysely) => {
+          await kysely
+            .insertInto('schema_metadata')
+            .values({
+              key: `entity_${orgId}_${entityName}_fields_modified`,
+              value: JSON.stringify({
+                action: 'soft_delete_field',
+                entityName,
+                deletedField: fieldName,
+                timestamp: new Date().toISOString()
+              }),
+              updated_at: new Date()
             })
-          )
-          .execute();
+            .onConflict((oc) =>
+              oc.column('key').doUpdateSet({
+                value: (eb) => eb.ref('excluded.value'),
+                updated_at: (eb) => eb.ref('excluded.updated_at')
+              })
+            )
+            .execute();
+        });
 
         console.log(`[FieldManager] Updated schema tracking for ${entityName} field soft deletion`);
       } catch (error) {
@@ -348,13 +372,15 @@ export class FieldManager {
       console.log(`[FieldManager] Restoring field ${fieldName} from trash for entity: ${entityName}`);
 
       // Check if field exists in trash
-      const trashedField = await this.config.kysely
-        .selectFrom('fields_trash')
-        .select(['id', 'field_definition', 'table_name', 'deleted_at'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('field_name', '=', fieldName)
-        .executeTakeFirst();
+      const trashedField = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('fields_trash')
+          .select(['id', 'field_definition', 'table_name', 'deleted_at'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('field_name', '=', fieldName)
+          .executeTakeFirst();
+      });
 
       if (!trashedField) {
         return { success: false, error: `Field '${fieldName}' not found in trash` };
@@ -362,16 +388,20 @@ export class FieldManager {
 
       // Get current entity definition
       const { getEntityDefinition } = await import('./entity-storage');
-      const currentDefinition = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      const currentDefinition = await this.entityManager.withKysely(async (kysely) => {
+        return await getEntityDefinition(kysely, orgId, entityName);
+      });
       if (!currentDefinition) {
         return { success: false, error: 'Entity definition not found' };
       }
 
       // Remove from fields_trash table
-      await this.config.kysely
-        .deleteFrom('fields_trash')
-        .where('id', '=', trashedField.id)
-        .execute();
+      await this.entityManager.withKysely(async (kysely) => {
+        await kysely
+          .deleteFrom('fields_trash')
+          .where('id', '=', trashedField.id)
+          .execute();
+      });
 
       // Update entity definition to restore field
       try {
@@ -395,38 +425,42 @@ export class FieldManager {
         }
 
         // Store updated definition in entity_schemas
-        await this.config.kysely
-          .updateTable('entity_schemas')
-          .set({
-            business_metadata: updatedDefinition,
-            updated_at: new Date().toISOString()
-          })
-          .where('org_id', '=', orgId)
-          .where('entity_name', '=', entityName)
-          .execute();
+        await this.entityManager.withKysely(async (kysely) => {
+          await kysely
+            .updateTable('entity_schemas')
+            .set({
+              business_metadata: updatedDefinition,
+              updated_at: new Date().toISOString()
+            })
+            .where('org_id', '=', orgId)
+            .where('entity_name', '=', entityName)
+            .execute();
+        });
 
         console.log(`[FieldManager] Updated entity definition after restoring field ${fieldName}`);
 
         // Update schema_metadata to trigger WAL events for cache invalidation
-        await this.config.kysely
-          .insertInto('schema_metadata')
-          .values({
-            key: `entity_${orgId}_${entityName}_fields_modified`,
-            value: JSON.stringify({
-              action: 'restore_field',
-              entityName,
-              restoredField: fieldName,
-              timestamp: new Date().toISOString()
-            }),
-            updated_at: new Date()
-          })
-          .onConflict((oc) => 
-            oc.column('key').doUpdateSet({
-              value: (eb) => eb.ref('excluded.value'),
-              updated_at: (eb) => eb.ref('excluded.updated_at')
+        await this.entityManager.withKysely(async (kysely) => {
+          await kysely
+            .insertInto('schema_metadata')
+            .values({
+              key: `entity_${orgId}_${entityName}_fields_modified`,
+              value: JSON.stringify({
+                action: 'restore_field',
+                entityName,
+                restoredField: fieldName,
+                timestamp: new Date().toISOString()
+              }),
+              updated_at: new Date()
             })
-          )
-          .execute();
+            .onConflict((oc) =>
+              oc.column('key').doUpdateSet({
+                value: (eb) => eb.ref('excluded.value'),
+                updated_at: (eb) => eb.ref('excluded.updated_at')
+              })
+            )
+            .execute();
+        });
 
         console.log(`[FieldManager] Updated schema tracking for ${entityName} field restoration`);
       } catch (error) {
@@ -460,13 +494,15 @@ export class FieldManager {
       console.log(`[FieldManager] Permanently deleting field ${fieldName} from entity: ${entityName} and dropping column`);
 
       // Check if field exists in trash
-      const trashedField = await this.config.kysely
-        .selectFrom('fields_trash')
-        .select(['id', 'field_definition', 'table_name', 'deleted_at'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('field_name', '=', fieldName)
-        .executeTakeFirst();
+      const trashedField = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('fields_trash')
+          .select(['id', 'field_definition', 'table_name', 'deleted_at'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('field_name', '=', fieldName)
+          .executeTakeFirst();
+      });
 
       if (!trashedField) {
         return { success: false, error: `Field '${fieldName}' not found in trash` };
@@ -474,24 +510,30 @@ export class FieldManager {
 
       // PERMANENT DELETE - DROP COLUMN AND REMOVE FROM TRASH
       const dropColumnDDL = DDLGenerator.generateDropColumnDDL(trashedField.table_name, fieldName);
-      
-      await this.config.kysely.executeQuery({
-        sql: dropColumnDDL,
-        parameters: []
+
+      await this.entityManager.withKysely(async (kysely) => {
+        await kysely.executeQuery({
+          sql: dropColumnDDL,
+          parameters: []
+        });
       });
       console.log(`Permanently dropped column: ${fieldName} from ${trashedField.table_name}`);
 
       // Remove from fields_trash table completely
-      await this.config.kysely
-        .deleteFrom('fields_trash')
-        .where('id', '=', trashedField.id)
-        .execute();
+      await this.entityManager.withKysely(async (kysely) => {
+        await kysely
+          .deleteFrom('fields_trash')
+          .where('id', '=', trashedField.id)
+          .execute();
+      });
       console.log(`Permanently removed field from fields_trash: ${fieldName}`);
 
       // Update entity definition to completely remove the field
       try {
         const { getEntityDefinition } = await import('./entity-storage');
-        const currentDefinition = await getEntityDefinition(this.config.kysely, orgId, entityName);
+        const currentDefinition = await this.entityManager.withKysely(async (kysely) => {
+          return await getEntityDefinition(kysely, orgId, entityName);
+        });
         
         if (currentDefinition) {
           const updatedDefinition = {
@@ -502,38 +544,42 @@ export class FieldManager {
           };
 
           // Store updated definition in entity_schemas
-          await this.config.kysely
-            .updateTable('entity_schemas')
-            .set({
-              business_metadata: updatedDefinition,
-              updated_at: new Date().toISOString()
-            })
-            .where('org_id', '=', orgId)
-            .where('entity_name', '=', entityName)
-            .execute();
+          await this.entityManager.withKysely(async (kysely) => {
+            await kysely
+              .updateTable('entity_schemas')
+              .set({
+                business_metadata: updatedDefinition,
+                updated_at: new Date().toISOString()
+              })
+              .where('org_id', '=', orgId)
+              .where('entity_name', '=', entityName)
+              .execute();
+          });
 
           console.log(`[FieldManager] Updated entity definition after permanent field deletion ${fieldName}`);
 
           // Update schema_metadata to trigger WAL events for cache invalidation
-          await this.config.kysely
-            .insertInto('schema_metadata')
-            .values({
-              key: `entity_${orgId}_${entityName}_fields_modified`,
-              value: JSON.stringify({
-                action: 'permanent_delete_field',
-                entityName,
-                permanentlyDeletedField: fieldName,
-                timestamp: new Date().toISOString()
-              }),
-              updated_at: new Date()
-            })
-            .onConflict((oc) => 
-              oc.column('key').doUpdateSet({
-                value: (eb) => eb.ref('excluded.value'),
-                updated_at: (eb) => eb.ref('excluded.updated_at')
+          await this.entityManager.withKysely(async (kysely) => {
+            await kysely
+              .insertInto('schema_metadata')
+              .values({
+                key: `entity_${orgId}_${entityName}_fields_modified`,
+                value: JSON.stringify({
+                  action: 'permanent_delete_field',
+                  entityName,
+                  permanentlyDeletedField: fieldName,
+                  timestamp: new Date().toISOString()
+                }),
+                updated_at: new Date()
               })
-            )
-            .execute();
+              .onConflict((oc) =>
+                oc.column('key').doUpdateSet({
+                  value: (eb) => eb.ref('excluded.value'),
+                  updated_at: (eb) => eb.ref('excluded.updated_at')
+                })
+              )
+              .execute();
+          });
 
           console.log(`[FieldManager] Updated schema tracking for ${entityName} permanent field deletion`);
         }
@@ -566,20 +612,22 @@ export class FieldManager {
   async listFieldTrash(orgId: string, entityName: string): Promise<any> {
     try {
       console.log(`[FieldManager] Listing field trash for entity: ${entityName} in org: ${orgId}`);
-      
-      const trashedFields = await this.config.kysely
-        .selectFrom('fields_trash')
-        .select([
-          'field_name',
-          'field_definition',
-          'table_name',
-          'deleted_by',
-          'deleted_at'
-        ])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .orderBy('deleted_at', 'desc')
-        .execute();
+
+      const trashedFields = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('fields_trash')
+          .select([
+            'field_name',
+            'field_definition',
+            'table_name',
+            'deleted_by',
+            'deleted_at'
+          ])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .orderBy('deleted_at', 'desc')
+          .execute();
+      });
 
       const formattedFields = trashedFields.map((field: any) => ({
         fieldName: field.field_name,

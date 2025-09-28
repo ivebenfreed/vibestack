@@ -12,7 +12,7 @@ import { ForeignKeyManager } from './ForeignKeyManager';
 import { DynamicSchemaManager } from './DynamicSchemaManager';
 
 export interface EntityMigrationToolConfig {
-  kysely: Kysely<Database>;
+  entityManager: any; // EntityManager instance for withKysely access
 }
 
 export interface MigrationPlan {
@@ -55,10 +55,12 @@ export interface MigrationResult {
 export class EntityMigrationTool {
   private foreignKeyManager: ForeignKeyManager;
   private schemaManager: DynamicSchemaManager;
-  
+  private entityManager: any;
+
   constructor(private config: EntityMigrationToolConfig) {
-    this.foreignKeyManager = new ForeignKeyManager(config);
-    this.schemaManager = new DynamicSchemaManager(config);
+    this.entityManager = config.entityManager;
+    this.foreignKeyManager = new ForeignKeyManager({ entityManager: this.entityManager });
+    this.schemaManager = new DynamicSchemaManager({ entityManager: this.entityManager });
   }
 
   /**
@@ -69,12 +71,14 @@ export class EntityMigrationTool {
     
     try {
       // Get all entities for the organization
-      const entities = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
-        .where('org_id', '=', orgId)
-        .where('deleted', '!=', true)
-        .execute();
+      const entities = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
+          .where('org_id', '=', orgId)
+          .where('deleted', '!=', true)
+          .execute();
+      });
 
       const plans: MigrationPlan[] = [];
       
@@ -347,19 +351,21 @@ export class EntityMigrationTool {
    */
   private async convertTextColumnToUuid(tableName: string, columnName: string): Promise<void> {
     console.log(`[EntityMigrationTool] Converting ${tableName}.${columnName} from TEXT to UUID`);
-    
-    await this.config.kysely.transaction().execute(async (trx) => {
-      // First, update any invalid UUID values to NULL
-      const updateSQL = `UPDATE ${tableName} SET ${columnName} = NULL 
-         WHERE ${columnName} IS NOT NULL 
-         AND ${columnName} !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`;
-      await sql.raw(updateSQL).execute(trx);
-      
-      // Then alter the column type
-      const alterSQL = `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE UUID USING ${columnName}::UUID`;
-      await sql.raw(alterSQL).execute(trx);
+
+    await this.entityManager.withKysely(async (kysely) => {
+      return await kysely.transaction().execute(async (trx) => {
+        // First, update any invalid UUID values to NULL
+        const updateSQL = `UPDATE ${tableName} SET ${columnName} = NULL
+           WHERE ${columnName} IS NOT NULL
+           AND ${columnName} !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`;
+        await sql.raw(updateSQL).execute(trx);
+
+        // Then alter the column type
+        const alterSQL = `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE UUID USING ${columnName}::UUID`;
+        await sql.raw(alterSQL).execute(trx);
+      });
     });
-    
+
     console.log(`[EntityMigrationTool] Successfully converted ${tableName}.${columnName} to UUID`);
   }
 
@@ -368,12 +374,14 @@ export class EntityMigrationTool {
    */
   private async getTableSchema(tableName: string): Promise<Array<{column_name: string; data_type: string}>> {
     try {
-      const schema = await this.config.kysely
-        .selectFrom('information_schema.columns')
-        .select(['column_name', 'data_type'])
-        .where('table_name', '=', tableName)
-        .execute();
-        
+      const schema = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('information_schema.columns')
+          .select(['column_name', 'data_type'])
+          .where('table_name', '=', tableName)
+          .execute();
+      });
+
       return schema;
     } catch (error) {
       console.warn(`[EntityMigrationTool] Could not get schema for ${tableName}:`, error);

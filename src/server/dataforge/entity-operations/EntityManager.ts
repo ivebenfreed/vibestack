@@ -67,12 +67,12 @@ export class DataForgeEntityManager {
     this.config = config;
     
     // Initialize specialized managers with shared config
-    this.recordManager = new RecordManager(config, this.configCache);
-    this.schemaManager = new EntitySchemaManager(config, this.configCache);
-    this.fieldManager = new FieldManager(config, this.configCache);
-    this.bulkManager = new BulkOperationsManager(config, this.configCache);
+    this.recordManager = new RecordManager(config, this.configCache, this);
+    this.schemaManager = new EntitySchemaManager(config, this.configCache, this);
+    this.fieldManager = new FieldManager(config, this.configCache, this);
+    this.bulkManager = new BulkOperationsManager(config, this.configCache, this);
     this.archetypeManager = new ArchetypeManager(config, this.configCache);
-    this.computedManager = new ComputedFieldsManager(config, this.configCache);
+    this.computedManager = new ComputedFieldsManager(config, this.configCache, this);
   }
 
   // =============================================================================
@@ -81,6 +81,11 @@ export class DataForgeEntityManager {
 
   getKysely() {
     return this.config.kysely;
+  }
+
+  async withKysely<T>(fn: (kysely: any) => Promise<T>): Promise<T> {
+    const { withKysely } = await import('../../lib/database-manager');
+    return await withKysely(fn);
   }
 
   async getEntityConfig(orgId: string, entityName: string): Promise<any> {

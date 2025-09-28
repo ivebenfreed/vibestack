@@ -21,10 +21,12 @@ export class ComputedFieldsManager {
   private configCache: Map<string, OrgEntityDefinition>;
   private computedFieldEngine: ComputedFieldEngine;
   private rollupEngine: RollupEngine;
+  private entityManager: any; // EntityManager instance for withKysely access
 
-  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>) {
+  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>, entityManager: any) {
     this.config = config;
     this.configCache = configCache;
+    this.entityManager = entityManager;
     
     // Initialize computed field engine (needs a reference to parent EntityManager)
     // For now, we'll pass 'this' but this would need the full EntityManager
@@ -43,8 +45,12 @@ export class ComputedFieldsManager {
       
       // Refresh both computed fields and rollup fields
       await Promise.all([
-        this.computedFieldEngine.refreshEntityComputedFields(this.config.kysely, orgId, entityName, entityId),
-        this.rollupEngine.refreshEntityRollups(this.config.kysely, orgId, entityName, entityId)
+        await this.entityManager.withKysely(async (kysely) => {
+          return await this.computedFieldEngine.refreshEntityComputedFields(kysely, orgId, entityName, entityId);
+        }),
+        await this.entityManager.withKysely(async (kysely) => {
+          return await this.rollupEngine.refreshEntityRollups(kysely, orgId, entityName, entityId);
+        })
       ]);
       
       console.log(`[ComputedFieldsManager] Completed computed field refresh for ${entityName}:${entityId}`);
@@ -63,8 +69,12 @@ export class ComputedFieldsManager {
       
       // Notify both engines of the field change
       await Promise.all([
-        this.computedFieldEngine.onFieldChange(this.config.kysely, orgId, entityType, entityId, changedField, newValue),
-        this.rollupEngine.onTargetFieldChange(this.config.kysely, orgId, entityType, entityId, changedField)
+        await this.entityManager.withKysely(async (kysely) => {
+          return await this.computedFieldEngine.onFieldChange(kysely, orgId, entityType, entityId, changedField, newValue);
+        }),
+        await this.entityManager.withKysely(async (kysely) => {
+          return await this.rollupEngine.onTargetFieldChange(kysely, orgId, entityType, entityId, changedField);
+        })
       ]);
       
       console.log(`[ComputedFieldsManager] Completed field change processing for ${entityType}:${entityId}.${changedField}`);

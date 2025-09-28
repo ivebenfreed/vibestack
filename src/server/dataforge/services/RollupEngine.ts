@@ -28,9 +28,11 @@ export interface RollupFieldConfig {
 export class RollupEngine {
   private config: { kysely: any };
   private expressionEvaluator: ExpressionEvaluator;
-  
-  constructor(manager: { config: { kysely: any } }) {
+  private entityManager: any;
+
+  constructor(manager: { config: { kysely: any }; entityManager?: any }) {
     this.config = manager.config;
+    this.entityManager = manager.entityManager || manager;
     this.expressionEvaluator = new ExpressionEvaluator();
   }
 
@@ -390,26 +392,13 @@ export class RollupEngine {
 
   private async storeRollupConfig(orgId: string, config: RollupFieldConfig): Promise<void> {
     try {
-      await this.config.kysely
-        .insertInto('dataforge_rollup_fields')
-        .values({
-          org_id: orgId,
-          entity_name: config.entityName,
-          field_name: config.fieldName,
-          rollup_type: config.type,
-          relationship_type: config.relationshipType,
-          target_entity_type: config.targetEntityType,
-          target_field: config.targetField || null,
-          separator: config.separator || null,
-          conditions: JSON.stringify(config.conditions || {}),
-          expression: config.expression || null,
-          computation_context: JSON.stringify(config.computationContext || {}),
-          created_at: new Date(),
-          updated_at: new Date()
-        })
-        .onConflict((oc) => oc
-          .columns(['org_id', 'entity_name', 'field_name'])
-          .doUpdateSet({
+      await this.entityManager.withKysely(async (kysely) => {
+        await kysely
+          .insertInto('dataforge_rollup_fields')
+          .values({
+            org_id: orgId,
+            entity_name: config.entityName,
+            field_name: config.fieldName,
             rollup_type: config.type,
             relationship_type: config.relationshipType,
             target_entity_type: config.targetEntityType,
@@ -418,10 +407,25 @@ export class RollupEngine {
             conditions: JSON.stringify(config.conditions || {}),
             expression: config.expression || null,
             computation_context: JSON.stringify(config.computationContext || {}),
+            created_at: new Date(),
             updated_at: new Date()
           })
-        )
-        .execute();
+          .onConflict((oc) => oc
+            .columns(['org_id', 'entity_name', 'field_name'])
+            .doUpdateSet({
+              rollup_type: config.type,
+              relationship_type: config.relationshipType,
+              target_entity_type: config.targetEntityType,
+              target_field: config.targetField || null,
+              separator: config.separator || null,
+              conditions: JSON.stringify(config.conditions || {}),
+              expression: config.expression || null,
+              computation_context: JSON.stringify(config.computationContext || {}),
+              updated_at: new Date()
+            })
+          )
+          .execute();
+      });
       
       console.log(`✅ Stored rollup config for ${config.entityName}.${config.fieldName}`);
     } catch (error) {

@@ -19,10 +19,12 @@ export interface DataForgeEntityManagerConfig {
 export class EntitySchemaManager {
   private config: DataForgeEntityManagerConfig;
   private configCache: Map<string, OrgEntityDefinition>;
+  private entityManager: any;
 
-  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>) {
+  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>, entityManager: any) {
     this.config = config;
     this.configCache = configCache;
+    this.entityManager = entityManager;
   }
 
   /**
@@ -32,18 +34,20 @@ export class EntitySchemaManager {
   private async createHardcodedUserEntity(orgId: string): Promise<any> {
     try {
       // Get actual users from organization_members table
-      const users = await this.config.kysely
-        .selectFrom('organization_members as om')
-        .innerJoin('user as u', 'u.id', 'om.user_id')
-        .select([
-          'u.id',
-          'u.name',
-          'u.email',
-          'om.role',
-          'om.created_at as joined_at'
-        ])
-        .where('om.organization_id', '=', orgId)
-        .execute();
+      const users = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('organization_members as om')
+          .innerJoin('user as u', 'u.id', 'om.user_id')
+          .select([
+            'u.id',
+            'u.name',
+            'u.email',
+            'om.role',
+            'om.created_at as joined_at'
+          ])
+          .where('om.organization_id', '=', orgId)
+          .execute();
+      });
 
       // Create User entity with org prefix for consistency
       const userEntityName = `${orgId}_User`;
@@ -174,13 +178,15 @@ export class EntitySchemaManager {
       console.log(`[EntitySchemaManager] Getting entity config: ${normalizedEntityName} (original: ${entityName}) for org: ${orgId}`);
       
       // Get entity from entity_schemas table
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', normalizedEntityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', normalizedEntityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         console.log(`[EntitySchemaManager] Entity ${normalizedEntityName} not found for org ${orgId}`);
@@ -232,12 +238,14 @@ export class EntitySchemaManager {
       console.log(`[EntitySchemaManager] Creating entity: ${normalizedEntityName} (${archetype}) for org: ${orgId}`);
       
       // Check if entity with this name already exists
-      const existingEntity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'deleted'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', normalizedEntityName)
-        .executeTakeFirst();
+      const existingEntity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'deleted'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', normalizedEntityName)
+          .executeTakeFirst();
+      });
       
       if (existingEntity) {
         const status = existingEntity.deleted ? 'soft-deleted' : 'active';
@@ -337,18 +345,20 @@ export class EntitySchemaManager {
       
       // Execute DDL
       try {
-        await this.config.kysely.executeQuery({
-          sql: ddl,
-          parameters: []
-        });
-        
-        // Set replica identity to FULL to support UPDATE operations with logical replication
-        const replicaIdentityDDL = DDLGenerator.generateSetReplicaIdentityDDL(fullTableName);
-        console.log('[EntitySchemaManager] Setting replica identity:', replicaIdentityDDL);
-        
-        await this.config.kysely.executeQuery({
-          sql: replicaIdentityDDL,
-          parameters: []
+        await this.entityManager.withKysely(async (kysely) => {
+          await kysely.executeQuery({
+            sql: ddl,
+            parameters: []
+          });
+
+          // Set replica identity to FULL to support UPDATE operations with logical replication
+          const replicaIdentityDDL = DDLGenerator.generateSetReplicaIdentityDDL(fullTableName);
+          console.log('[EntitySchemaManager] Setting replica identity:', replicaIdentityDDL);
+
+          return await kysely.executeQuery({
+            sql: replicaIdentityDDL,
+            parameters: []
+          });
         });
         
         // Process relationship fields if any exist
@@ -365,12 +375,14 @@ export class EntitySchemaManager {
             );
             
             // Store relationship field configuration
-            await RelationshipFieldHandler.storeRelationshipFieldConfig(
-              this.config.kysely,
-              orgId,
-              normalizedEntityName,
-              relationshipDef
-            );
+            await this.entityManager.withKysely(async (kysely) => {
+              return await RelationshipFieldHandler.storeRelationshipFieldConfig(
+                kysely,
+                orgId,
+                normalizedEntityName,
+                relationshipDef
+              );
+            });
             
             console.log(`[EntitySchemaManager] Configured relationship field: ${relField.name} as ${relationshipDef.relationshipType}`);
           }
@@ -392,14 +404,18 @@ export class EntitySchemaManager {
       
       // Store in entity_schemas with complete field information
       const { storeEntityDefinition } = await import('./entity-storage');
-      await storeEntityDefinition(this.config.kysely, orgId, normalizedEntityName, entityDefinition, fullTableName);
+      await this.entityManager.withKysely(async (kysely) => {
+        return await storeEntityDefinition(kysely, orgId, normalizedEntityName, entityDefinition, fullTableName);
+      });
       
       console.log(`[EntitySchemaManager] Successfully created entity: ${fullTableName}`);
       
       // Auto-copy system option templates to custom options for new archetype
       try {
         const { ArchetypeOptionsManager } = await import('../services/ArchetypeOptionsManager');
-        await ArchetypeOptionsManager.ensureArchetypeOptions(this.config.kysely, orgId, archetype);
+        await this.entityManager.withKysely(async (kysely) => {
+          return await ArchetypeOptionsManager.ensureArchetypeOptions(kysely, orgId, archetype);
+        });
         console.log(`[EntitySchemaManager] Auto-copied system option templates for archetype: ${archetype}`);
       } catch (error) {
         console.warn(`[EntitySchemaManager] Failed to auto-copy system options for archetype ${archetype}:`, error);
@@ -479,8 +495,8 @@ export class EntitySchemaManager {
     try {
       console.log(`[EntitySchemaManager] Auto-assigning status sets for entity: ${entityName} (${archetype})`);
       
-      // Use StatusSetManager with static import  
-      const statusSetManager = new StatusSetManager(this.config.kysely);
+      // Use StatusSetManager with static import
+      const statusSetManager = new StatusSetManager(this.entityManager);
       
       // Check all fields (base + custom) for status fields
       const allFieldMaps = [mergedFields.baseFields, mergedFields.customFields];
@@ -618,13 +634,15 @@ export class EntitySchemaManager {
       console.log(`[EntitySchemaManager] Soft deleting entity: ${entityName} for org: ${orgId} (data preserved for recovery)`);
       
       // Get entity details first
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['table_name as tableName', 'archetype'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         return {
@@ -635,16 +653,18 @@ export class EntitySchemaManager {
 
       // SOFT DELETE ONLY - table and data are preserved for recovery
       // Table can be permanently deleted later via "empty trash" functionality
-      await this.config.kysely
-        .updateTable('entity_schemas')
-        .set({ 
-          deleted: true, 
-          deleted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString() 
-        })
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .execute();
+      await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .updateTable('entity_schemas')
+          .set({
+            deleted: true,
+            deleted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .execute();
+      });
 
       // Clear cache entry
       const cacheKey = `${orgId}:${entityName}`;
@@ -673,15 +693,17 @@ export class EntitySchemaManager {
   async restoreEntity(orgId: string, entityName: string): Promise<any> {
     try {
       console.log(`[EntitySchemaManager] Restoring entity from trash: ${entityName} for org: ${orgId}`);
-      
+
       // Check if entity exists in trash (deleted = true)
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype', 'deleted_at'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('deleted', '=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['table_name as tableName', 'archetype', 'deleted_at'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('deleted', '=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         return {
@@ -691,16 +713,18 @@ export class EntitySchemaManager {
       }
 
       // Restore entity by setting deleted = false
-      await this.config.kysely
-        .updateTable('entity_schemas')
-        .set({ 
-          deleted: false, 
-          deleted_at: null,
-          updated_at: new Date().toISOString() 
-        })
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .execute();
+      await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .updateTable('entity_schemas')
+          .set({
+            deleted: false,
+            deleted_at: null,
+            updated_at: new Date().toISOString()
+          })
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .execute();
+      });
 
       // Clear cache entry (it will be repopulated on next access)
       const cacheKey = `${orgId}:${entityName}`;
@@ -729,15 +753,17 @@ export class EntitySchemaManager {
   async permanentDeleteEntity(orgId: string, entityName: string): Promise<any> {
     try {
       console.log(`[EntitySchemaManager] Permanently deleting entity: ${entityName} and its table`);
-      
+
       // Check if entity exists in trash (deleted = true)
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['table_name as tableName', 'archetype', 'deleted_at'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('deleted', '=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['table_name as tableName', 'archetype', 'deleted_at'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('deleted', '=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         return {
@@ -747,20 +773,22 @@ export class EntitySchemaManager {
       }
 
       // PERMANENT DELETE - DROP TABLE AND REMOVE SCHEMA
-      const dropDDL = DDLGenerator.generateDropTableDDL(entity.tableName);
-      await this.config.kysely.executeQuery({
-        sql: dropDDL,
-        parameters: []
-      });
-      console.log(`Permanently dropped table: ${entity.tableName}`);
+      await this.entityManager.withKysely(async (kysely) => {
+        const dropDDL = DDLGenerator.generateDropTableDDL(entity.tableName);
+        await kysely.executeQuery({
+          sql: dropDDL,
+          parameters: []
+        });
+        console.log(`Permanently dropped table: ${entity.tableName}`);
 
-      // Remove from entity_schemas table completely
-      await this.config.kysely
-        .deleteFrom('entity_schemas')
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .execute();
-      console.log(`Permanently removed entity from entity_schemas: ${entityName}`);
+        // Remove from entity_schemas table completely
+        await kysely
+          .deleteFrom('entity_schemas')
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .execute();
+        console.log(`Permanently removed entity from entity_schemas: ${entityName}`);
+      });
 
       // Clear cache entry
       const cacheKey = `${orgId}:${entityName}`;
@@ -790,19 +818,21 @@ export class EntitySchemaManager {
     try {
       console.log(`[EntitySchemaManager] Listing trash for org: ${orgId}`);
       
-      const entities = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select([
-          'entity_name',
-          'table_name',
-          'archetype', 
-          'created_at',
-          'deleted_at'
-        ])
-        .where('org_id', '=', orgId)
-        .where('deleted', '=', true)
-        .orderBy('deleted_at', 'desc')
-        .execute();
+      const entities = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select([
+            'entity_name',
+            'table_name',
+            'archetype',
+            'created_at',
+            'deleted_at'
+          ])
+          .where('org_id', '=', orgId)
+          .where('deleted', '=', true)
+          .orderBy('deleted_at', 'desc')
+          .execute();
+      });
 
       const formattedEntities = entities.map((entity: any) => ({
         entityName: entity.entity_name,
@@ -837,12 +867,14 @@ export class EntitySchemaManager {
     try {
       console.log(`[EntitySchemaManager] Getting enhanced schema for org: ${orgId}`);
       
-      const entities = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'archetype', 'table_name', 'business_metadata', 'created_at', 'updated_at'])
-        .where('org_id', '=', orgId)
-        .where('deleted', '!=', true)
-        .execute();
+      const entities = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'archetype', 'table_name', 'business_metadata', 'created_at', 'updated_at'])
+          .where('org_id', '=', orgId)
+          .where('deleted', '!=', true)
+          .execute();
+      });
 
       console.log(`[EntitySchemaManager] Found ${entities.length} entities from database`);
       console.log(`[EntitySchemaManager] Entity names:`, entities.map((e: any) => e.entity_name).sort());
@@ -897,22 +929,24 @@ export class EntitySchemaManager {
               if (field.type === 'custom_option_reference' && field.optionSetType && field.archetype) {
                 try {
                   // Load options from the options API (using same query as options endpoint)
-                  const options = await this.config.kysely
-                    .selectFrom('custom_options')
-                    .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
-                    .select([
-                      'custom_options.value as option_key',
-                      'custom_options.label',
-                      'custom_options.description',
-                      'custom_options.metadata',
-                      'custom_options.sort_order'
-                    ])
-                    .where('custom_option_sets.org_id', '=', orgId)
-                    .where('custom_option_sets.option_set_type', '=', field.optionSetType)
-                    .where('custom_options.is_active', '=', true)
-                    .orderBy('custom_options.sort_order', 'asc')
-                    .orderBy('custom_options.label', 'asc')
-                    .execute();
+                  const options = await this.entityManager.withKysely(async (kysely) => {
+                    return await kysely
+                      .selectFrom('custom_options')
+                      .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+                      .select([
+                        'custom_options.value as option_key',
+                        'custom_options.label',
+                        'custom_options.description',
+                        'custom_options.metadata',
+                        'custom_options.sort_order'
+                      ])
+                      .where('custom_option_sets.org_id', '=', orgId)
+                      .where('custom_option_sets.option_set_type', '=', field.optionSetType)
+                      .where('custom_options.is_active', '=', true)
+                      .orderBy('custom_options.sort_order', 'asc')
+                      .orderBy('custom_options.label', 'asc')
+                      .execute();
+                  });
 
                   if (options.length > 0) {
                     // Populate editor metadata with options and colors
@@ -954,7 +988,7 @@ export class EntitySchemaManager {
               if ((field.type === 'status' || field.type === 'status_set') && field.statusSetId) {
                 try {
                   // Load status set values from the StatusSetManager
-                  const statusSetManager = new StatusSetManager(this.config.kysely);
+                  const statusSetManager = new StatusSetManager(this.entityManager);
                   const statusSet = await statusSetManager.getStatusSet(orgId, field.statusSetId);
                   
                   if (statusSet && statusSet.status_values) {
@@ -1017,24 +1051,26 @@ export class EntitySchemaManager {
                   console.log(`[EntitySchemaManager] Loading custom options for field ${field.name}, optionSetType: ${field.optionSetType}`);
 
                   // Use the existing options API endpoint pattern
-                  const optionsQuery = await this.config.kysely
-                    .selectFrom('custom_options')
-                    .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
-                    .select([
-                      'custom_options.value as option_key',
-                      'custom_options.label',
-                      'custom_options.description',
-                      'custom_options.color',
-                      'custom_options.icon',
-                      'custom_options.sort_order',
-                      'custom_options.is_active'
-                    ])
-                    .where('custom_option_sets.org_id', '=', orgId)
-                    .where('custom_option_sets.option_set_type', '=', field.optionSetType)
-                    .where('custom_options.is_active', '=', true)
-                    .orderBy('custom_options.sort_order', 'asc')
-                    .orderBy('custom_options.label', 'asc')
-                    .execute();
+                  const optionsQuery = await this.entityManager.withKysely(async (kysely) => {
+                    return await kysely
+                      .selectFrom('custom_options')
+                      .innerJoin('custom_option_sets', 'custom_options.option_set_id', 'custom_option_sets.id')
+                      .select([
+                        'custom_options.value as option_key',
+                        'custom_options.label',
+                        'custom_options.description',
+                        'custom_options.color',
+                        'custom_options.icon',
+                        'custom_options.sort_order',
+                        'custom_options.is_active'
+                      ])
+                      .where('custom_option_sets.org_id', '=', orgId)
+                      .where('custom_option_sets.option_set_type', '=', field.optionSetType)
+                      .where('custom_options.is_active', '=', true)
+                      .orderBy('custom_options.sort_order', 'asc')
+                      .orderBy('custom_options.label', 'asc')
+                      .execute();
+                  });
 
                   if (optionsQuery.length > 0) {
                     // Convert to frontend format
@@ -1121,12 +1157,14 @@ export class EntitySchemaManager {
     try {
       console.log(`[EntitySchemaManager] Listing entities for org: ${orgId}`);
       
-      const entities = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name as entityName', 'table_name as tableName', 'archetype', 'created_at', 'updated_at'])
-        .where('org_id', '=', orgId)
-        .where('deleted', '!=', true)
-        .execute();
+      const entities = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name as entityName', 'table_name as tableName', 'archetype', 'created_at', 'updated_at'])
+          .where('org_id', '=', orgId)
+          .where('deleted', '!=', true)
+          .execute();
+      });
 
       console.log(`[EntitySchemaManager] Found ${entities.length} entities`);
 

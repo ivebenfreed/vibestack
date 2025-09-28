@@ -380,36 +380,36 @@ export class ComputedFieldEngine {
   // Database storage methods
 
   private async storeComputedFieldConfig(orgId: string, config: ComputedFieldConfiguration): Promise<void> {
-    const kysely = this.entityManager.getKysely();
-    
-    await kysely
-      .insertInto('dataforge_computed_fields')
-      .values({
-        org_id: orgId,
-        entity_type: config.entityName,
-        field_name: config.fieldName,
-        field_type: config.fieldType,
-        expression: config.expression,
-        dependencies: JSON.stringify(config.dependencies),
-        compute_location: config.computeLocation,
-        result_type: config.resultType,
-        refresh_triggers: JSON.stringify(config.refreshTriggers),
-        cache_results: config.cacheResults,
-        is_active: true
-      })
-      .onConflict((oc) => oc
-        .columns(['org_id', 'entity_type', 'field_name'])
-        .doUpdateSet({
-          expression: (eb) => eb.ref('excluded.expression'),
-          dependencies: (eb) => eb.ref('excluded.dependencies'),
-          compute_location: (eb) => eb.ref('excluded.compute_location'),
-          result_type: (eb) => eb.ref('excluded.result_type'),
-          refresh_triggers: (eb) => eb.ref('excluded.refresh_triggers'),
-          cache_results: (eb) => eb.ref('excluded.cache_results'),
-          updated_at: new Date()
+    await this.entityManager.withKysely(async (kysely) => {
+      await kysely
+        .insertInto('dataforge_computed_fields')
+        .values({
+          org_id: orgId,
+          entity_type: config.entityName,
+          field_name: config.fieldName,
+          field_type: config.fieldType,
+          expression: config.expression,
+          dependencies: JSON.stringify(config.dependencies),
+          compute_location: config.computeLocation,
+          result_type: config.resultType,
+          refresh_triggers: JSON.stringify(config.refreshTriggers),
+          cache_results: config.cacheResults,
+          is_active: true
         })
-      )
-      .execute();
+        .onConflict((oc) => oc
+          .columns(['org_id', 'entity_type', 'field_name'])
+          .doUpdateSet({
+            expression: (eb) => eb.ref('excluded.expression'),
+            dependencies: (eb) => eb.ref('excluded.dependencies'),
+            compute_location: (eb) => eb.ref('excluded.compute_location'),
+            result_type: (eb) => eb.ref('excluded.result_type'),
+            refresh_triggers: (eb) => eb.ref('excluded.refresh_triggers'),
+            cache_results: (eb) => eb.ref('excluded.cache_results'),
+            updated_at: new Date()
+          })
+        )
+        .execute();
+    });
   }
 
   private async getComputedFieldConfigs(

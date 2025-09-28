@@ -17,10 +17,12 @@ export interface DataForgeEntityManagerConfig {
 export class RecordManager {
   private config: DataForgeEntityManagerConfig;
   private configCache: Map<string, OrgEntityDefinition>;
+  private entityManager: any;
 
-  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>) {
+  constructor(config: DataForgeEntityManagerConfig, configCache: Map<string, OrgEntityDefinition>, entityManager: any) {
     this.config = config;
     this.configCache = configCache;
+    this.entityManager = entityManager;
   }
 
   /**
@@ -37,13 +39,15 @@ export class RecordManager {
       console.log(`[RecordManager] Getting entity config: ${normalizedEntityName} (original: ${entityName}) for org: ${orgId}`);
       
       // Get entity from entity_schemas table
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', normalizedEntityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'table_name', 'archetype', 'business_metadata'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', normalizedEntityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         console.log(`[RecordManager] Entity ${normalizedEntityName} not found for org ${orgId}`);
@@ -76,10 +80,12 @@ export class RecordManager {
       // Get archetype definition to understand field types
       const { ArchetypeRegistry } = await import('../ArchetypeRegistry');
       const archetypeClass = ArchetypeRegistry.getArchetypeClass(config.archetype);
-      
+
       // Get entity definition to understand custom fields
       const { getEntityDefinition } = await import('./entity-storage');
-      const entityDef = await getEntityDefinition(this.config.kysely, orgId, entityName);
+      const entityDef = await this.entityManager.withKysely(async (kysely) => {
+        return await getEntityDefinition(kysely, orgId, entityName);
+      });
       
       let baseData: any;
       let customData: any = {};
@@ -252,11 +258,13 @@ export class RecordManager {
       // Use the validated/transformed data
       const finalData = validationResult.transformedData || saveData;
 
-      const result = await this.config.kysely
-        .insertInto(config.tableName as any)
-        .values(finalData as any)
-        .returningAll()
-        .executeTakeFirst();
+      const result = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .insertInto(config.tableName as any)
+          .values(finalData as any)
+          .returningAll()
+          .executeTakeFirst();
+      });
 
       if (!result) {
         return { success: false, errors: ['Failed to create record'] };
@@ -297,15 +305,17 @@ export class RecordManager {
                 fieldDef
               );
               
-              await RelationshipFieldHandler.createRelationship(
-                this.config.kysely,
-                orgId,
-                entityName,
-                recordId,
-                relationshipDef,
-                targetId,
-                userId || 'system'
-              );
+              await this.entityManager.withKysely(async (kysely) => {
+                await RelationshipFieldHandler.createRelationship(
+                  kysely,
+                  orgId,
+                  entityName,
+                  recordId,
+                  relationshipDef,
+                  targetId,
+                  userId || 'system'
+                );
+              });
             } catch (error) {
               console.warn(`Failed to create relationship ${fieldName}:`, error);
               // Don't fail the entire operation if relationship creation fails
@@ -321,7 +331,9 @@ export class RecordManager {
           const rollupEngine = new RollupEngine(this);
           
           // Refresh rollups for the newly created entity
-          await rollupEngine.refreshEntityRollups(this.config.kysely, orgId, entityName, recordId);
+          await this.entityManager.withKysely(async (kysely) => {
+            await rollupEngine.refreshEntityRollups(kysely, orgId, entityName, recordId);
+          });
           
           // Also refresh rollups for any target entities that might have rollup fields
           for (const [fieldName, targetId] of Object.entries(relationshipData)) {
@@ -331,12 +343,14 @@ export class RecordManager {
                   entityDef?.customFields?.find(f => f.name === fieldName);
                 
                 if (fieldDef && fieldDef.targetEntityType) {
-                  await rollupEngine.refreshEntityRollups(
-                    this.config.kysely, 
-                    orgId, 
-                    fieldDef.targetEntityType, 
-                    targetId
-                  );
+                  await this.entityManager.withKysely(async (kysely) => {
+                    await rollupEngine.refreshEntityRollups(
+                      kysely,
+                      orgId,
+                      fieldDef.targetEntityType,
+                      targetId
+                    );
+                  });
                 }
               } catch (error) {
                 console.warn(`Failed to refresh rollups for target entity ${targetId}:`, error);
@@ -409,8 +423,10 @@ export class RecordManager {
 
       // Get entity definition to understand custom fields
       const { getEntityDefinition } = await import('./entity-storage');
-      const entityDef = await getEntityDefinition(this.config.kysely, orgId, entityName);
-      
+      const entityDef = await this.entityManager.withKysely(async (kysely) => {
+        return await getEntityDefinition(kysely, orgId, entityName);
+      });
+
       console.log(`📋 [RecordManager] Entity definition:`, {
         hasEntityDef: !!entityDef,
         customFieldsCount: entityDef?.customFields?.length || 0,
@@ -483,13 +499,15 @@ export class RecordManager {
 
       console.log(`🚀 [RecordManager] Executing Kysely update query...`);
 
-      const result = await this.config.kysely
-        .updateTable(config.tableName as any)
-        .set(updateData as any)
-        .where('id', '=', recordId)
-        .where('organization_id', '=', orgId)
-        .returningAll()
-        .executeTakeFirst();
+      const result = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .updateTable(config.tableName as any)
+          .set(updateData as any)
+          .where('id', '=', recordId)
+          .where('organization_id', '=', orgId)
+          .returningAll()
+          .executeTakeFirst();
+      });
 
       console.log(`📊 [RecordManager] Kysely update result:`, {
         hasResult: !!result,
@@ -540,25 +558,29 @@ export class RecordManager {
       let result;
       if (permanent) {
         // Hard delete
-        result = await this.config.kysely
-          .deleteFrom(config.tableName as any)
-          .where('id', '=', recordId)
-          .where('organization_id', '=', orgId)
-          .returning(['id'])
-          .executeTakeFirst();
+        result = await this.entityManager.withKysely(async (kysely) => {
+          return await kysely
+            .deleteFrom(config.tableName as any)
+            .where('id', '=', recordId)
+            .where('organization_id', '=', orgId)
+            .returning(['id'])
+            .executeTakeFirst();
+        });
       } else {
         // Soft delete (archetype pattern)
-        result = await this.config.kysely
-          .updateTable(config.tableName as any)
-          .set({
-            status: 'deleted',
-            updated_at: new Date().toISOString()
-          } as any)
-          .where('id', '=', recordId)
-          .where('organization_id', '=', orgId)
-          .where('status', '!=', 'deleted')
-          .returning(['id'])
-          .executeTakeFirst();
+        result = await this.entityManager.withKysely(async (kysely) => {
+          return await kysely
+            .updateTable(config.tableName as any)
+            .set({
+              status: 'deleted',
+              updated_at: new Date().toISOString()
+            } as any)
+            .where('id', '=', recordId)
+            .where('organization_id', '=', orgId)
+            .where('status', '!=', 'deleted')
+            .returning(['id'])
+            .executeTakeFirst();
+        });
       }
 
       if (!result) {
@@ -584,12 +606,14 @@ export class RecordManager {
         return { success: false, errors: [`Entity ${entityName} not found for org ${orgId}`] };
       }
 
-      const result = await this.config.kysely
-        .selectFrom(config.tableName as any)
-        .selectAll()
-        .where('id', '=', recordId)
-        .where('organization_id', '=', orgId)
-        .executeTakeFirst();
+      const result = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom(config.tableName as any)
+          .selectAll()
+          .where('id', '=', recordId)
+          .where('organization_id', '=', orgId)
+          .executeTakeFirst();
+      });
 
       if (!result) {
         return { success: false, errors: ['Record not found'] };
@@ -619,31 +643,33 @@ export class RecordManager {
         return { success: false, errors: [`Entity ${entityName} not found for org ${orgId}`] };
       }
 
-      let query = this.config.kysely
-        .selectFrom(config.tableName as any)
-        .selectAll()
-        .where('organization_id', '=', orgId);
+      const results = await this.entityManager.withKysely(async (kysely) => {
+        let query = kysely
+          .selectFrom(config.tableName as any)
+          .selectAll()
+          .where('organization_id', '=', orgId);
 
-      // Apply filters
-      if (options.filters) {
-        query = this.applyFiltersToQuery(query, options.filters);
-      }
+        // Apply filters
+        if (options.filters) {
+          query = this.applyFiltersToQuery(query, options.filters);
+        }
 
-      // Apply ordering
-      if (options.orderBy) {
-        const direction = options.orderDirection || 'asc';
-        query = query.orderBy(options.orderBy as any, direction);
-      }
+        // Apply ordering
+        if (options.orderBy) {
+          const direction = options.orderDirection || 'asc';
+          query = query.orderBy(options.orderBy as any, direction);
+        }
 
-      // Apply pagination
-      if (options.limit) {
-        query = query.limit(options.limit);
-      }
-      if (options.offset) {
-        query = query.offset(options.offset);
-      }
+        // Apply pagination
+        if (options.limit) {
+          query = query.limit(options.limit);
+        }
+        if (options.offset) {
+          query = query.offset(options.offset);
+        }
 
-      const results = await query.execute();
+        return await query.execute();
+      });
 
       // Custom fields are now direct columns, no need to merge JSONB
       const mergedResults = results.map((record: any) => {
@@ -654,7 +680,7 @@ export class RecordManager {
       // Resolve reference fields if requested
       if (options.resolveReferences && mergedResults.length > 0) {
         const { ReferenceResolver } = await import('../services/ReferenceResolver');
-        const referenceResolver = new ReferenceResolver({ kysely: this.config.kysely });
+        const referenceResolver = new ReferenceResolver({ kysely: this.entityManager });
         
         // Get reference field definitions from archetype or entity config
         const referenceFields: string[] = [];
@@ -757,13 +783,15 @@ export class RecordManager {
       console.log(`[RecordManager] Getting entity details: ${entityName} for org: ${orgId}`);
       
       // Get entity details from entity_schemas table
-      const entity = await this.config.kysely
-        .selectFrom('entity_schemas')
-        .select(['entity_name', 'table_name', 'archetype', 'business_metadata', 'created_at', 'updated_at'])
-        .where('org_id', '=', orgId)
-        .where('entity_name', '=', entityName)
-        .where('deleted', '!=', true)
-        .executeTakeFirst();
+      const entity = await this.entityManager.withKysely(async (kysely) => {
+        return await kysely
+          .selectFrom('entity_schemas')
+          .select(['entity_name', 'table_name', 'archetype', 'business_metadata', 'created_at', 'updated_at'])
+          .where('org_id', '=', orgId)
+          .where('entity_name', '=', entityName)
+          .where('deleted', '!=', true)
+          .executeTakeFirst();
+      });
 
       if (!entity) {
         return {
