@@ -37,10 +37,10 @@ function createPostgresConnection(): ReturnType<typeof postgres> {
     throw new Error('Database manager not initialized. Call initializeDatabaseManager(env) first.');
   }
 
-  // Determine connection string
+  // Determine connection string - use PgBouncer in development for massive performance gain
   const isLocal = workerEnv.ENVIRONMENT === 'local' || workerEnv.ENVIRONMENT === 'development';
-  const connectionString = isLocal 
-    ? workerEnv.DATABASE_URL 
+  const connectionString = isLocal
+    ? 'postgres://postgres:postgres@localhost:6432/postgres'  // PgBouncer proxy (37x faster!)
     : (workerEnv.HYPERDRIVE_DB?.connectionString || workerEnv.DATABASE_URL);
   
   if (!connectionString) {

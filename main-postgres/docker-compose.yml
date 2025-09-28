@@ -34,6 +34,34 @@ services:
       - main
     restart: unless-stopped
 
+  pgbouncer:
+    container_name: elevra-pgbouncer
+    image: bitnami/pgbouncer:latest
+    environment:
+      POSTGRESQL_HOST: postgres
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: postgres
+      POSTGRESQL_DATABASE: elevra_dev
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_DEFAULT_POOL_SIZE: 100
+      PGBOUNCER_MAX_CLIENT_CONN: 1000
+      PGBOUNCER_SERVER_RESET_QUERY: DISCARD ALL
+      PGBOUNCER_AUTH_TYPE: md5
+    ports:
+      - "6432:6432"  # PgBouncer proxy on port 6432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - main
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'psql -h localhost -p 6432 -U postgres -d elevra_dev -c "SELECT 1" || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   main:
     driver: bridge

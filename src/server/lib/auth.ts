@@ -12,6 +12,8 @@ import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
 import { createKyselyForPersistentUse, withKysely } from './database-manager';
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { getDB } from './database-manager-v2';
 
 // import { createKVSessionInterceptor } from './kv-session-adapter'; // Replaced with Better Auth native secondaryStorage
 
@@ -239,11 +241,10 @@ export const auth = (() => {
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
-  // Create a fresh Kysely instance for each auth initialization to avoid
-  // Cloudflare Workers I/O context violations from sharing connections across requests
-  const kyselyInstance = createKyselyForPersistentUse();
-  
-  // Database connection is already established by middleware
+  // Use lightweight Drizzle connection via PgBouncer - zero setup overhead
+  const db = getDB(env);
+
+  // PgBouncer handles all connection pooling automatically
   if (env.USE_KV_SESSIONS && env.SESSIONS) {
     dbLogger.info('Using KV secondaryStorage for sessions', {}, 'auth');
   } else {
@@ -270,12 +271,10 @@ export function initializeAuth(env: Env, request?: Request) {
       : "https://app.getelevra.com";
   
   const runtimeAuthConfig = {
-    // Database configuration (PostgreSQL via Kysely)
-    database: {
-      db: kyselyInstance,
-      type: "postgres" as const
-      // Remove custom casing - let Better Auth use defaults
-    },
+    // Database configuration (PostgreSQL via Drizzle + PgBouncer)
+    database: drizzleAdapter(db, {
+      provider: "pg",  // PostgreSQL with postgres.js
+    }),
     // Native Better Auth secondaryStorage for KV sessions
     ...(env.USE_KV_SESSIONS && env.SESSIONS ? {
       secondaryStorage: {
