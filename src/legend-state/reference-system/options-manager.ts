@@ -4,6 +4,7 @@
  */
 
 import { observable, computed } from '@legendapp/state'
+import { synced, syncedCrud } from '@legendapp/state/sync'
 import { universeOrgId$, universeSchema$, universeContext$ } from '../observables'
 import { log } from '@/logger';
 const fileLog = log('legend-state/reference-system/options-manager.ts');
@@ -43,12 +44,10 @@ export interface CustomOptionSet {
   options: CustomOption[]
 }
 
-// Central options store
+// Central options store - using synced observables for automatic deduplication
 const optionsStore$ = observable({
   systemOptions: {} as Record<string, SystemOptionSet>, // key: "priority_task"
   customOptions: {} as Record<string, CustomOptionSet>, // key: "departments_org123"
-  loading: new Set<string>(),
-  errors: {} as Record<string, string>
 })
 
 /**
@@ -79,94 +78,76 @@ function getValidOrgId(preferredOrgId?: string): string | null {
 }
 
 /**
- * Get or create system options observable for a specific type/archetype
+ * Get or create system options observable with synced() for automatic deduplication
  */
 function getSystemOptionsObservable(optionType: string, archetype: string) {
   const key = `${optionType}_${archetype}`
-  
-  if (!optionsStore$.systemOptions[key].peek()) {
-    // Create observable for this option set
-    optionsStore$.systemOptions[key].set({
+
+  // Check if observable exists - if not, create it SYNCHRONOUSLY to prevent race conditions
+  let existing = optionsStore$.systemOptions[key].peek()
+
+  if (!existing) {
+    // Immediately set a placeholder to prevent duplicate creation
+    const placeholder: SystemOptionSet = {
       id: key,
       name: `${optionType} (${archetype})`,
       archetype,
       optionType,
       options: []
-    })
-    
-    // Load data asynchronously
-    loadSystemOptions(optionType, archetype, key)
+    }
+    optionsStore$.systemOptions[key].set(placeholder)
+
+    // Now create and configure the synced observable
+    optionsStore$.systemOptions[key].set(
+      synced({
+        get: async () => {
+          // Get a real organization ID from universe context instead of "universe"
+          const orgId = getValidOrgId()
+          if (!orgId) {
+            throw new Error('No organizations available for loading options')
+          }
+
+          fileLog.debug(`[OptionsManager] Fetching options for ${key} using org ${orgId}`)
+
+          // Use unified options API endpoint
+          const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionType}`)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch options: ${response.status}`)
+          }
+
+          const data = await response.json()
+
+          // Transform unified API response to our format
+          const transformedOptions = (data.data || []).map((option: any) => ({
+            value: option.option_key || option.value,
+            label: option.label,
+            color: option.color,
+            icon: option.icon,
+            description: option.description,
+            order: option.sort_order || 0
+          }))
+
+          const optionSet: SystemOptionSet = {
+            id: key,
+            name: `${optionType} (${archetype})`,
+            archetype,
+            optionType,
+            options: transformedOptions
+          }
+
+          fileLog.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
+          return optionSet
+        },
+        initial: placeholder
+      })
+    )
   }
-  
+
   return optionsStore$.systemOptions[key]
 }
 
 /**
- * Async function to load system options (now using unified options API)
- */
-async function loadSystemOptions(optionType: string, archetype: string, key: string) {
-  try {
-    optionsStore$.loading.set(prev => new Set([...prev, key]))
-    
-    // Get a real organization ID from universe context instead of "universe"
-    const orgId = getValidOrgId()
-    if (!orgId) {
-      throw new Error('No organizations available for loading options')
-    }
-    
-    fileLog.debug(`[OptionsManager] Using organization ${orgId} for options loading`)
-    
-    // Use unified options API endpoint
-    const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionType}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch options: ${response.status}`)
-    }
-    
-    const data = await response.json()
-    
-    // Transform unified API response to our format
-    // The API returns option_key but we need value in our interface
-    const transformedOptions = (data.data || []).map((option: any) => ({
-      value: option.option_key || option.value,
-      label: option.label,
-      color: option.color,
-      icon: option.icon,
-      description: option.description,
-      order: option.sort_order || 0
-    }))
-    
-    const optionSet: SystemOptionSet = {
-      id: key,
-      name: `${optionType} (${archetype})`,
-      archetype,
-      optionType,
-      options: transformedOptions
-    }
-    
-    fileLog.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
-    optionsStore$.systemOptions[key].set(optionSet)
-    
-  } catch (error) {
-    fileLog.error(`[OptionsManager] Error loading options for ${key}:`, error)
-    optionsStore$.errors[key].set(error.message)
-    optionsStore$.systemOptions[key].set({
-      id: key,
-      name: `${optionType} (${archetype})`,
-      archetype,
-      optionType,
-      options: []
-    })
-  } finally {
-    optionsStore$.loading.set(prev => {
-      const next = new Set(prev)
-      next.delete(key)
-      return next
-    })
-  }
-}
-
-/**
- * Get or create custom options observable for an organization option set
+ * Get or create custom options observable with synced() for automatic deduplication
  */
 function getCustomOptionsObservable(optionSetName: string, organizationId?: string) {
   const orgId = getValidOrgId(organizationId)
@@ -174,76 +155,61 @@ function getCustomOptionsObservable(optionSetName: string, organizationId?: stri
     throw new Error(`No valid organization ID available for custom options: ${optionSetName}`)
   }
   const key = `${optionSetName}_${orgId}`
-  
-  if (!optionsStore$.customOptions[key].peek()) {
-    // Create observable for this option set
-    optionsStore$.customOptions[key].set({
-      id: key,
-      name: optionSetName,
-      organizationId: orgId,
-      options: []
-    })
-    
-    // Load data asynchronously
-    loadCustomOptions(optionSetName, orgId, key)
-  }
-  
-  return optionsStore$.customOptions[key]
-}
 
-/**
- * Async function to load custom options (now using unified options API)
- */
-async function loadCustomOptions(optionSetName: string, orgId: string, key: string) {
-  try {
-    optionsStore$.loading.set(prev => new Set([...prev, key]))
-    
-    // Use unified options API endpoint
-    const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionSetName}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch options: ${response.status}`)
-    }
-    
-    const data = await response.json()
-    
-    // Transform unified API response to our format
-    // The API returns option_key but we need value in our interface
-    const transformedOptions = (data.data || []).map((option: any) => ({
-      value: option.option_key || option.value,
-      label: option.label,
-      color: option.color,
-      icon: option.icon,
-      description: option.description,
-      order: option.sort_order || 0,
-      organizationId: orgId
-    }))
-    
-    const optionSet: CustomOptionSet = {
-      id: key,
-      name: optionSetName,
-      organizationId: orgId,
-      options: transformedOptions
-    }
-    
-    fileLog.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
-    optionsStore$.customOptions[key].set(optionSet)
-    
-  } catch (error) {
-    fileLog.error(`[OptionsManager] Error loading options for ${key}:`, error)
-    optionsStore$.errors[key].set(error.message)
-    optionsStore$.customOptions[key].set({
+  // Check if observable exists - if not, create it SYNCHRONOUSLY to prevent race conditions
+  let existing = optionsStore$.customOptions[key].peek()
+
+  if (!existing) {
+    // Immediately set a placeholder to prevent duplicate creation
+    const placeholder: CustomOptionSet = {
       id: key,
       name: optionSetName,
       organizationId: orgId,
       options: []
-    })
-  } finally {
-    optionsStore$.loading.set(prev => {
-      const next = new Set(prev)
-      next.delete(key)
-      return next
-    })
+    }
+    optionsStore$.customOptions[key].set(placeholder)
+
+    // Now create and configure the synced observable
+    optionsStore$.customOptions[key].set(
+      synced({
+        get: async () => {
+          fileLog.debug(`[OptionsManager] Fetching custom options for ${key}`)
+
+          // Use unified options API endpoint
+          const response = await fetch(`/api/dataforge/orgs/${orgId}/options/${optionSetName}`)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch options: ${response.status}`)
+          }
+
+          const data = await response.json()
+
+          // Transform unified API response to our format
+          const transformedOptions = (data.data || []).map((option: any) => ({
+            value: option.option_key || option.value,
+            label: option.label,
+            color: option.color,
+            icon: option.icon,
+            description: option.description,
+            order: option.sort_order || 0,
+            organizationId: orgId
+          }))
+
+          const optionSet: CustomOptionSet = {
+            id: key,
+            name: optionSetName,
+            organizationId: orgId,
+            options: transformedOptions
+          }
+
+          fileLog.info(`[OptionsManager] Loaded options for ${key}:`, optionSet)
+          return optionSet
+        },
+        initial: placeholder
+      })
+    )
   }
+
+  return optionsStore$.customOptions[key]
 }
 
 /**
@@ -316,21 +282,6 @@ export const OptionsManager = {
     return resolver ? resolver(value) : null
   },
   
-  /**
-   * Get loading state for options
-   */
-  isLoading(key?: string) {
-    const loading = optionsStore$.loading.peek()
-    return key ? loading.has(key) : loading.size > 0
-  },
-  
-  /**
-   * Get error state for options  
-   */
-  getError(key?: string) {
-    const errors = optionsStore$.errors.peek()
-    return key ? errors[key] : Object.values(errors).find(Boolean)
-  },
   
   /**
    * Preload commonly used system options
@@ -366,8 +317,6 @@ export const OptionsManager = {
   clearCache() {
     optionsStore$.systemOptions.set({})
     optionsStore$.customOptions.set({})
-    optionsStore$.loading.set(new Set())
-    optionsStore$.errors.set({})
     fileLog.info('[OptionsManager] Cache cleared')
   },
   
@@ -376,11 +325,13 @@ export const OptionsManager = {
   _resolvers$: optionResolvers$
 }
 
-// Auto-preload on initialization
+// Auto-preload on initialization (only once)
 if (typeof window !== 'undefined') {
+  let hasPreloaded = false
   // Wait for universe schema to be ready
   universeSchema$.onChange((schema) => {
-    if (schema) {
+    if (schema && !hasPreloaded) {
+      hasPreloaded = true
       OptionsManager.preloadSystemOptions()
     }
   })
