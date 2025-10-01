@@ -36,7 +36,8 @@ import {
   ChevronsLeft,
   Vault,
   FolderKanban,
-  Network
+  Network,
+  GitBranch
 } from 'lucide-react'
 
 // Icon resolver for dynamic entity icons
@@ -493,6 +494,26 @@ function OrganizationView({ orgId, isCollapsed, isUniverseMode = true, onBackToU
               Entity Studio
             </TooltipContent>
           </Tooltip>
+
+          {/* Process Studio */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to={`/org/${orgId}/process-studio`}
+                className={cn(
+                  "flex items-center justify-center rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  location.pathname.startsWith(`/org/${orgId}/process-studio`)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground"
+                )}
+              >
+                <GitBranch className="h-4 w-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              Process Studio
+            </TooltipContent>
+          </Tooltip>
         </div>
       </TooltipProvider>
     )
@@ -592,6 +613,21 @@ function OrganizationView({ orgId, isCollapsed, isUniverseMode = true, onBackToU
         >
           <Network className="h-4 w-4" />
           <span className="truncate">Entity Studio</span>
+        </Link>
+
+        {/* Process Studio - Business Process Mapping */}
+        <Link
+          to={`/org/${orgId}/process-studio`}
+          className={cn(
+            'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            location.pathname.startsWith(`/org/${orgId}/process-studio`)
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+              : 'text-sidebar-foreground'
+          )}
+        >
+          <GitBranch className="h-4 w-4" />
+          <span className="truncate">Process Studio</span>
         </Link>
       </div>
 

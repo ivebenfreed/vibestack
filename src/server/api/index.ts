@@ -60,6 +60,10 @@ api.route('/generic-kysely', genericKysely)
 // Replace the old Drizzle generic API with Kysely
 api.route('/generic', genericKysely) // Now using Kysely instead of Drizzle
 
+// Process API
+import processRouter from './process'
+api.route('/process', processRouter)
+
 // File Import API
 import fileImportApi from '../routes/file-import-api'
 api.route('/file-import', fileImportApi)

@@ -16,7 +16,6 @@ import {
 } from '../middleware/hybrid-rls-org-actor';
 import { apiLogger } from '../middleware/logger';
 import statusSetsApi from './status-sets-api';
-import processApi from './process-api';
 
 // Legacy context validation imports kept for backward compatibility
 import { 
@@ -215,9 +214,6 @@ export function mountProtectedRoutes(app: Hono<AppContext>) {
   
   // Status set management API (requires organization context)
   app.route('/api', statusSetsApi);
-
-  // Process API (backend for Process Studio frontend feature)
-  app.route('/api/process', processApi);
 
   // Sync routes use special handling for WebSocket upgrades
   app.route('/api/sync', syncRoutes);

@@ -63,6 +63,7 @@ import { Route as AuthenticatedDebugLocalStorageSyncRouteImport } from './routes
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
 import { Route as AuthenticatedOrgOrgIdTestPassiveRendererRouteImport } from './routes/_authenticated/org/$orgId/test-passive-renderer'
+import { Route as AuthenticatedOrgOrgIdProcessStudioRouteImport } from './routes/_authenticated/org/$orgId/process-studio'
 import { Route as AuthenticatedOrgOrgIdEntityStudioRouteImport } from './routes/_authenticated/org/$orgId/entity-studio'
 import { Route as AuthenticatedOrgOrgIdDashboardRouteImport } from './routes/_authenticated/org/$orgId/dashboard'
 import { Route as AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport } from './routes/_authenticated/org/$orgId/entities/$entityName'
@@ -381,6 +382,12 @@ const AuthenticatedOrgOrgIdTestPassiveRendererRoute =
     path: '/org/$orgId/test-passive-renderer',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOrgOrgIdProcessStudioRoute =
+  AuthenticatedOrgOrgIdProcessStudioRouteImport.update({
+    id: '/org/$orgId/process-studio',
+    path: '/org/$orgId/process-studio',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOrgOrgIdEntityStudioRoute =
   AuthenticatedOrgOrgIdEntityStudioRouteImport.update({
     id: '/org/$orgId/entity-studio',
@@ -454,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/org/$orgId/entity-studio': typeof AuthenticatedOrgOrgIdEntityStudioRoute
+  '/org/$orgId/process-studio': typeof AuthenticatedOrgOrgIdProcessStudioRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -510,6 +518,7 @@ export interface FileRoutesByTo {
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/org/$orgId/entity-studio': typeof AuthenticatedOrgOrgIdEntityStudioRoute
+  '/org/$orgId/process-studio': typeof AuthenticatedOrgOrgIdProcessStudioRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -570,6 +579,7 @@ export interface FileRoutesById {
   '/_authenticated/universe/': typeof AuthenticatedUniverseIndexRoute
   '/_authenticated/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
   '/_authenticated/org/$orgId/entity-studio': typeof AuthenticatedOrgOrgIdEntityStudioRoute
+  '/_authenticated/org/$orgId/process-studio': typeof AuthenticatedOrgOrgIdProcessStudioRoute
   '/_authenticated/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/_authenticated/org/$orgId/': typeof AuthenticatedOrgOrgIdIndexRoute
   '/_authenticated/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -630,6 +640,7 @@ export interface FileRouteTypes {
     | '/universe'
     | '/org/$orgId/dashboard'
     | '/org/$orgId/entity-studio'
+    | '/org/$orgId/process-studio'
     | '/org/$orgId/test-passive-renderer'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
@@ -686,6 +697,7 @@ export interface FileRouteTypes {
     | '/universe'
     | '/org/$orgId/dashboard'
     | '/org/$orgId/entity-studio'
+    | '/org/$orgId/process-studio'
     | '/org/$orgId/test-passive-renderer'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
@@ -745,6 +757,7 @@ export interface FileRouteTypes {
     | '/_authenticated/universe/'
     | '/_authenticated/org/$orgId/dashboard'
     | '/_authenticated/org/$orgId/entity-studio'
+    | '/_authenticated/org/$orgId/process-studio'
     | '/_authenticated/org/$orgId/test-passive-renderer'
     | '/_authenticated/org/$orgId/'
     | '/_authenticated/org/$orgId/entities/$entityName'
@@ -1150,6 +1163,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/org/$orgId/process-studio': {
+      id: '/_authenticated/org/$orgId/process-studio'
+      path: '/org/$orgId/process-studio'
+      fullPath: '/org/$orgId/process-studio'
+      preLoaderRoute: typeof AuthenticatedOrgOrgIdProcessStudioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/org/$orgId/entity-studio': {
       id: '/_authenticated/org/$orgId/entity-studio'
       path: '/org/$orgId/entity-studio'
@@ -1260,6 +1280,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUniverseIndexRoute: typeof AuthenticatedUniverseIndexRoute
   AuthenticatedOrgOrgIdDashboardRoute: typeof AuthenticatedOrgOrgIdDashboardRoute
   AuthenticatedOrgOrgIdEntityStudioRoute: typeof AuthenticatedOrgOrgIdEntityStudioRoute
+  AuthenticatedOrgOrgIdProcessStudioRoute: typeof AuthenticatedOrgOrgIdProcessStudioRoute
   AuthenticatedOrgOrgIdTestPassiveRendererRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   AuthenticatedOrgOrgIdIndexRoute: typeof AuthenticatedOrgOrgIdIndexRoute
   AuthenticatedOrgOrgIdEntitiesEntityNameRoute: typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -1289,6 +1310,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOrgOrgIdDashboardRoute: AuthenticatedOrgOrgIdDashboardRoute,
   AuthenticatedOrgOrgIdEntityStudioRoute:
     AuthenticatedOrgOrgIdEntityStudioRoute,
+  AuthenticatedOrgOrgIdProcessStudioRoute:
+    AuthenticatedOrgOrgIdProcessStudioRoute,
   AuthenticatedOrgOrgIdTestPassiveRendererRoute:
     AuthenticatedOrgOrgIdTestPassiveRendererRoute,
   AuthenticatedOrgOrgIdIndexRoute: AuthenticatedOrgOrgIdIndexRoute,
