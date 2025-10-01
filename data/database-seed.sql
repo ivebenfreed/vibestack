@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BiDtWUtoEpUs69ebfaKIBnL8ieQ1c4YYFaidbaOEwVRxh51w9XnCr84h0dNwGnY
+\restrict W5GHYbVRkyIbjGer0i70UdW51eVwxKqEm4W0b3DjN3NDt2GEUUf0093ft6xycKK
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -1232,6 +1232,39 @@ feadfeb3-7da7-46d4-a8c2-d6205ce6fb95	8b525929-c8f5-4056-b343-1f85f70e34d2	0198b0
 
 
 --
+-- Data for Name: process_definitions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_definitions (id, organization_id, name, description, category, version, is_published, bpmn_xml, diagram_json, created_at, updated_at, created_by, published_at, published_by) FROM stdin;
+7660bdf0-5a0c-4f58-83fa-ac45d2ce13aa	01920000-1000-7000-8000-000000000001	Test Process	Testing backend	operational	1	f	\N	{}	2025-10-01 13:25:20.173646+00	2025-10-01 13:25:20.173646+00	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: process_nodes; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_nodes (id, process_id, organization_id, node_key, node_type, label, description, position_x, position_y, width, height, style, bpmn_properties, linked_entity_type, linked_entity_id, display_config, automation_config, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: process_connections; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_connections (id, process_id, organization_id, connection_key, source_node_id, target_node_id, connection_type, label, condition_expression, is_default, waypoints, style, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: process_lanes; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_lanes (id, process_id, organization_id, lane_key, name, assigned_role, assigned_team_id, assigned_user_id, position_y, height, color, created_at) FROM stdin;
+\.
+
+
+--
 -- Data for Name: teams; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -1498,5 +1531,5 @@ SELECT pg_catalog.setval('public.dataforge_computed_fields_id_seq', 4, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BiDtWUtoEpUs69ebfaKIBnL8ieQ1c4YYFaidbaOEwVRxh51w9XnCr84h0dNwGnY
+\unrestrict W5GHYbVRkyIbjGer0i70UdW51eVwxKqEm4W0b3DjN3NDt2GEUUf0093ft6xycKK
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database cluster dump
 --
 
-\restrict AFLvWnK1haaWuecJeueoX1ElWZhKeaowM1jLgzCIKq1E38epF1hwAfvOfk9Op96
+\restrict xuYUmDn48JU2wPiE19oXBI1kMPCjADfwBdQeHMG09qD3CVqpRbV4aeyJWTtNECt
 
 SET default_transaction_read_only = off;
 
@@ -35,7 +35,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 
 
 
-\unrestrict AFLvWnK1haaWuecJeueoX1ElWZhKeaowM1jLgzCIKq1E38epF1hwAfvOfk9Op96
+\unrestrict xuYUmDn48JU2wPiE19oXBI1kMPCjADfwBdQeHMG09qD3CVqpRbV4aeyJWTtNECt
 
 --
 -- Databases
@@ -51,7 +51,7 @@ ALTER ROLE vibestack_app_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB L
 -- PostgreSQL database dump
 --
 
-\restrict Hvxrk7jpSQKBY3ypNBWvzxMwDTZPPb2c93yPMNV9ESonM7Wpdz0KGJFIoL3gKTY
+\restrict eQF8EHyFTCXi8b6WVE5kgRFOQd0lJyduB5aIKw0QH9yicXhGvK8K1uYoM8JBWvw
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -72,7 +72,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Hvxrk7jpSQKBY3ypNBWvzxMwDTZPPb2c93yPMNV9ESonM7Wpdz0KGJFIoL3gKTY
+\unrestrict eQF8EHyFTCXi8b6WVE5kgRFOQd0lJyduB5aIKw0QH9yicXhGvK8K1uYoM8JBWvw
 
 --
 -- Database "elevra_dev" dump
@@ -82,7 +82,7 @@ SET row_security = off;
 -- PostgreSQL database dump
 --
 
-\restrict LHG4B5JqoM4sQbv1gEMBfjN17ZrQBKduWQSszeg8pB3fU5ripq5o03YuUzyWawF
+\restrict zeb9LxuyZ9VOxV5lhLiKiM5SLhKelDDQanzDLHn6bmxF87FH6fNwPgpcaQrl2gy
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -108,9 +108,9 @@ CREATE DATABASE elevra_dev WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PR
 
 ALTER DATABASE elevra_dev OWNER TO postgres;
 
-\unrestrict LHG4B5JqoM4sQbv1gEMBfjN17ZrQBKduWQSszeg8pB3fU5ripq5o03YuUzyWawF
+\unrestrict zeb9LxuyZ9VOxV5lhLiKiM5SLhKelDDQanzDLHn6bmxF87FH6fNwPgpcaQrl2gy
 \connect elevra_dev
-\restrict LHG4B5JqoM4sQbv1gEMBfjN17ZrQBKduWQSszeg8pB3fU5ripq5o03YuUzyWawF
+\restrict zeb9LxuyZ9VOxV5lhLiKiM5SLhKelDDQanzDLHn6bmxF87FH6fNwPgpcaQrl2gy
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -3577,6 +3577,132 @@ COMMENT ON COLUMN public.organizations.canon IS 'World canon: The rules, standar
 
 
 --
+-- Name: process_connections; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_connections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    process_id uuid NOT NULL,
+    organization_id text NOT NULL,
+    connection_key text NOT NULL,
+    source_node_id uuid NOT NULL,
+    target_node_id uuid NOT NULL,
+    connection_type text DEFAULT 'sequence_flow'::text,
+    label text,
+    condition_expression text,
+    is_default boolean DEFAULT false,
+    waypoints jsonb DEFAULT '[]'::jsonb,
+    style jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.process_connections OWNER TO postgres;
+
+--
+-- Name: TABLE process_connections; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.process_connections IS 'Sequence flows and connections between process nodes';
+
+
+--
+-- Name: process_definitions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_definitions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    name text NOT NULL,
+    description text,
+    category text,
+    version integer DEFAULT 1,
+    is_published boolean DEFAULT false,
+    bpmn_xml text,
+    diagram_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    created_by text,
+    published_at timestamp with time zone,
+    published_by text
+);
+
+
+ALTER TABLE public.process_definitions OWNER TO postgres;
+
+--
+-- Name: TABLE process_definitions; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.process_definitions IS 'BPMN 2.0 process definitions - system entity for business process modeling';
+
+
+--
+-- Name: process_lanes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_lanes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    process_id uuid NOT NULL,
+    organization_id text NOT NULL,
+    lane_key text NOT NULL,
+    name text NOT NULL,
+    assigned_role text,
+    assigned_team_id uuid,
+    assigned_user_id uuid,
+    position_y numeric NOT NULL,
+    height numeric DEFAULT 200,
+    color text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.process_lanes OWNER TO postgres;
+
+--
+-- Name: TABLE process_lanes; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.process_lanes IS 'BPMN swimlanes for responsibility assignment';
+
+
+--
+-- Name: process_nodes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_nodes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    process_id uuid NOT NULL,
+    organization_id text NOT NULL,
+    node_key text NOT NULL,
+    node_type text NOT NULL,
+    label text NOT NULL,
+    description text,
+    position_x numeric NOT NULL,
+    position_y numeric NOT NULL,
+    width numeric DEFAULT 100,
+    height numeric DEFAULT 80,
+    style jsonb DEFAULT '{}'::jsonb,
+    bpmn_properties jsonb DEFAULT '{}'::jsonb,
+    linked_entity_type text,
+    linked_entity_id uuid,
+    display_config jsonb DEFAULT '{}'::jsonb,
+    automation_config jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.process_nodes OWNER TO postgres;
+
+--
+-- Name: TABLE process_nodes; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.process_nodes IS 'Process nodes (tasks, gateways, events) with optional entity linking';
+
+
+--
 -- Name: projects; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4310,6 +4436,38 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: process_connections process_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_connections
+    ADD CONSTRAINT process_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: process_definitions process_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_definitions
+    ADD CONSTRAINT process_definitions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: process_lanes process_lanes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_lanes
+    ADD CONSTRAINT process_lanes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: process_nodes process_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_nodes
+    ADD CONSTRAINT process_nodes_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: projects projects_org_name_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4422,11 +4580,43 @@ ALTER TABLE ONLY public.teams
 
 
 --
+-- Name: process_connections unique_connection_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_connections
+    ADD CONSTRAINT unique_connection_key UNIQUE (process_id, connection_key);
+
+
+--
+-- Name: process_lanes unique_lane_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_lanes
+    ADD CONSTRAINT unique_lane_key UNIQUE (process_id, lane_key);
+
+
+--
+-- Name: process_nodes unique_node_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_nodes
+    ADD CONSTRAINT unique_node_key UNIQUE (process_id, node_key);
+
+
+--
 -- Name: integration_connections unique_org_provider; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.integration_connections
     ADD CONSTRAINT unique_org_provider UNIQUE (org_id, provider);
+
+
+--
+-- Name: process_definitions unique_process_version; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_definitions
+    ADD CONSTRAINT unique_process_version UNIQUE (organization_id, name, version);
 
 
 --
@@ -4869,6 +5059,62 @@ CREATE INDEX idx_organizations_lore_gin ON public.organizations USING gin (to_ts
 
 
 --
+-- Name: idx_process_connections_process; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_connections_process ON public.process_connections USING btree (process_id);
+
+
+--
+-- Name: idx_process_connections_source; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_connections_source ON public.process_connections USING btree (source_node_id);
+
+
+--
+-- Name: idx_process_connections_target; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_connections_target ON public.process_connections USING btree (target_node_id);
+
+
+--
+-- Name: idx_process_definitions_org; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_definitions_org ON public.process_definitions USING btree (organization_id);
+
+
+--
+-- Name: idx_process_definitions_published; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_definitions_published ON public.process_definitions USING btree (organization_id, is_published);
+
+
+--
+-- Name: idx_process_lanes_process; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_lanes_process ON public.process_lanes USING btree (process_id);
+
+
+--
+-- Name: idx_process_nodes_entity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_nodes_entity ON public.process_nodes USING btree (linked_entity_type, linked_entity_id) WHERE (linked_entity_id IS NOT NULL);
+
+
+--
+-- Name: idx_process_nodes_process; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_nodes_process ON public.process_nodes USING btree (process_id);
+
+
+--
 -- Name: idx_projects_created_by; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -5290,6 +5536,46 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: process_connections process_connections_process_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_connections
+    ADD CONSTRAINT process_connections_process_id_fkey FOREIGN KEY (process_id) REFERENCES public.process_definitions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: process_connections process_connections_source_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_connections
+    ADD CONSTRAINT process_connections_source_node_id_fkey FOREIGN KEY (source_node_id) REFERENCES public.process_nodes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: process_connections process_connections_target_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_connections
+    ADD CONSTRAINT process_connections_target_node_id_fkey FOREIGN KEY (target_node_id) REFERENCES public.process_nodes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: process_lanes process_lanes_process_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_lanes
+    ADD CONSTRAINT process_lanes_process_id_fkey FOREIGN KEY (process_id) REFERENCES public.process_definitions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: process_nodes process_nodes_process_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_nodes
+    ADD CONSTRAINT process_nodes_process_id_fkey FOREIGN KEY (process_id) REFERENCES public.process_definitions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: projects projects_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5611,7 +5897,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LHG4B5JqoM4sQbv1gEMBfjN17ZrQBKduWQSszeg8pB3fU5ripq5o03YuUzyWawF
+\unrestrict zeb9LxuyZ9VOxV5lhLiKiM5SLhKelDDQanzDLHn6bmxF87FH6fNwPgpcaQrl2gy
 
 --
 -- Database "postgres" dump
@@ -5623,7 +5909,7 @@ GRANT SELECT ON TABLE public.verification TO test_user;
 -- PostgreSQL database dump
 --
 
-\restrict pvyk3CiaN9DuwjCPAhYLrpmU75b5ZSkG8f99rXzKOhYmA1rF4q0AhNNOoidTdTw
+\restrict 7pC390hthrWBS4wOoEkTUxgzVb6SuQk4fuhXkELLXXzZCn0z3ZParJve3b75zz6
 
 -- Dumped from database version 17.6 (Debian 17.6-1.pgdg12+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg12+1)
@@ -5644,7 +5930,7 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pvyk3CiaN9DuwjCPAhYLrpmU75b5ZSkG8f99rXzKOhYmA1rF4q0AhNNOoidTdTw
+\unrestrict 7pC390hthrWBS4wOoEkTUxgzVb6SuQk4fuhXkELLXXzZCn0z3ZParJve3b75zz6
 
 --
 -- PostgreSQL database cluster dump complete
