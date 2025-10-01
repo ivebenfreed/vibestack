@@ -63,6 +63,7 @@ import { Route as AuthenticatedDebugLocalStorageSyncRouteImport } from './routes
 import { Route as AuthenticatedDebugLegendStateTestRouteImport } from './routes/_authenticated/debug/legend-state-test'
 import { Route as AuthenticatedOrgOrgIdIndexRouteImport } from './routes/_authenticated/org/$orgId/index'
 import { Route as AuthenticatedOrgOrgIdTestPassiveRendererRouteImport } from './routes/_authenticated/org/$orgId/test-passive-renderer'
+import { Route as AuthenticatedOrgOrgIdEntityStudioRouteImport } from './routes/_authenticated/org/$orgId/entity-studio'
 import { Route as AuthenticatedOrgOrgIdDashboardRouteImport } from './routes/_authenticated/org/$orgId/dashboard'
 import { Route as AuthenticatedOrgOrgIdEntitiesEntityNameRouteImport } from './routes/_authenticated/org/$orgId/entities/$entityName'
 
@@ -380,6 +381,12 @@ const AuthenticatedOrgOrgIdTestPassiveRendererRoute =
     path: '/org/$orgId/test-passive-renderer',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOrgOrgIdEntityStudioRoute =
+  AuthenticatedOrgOrgIdEntityStudioRouteImport.update({
+    id: '/org/$orgId/entity-studio',
+    path: '/org/$orgId/entity-studio',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOrgOrgIdDashboardRoute =
   AuthenticatedOrgOrgIdDashboardRouteImport.update({
     id: '/org/$orgId/dashboard',
@@ -446,6 +453,7 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
+  '/org/$orgId/entity-studio': typeof AuthenticatedOrgOrgIdEntityStudioRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -501,6 +509,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/universe': typeof AuthenticatedUniverseIndexRoute
   '/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
+  '/org/$orgId/entity-studio': typeof AuthenticatedOrgOrgIdEntityStudioRoute
   '/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/org/$orgId': typeof AuthenticatedOrgOrgIdIndexRoute
   '/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -560,6 +569,7 @@ export interface FileRoutesById {
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/universe/': typeof AuthenticatedUniverseIndexRoute
   '/_authenticated/org/$orgId/dashboard': typeof AuthenticatedOrgOrgIdDashboardRoute
+  '/_authenticated/org/$orgId/entity-studio': typeof AuthenticatedOrgOrgIdEntityStudioRoute
   '/_authenticated/org/$orgId/test-passive-renderer': typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   '/_authenticated/org/$orgId/': typeof AuthenticatedOrgOrgIdIndexRoute
   '/_authenticated/org/$orgId/entities/$entityName': typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -619,6 +629,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/universe'
     | '/org/$orgId/dashboard'
+    | '/org/$orgId/entity-studio'
     | '/org/$orgId/test-passive-renderer'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
@@ -674,6 +685,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/universe'
     | '/org/$orgId/dashboard'
+    | '/org/$orgId/entity-studio'
     | '/org/$orgId/test-passive-renderer'
     | '/org/$orgId'
     | '/org/$orgId/entities/$entityName'
@@ -732,6 +744,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks/'
     | '/_authenticated/universe/'
     | '/_authenticated/org/$orgId/dashboard'
+    | '/_authenticated/org/$orgId/entity-studio'
     | '/_authenticated/org/$orgId/test-passive-renderer'
     | '/_authenticated/org/$orgId/'
     | '/_authenticated/org/$orgId/entities/$entityName'
@@ -1137,6 +1150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/org/$orgId/entity-studio': {
+      id: '/_authenticated/org/$orgId/entity-studio'
+      path: '/org/$orgId/entity-studio'
+      fullPath: '/org/$orgId/entity-studio'
+      preLoaderRoute: typeof AuthenticatedOrgOrgIdEntityStudioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/org/$orgId/dashboard': {
       id: '/_authenticated/org/$orgId/dashboard'
       path: '/org/$orgId/dashboard'
@@ -1239,6 +1259,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUniverseIndexRoute: typeof AuthenticatedUniverseIndexRoute
   AuthenticatedOrgOrgIdDashboardRoute: typeof AuthenticatedOrgOrgIdDashboardRoute
+  AuthenticatedOrgOrgIdEntityStudioRoute: typeof AuthenticatedOrgOrgIdEntityStudioRoute
   AuthenticatedOrgOrgIdTestPassiveRendererRoute: typeof AuthenticatedOrgOrgIdTestPassiveRendererRoute
   AuthenticatedOrgOrgIdIndexRoute: typeof AuthenticatedOrgOrgIdIndexRoute
   AuthenticatedOrgOrgIdEntitiesEntityNameRoute: typeof AuthenticatedOrgOrgIdEntitiesEntityNameRoute
@@ -1266,6 +1287,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUniverseIndexRoute: AuthenticatedUniverseIndexRoute,
   AuthenticatedOrgOrgIdDashboardRoute: AuthenticatedOrgOrgIdDashboardRoute,
+  AuthenticatedOrgOrgIdEntityStudioRoute:
+    AuthenticatedOrgOrgIdEntityStudioRoute,
   AuthenticatedOrgOrgIdTestPassiveRendererRoute:
     AuthenticatedOrgOrgIdTestPassiveRendererRoute,
   AuthenticatedOrgOrgIdIndexRoute: AuthenticatedOrgOrgIdIndexRoute,

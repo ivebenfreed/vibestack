@@ -495,8 +495,8 @@ export class EntitySchemaManager {
     try {
       console.log(`[EntitySchemaManager] Auto-assigning status sets for entity: ${entityName} (${archetype})`);
       
-      // Use StatusSetManager with static import
-      const statusSetManager = new StatusSetManager(this.entityManager);
+      // Use StatusSetManager with Kysely instance
+      const statusSetManager = new StatusSetManager(this.config.kysely);
       
       // Check all fields (base + custom) for status fields
       const allFieldMaps = [mergedFields.baseFields, mergedFields.customFields];
@@ -988,7 +988,7 @@ export class EntitySchemaManager {
               if ((field.type === 'status' || field.type === 'status_set') && field.statusSetId) {
                 try {
                   // Load status set values from the StatusSetManager
-                  const statusSetManager = new StatusSetManager(this.entityManager);
+                  const statusSetManager = new StatusSetManager(this.config.kysely);
                   const statusSet = await statusSetManager.getStatusSet(orgId, field.statusSetId);
                   
                   if (statusSet && statusSet.status_values) {

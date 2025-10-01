@@ -35,7 +35,8 @@ import {
   BarChart3,
   ChevronsLeft,
   Vault,
-  FolderKanban
+  FolderKanban,
+  Network
 } from 'lucide-react'
 
 // Icon resolver for dynamic entity icons
@@ -472,6 +473,26 @@ function OrganizationView({ orgId, isCollapsed, isUniverseMode = true, onBackToU
               {currentOrg.name} World
             </TooltipContent>
           </Tooltip>
+
+          {/* Entity Studio */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to={`/org/${orgId}/entity-studio`}
+                className={cn(
+                  "flex items-center justify-center rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  location.pathname.startsWith(`/org/${orgId}/entity-studio`)
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground"
+                )}
+              >
+                <Network className="h-4 w-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              Entity Studio
+            </TooltipContent>
+          </Tooltip>
         </div>
       </TooltipProvider>
     )
@@ -556,6 +577,21 @@ function OrganizationView({ orgId, isCollapsed, isUniverseMode = true, onBackToU
         >
           <BarChart3 className="h-4 w-4" />
           <span className="truncate">Dashboard</span>
+        </Link>
+
+        {/* Entity Studio - Visual Entity Schema Viewer */}
+        <Link
+          to={`/org/${orgId}/entity-studio`}
+          className={cn(
+            'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            location.pathname.startsWith(`/org/${orgId}/entity-studio`)
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+              : 'text-sidebar-foreground'
+          )}
+        >
+          <Network className="h-4 w-4" />
+          <span className="truncate">Entity Studio</span>
         </Link>
       </div>
 
