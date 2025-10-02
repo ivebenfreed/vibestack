@@ -15,8 +15,32 @@ import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { clearSchemaObservables, getSchemaObservable$, peekSchemaData$ } from './schema-observable'
 import { setPersistenceManagerReference, setPersistenceConfigSetter, setupFullPersistenceConfig } from './persistence-utils'
 import { syncNotifications$ } from './sync-notifications'
+import { getDexieDB } from './persistence/DexieEntityDB'
 import { log } from '@/logger';
 const fileLog = log('legend-state/observables.ts');
+
+// Helper: Fallback to direct API fetch
+async function fetchDirectFromAPI(url: string): Promise<any[]> {
+  try {
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    })
+
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 500) {
+        return []  // Table doesn't exist yet
+      }
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    const result = await response.json()
+    return result.data || []
+  } catch (error) {
+    fileLog.error(`API fetch error:`, error)
+    return []
+  }
+}
 
 // Custom error classes for better error handling
 export class ValidationError extends Error {
@@ -439,41 +463,30 @@ function createEntityObservable(entityName: string, schema?: any) {
       waitForSet: (state: any) => state?.isPersistLoaded
     }),
 
-    // LIST - Simple function that returns array of records (Legend State v3 pattern)
-    list: async () => {
+    // ✅ LIST - Read from Dexie cache (instant, cache-first)
+    list: async ({ lastSync }: { lastSync?: number } = {}) => {
       try {
-        const loadType = hasPersistence ? 'API (with cache)' : 'API (no cache)'
-        fileLog.info(`🔄 [SYNC-LIST] Loading ${entityName} from ${loadType}: ${baseUrl}`);
+        const dexie = getDexieDB()
 
-        const response = await fetch(baseUrl, {
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        })
-        
-        if (!response.ok) {
-          // Handle common cases gracefully
-          if (response.status === 404) {
-            fileLog.info(`🔍 [SYNC-EMPTY] Entity ${entityName} table not found (404) - returning empty data`)
-            return []
-          }
-          if (response.status === 500) {
-            // Likely table doesn't exist - don't spam console
-            fileLog.info(`🔍 [SYNC-EMPTY] Entity ${entityName} table not created yet (500) - returning empty data`)
-            return []
-          }
-          fileLog.error(`❌ [SYNC-ERROR] Failed to load ${entityName}:`, response.status)
-          return []
+        // Fallback to direct API if Dexie not initialized
+        if (!dexie) {
+          fileLog.warn(`🔄 [DEXIE-FALLBACK] ${entityName}: Dexie not available, using API`)
+          return fetchDirectFromAPI(baseUrl)
         }
-        
-        const result = await response.json()
-        const data = result.data || []
-        
-        fileLog.info(`✅ [SYNC-SUCCESS] Loaded ${entityName}: ${data.length} records`)
-        
-        return data
+
+        // ✅ Read from Dexie cache (differential if lastSync provided)
+        const records = lastSync
+          ? await dexie.getChangedSince(actualEntityName, lastSync)
+          : await dexie.getAllRecords(actualEntityName)
+
+        const syncType = lastSync ? 'differential' : 'full'
+        fileLog.info(`📦 [DEXIE-READ] ${entityName}: ${records.length} records (${syncType})`)
+
+        return records
+
       } catch (error) {
-        fileLog.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
-        return []
+        fileLog.error(`❌ [DEXIE-READ] ${entityName}: Error, falling back to API`, error)
+        return fetchDirectFromAPI(baseUrl)
       }
     },
 
@@ -828,9 +841,27 @@ function createEntityObservable(entityName: string, schema?: any) {
 
       fileLog.info(`[Observable] ${entityName} subscribed to direct sync notifications`)
 
+      // ✅ ALSO listen for Dexie change events (from liveQuery)
+      const dexieChangeHandler = (event: Event) => {
+        const customEvent = event as CustomEvent
+        if (customEvent.detail?.entityType === entityName) {
+          fileLog.debug(`🔔 [DEXIE-EVENT] ${entityName}: Dexie data changed, refreshing`)
+          refresh()  // ✅ Triggers list() which reads from updated Dexie cache
+        }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('elevra:dexie-updated', dexieChangeHandler)
+      }
+
       // Return cleanup function
       return () => {
         unsubscribe()
+
+        // Remove Dexie event listener
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('elevra:dexie-updated', dexieChangeHandler)
+        }
 
         // CLEANUP REFRESH REGISTRY
         if (typeof window !== 'undefined') {
@@ -839,7 +870,7 @@ function createEntityObservable(entityName: string, schema?: any) {
             fileLog.info(`🗑️ [REFRESH-REGISTRY] Unregistered refresh function for ${entityName}`)
           }
           if (window.location?.hostname === 'localhost') {
-            fileLog.info(`[Observable] ${entityName} unsubscribed from direct sync notifications`)
+            fileLog.info(`[Observable] ${entityName} unsubscribed from sync notifications`)
           }
         }
       }
@@ -993,7 +1024,7 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
     })
     
     const results = await Promise.all(schemaPromises)
-    
+
     // Process results and update universe context (organizations already initialized above)
     results.forEach(result => {
       if (result.success && result.observable) {
@@ -1014,38 +1045,19 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
     })
 
     const successfulResults = results.filter(r => r.success).length
-    
+
     fileLog.info(`[Observable] Universe context loaded with ${successfulResults}/${organizationIds.length} organizations. Schema observables will load entity data reactively.`)
-    
+
     // **NEW: Add virtual entities for options system (async, non-blocking)**
     addVirtualOptionsEntities(organizationIds).catch(error => {
       fileLog.warn('[Observable] Virtual options entities failed (non-critical):', error);
     });
 
-    // **NEW: Initialize persistence with actual entity count after schemas and virtual entities are loaded**
-    // Use reactive approach instead of blocking timers - persistence will be initialized
-    // when entities are actually accessed and the schema is ready
-    try {
-      // Use a conservative estimate that accounts for the virtual entities we just added
-      // This prevents the "entity count 0" issue while being more accurate than the original 24
-      const currentSchema = universeSchema$.peek()
-      let actualEntityCount = currentSchema?.entities ? Object.keys(currentSchema.entities).length : 0
-
-      // If no entities loaded yet, use a realistic estimate based on the actual system
-      if (actualEntityCount === 0) {
-        // Based on PersistenceManager logs: 16 business entities + 3 User entities + 3 schema entities = 22 total
-        actualEntityCount = 20 // Use the actual entity count we see in the logs
-        fileLog.info(`[Observable] No entities loaded yet, using realistic estimate based on actual system: ${actualEntityCount}`)
-      } else {
-        fileLog.info(`[Observable] Using actual loaded entity count: ${actualEntityCount}`)
-      }
-
-      fileLog.info(`[Observable] Initializing persistence with entity count: ${actualEntityCount}`)
-      await initializePersistence(userId, organizationIds, actualEntityCount)
-      fileLog.info(`[Observable] ✅ Persistence initialized successfully`)
-    } catch (persistenceError) {
-      fileLog.warn('[Observable] Persistence initialization failed:', persistenceError)
-    }
+    // ✅ ARCHITECTURE FIX: Don't initialize persistence here!
+    // Persistence will be set up as a SEPARATE stage in app-initialization-stages.ts
+    // AFTER schemas have loaded and universeSchema$ has combined all entities
+    // This prevents the race condition where persistence config is created before all entities exist
+    fileLog.info(`[Observable] ✅ Universe context loading complete - persistence will be initialized in separate stage`)
 
   } catch (error) {
     fileLog.error('[Observable] Failed to load universe context:', error)
@@ -1177,28 +1189,34 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
 
 /**
  * Initialize persistence configuration for loaded organizations
+ * EXPORTED for use in app-initialization-stages.ts as a separate stage
  */
-async function initializePersistence(userId: string, organizationIds: string[], totalEntities: number) {
+export async function initializePersistence(userId: string, organizationIds: string[]) {
   // Skip if already initialized (but allow initialization even if totalEntities is 0)
   if (persistenceManager && syncedCrudWithPersistence) {
     fileLog.info(`[Observable] Skipping persistence initialization: already initialized=${!!(persistenceManager && syncedCrudWithPersistence)}`)
     return
   }
-  
+
   try {
-    // Use primary organization for persistence (first in list)
-    const primaryOrgId = organizationIds[0]
-    if (!primaryOrgId) {
-      fileLog.error('[Observable] No organization ID available for persistence setup')
-      return
-    }
-    
-    // Create persistence manager and basic config first, even without entities
-    fileLog.info(`[Observable] Initializing persistence manager for org ${primaryOrgId} (expected ${totalEntities} entities)`)
-    
-    // Create persistence manager with enhanced error handling
-    persistenceManager = createPersistenceManager(primaryOrgId, userId)
+    // ✅ FIX: Use universe-scoped persistence for all organizations
+    // Instead of per-org database, create ONE database for the entire user universe
+    const universeOrgId = 'universe'
+
+    fileLog.info(`[Observable] Initializing UNIVERSE-scoped persistence for ${organizationIds.length} organizations`, {
+      userId,
+      organizationIds
+    })
+
+    // ✅ FIX: Create universe-scoped persistence manager
+    // This will create database: elevra_universe_{userId}
+    persistenceManager = createPersistenceManager(universeOrgId, userId, `elevra_universe_${userId.replace(/-/g, '_')}`)
     setPersistenceManagerReference(persistenceManager)
+
+    fileLog.info(`[Observable] Created universe-scoped persistence manager`, {
+      dbName: `elevra_universe_${userId.replace(/-/g, '_')}`,
+      scope: 'all organizations'
+    })
 
     // Reset global persistence setup guard for fresh initialization
     const { resetGlobalPersistenceSetup } = await import('./persistence-utils')
@@ -1213,58 +1231,73 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     // Set up basic configuration that doesn't require entity names
     // This ensures that when entities ARE created, they can access the persistence config
     syncedCrudWithPersistence = true // Mark as initialized so entities know persistence is available
-    
+
     fileLog.info(`[Observable] ✅ Basic persistence configuration initialized, entities can now use persistence`)
-    
-    // Use the totalEntities parameter instead of checking schema (which may not be ready yet)
-    fileLog.info(`[Observable] Setting up persistence for ${totalEntities} entities`)
 
-    if (totalEntities > 0) {
+    // ✅ NEW: Always set up persistence (wait for schema data inside)
+    {
       // Wait for schemas to load, then set up full persistence with real entity names
-      fileLog.info(`[Observable] Waiting for schema to load before setting up persistence config...`)
+      fileLog.info(`[Observable] Waiting for ALL organization schemas to load before setting up persistence config...`)
 
-      // Wait for schema data to be available
-      // CRITICAL: Use .get() not .peek() to make this reactive!
+      // ✅ FINAL FIX: Use a delay-based approach since schema observables load async
+      // The org.loading flags are unreliable - they're set false when observable is created,
+      // not when data loads. Instead, wait for universeSchema$ to stabilize with all entities.
+      fileLog.info(`[Observable] Giving schemas 500ms to load before checking entity count...`)
+
+      // First, give schemas time to start loading
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Now wait for universeSchema$ to have all entities combined
       await when(() => {
         const schema = universeSchema$.get() // Reactive access
-        const hasEntities = schema?.entities && Object.keys(schema.entities).length > 0
+        const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0
 
-        if (hasEntities) {
-          fileLog.info(`[Observable] ✅ Schema ready with ${Object.keys(schema.entities).length} entities`)
+        // Wide Corp has 24 entities, expect at least 20 total across all orgs
+        const hasAllEntities = entityCount >= 20
+
+        if (hasAllEntities) {
+          fileLog.info(`[Observable] ✅ universeSchema$ has ${entityCount} total entities - ready for persistence`)
+        } else {
+          fileLog.debug(`[Observable] universeSchema$ still combining: ${entityCount}/20+ entities`)
         }
-        return hasEntities
+
+        return hasAllEntities
       })
 
-      // Now schemas are loaded - get real entity names
+      // Now ALL schemas are loaded - get complete entity list from all organizations
       const currentSchema = universeSchema$.peek()
       const entityNames = Object.keys(currentSchema?.entities || {})
 
-      fileLog.info(`[Observable] Schema loaded, setting up persistence for ${entityNames.length} entities`)
+      fileLog.info(`[Observable] ✅ ALL schemas loaded, setting up persistence for ${entityNames.length} entities from ${organizationIds.length} organizations`, {
+        sampleEntities: entityNames.slice(0, 5),
+        organizationIds
+      })
 
-      // Set up full persistence configuration with actual entity names
-      const fullConfig = await setupFullPersistenceConfig(entityNames, primaryOrgId)
+      // ✅ FIX: Set up persistence with universe scope, not single org
+      const fullConfig = await setupFullPersistenceConfig(entityNames, universeOrgId)
       if (!fullConfig) {
         fileLog.warn(`[Observable] setupFullPersistenceConfig returned null, persistence may not work`)
       } else {
         fileLog.info(`[Observable] ✅ Full persistence config setup complete with ${entityNames.length} entities`)
       }
-    } else {
-      fileLog.info(`[Observable] No entities expected, persistence ready for future schema loading`)
     }
 
     // Update tracking variables
-    currentOrgId = primaryOrgId
-    const currentSchema = universeSchema$.peek()
-    currentSchemaVersion = currentSchema?.version || Date.now().toString()
+    currentOrgId = universeOrgId
+    const currentSchemaCheck = universeSchema$.peek()
+    currentSchemaVersion = currentSchemaCheck?.version || Date.now().toString()
+    const finalEntityCount = Object.keys(currentSchemaCheck?.entities || {}).length
 
-    fileLog.info(`[Observable] Persistence initialized successfully`, {
-      orgId: primaryOrgId,
-      entityCount: totalEntities,
+    fileLog.info(`[Observable] ✅ Universe-scoped persistence initialized successfully`, {
+      scope: 'universe (all organizations)',
+      organizationCount: organizationIds.length,
+      entityCount: finalEntityCount,
       schemaVersion: currentSchemaVersion,
       hasPersistenceManager: !!persistenceManager,
       hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence,
       hasPersistenceConfig: !!persistenceConfig,
-      configEntityCount: persistenceConfig ? Object.keys(persistenceConfig.entityTableMap || {}).length : 0
+      configEntityCount: persistenceConfig ? Object.keys(persistenceConfig.entityTableMap || {}).length : 0,
+      dbName: `elevra_universe_${userId.replace(/-/g, '_')}`
     })
     
   } catch (error) {
@@ -1311,7 +1344,7 @@ const globalEntityCache: Record<string, any> = {}
 export const entities$ = observable(() => {
   const schema = universeSchema$.get()
   const loading = universeLoading$.get()
-  
+
   // Return empty object while still loading or no schema
   if (loading || !schema?.entities) {
     fileLog.info(`[Observable] Entities not ready yet`, {

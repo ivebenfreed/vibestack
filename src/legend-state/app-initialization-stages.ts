@@ -9,8 +9,10 @@ import { observable, batch, when } from '@legendapp/state';
 import { log } from '@/logger';
 import { auth$ } from './auth';
 import { unifiedAuth$ } from './unified-auth';
-import { loadUniverseContext, universeContext$ } from './observables';
+import { loadUniverseContext, universeContext$, universeSchema$ } from './observables';
 import { OptionsManager } from './reference-system/options-manager';
+import { initializeDexieDB } from './persistence/DexieEntityDB';
+import { initializeSyncLayer } from './persistence/DexieSyncLayer';
 
 const fileLog = log('legend-state/app-initialization-stages.ts');
 
@@ -27,6 +29,7 @@ export type AppLoadingStage =
   | 'auth'               // Checking authentication
   | 'organizations'      // Loading user organizations
   | 'universe'          // Loading universe context/schemas
+  | 'persistence'       // Setting up IndexedDB persistence (after schemas load)
   | 'entities'          // Initial entity data load
   | 'sync'              // Initialize sync connection
   | 'options'           // Preloading common options (needs entities)
@@ -80,14 +83,14 @@ if (import.meta.hot) {
 const appInitMethods = {
   // Progress tracking
   get progress(): number {
-    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'entities', 'sync', 'options', 'ready'];
+    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'persistence', 'entities', 'sync', 'options', 'ready'];
     const currentIndex = stages.indexOf(appInitStage$.stage.get());
     const totalStages = stages.length - 1; // Don't count 'idle'
     return Math.max(0, currentIndex) / totalStages;
   },
 
   get progressPercent(): number {
-    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'entities', 'sync', 'options', 'ready'];
+    const stages: AppLoadingStage[] = ['idle', 'auth', 'organizations', 'universe', 'persistence', 'entities', 'sync', 'options', 'ready'];
     const currentIndex = stages.indexOf(appInitStage$.stage.get());
     const totalStages = stages.length - 1; // Don't count 'idle'
     const progress = Math.max(0, currentIndex) / totalStages;
@@ -100,6 +103,7 @@ const appInitMethods = {
       case 'auth': return 'Checking authentication...';
       case 'organizations': return 'Loading organizations...';
       case 'universe': return 'Loading schemas...';
+      case 'persistence': return 'Setting up local cache...';
       case 'entities': return 'Loading entity data...';
       case 'sync': return 'Connecting to sync...';
       case 'options': return 'Loading system options...';
@@ -118,8 +122,12 @@ const appInitMethods = {
     return appInitStage$.stage.get() === 'organizations';
   },
 
-  get canLoadEntities() {
+  get canSetupPersistence() {
     return appInitStage$.stage.get() === 'universe';
+  },
+
+  get canLoadEntities() {
+    return appInitStage$.stage.get() === 'persistence';
   },
 
   get canLoadSync() {
@@ -182,6 +190,9 @@ const appInitMethods = {
           break;
         case 'universe':
           success = await this.executeUniverseLoad();
+          break;
+        case 'persistence':
+          success = await this.executePersistenceSetup();
           break;
         case 'entities':
           success = await this.executeInitialEntitiesLoad();
@@ -301,21 +312,10 @@ const appInitMethods = {
         throw error;
       }
 
-      // Debug: Check if we can advance to entities
-      try {
-        initLog.info(`🌌 Universe stage complete, checking if can advance to entities: ${this.canLoadEntities}`);
-
-        // Auto-advance to entities stage after universe context is loaded
-        if (this.canLoadEntities) {
-          initLog.info(`🌌 Advancing to entities stage...`);
-          await this.advanceToStage('entities');
-          initLog.info(`✅ Advanced to entities stage successfully`);
-        } else {
-          initLog.warn(`⚠️ Cannot advance to entities - canLoadEntities is false`);
-        }
-      } catch (error) {
-        initLog.error(`❌ Failed to advance to entities stage:`, error);
-        throw error;
+      // ✅ Auto-advance to persistence stage after universe context is loaded
+      if (this.canSetupPersistence) {
+        initLog.info(`🌌 Advancing to persistence stage...`);
+        await this.advanceToStage('persistence');
       }
 
       return true;
@@ -324,6 +324,86 @@ const appInitMethods = {
       initLog.error('❌ [Universe] executeUniverseLoad failed:', error);
       this.handleError(error as Error);
       return false;
+    }
+  },
+
+  async executePersistenceSetup(): Promise<boolean> {
+    initLog.debug('💾 Setting up Dexie entity cache');
+
+    try {
+      const user = unifiedAuth$.user.get();
+      const userOrganizations = unifiedAuth$.userOrganizations.get();
+
+      if (!user) {
+        throw new Error('User not available for cache setup');
+      }
+
+      // ✅ Wait for universeSchema$ to have all entities
+      initLog.info(`💾 Waiting for schemas to combine...`);
+
+      await when(() => {
+        const schema = universeSchema$.get();
+        const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
+        const hasAllEntities = entityCount >= 20;
+
+        if (hasAllEntities) {
+          initLog.info(`💾 ✅ Schemas ready: ${entityCount} entities`);
+        } else {
+          initLog.debug(`💾 Waiting: ${entityCount}/20+ entities`);
+        }
+
+        return hasAllEntities;
+      });
+
+      const schemas = universeSchema$.peek();
+
+      // ✅ Initialize Dexie database with entity schemas
+      initLog.info(`💾 Creating Dexie database with ${Object.keys(schemas.entities).length} tables`);
+
+      const dexie = initializeDexieDB(user.id, schemas.entities);
+      await dexie.open();
+
+      initLog.info('✅ Dexie database opened:', {
+        dbName: dexie.name,
+        tables: dexie.tables.map(t => t.name),
+        tableCount: dexie.tables.length
+      });
+
+      // ✅ Initialize sync layer with schema change detection
+      const syncLayer = initializeSyncLayer();
+      const entityTypes = Object.keys(schemas.entities);
+
+      // ✅ Start initialization (returns immediately on warm start)
+      await syncLayer.initializeWithSchemaCheck(user.id, schemas.entities);
+
+      initLog.info('✅ Dexie cache ready (background sync active)');
+
+      // ✅ Setup liveQuery subscriptions
+      syncLayer.setupLiveQueries(entityTypes);
+
+      // ✅ Setup sync listeners for WebSocket notifications
+      syncLayer.initializeSyncListeners(entityTypes);
+
+      initLog.info('✅ Dexie fully initialized, entities can read from cache');
+
+      // Auto-advance to entities
+      if (this.canLoadEntities) {
+        await this.advanceToStage('entities');
+      }
+
+      return true;
+
+    } catch (error) {
+      initLog.error('❌ [Dexie] executePersistenceSetup failed:', error);
+
+      // Continue without cache (server-only mode)
+      initLog.warn('Continuing without Dexie cache, using direct API calls');
+
+      if (this.canLoadEntities) {
+        await this.advanceToStage('entities');
+      }
+
+      return true;  // Don't fail app initialization
     }
   },
 
