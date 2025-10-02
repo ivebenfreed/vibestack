@@ -71,12 +71,7 @@ export class EmbeddingGeneratorDO extends DurableObject {
   }
 }
 
-// Dynamic import for main worker to avoid top-level scope issues
-const worker = {
-  async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
-    const workerModule = await import('./src/server/index');
-    return workerModule.default.fetch(request, env, ctx);
-  }
-};
+// Static import - Vite/Cloudflare Workers runtime handles module caching automatically
+import serverWorker from './src/server/index'
 
-export default worker
+export default serverWorker

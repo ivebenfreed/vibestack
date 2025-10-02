@@ -18,6 +18,9 @@ export default defineConfig({
     cloudflare({
       inspectorPort: false,
       persistState: true,
+      // PERFORMANCE: Only handle API requests through worker in dev mode
+      // Let Vite serve static HTML directly (much faster)
+      configPath: process.env.NODE_ENV === 'production' ? './wrangler.toml' : false,
     }),
   ],
   resolve: {
@@ -31,6 +34,19 @@ export default defineConfig({
     watch: {
       ignored: ['**/.wrangler/**', '**/node_modules/**'],
     },
+  },
+  // PERFORMANCE: Pre-bundle server dependencies to reduce worker transformation time
+  optimizeDeps: {
+    include: [
+      'hono',
+      'hono/cors',
+      '@hono/zod-openapi',
+      'better-auth',
+      'kysely',
+      'postgres',
+    ],
+    // Force Vite to pre-bundle on server start
+    force: false,
   },
   build: {
     chunkSizeWarningLimit: 1000,
