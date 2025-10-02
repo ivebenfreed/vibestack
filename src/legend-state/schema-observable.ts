@@ -237,7 +237,10 @@ export function createSchemaObservable(orgId: string) {
     fieldUpdatedAt: 'version',
     fieldCreatedAt: 'created_at',
 
-    // **LEGEND STATE PERSISTENCE**
+    // Initial value - required for syncedCrud to know to fetch
+    initial: {},
+
+    // Persistence configuration - each org gets its own database
     persist: {
       name: `schema_${orgId}`,
       plugin: observablePersistIndexedDB({
@@ -247,7 +250,7 @@ export function createSchemaObservable(orgId: string) {
       }),
       retrySync: true
     },
-    
+
     // LIST - Load organization schema from server
     list: async () => {
       try {
@@ -310,10 +313,7 @@ export function createSchemaObservable(orgId: string) {
     create: null,
     update: null,
     delete: null,
-    
-    // Initial empty state
-    initial: [],
-    
+
     // Subscribe to schema change notifications via WebSocket
     subscribe: ({ refresh }: { refresh: () => void }) => {
       const handler = (e: CustomEvent) => {
@@ -345,7 +345,7 @@ export function createSchemaObservable(orgId: string) {
       }
     },
     
-    // Retry configuration for reliability  
+    // Retry configuration for reliability
     retry: {
       times: 3,
       delay: 1000,
@@ -353,7 +353,8 @@ export function createSchemaObservable(orgId: string) {
       maxDelay: 10000
     }
   }
-  
+
+  // Create the synced observable with persistence configured
   return observable(syncedCrud(crudConfig))
 }
 
@@ -464,14 +465,17 @@ const schemaObservables = new Map<string, any>()
 /**
  * Get or create schema observable for an organization
  * Follows same pattern as getEntity$() for consistency
+ * Uses persisted synced observable to load from IndexedDB cache
  */
 export function getSchemaObservable$(orgId: string) {
   if (!schemaObservables.has(orgId)) {
     const observable = createSchemaObservable(orgId)
     schemaObservables.set(orgId, observable)
-    fileLog.info(`[SchemaObservable] Created new schema observable for org: ${orgId}`)
+    fileLog.info(`[SchemaObservable] Created persisted synced observable for org: ${orgId} (will load from cache if available)`)
+  } else {
+    fileLog.debug(`[SchemaObservable] Reusing existing schema observable for org: ${orgId}`)
   }
-  
+
   return schemaObservables.get(orgId)
 }
 

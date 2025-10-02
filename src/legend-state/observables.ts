@@ -6,7 +6,7 @@
  * Updated to fix HMR reload issues - Force timestamp update.
  */
 
-import { observable, syncState, when, batch } from '@legendapp/state'
+import { observable, syncState, when, batch, whenReady } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { configureSynced } from '@legendapp/state/sync'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
@@ -111,26 +111,18 @@ export const universeUserId$ = observable(() => universeContext$.get().userId)
 export const universeSchema$ = observable(() => {
   const universe = universeContext$.get()
   const organizations = Object.values(universe.organizations)
-  const readyOrganizations = organizations.filter(org => !org.loading)
-
-  // Only log when the computation is actually meaningful
-  if (organizations.length > 0 && readyOrganizations.length === organizations.length) {
-    fileLog.debug(`[UniverseSchema] Computing universe schema with ${organizations.length} organizations (${readyOrganizations.length} ready, ${organizations.length - readyOrganizations.length} still loading)`)
-  }
 
   if (organizations.length === 0) {
     return null
   }
 
-  if (readyOrganizations.length === 0) {
-    return null
-  }
-  
   // Combine schemas from all organizations for universe view
   const combinedEntities: Record<string, any> = {}
   let totalEntitiesAdded = 0
-  
-  readyOrganizations.forEach((org) => {
+
+  // Process ALL organizations, not just "ready" ones
+  // Filter by actual schema data existence instead of loading flag
+  organizations.forEach((org) => {
     // Safety check: ensure orgId exists (API returns 'id', not 'orgId')
     const orgId = org.orgId || org.id
     if (!orgId) {
@@ -152,28 +144,21 @@ export const universeSchema$ = observable(() => {
     }
 
     const schemaData = schemaObservable.get() // Reactive access to schema data
-    
+
     // syncedCrud observables return objects with IDs as keys: { [orgId]: schemaObject }
     // Handle different data states:
     // - undefined/null: Still loading
     // - {}: Empty object means no schema found
     // - { [orgId]: schema }: Object with schema means loaded
-    if (!schemaData) {
-      fileLog.debug(`[UniverseSchema] Schema data for org ${orgId} still loading (undefined/null)`)
+    if (!schemaData || typeof schemaData !== 'object') {
       return // Skip this org - data is still loading
     }
-    
-    if (typeof schemaData !== 'object') {
-      fileLog.error(`[UniverseSchema] Schema data for org ${orgId} has unexpected format (not object):`, typeof schemaData)
-      return // Skip this org - unexpected format
-    }
-    
+
     // Get the schema object by orgId key (syncedCrud format)
     const schema = schemaData[orgId]
-    
+
     if (!schema) {
-      fileLog.debug(`[UniverseSchema] No schema found for org ${orgId} in syncedCrud data`)
-      return // Skip this org - no schema available
+      return // Skip this org - no schema available yet
     }
 
       if (schema?.entities) {
@@ -200,9 +185,9 @@ export const universeSchema$ = observable(() => {
   })
 
   fileLog.debug(`[UniverseSchema] Completed universe schema computation:`, {
-    organizationsProcessed: readyOrganizations.length,
+    organizationsTotal: organizations.length,
     totalEntitiesAdded,
-    combinedEntityKeys: Object.keys(combinedEntities)
+    combinedEntityKeys: Object.keys(combinedEntities).slice(0, 5)
   })
 
   return {
@@ -415,29 +400,51 @@ function createEntityObservable(entityName: string, schema?: any) {
   }
   
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
-  
+
   fileLog.info(`[Observable] Creating entity observable for ${entityName}`, {
     hasPersistenceManager: !!persistenceManager,
     hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence,
     hasConfig: !!persistenceConfig
   });
-  
+
+  // Get persistence configuration for this entity if available
+  const tableName = persistenceConfig?.entityTableMap?.[entityName]
+  const hasPersistence = !!tableName && !!persistenceManager
+
+  if (hasPersistence) {
+    fileLog.info(`[Observable] ${entityName} will use IndexedDB persistence (table: ${tableName})`)
+  }
+
   // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
     // CRITICAL: Enable Legend State's built-in differential sync for bandwidth efficiency
     changesSince: 'last-sync',
-    
+
     // CRITICAL: Field mappings for differential sync tracking
     fieldId: 'id',
     fieldCreatedAt: 'created_at',
     fieldUpdatedAt: 'updated_at',
     fieldDeleted: 'deleted',
-    
+
+    // Initial value - required for syncedCrud
+    initial: {},
+
+    // Persistence configuration - load from IndexedDB cache first
+    ...(hasPersistence && {
+      persist: {
+        name: tableName,
+        retrySync: true
+      },
+      // Don't call list() until persistence is loaded
+      waitForSet: (state: any) => state?.isPersistLoaded
+    }),
+
     // LIST - Simple function that returns array of records (Legend State v3 pattern)
     list: async () => {
       try {
-        fileLog.info(`🔄 [SYNC-LIST] Loading ${entityName} from: ${baseUrl}`);
-        
+        const loadType = hasPersistence ? 'API (with cache)' : 'API (no cache)'
+        fileLog.info(`🔄 [SYNC-LIST] Loading ${entityName} from ${loadType}: ${baseUrl}`);
+
         const response = await fetch(baseUrl, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
@@ -700,8 +707,13 @@ function createEntityObservable(entityName: string, schema?: any) {
       }
     },
 
-    // Retry configuration for network failures
-    retry: {
+    // Retry configuration for robust offline-first behavior
+    retry: hasPersistence ? {
+      infinite: true, // Keep retrying forever for offline-first apps
+      delay: 1000,
+      backoff: 'exponential',
+      maxDelay: 30000
+    } : {
       times: 3,
       delay: 1000,
       backoff: 'exponential',
@@ -838,10 +850,24 @@ function createEntityObservable(entityName: string, schema?: any) {
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
     fileLog.info(`[Observable] Creating syncedCrud for ${entityName}, hasPersistenceConfig: ${!!persistenceConfig?.entityTableMap}`)
   }
-  
-  // CRITICAL FIX: Use syncedCrud(config) directly like in working example
-  // Don't store the function separately - call it immediately with config
-  const syncedObservable = observable(syncedCrud(crudConfig))
+
+  // Create synced observable with persistence if available
+  // persistOptions is a configureSynced wrapper that applies global IndexedDB config
+  const syncedObservable = hasPersistence && persistenceConfig?.persistOptions
+    ? observable(syncedCrud(persistenceConfig.persistOptions(crudConfig)))
+    : observable(syncedCrud(crudConfig))
+
+  // Add persistence state logging
+  if (typeof window !== 'undefined' && hasPersistence) {
+    // Check if data loaded from persistence
+    setTimeout(() => {
+      const data = syncedObservable.peek()
+      const hasData = data && Object.keys(data).length > 0
+      fileLog.info(`[Observable] ${entityName} persistence check: ${hasData ? '✅ Cache loaded' : '⚠️ No cache data'}`, {
+        dataKeys: hasData ? Object.keys(data).length : 0
+      })
+    }, 100)
+  }
   
   // Log available methods for debugging (should now have proper syncedCrud methods)
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
@@ -925,23 +951,32 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
     // Skip persistence initialization here - will be initialized after schemas load with actual entity count
     fileLog.info(`[Observable] Deferring persistence initialization until after schema loading to get accurate entity count`)
 
+    // Initialize all organization entries first to avoid partial state
+    organizationIds.forEach(orgId => {
+      const orgName = orgNameMap.get(orgId) || orgId
+      universeContext$.organizations[orgId].set({
+        orgId,
+        name: orgName,
+        schema: null,
+        loading: true,
+        error: null
+      })
+    })
+
     // Load schemas from all organizations in parallel
     const schemaPromises = organizationIds.map(async (orgId) => {
       try {
-        universeContext$.organizations[orgId].loading.set(true)
-        universeContext$.organizations[orgId].error.set(null)
-        
         // Create schema observable (loads in background like entity observables)
         const schemaObs = getSchemaObservable$(orgId)
         if (!schemaObs) {
           throw new Error(`Failed to create schema observable for org ${orgId}`)
         }
-        
+
         // CRITICAL FIX: Don't wait for data loading synchronously - this breaks Legend State patterns
         // Legend State handles initialization automatically through reactive observables
         // Schema observables will load asynchronously and components will react when data is ready
         fileLog.info(`[Observable] Schema observable created for org ${orgId}, data will load asynchronously`)
-        
+
         return {
           orgId,
           observable: schemaObs,
@@ -959,33 +994,17 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
     
     const results = await Promise.all(schemaPromises)
     
-    // Process results and update universe context
+    // Process results and update universe context (organizations already initialized above)
     results.forEach(result => {
       if (result.success && result.observable) {
-        // Use the provided organization name or fall back to orgId
-        const orgName = orgNameMap.get(result.orgId) || result.orgId
-        
-        universeContext$.organizations[result.orgId].assign({
-          orgId: result.orgId,
-          name: orgName,
-          // Don't store the observable here - Legend State's assign() corrupts it
-          // Instead, we'll access it directly from the cache in universeSchema$
-          loading: false,
-          error: null
-        })
-        
-        fileLog.info(`[Observable] Schema observable created for org ${result.orgId} (${orgName})`)
+        // Update to loaded state
+        universeContext$.organizations[result.orgId].loading.set(false)
+
+        fileLog.info(`[Observable] Schema observable created for org ${result.orgId} (${universeContext$.organizations[result.orgId].name.peek()})`)
       } else {
-        const orgName = orgNameMap.get(result.orgId) || result.orgId
-        
-        universeContext$.organizations[result.orgId].assign({
-          orgId: result.orgId,
-          name: orgName,
-          schemaObservable: null,
-          schema: null,
-          loading: false,
-          error: result.error
-        })
+        // Update to error state
+        universeContext$.organizations[result.orgId].loading.set(false)
+        universeContext$.organizations[result.orgId].error.set(result.error)
       }
     })
 
@@ -1028,16 +1047,6 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
       fileLog.warn('[Observable] Persistence initialization failed:', persistenceError)
     }
 
-    // **NEW: Setup global persistence configuration after all schemas are loaded (async, non-blocking)**
-    // This prevents multiple version increments from individual schema loads
-    import('./persistence-utils').then(({ setupGlobalPersistenceConfig }) => {
-      return setupGlobalPersistenceConfig();
-    }).then(() => {
-      fileLog.info(`[Observable] ✅ Global persistence configuration completed after all schemas loaded`);
-    }).catch(persistenceError => {
-      fileLog.warn('[Observable] Global persistence setup failed:', persistenceError);
-    });
-    
   } catch (error) {
     fileLog.error('[Observable] Failed to load universe context:', error)
     universeContext$.assign({
@@ -1211,24 +1220,51 @@ async function initializePersistence(userId: string, organizationIds: string[], 
     fileLog.info(`[Observable] Setting up persistence for ${totalEntities} entities`)
 
     if (totalEntities > 0) {
-      // Defer full persistence config to when schema data is actually available
-      // The global persistence setup will handle this with the real entity names
-      fileLog.info(`[Observable] Deferring full persistence config setup - will be handled by global persistence setup`)
+      // Wait for schemas to load, then set up full persistence with real entity names
+      fileLog.info(`[Observable] Waiting for schema to load before setting up persistence config...`)
+
+      // Wait for schema data to be available
+      // CRITICAL: Use .get() not .peek() to make this reactive!
+      await when(() => {
+        const schema = universeSchema$.get() // Reactive access
+        const hasEntities = schema?.entities && Object.keys(schema.entities).length > 0
+
+        if (hasEntities) {
+          fileLog.info(`[Observable] ✅ Schema ready with ${Object.keys(schema.entities).length} entities`)
+        }
+        return hasEntities
+      })
+
+      // Now schemas are loaded - get real entity names
+      const currentSchema = universeSchema$.peek()
+      const entityNames = Object.keys(currentSchema?.entities || {})
+
+      fileLog.info(`[Observable] Schema loaded, setting up persistence for ${entityNames.length} entities`)
+
+      // Set up full persistence configuration with actual entity names
+      const fullConfig = await setupFullPersistenceConfig(entityNames, primaryOrgId)
+      if (!fullConfig) {
+        fileLog.warn(`[Observable] setupFullPersistenceConfig returned null, persistence may not work`)
+      } else {
+        fileLog.info(`[Observable] ✅ Full persistence config setup complete with ${entityNames.length} entities`)
+      }
     } else {
       fileLog.info(`[Observable] No entities expected, persistence ready for future schema loading`)
     }
 
     // Update tracking variables
     currentOrgId = primaryOrgId
-    const currentSchema = universeSchema$.peek() // Add back the missing variable
+    const currentSchema = universeSchema$.peek()
     currentSchemaVersion = currentSchema?.version || Date.now().toString()
 
     fileLog.info(`[Observable] Persistence initialized successfully`, {
       orgId: primaryOrgId,
-      entityCount: totalEntities, // Use the passed parameter - this is the correct count
+      entityCount: totalEntities,
       schemaVersion: currentSchemaVersion,
       hasPersistenceManager: !!persistenceManager,
-      hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence
+      hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence,
+      hasPersistenceConfig: !!persistenceConfig,
+      configEntityCount: persistenceConfig ? Object.keys(persistenceConfig.entityTableMap || {}).length : 0
     })
     
   } catch (error) {
