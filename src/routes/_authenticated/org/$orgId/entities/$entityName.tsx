@@ -4,8 +4,7 @@ import { use$ } from '@legendapp/state/react'
 import { useAuth } from '@/lib/auth'
 import * as React from 'react'
 
-// ⚡ PERFORMANCE: Lazy load heavy component to reduce initial bundle size
-const UniversalEntityPage = React.lazy(() => import('@/components/entities/UniversalEntityPage').then(m => ({ default: m.UniversalEntityPage })))
+import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import {
   getEntity$,
   universeLoading$,
@@ -165,12 +164,10 @@ const OrganizationEntityPageInner = observer(function OrganizationEntityPageInne
   // Pass the properly formatted entity name with org prefix - UniversalEntityPage will handle display formatting
 
   return (
-    <React.Suspense fallback={<div className="flex items-center justify-center py-8">Loading entity page...</div>}>
-      <UniversalEntityPage
-        entityName={actualEntityKey}
-        schema={entitySchema}
-        orgId={orgId}
-      />
-    </React.Suspense>
+    <UniversalEntityPage
+      entityName={actualEntityKey}
+      schema={entitySchema}
+      orgId={orgId}
+    />
   )
 })
