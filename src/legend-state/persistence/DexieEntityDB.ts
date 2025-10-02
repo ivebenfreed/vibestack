@@ -273,11 +273,18 @@ let dexieDB: DexieEntityDB | null = null
 
 /**
  * Initialize Dexie database with entity schemas
+ * Force recreate if schemas provided (for rebuild scenarios)
  */
-export function initializeDexieDB(userId: string, schemas: EntitySchemas): DexieEntityDB {
-  if (dexieDB) {
+export function initializeDexieDB(userId: string, schemas: EntitySchemas, forceRecreate: boolean = false): DexieEntityDB {
+  if (dexieDB && !forceRecreate) {
     fileLog.info('Dexie DB already initialized, returning existing instance')
     return dexieDB
+  }
+
+  if (forceRecreate && dexieDB) {
+    fileLog.info('Force recreating Dexie DB instance')
+    dexieDB.close()
+    dexieDB = null
   }
 
   dexieDB = new DexieEntityDB(userId, schemas)
@@ -324,4 +331,44 @@ export function computeSchemaHash(entitySchemas: EntitySchemas): string {
   }
 
   return `schema_${Math.abs(hash).toString(36)}_${Object.keys(entitySchemas).length}`
+}
+
+/**
+ * Store schema in localStorage for instant warm start access
+ */
+export function storeSchemaInLocalStorage(userId: string, schemas: EntitySchemas): void {
+  try {
+    const hash = computeSchemaHash(schemas)
+    localStorage.setItem(`dexie_schema_${userId}`, JSON.stringify(schemas))
+    localStorage.setItem(`dexie_schema_hash_${userId}`, hash)
+    fileLog.debug(`📝 Stored schema in localStorage: ${hash}`)
+  } catch (error) {
+    fileLog.error('❌ Failed to store schema in localStorage', error)
+  }
+}
+
+/**
+ * Load schema from localStorage for instant warm start
+ */
+export function loadSchemaFromLocalStorage(userId: string): EntitySchemas | null {
+  try {
+    const cached = localStorage.getItem(`dexie_schema_${userId}`)
+    if (!cached) return null
+
+    const schemas = JSON.parse(cached)
+    fileLog.debug(`📖 Loaded schema from localStorage: ${Object.keys(schemas).length} entities`)
+    return schemas
+  } catch (error) {
+    fileLog.error('❌ Failed to load schema from localStorage', error)
+    return null
+  }
+}
+
+/**
+ * Clear schema from localStorage
+ */
+export function clearSchemaFromLocalStorage(userId: string): void {
+  localStorage.removeItem(`dexie_schema_${userId}`)
+  localStorage.removeItem(`dexie_schema_hash_${userId}`)
+  fileLog.debug('🗑️  Cleared schema from localStorage')
 }

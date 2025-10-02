@@ -1,3 +1,5 @@
+console.log('[WARM-START-PERF] ⏱️ DashboardLegend.tsx top-level START at:', performance.now().toFixed(2) + 'ms');
+
 import React, { useEffect } from 'react';
 import { observer } from '@legendapp/state/react';
 import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
@@ -12,7 +14,9 @@ const KnowledgeTab = React.lazy(() => import('@/components/ui/knowledge-tab-simp
 const QuickEntityCreate = React.lazy(() => import('./QuickEntityCreate').then(m => ({ default: m.QuickEntityCreate })))
 import { EntityCard } from './EntityCard'
 import { PlusCircle, Globe, Building } from 'lucide-react'
-import { 
+
+console.log('[WARM-START-PERF] ⏱️ DashboardLegend.tsx importing from @/legend-state at:', performance.now().toFixed(2) + 'ms');
+import {
   universeLoading$,
   universeSchema$,
   universeError$,
@@ -20,12 +24,17 @@ import {
   removeEntityFromSchema,
   loadUniverseContext
 } from '@/legend-state'
+console.log('[WARM-START-PERF] ⏱️ DashboardLegend.tsx @/legend-state import DONE at:', performance.now().toFixed(2) + 'ms');
+
+import { universeContext$ } from '@/legend-state/observables'
 import { use$ } from '@legendapp/state/react'
 import { log } from '@/logger'
 import { useParams } from '@tanstack/react-router'
 
 // Create logger instance for this file
 const fileLog = log('features/dashboard/DashboardLegend.tsx');
+
+console.log('[WARM-START-PERF] ⏱️ DashboardLegend.tsx top-level DONE at:', performance.now().toFixed(2) + 'ms');
 
 
 const DashboardLegend = observer(function DashboardLegend() {
@@ -50,7 +59,7 @@ const DashboardLegend = observer(function DashboardLegend() {
   // EXACT TIMING: Mark when component starts rendering
   React.useEffect(() => {
     performance.mark('dashboard-render-start');
-    console.log(`⏱️ [EXACT-TIMING] Dashboard component render started at: ${performance.now().toFixed(2)}ms`);
+    console.log(`[WARM-START-PERF] ⏱️ DashboardLegend component render started at: ${performance.now().toFixed(2)}ms`);
   }, []);
 
   fileLog.info('DashboardLegend route analysis:', {
@@ -75,8 +84,9 @@ const DashboardLegend = observer(function DashboardLegend() {
     timestamp: new Date().toISOString()
   });
 
-  // REACTIVE: Determine if data is ready based purely on observables
-  const isDataReady = !loading && !!schema?.entities && Object.keys(schema.entities).length > 0;
+  // REACTIVE: Show dashboard immediately after initialization completes
+  // Entity cards will load progressively as schema data becomes available
+  const isDataReady = !loading;
 
   fileLog.info('🔍 [DASHBOARD-PERF] Data readiness check:', {
     isDataReady,
@@ -91,13 +101,22 @@ const DashboardLegend = observer(function DashboardLegend() {
 
   // Show loading until schema data is loaded
   if (!isDataReady) {
-    fileLog.info('🔍 [DASHBOARD-PERF] Showing loading screen:', {
+    const debugInfo = {
       reason: 'isDataReady=false',
       loading,
       hasSchema: !!schema,
       hasEntities: !!schema?.entities,
+      entityCount: schema?.entities ? Object.keys(schema.entities).length : 0,
+      universeContextLoading: universeContext$.loading.peek(),
+      organizationLoadingStates: Object.entries(universeContext$.organizations.peek() || {}).map(([orgId, org]) => ({
+        orgId,
+        loading: org.loading
+      })),
       timestamp: new Date().toISOString()
-    });
+    };
+
+    fileLog.info('🔍 [DASHBOARD-LOADING-SCREEN] Why still loading?', debugInfo);
+    console.log('🔍 [DASHBOARD-LOADING-SCREEN] Debug info:', debugInfo);
 
     // Use UnifiedLoadingScreen for consistency
     return (
@@ -115,7 +134,10 @@ const DashboardLegend = observer(function DashboardLegend() {
             <div className="space-y-2">
               <p className="text-lg font-medium">Loading your workspace</p>
               <p className="text-sm text-muted-foreground">
-                {loading ? 'Fetching organization schema...' : 'Loading entity data...'}
+                {loading ? 'Initializing system...' : 'Loading schemas...'}
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                Debug: loading={String(loading)}, hasSchema={String(!!schema)}, entities={schema?.entities ? Object.keys(schema.entities).length : 0}
               </p>
             </div>
           </div>
@@ -219,10 +241,13 @@ const DashboardContent = observer(function DashboardContent({
   }
 
   if (!schema?.entities) {
-    const contextLabel = isUniverseMode ? 'universe' : 'organization'
+    // Schemas are loading reactively - show loading state
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No schema loaded for {contextLabel}</p>
+        <div className="space-y-2">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Loading entities...</p>
+        </div>
       </div>
     )
   }

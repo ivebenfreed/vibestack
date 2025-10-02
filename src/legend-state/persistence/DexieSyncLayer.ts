@@ -16,6 +16,8 @@ export class DexieSyncLayer {
   private syncInProgress = new Set<string>()
   private liveQuerySubscriptions = new Map<string, any>()
   private isInitialSyncComplete = false
+  private isRebuilding = false
+  private pendingReads = new Map<string, Promise<any>>()
 
   /**
    * Initialize with schema change detection
@@ -40,24 +42,68 @@ export class DexieSyncLayer {
       // ✅ Mark as ready immediately (tables already exist)
       this.isInitialSyncComplete = true
 
-      // ✅ Start differential sync in BACKGROUND (don't await!)
-      this.performDifferentialSyncOnly(Object.keys(entitySchemas)).catch(error => {
-        fileLog.error('Background differential sync failed:', error)
-      })
+      // ✅ Defer differential sync until after UI renders (requestIdleCallback)
+      fileLog.info(`[WARM-START-PERF] 🔄 Deferring background differential sync for ${Object.keys(entitySchemas).length} entities...`)
 
-      fileLog.info(`✅ Using existing cache, differential sync running in background`)
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+          this.performDifferentialSyncOnly(Object.keys(entitySchemas)).catch(error => {
+            fileLog.error('[WARM-START-PERF] ❌ Background differential sync failed:', error)
+          })
+        })
+      } else {
+        // Fallback: defer with setTimeout
+        setTimeout(() => {
+          this.performDifferentialSyncOnly(Object.keys(entitySchemas)).catch(error => {
+            fileLog.error('[WARM-START-PERF] ❌ Background differential sync failed:', error)
+          })
+        }, 100)
+      }
+
+      fileLog.info(`[WARM-START-PERF] ✅ Using existing cache, differential sync deferred until idle`)
 
       return
     }
 
-    fileLog.info(`📝 Schema changed, rebuilding Dexie DB`, {
+    fileLog.info(`📝 Schema changed - triggering background rebuild`, {
       oldHash: storedHash?.substring(0, 12),
       newHash: currentSchemaHash.substring(0, 12),
       entityCount: Object.keys(entitySchemas).length
     })
 
-    // Schema changed - rebuild and do full sync
-    await this.rebuildDexieSchema(userId, entitySchemas, currentSchemaHash)
+    // ✅ Schema changed - rebuild in BACKGROUND (non-blocking)
+    this.rebuildInBackground(userId, entitySchemas, currentSchemaHash).catch(error => {
+      fileLog.error('❌ Background rebuild failed:', error)
+    })
+
+    // ✅ Mark as complete so app can continue (reads will fall back to API during rebuild)
+    this.isInitialSyncComplete = true
+    fileLog.info(`✅ Background rebuild started, app continues with API fallback`)
+  }
+
+  /**
+   * Rebuild Dexie in background (non-blocking, transparent to user)
+   */
+  private async rebuildInBackground(
+    userId: string,
+    entitySchemas: EntitySchemas,
+    schemaHash: string
+  ): Promise<void> {
+    this.isRebuilding = true
+    fileLog.info(`🔄 Starting background DB rebuild...`)
+
+    try {
+      await this.rebuildDexieSchema(userId, entitySchemas, schemaHash)
+
+      fileLog.info(`✅ Background rebuild complete - cache restored`)
+
+      // Trigger UI refresh to switch from API to cache
+      window.dispatchEvent(new CustomEvent('elevra:dexie-rebuild-complete'))
+
+    } finally {
+      this.isRebuilding = false
+      this.pendingReads.clear()
+    }
   }
 
   /**
@@ -84,13 +130,29 @@ export class DexieSyncLayer {
       fileLog.warn(`Could not delete old DB (may not exist):`, error)
     }
 
-    // Dexie DB will be recreated by initializeDexieDB() call in app-initialization-stages
-    // Just store the new schema hash
+    // Store new schema hash and schema data in localStorage
     localStorage.setItem(`dexie_schema_hash_${userId}`, schemaHash)
 
-    // Perform full initial sync
+    // Import DB management functions
+    const { storeSchemaInLocalStorage, initializeDexieDB } = await import('./DexieEntityDB')
+    storeSchemaInLocalStorage(userId, entitySchemas)
+
+    // Recreate Dexie DB with new schema (force recreate to replace singleton)
+    const newDB = initializeDexieDB(userId, entitySchemas, true)
+    await newDB.open()
+
+    fileLog.info(`✅ Recreated Dexie DB with ${newDB.tables.length} tables`)
+
+    // Perform full initial sync to populate new tables
     const entityTypes = Object.keys(entitySchemas)
     await this.performInitialSync(entityTypes)
+  }
+
+  /**
+   * Check if currently rebuilding
+   */
+  isCurrentlyRebuilding(): boolean {
+    return this.isRebuilding
   }
 
   /**
@@ -117,18 +179,31 @@ export class DexieSyncLayer {
 
   /**
    * Perform differential sync only (schema unchanged)
+   * Throttled to avoid saturating browser event loop/network
    */
   private async performDifferentialSyncOnly(entityTypes: string[]): Promise<void> {
-    fileLog.info(`🔄 Differential sync only (schema unchanged): ${entityTypes.length} entities`)
+    const startTime = performance.now();
+    fileLog.info(`[WARM-START-PERF] 🔄 Differential sync starting: ${entityTypes.length} entities (throttled batches of 5)`)
 
-    // Sync all entities in parallel, fetching only changes
-    const results = await Promise.allSettled(
-      entityTypes.map(type => this.syncEntityFromServer(type))
-    )
+    // ✅ Throttle to 5 concurrent syncs to avoid blocking UI
+    const BATCH_SIZE = 5;
+    const results: PromiseSettledResult<void>[] = [];
+
+    for (let i = 0; i < entityTypes.length; i += BATCH_SIZE) {
+      const batch = entityTypes.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(type => this.syncEntityFromServer(type))
+      );
+      results.push(...batchResults);
+
+      // Yield to browser between batches to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length
+    const duration = performance.now() - startTime;
 
-    fileLog.info(`✅ Differential sync complete: ${succeeded}/${entityTypes.length} succeeded`)
+    fileLog.info(`[WARM-START-PERF] ✅ Differential sync complete: ${succeeded}/${entityTypes.length} succeeded in ${duration.toFixed(0)}ms`)
   }
 
   /**
@@ -153,6 +228,15 @@ export class DexieSyncLayer {
       // Get sync metadata for differential sync
       const meta = await dexie.getSyncMetadata(entityType)
       const lastSync = meta?.lastSync || 0
+
+      // DEBUG: Log sync metadata state
+      fileLog.info(`📊 [SYNC-META] ${entityType}:`, {
+        hasMeta: !!meta,
+        lastSync,
+        lastSyncDate: lastSync > 0 ? new Date(lastSync).toISOString() : 'never',
+        recordCount: meta?.recordCount,
+        version: meta?.version
+      })
 
       // Parse entity type to get org and table name
       const { orgId, tableName } = this.parseEntityType(entityType)

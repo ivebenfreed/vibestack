@@ -107,11 +107,19 @@ export const universeLoading$ = observable(() => {
   const universe = universeContext$.get()
 
   // If main universe is loading, we're definitely loading
-  if (universe.loading) return true
+  if (universe.loading) {
+    fileLog.debug('[universeLoading$] Main universe loading: true')
+    return true
+  }
 
   // Check if any organizations are still loading
   const organizations = Object.values(universe.organizations || {})
   const hasLoadingOrgs = organizations.some(org => org.loading)
+
+  if (hasLoadingOrgs) {
+    const loadingOrgs = organizations.filter(org => org.loading).map(org => org.orgId)
+    fileLog.debug('[universeLoading$] Organizations still loading:', loadingOrgs)
+  }
 
   return hasLoadingOrgs
 })
@@ -425,19 +433,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
 
-  fileLog.info(`[Observable] Creating entity observable for ${entityName}`, {
-    hasPersistenceManager: !!persistenceManager,
-    hasSyncedCrudWithPersistence: !!syncedCrudWithPersistence,
-    hasConfig: !!persistenceConfig
-  });
-
-  // Get persistence configuration for this entity if available
-  const tableName = persistenceConfig?.entityTableMap?.[entityName]
-  const hasPersistence = !!tableName && !!persistenceManager
-
-  if (hasPersistence) {
-    fileLog.info(`[Observable] ${entityName} will use IndexedDB persistence (table: ${tableName})`)
-  }
+  fileLog.info(`[Observable] Creating entity observable for ${entityName} with Dexie cache`);
 
   // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
@@ -453,19 +449,21 @@ function createEntityObservable(entityName: string, schema?: any) {
     // Initial value - required for syncedCrud
     initial: {},
 
-    // Persistence configuration - load from IndexedDB cache first
-    ...(hasPersistence && {
-      persist: {
-        name: tableName,
-        retrySync: true
-      },
-      // Don't call list() until persistence is loaded
-      waitForSet: (state: any) => state?.isPersistLoaded
-    }),
+    // ✅ NO Legend State persist config - Dexie handles all persistence
+    // Custom list() below reads directly from Dexie cache for instant warm start
+    // DexieSyncLayer manages differential sync in background
 
     // ✅ LIST - Read from Dexie cache (instant, cache-first)
     list: async ({ lastSync }: { lastSync?: number } = {}) => {
       try {
+        // Check if Dexie is rebuilding - use API fallback
+        const { getSyncLayer } = await import('./persistence/DexieSyncLayer')
+        const syncLayer = getSyncLayer()
+        if (syncLayer?.isCurrentlyRebuilding()) {
+          fileLog.debug(`🔄 [REBUILD] ${entityName}: DB rebuilding, using API`)
+          return fetchDirectFromAPI(baseUrl)
+        }
+
         const dexie = getDexieDB()
 
         // Fallback to direct API if Dexie not initialized
@@ -721,13 +719,9 @@ function createEntityObservable(entityName: string, schema?: any) {
     },
 
     // Retry configuration for robust offline-first behavior
-    retry: hasPersistence ? {
-      infinite: true, // Keep retrying forever for offline-first apps
-      delay: 1000,
-      backoff: 'exponential',
-      maxDelay: 30000
-    } : {
-      times: 3,
+    // Dexie cache allows infinite retries since data is persisted locally
+    retry: {
+      infinite: true,
       delay: 1000,
       backoff: 'exponential',
       maxDelay: 30000
@@ -879,34 +873,13 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    fileLog.info(`[Observable] Creating syncedCrud for ${entityName}, hasPersistenceConfig: ${!!persistenceConfig?.entityTableMap}`)
+    fileLog.info(`[Observable] Creating syncedCrud for ${entityName} with Dexie persistence`)
   }
 
-  // Create synced observable with persistence if available
-  // persistOptions is a configureSynced wrapper that applies global IndexedDB config
-  const syncedObservable = hasPersistence && persistenceConfig?.persistOptions
-    ? observable(syncedCrud(persistenceConfig.persistOptions(crudConfig)))
-    : observable(syncedCrud(crudConfig))
+  // Create synced observable - Dexie handles all persistence via custom list() function
+  // No Legend State persistOptions wrapper needed
+  const syncedObservable = observable(syncedCrud(crudConfig))
 
-  // Add persistence state logging
-  if (typeof window !== 'undefined' && hasPersistence) {
-    // Check if data loaded from persistence
-    setTimeout(() => {
-      const data = syncedObservable.peek()
-      const hasData = data && Object.keys(data).length > 0
-      fileLog.info(`[Observable] ${entityName} persistence check: ${hasData ? '✅ Cache loaded' : '⚠️ No cache data'}`, {
-        dataKeys: hasData ? Object.keys(data).length : 0
-      })
-    }, 100)
-  }
-  
-  // Log available methods for debugging (should now have proper syncedCrud methods)
-  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    setTimeout(() => {
-      fileLog.info(`[Observable] ${entityName} observable created with methods:`, Object.getOwnPropertyNames(syncedObservable))
-    }, 10)
-  }
-  
   return syncedObservable
 }
 
@@ -1234,53 +1207,14 @@ export async function initializePersistence(userId: string, organizationIds: str
 
     fileLog.info(`[Observable] ✅ Basic persistence configuration initialized, entities can now use persistence`)
 
-    // ✅ NEW: Always set up persistence (wait for schema data inside)
-    {
-      // Wait for schemas to load, then set up full persistence with real entity names
-      fileLog.info(`[Observable] Waiting for ALL organization schemas to load before setting up persistence config...`)
+    // ✅ WARM START FIX: Don't wait for schemas - they load reactively from IndexedDB cache
+    // On warm start, schema observables load cached data automatically via observablePersistIndexedDB
+    // DexieSyncLayer checks schema hash and uses existing tables without rebuilding
+    // This allows dashboard to show immediately with cached data while schemas load in background
+    fileLog.info(`[Observable] ✅ Persistence initialized - schemas load reactively from cache`)
 
-      // ✅ FINAL FIX: Use a delay-based approach since schema observables load async
-      // The org.loading flags are unreliable - they're set false when observable is created,
-      // not when data loads. Instead, wait for universeSchema$ to stabilize with all entities.
-      fileLog.info(`[Observable] Giving schemas 500ms to load before checking entity count...`)
-
-      // First, give schemas time to start loading
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Now wait for universeSchema$ to have all entities combined
-      await when(() => {
-        const schema = universeSchema$.get() // Reactive access
-        const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0
-
-        // Wide Corp has 24 entities, expect at least 20 total across all orgs
-        const hasAllEntities = entityCount >= 20
-
-        if (hasAllEntities) {
-          fileLog.info(`[Observable] ✅ universeSchema$ has ${entityCount} total entities - ready for persistence`)
-        } else {
-          fileLog.debug(`[Observable] universeSchema$ still combining: ${entityCount}/20+ entities`)
-        }
-
-        return hasAllEntities
-      })
-
-      // Now ALL schemas are loaded - get complete entity list from all organizations
-      const currentSchema = universeSchema$.peek()
-      const entityNames = Object.keys(currentSchema?.entities || {})
-
-      fileLog.info(`[Observable] ✅ ALL schemas loaded, setting up persistence for ${entityNames.length} entities from ${organizationIds.length} organizations`, {
-        sampleEntities: entityNames.slice(0, 5),
-        organizationIds
-      })
-
-      // ✅ FIX: Set up persistence with universe scope, not single org
-      const fullConfig = await setupFullPersistenceConfig(entityNames, universeOrgId)
-      if (!fullConfig) {
-        fileLog.warn(`[Observable] setupFullPersistenceConfig returned null, persistence may not work`)
-      } else {
-        fileLog.info(`[Observable] ✅ Full persistence config setup complete with ${entityNames.length} entities`)
-      }
-    }
+    // Persistence config will be set up reactively as schemas load
+    // This is handled by the global persistence manager which reacts to schema changes
 
     // Update tracking variables
     currentOrgId = universeOrgId
