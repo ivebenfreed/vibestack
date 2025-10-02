@@ -42,25 +42,22 @@ export class DexieSyncLayer {
       // ✅ Mark as ready immediately (tables already exist)
       this.isInitialSyncComplete = true
 
-      // ✅ Defer differential sync until after UI renders (requestIdleCallback)
-      fileLog.info(`[WARM-START-PERF] 🔄 Deferring background differential sync for ${Object.keys(entitySchemas).length} entities...`)
-
+      // Defer differential sync until browser is idle to avoid blocking UI
       if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
         requestIdleCallback(() => {
           this.performDifferentialSyncOnly(Object.keys(entitySchemas)).catch(error => {
-            fileLog.error('[WARM-START-PERF] ❌ Background differential sync failed:', error)
+            fileLog.error('❌ Background differential sync failed:', error)
           })
         })
       } else {
-        // Fallback: defer with setTimeout
         setTimeout(() => {
           this.performDifferentialSyncOnly(Object.keys(entitySchemas)).catch(error => {
-            fileLog.error('[WARM-START-PERF] ❌ Background differential sync failed:', error)
+            fileLog.error('❌ Background differential sync failed:', error)
           })
         }, 100)
       }
 
-      fileLog.info(`[WARM-START-PERF] ✅ Using existing cache, differential sync deferred until idle`)
+      fileLog.info('✅ Using existing cache, sync deferred')
 
       return
     }
@@ -182,10 +179,9 @@ export class DexieSyncLayer {
    * Throttled to avoid saturating browser event loop/network
    */
   private async performDifferentialSyncOnly(entityTypes: string[]): Promise<void> {
-    const startTime = performance.now();
-    fileLog.info(`[WARM-START-PERF] 🔄 Differential sync starting: ${entityTypes.length} entities (throttled batches of 5)`)
+    fileLog.debug(`🔄 Differential sync: ${entityTypes.length} entities`)
 
-    // ✅ Throttle to 5 concurrent syncs to avoid blocking UI
+    // Throttle to 5 concurrent syncs to avoid blocking UI
     const BATCH_SIZE = 5;
     const results: PromiseSettledResult<void>[] = [];
 
@@ -201,9 +197,7 @@ export class DexieSyncLayer {
     }
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length
-    const duration = performance.now() - startTime;
-
-    fileLog.info(`[WARM-START-PERF] ✅ Differential sync complete: ${succeeded}/${entityTypes.length} succeeded in ${duration.toFixed(0)}ms`)
+    fileLog.info(`✅ Differential sync complete: ${succeeded}/${entityTypes.length}`)
   }
 
   /**
@@ -229,15 +223,6 @@ export class DexieSyncLayer {
       const meta = await dexie.getSyncMetadata(entityType)
       const lastSync = meta?.lastSync || 0
 
-      // DEBUG: Log sync metadata state
-      fileLog.info(`📊 [SYNC-META] ${entityType}:`, {
-        hasMeta: !!meta,
-        lastSync,
-        lastSyncDate: lastSync > 0 ? new Date(lastSync).toISOString() : 'never',
-        recordCount: meta?.recordCount,
-        version: meta?.version
-      })
-
       // Parse entity type to get org and table name
       const { orgId, tableName } = this.parseEntityType(entityType)
 
@@ -252,8 +237,6 @@ export class DexieSyncLayer {
 
       const syncType = lastSync > 0 ? 'differential' : 'full'
 
-      fileLog.info(`🔄 [DEXIE-SYNC] ${entityType}: ${syncType} sync from ${new Date(lastSync).toISOString()}`)
-
       // Fetch from server
       const response = await fetch(diffUrl, {
         credentials: 'include',
@@ -261,15 +244,16 @@ export class DexieSyncLayer {
       })
 
       if (!response.ok) {
-        // Don't throw - just log and continue
-        fileLog.warn(`⚠️  [DEXIE-SYNC] ${entityType}: API error ${response.status}`)
+        fileLog.warn(`⚠️ ${entityType}: API error ${response.status}`)
         return
       }
 
       const result = await response.json()
       const serverData = result.data || []
 
-      fileLog.info(`✅ [DEXIE-SYNC] ${entityType}: Received ${serverData.length} ${syncType === 'differential' ? 'changes' : 'records'}`)
+      if (serverData.length > 0) {
+        fileLog.debug(`✅ ${entityType}: ${serverData.length} ${syncType} changes`)
+      }
 
       // Update Dexie cache
       await dexie.updateFromServer(tableName, serverData)
@@ -280,8 +264,6 @@ export class DexieSyncLayer {
         recordCount: serverData.length,
         version: (meta?.version || 0) + 1
       })
-
-      fileLog.info(`💾 [DEXIE-SYNC] ${entityType}: Sync complete`)
 
     } catch (error) {
       fileLog.error(`❌ [DEXIE-SYNC] ${entityType}: Sync failed`, error)

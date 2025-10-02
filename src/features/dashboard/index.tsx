@@ -1,5 +1,3 @@
-console.log('[WARM-START-PERF] ⏱️ @/features/dashboard/index.tsx module loading at:', performance.now().toFixed(2) + 'ms');
-
 // Temporarily use the Legend Central implementation
 export { default } from './DashboardLegend'
 

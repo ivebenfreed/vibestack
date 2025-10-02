@@ -328,8 +328,7 @@ const appInitMethods = {
   },
 
   async executePersistenceSetup(): Promise<boolean> {
-    initLog.info('[WARM-START-PERF] 💾 executePersistenceSetup starting...')
-    const stageStartTime = performance.now();
+    initLog.debug('💾 Setting up Dexie entity cache');
 
     try {
       const user = unifiedAuth$.user.get();
@@ -339,82 +338,45 @@ const appInitMethods = {
         throw new Error('User not available for cache setup');
       }
 
-      // ✅ WARM START FIX: Load schema from localStorage (instant, synchronous)
-      initLog.info(`[WARM-START-PERF] 💾 Loading schema from localStorage...`);
-      const loadStartTime = performance.now();
+      // Load schema from localStorage for instant warm start
       const { loadSchemaFromLocalStorage, storeSchemaInLocalStorage } = await import('./persistence/DexieEntityDB');
       const cachedSchemas = loadSchemaFromLocalStorage(user.id);
-      const loadDuration = performance.now() - loadStartTime;
 
       if (cachedSchemas && Object.keys(cachedSchemas).length > 0) {
-        initLog.info(`[WARM-START-PERF] 💾 ✅ Warm start: Loaded ${Object.keys(cachedSchemas).length} entities from localStorage in ${loadDuration.toFixed(0)}ms`);
+        initLog.info(`💾 Warm start: ${Object.keys(cachedSchemas).length} entities from cache`);
 
-        // Open Dexie with cached schema (instant - no async wait)
-        const openStartTime = performance.now();
+        // Open Dexie with cached schema
         const dexie = initializeDexieDB(user.id, cachedSchemas);
         await dexie.open();
-        const openDuration = performance.now() - openStartTime;
-        initLog.info(`[WARM-START-PERF] 💾 Dexie opened in ${openDuration.toFixed(0)}ms`);
-
-        initLog.info('✅ Dexie database opened (warm start):', {
-          dbName: dexie.name,
-          tables: dexie.tables.map(t => t.name),
-          tableCount: dexie.tables.length
-        });
 
         // Initialize sync layer - will check schema hash
         const syncLayer = initializeSyncLayer();
         const entityTypes = Object.keys(cachedSchemas);
 
-        // This returns immediately if hash matches, or triggers background rebuild if changed
-        const syncStartTime = performance.now();
-        initLog.info(`[WARM-START-PERF] ⏱️ Starting initializeWithSchemaCheck...`);
+        // Returns immediately if hash matches, or triggers background rebuild if changed
         await syncLayer.initializeWithSchemaCheck(user.id, cachedSchemas);
-        const syncDuration = performance.now() - syncStartTime;
-        initLog.info(`[WARM-START-PERF] ⏱️ initializeWithSchemaCheck completed in ${syncDuration.toFixed(0)}ms`);
 
         // Setup queries for entities
-        const queryStartTime = performance.now();
-        initLog.info(`[WARM-START-PERF] ⏱️ Starting setupLiveQueries...`);
         syncLayer.setupLiveQueries(entityTypes);
         syncLayer.initializeSyncListeners(entityTypes);
-        const queryDuration = performance.now() - queryStartTime;
-        initLog.info(`[WARM-START-PERF] ⏱️ setupLiveQueries + listeners completed in ${queryDuration.toFixed(0)}ms`);
 
       } else {
-        initLog.info(`💾 Cold start: Waiting for schemas to create Dexie DB...`);
+        initLog.info('💾 Cold start: Loading schemas...');
 
-        // Cold start - need to wait for schemas to create tables
+        // Cold start - wait for schemas to create tables
         await when(() => {
           const schema = universeSchema$.get();
           const entityCount = schema?.entities ? Object.keys(schema.entities).length : 0;
-          const hasAllEntities = entityCount >= 20;
-
-          if (hasAllEntities) {
-            initLog.info(`💾 ✅ Schemas ready: ${entityCount} entities`);
-          } else {
-            initLog.debug(`💾 Waiting: ${entityCount}/20+ entities`);
-          }
-
-          return hasAllEntities;
+          return entityCount >= 20;
         });
 
         const schemas = universeSchema$.peek();
-
-        // Initialize Dexie database with entity schemas
-        initLog.info(`💾 Creating Dexie database with ${Object.keys(schemas.entities).length} tables`);
 
         // Store schema in localStorage for future instant warm starts
         storeSchemaInLocalStorage(user.id, schemas.entities);
 
         const dexie = initializeDexieDB(user.id, schemas.entities);
         await dexie.open();
-
-        initLog.info('✅ Dexie database created (cold start):', {
-          dbName: dexie.name,
-          tables: dexie.tables.map(t => t.name),
-          tableCount: dexie.tables.length
-        });
 
         // Initialize sync layer
         const syncLayer = initializeSyncLayer();
@@ -426,10 +388,7 @@ const appInitMethods = {
         syncLayer.initializeSyncListeners(entityTypes);
       }
 
-      const stageDuration = performance.now() - stageStartTime;
-      initLog.info(`[WARM-START-PERF] ✅ executePersistenceSetup completed in ${stageDuration.toFixed(0)}ms`);
-      initLog.info('✅ Dexie cache ready (background sync active)');
-      initLog.info('✅ Dexie fully initialized, entities can read from cache');
+      initLog.info('✅ Dexie cache ready');
 
       // Auto-advance to entities
       if (this.canLoadEntities) {
@@ -453,20 +412,15 @@ const appInitMethods = {
   },
 
   async executeInitialEntitiesLoad(): Promise<boolean> {
-    initLog.info('[WARM-START-PERF] 📊 executeInitialEntitiesLoad starting...');
-    const stageStartTime = performance.now();
+    initLog.debug('📊 Verifying entity system ready');
 
     // Entity data loads reactively via observables
-    // We just need to verify the system is ready
+    // Just verify universe is not loading
 
     const universeLoading = universeContext$.loading.get();
-    initLog.info(`[WARM-START-PERF] 📊 Universe loading state: ${universeLoading}`);
-
     if (universeLoading) {
-      initLog.info('[WARM-START-PERF] 📊 Waiting for universeContext$.loading to become false...');
       await new Promise<void>((resolve) => {
-        const unsubscribe = universeContext$.loading.onChange((value) => {
-          initLog.info(`[WARM-START-PERF] 📊 universeContext$.loading changed to: ${value.value}`);
+        const unsubscribe = universeContext$.loading.onChange(() => {
           if (!universeContext$.loading.get()) {
             unsubscribe();
             resolve();
@@ -475,8 +429,7 @@ const appInitMethods = {
       });
     }
 
-    const stageDuration = performance.now() - stageStartTime;
-    initLog.info(`[WARM-START-PERF] ✅ executeInitialEntitiesLoad completed in ${stageDuration.toFixed(0)}ms`);
+    initLog.debug('✅ Entity system ready');
 
     // Auto-advance to sync
     if (this.canLoadSync) {

@@ -5,8 +5,6 @@
  * No store abstraction - just pure Legend State patterns.
  */
 
-console.log('[WARM-START-PERF] ⏱️ @/legend-state/index.ts module loading at:', performance.now().toFixed(2) + 'ms');
-
 // Main observable exports - direct Legend State patterns
 export {
   // getOrgContext$ removed - use universe-based helpers instead

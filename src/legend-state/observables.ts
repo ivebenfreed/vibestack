@@ -107,19 +107,11 @@ export const universeLoading$ = observable(() => {
   const universe = universeContext$.get()
 
   // If main universe is loading, we're definitely loading
-  if (universe.loading) {
-    fileLog.debug('[universeLoading$] Main universe loading: true')
-    return true
-  }
+  if (universe.loading) return true
 
   // Check if any organizations are still loading
   const organizations = Object.values(universe.organizations || {})
   const hasLoadingOrgs = organizations.some(org => org.loading)
-
-  if (hasLoadingOrgs) {
-    const loadingOrgs = organizations.filter(org => org.loading).map(org => org.orgId)
-    fileLog.debug('[universeLoading$] Organizations still loading:', loadingOrgs)
-  }
 
   return hasLoadingOrgs
 })
