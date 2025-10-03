@@ -465,9 +465,10 @@ function createEntityObservable(entityName: string, schema?: any) {
         }
 
         // ✅ Read from Dexie cache (differential if lastSync provided)
+        // FIXED: Pass full entityName (with org prefix) to match Dexie table names
         const records = lastSync
-          ? await dexie.getChangedSince(actualEntityName, lastSync)
-          : await dexie.getAllRecords(actualEntityName)
+          ? await dexie.getChangedSince(entityName, lastSync)
+          : await dexie.getAllRecords(entityName)
 
         const syncType = lastSync ? 'differential' : 'full'
         fileLog.debug(`📦 [DEXIE-READ] ${entityName}: ${records.length} records (${syncType})`)

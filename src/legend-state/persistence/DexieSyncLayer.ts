@@ -223,13 +223,16 @@ export class DexieSyncLayer {
       const meta = await dexie.getSyncMetadata(entityType)
       const lastSync = meta?.lastSync || 0
 
-      // Parse entity type to get org and table name
+      // Parse entity type to get org and base entity name
       const { orgId, tableName } = this.parseEntityType(entityType)
 
       // ✅ Special handling for User entity (uses /members endpoint)
       const baseUrl = tableName === 'User'
         ? `/api/dataforge/orgs/${orgId}/members`
         : `/api/dataforge/orgs/${orgId}/data/${tableName}`
+
+      // FIXED: Use full entityType (with org prefix) as Dexie table name
+      const dexieTableName = entityType
 
       const diffUrl = lastSync > 0
         ? `${baseUrl}?updated_at[gte]=${lastSync}`
@@ -255,8 +258,8 @@ export class DexieSyncLayer {
         fileLog.debug(`📦 [DEXIE-READ] ${entityType}: ${serverData.length} records (${syncType})`)
       }
 
-      // Update Dexie cache
-      await dexie.updateFromServer(tableName, serverData)
+      // Update Dexie cache (use full entity name with org prefix)
+      await dexie.updateFromServer(dexieTableName, serverData)
 
       // Update sync metadata
       await dexie.updateSyncMetadata(entityType, {
@@ -287,13 +290,14 @@ export class DexieSyncLayer {
     }
 
     entityTypes.forEach(entityType => {
-      const { tableName } = this.parseEntityType(entityType)
+      // FIXED: Use full entityType (with org prefix) as Dexie table name
+      const dexieTableName = entityType
 
       try {
-        const table = dexie.table(tableName)
+        const table = dexie.table(dexieTableName)
 
         if (!table) {
-          fileLog.warn(`Cannot setup liveQuery for ${entityType}: table ${tableName} not found`)
+          fileLog.warn(`Cannot setup liveQuery for ${entityType}: table ${dexieTableName} not found`)
           return
         }
 

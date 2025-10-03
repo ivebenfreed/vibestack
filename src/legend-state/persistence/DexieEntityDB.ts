@@ -62,8 +62,9 @@ export class DexieEntityDB extends Dexie {
     const dexieSchema: Record<string, string> = {}
 
     Object.entries(entitySchemas).forEach(([entityName, schema]) => {
-      // Extract table name: "01920000-1000_BuildProject" → "BuildProject"
-      const tableName = entityName.split('_').pop() || entityName
+      // FIXED: Use full prefixed entity name to avoid cross-org contamination
+      // "01920000-1000_BuildProject" → "01920000-1000_BuildProject" (NOT just "BuildProject")
+      const tableName = entityName
 
       // Build Dexie index string from entity fields
       const indexes: string[] = ['&id']  // Primary key (unique)
