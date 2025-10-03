@@ -226,19 +226,42 @@ export const getAuthState = () => {
   }
 }
 
-// Log authentication state changes
-unifiedAuth$.isAuthenticated.onChange((isAuthenticated) => {
+// Log authentication state changes (only when value actually changes)
+let lastAuthState: { isAuthenticated: boolean; userEmail?: string } | null = null
+unifiedAuth$.isAuthenticated.onChange((value) => {
+  // Extract actual boolean value (onChange may pass observable wrapper)
+  const isAuthenticated = typeof value === 'object' && 'value' in value ? value.value : value
   const user = unifiedAuth$.user.get()
-  unifiedAuthLog.info('[UnifiedAuth] Authentication state changed:', {
-    isAuthenticated,
-    userEmail: user?.email,
-    source: user ? 'determined from available auth systems' : 'no user data'
-  })
+  const currentState = {
+    isAuthenticated: !!isAuthenticated,
+    userEmail: user?.email
+  }
+
+  // Only log if state actually changed
+  if (!lastAuthState ||
+      lastAuthState.isAuthenticated !== currentState.isAuthenticated ||
+      lastAuthState.userEmail !== currentState.userEmail) {
+    unifiedAuthLog.info('[UnifiedAuth] Authentication state changed:', {
+      isAuthenticated: currentState.isAuthenticated,
+      userEmail: user?.email,
+      source: user ? 'determined from available auth systems' : 'no user data'
+    })
+    lastAuthState = currentState
+  }
 })
 
-// Log system readiness changes
-unifiedAuth$.isSystemReady.onChange((isReady) => {
-  unifiedAuthLog.info('[UnifiedAuth] System readiness changed:', { isReady })
+// Log system readiness changes (only when value actually changes)
+let lastSystemReady: boolean | null = null
+unifiedAuth$.isSystemReady.onChange((value) => {
+  // Extract actual boolean value (onChange may pass observable wrapper)
+  const isReady = typeof value === 'object' && 'value' in value ? value.value : value
+  const readyBool = !!isReady
+
+  // Only log if state actually changed
+  if (lastSystemReady !== readyBool) {
+    unifiedAuthLog.info('[UnifiedAuth] System readiness changed:', { isReady: readyBool })
+    lastSystemReady = readyBool
+  }
 })
 
 unifiedAuthLog.info('[UnifiedAuth] Unified authentication observable initialized')
