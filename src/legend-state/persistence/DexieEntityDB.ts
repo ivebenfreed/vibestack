@@ -178,7 +178,7 @@ export class DexieEntityDB extends Dexie {
       // bulkPut = upsert (add or update based on primary key)
       await table.bulkPut(records)
 
-      fileLog.info(`💾 [DEXIE] ${entityType}: Cached ${records.length} records`)
+      fileLog.debug(`💾 [DEXIE] ${entityType}: Cached ${records.length} records`)
 
     } catch (error) {
       fileLog.error(`❌ [DEXIE] ${entityType}: Error updating cache`, {
@@ -259,7 +259,7 @@ export class DexieEntityDB extends Dexie {
         }
       }
 
-      fileLog.info(`📊 Cache stats:`, stats)
+      fileLog.debug(`📊 Cache stats:`, stats)
       return stats
     } catch (error) {
       fileLog.error(`❌ Error getting cache stats`, error)

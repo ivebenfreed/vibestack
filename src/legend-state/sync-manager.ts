@@ -111,9 +111,9 @@ function getPersistentClientId(): string {
   if (!persistentClientId) {
     persistentClientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
     localStorage.setItem('elevra_websocket_client_id', persistentClientId)
-    fileLog.info('🆔 Generated new persistent client ID:', persistentClientId)
+    fileLog.debug('🆔 Generated new persistent client ID:', persistentClientId)
   } else {
-    fileLog.info('🆔 Using existing persistent client ID:', persistentClientId)
+    fileLog.debug('🆔 Using existing persistent client ID:', persistentClientId)
   }
   return persistentClientId
 }
@@ -125,7 +125,7 @@ async function createWebSocketConnection(serverUrl: string, clientId: string, us
   return new Promise<WebSocket>((resolve, reject) => {
     try {
       const wsUrl = `${serverUrl}?clientId=${clientId}&userId=${userId}&lsn=0/0`
-      fileLog.info('🔌 [WEBSOCKET-CONNECT] Attempting user-scoped connection:', {
+      fileLog.debug('🔌 [WEBSOCKET-CONNECT] Attempting user-scoped connection:', {
         serverUrl,
         clientId,
         userId,
@@ -168,16 +168,16 @@ async function createWebSocketConnection(serverUrl: string, clientId: string, us
 function setupWebSocketHandlers(ws: WebSocket) {
   ws.onmessage = (event) => {
     // RAW MESSAGE LOGGING - see everything that comes through
-    fileLog.info('🔴 [WEBSOCKET-RAW] Message received:', {
+    fileLog.debug('🔴 [WEBSOCKET-RAW] Message received:', {
       data: event.data,
       timestamp: new Date().toISOString()
     })
     try {
       const message = JSON.parse(event.data)
-      
+
       // Log non-heartbeat messages for debugging
       if (message.type !== 'srv_heartbeat') {
-        fileLog.info('📨 [SYNC-NOTIFY] WebSocket message received:', {
+        fileLog.debug('📨 [SYNC-NOTIFY] WebSocket message received:', {
           type: message.type,
           messageId: message.messageId,
           tables: message.tables,
@@ -258,9 +258,9 @@ function startHeartbeat() {
       }
     }
   }, syncConfig.heartbeatInterval)
-  
+
   syncState$.heartbeatInterval.set(heartbeatTimer)
-  fileLog.info(`💓 Started heartbeat timer (${syncConfig.heartbeatInterval}ms)`)
+  fileLog.debug(`💓 Started heartbeat timer (${syncConfig.heartbeatInterval}ms)`)
 }
 
 /**

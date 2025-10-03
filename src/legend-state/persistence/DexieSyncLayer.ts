@@ -252,7 +252,7 @@ export class DexieSyncLayer {
       const serverData = result.data || []
 
       if (serverData.length > 0) {
-        fileLog.debug(`✅ ${entityType}: ${serverData.length} ${syncType} changes`)
+        fileLog.debug(`📦 [DEXIE-READ] ${entityType}: ${serverData.length} records (${syncType})`)
       }
 
       // Update Dexie cache

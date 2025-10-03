@@ -33,7 +33,7 @@ export function useLegendAuth() {
   const loadingOrganizationsValue = loadingOrganizations?.get ? loadingOrganizations.get() : loadingOrganizations;
   const errorValue = error?.get ? error.get() : error;
 
-  myLog.info('[useLegendAuth] Hook called with state:', {
+  myLog.debug('[useLegendAuth] Hook called with state:', {
     hasUser: !!userValue,
     userEmail: userValue?.email,
     organizationName: organizationValue?.name,

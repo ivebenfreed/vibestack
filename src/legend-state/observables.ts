@@ -341,7 +341,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   const hasPersistenceConfig = !!persistenceConfig?.entityTableMap
   
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    fileLog.info(`[Observable] Creating ${entityName} observable - persistence: ${hasPersistenceConfig ? 'available' : 'not available'}`)
+    fileLog.debug(`[Observable] Creating ${entityName} observable - persistence: ${hasPersistenceConfig ? 'available' : 'not available'}`)
   }
   
   // SCHEMA-DRIVEN ORG PARAMETERS: Extract org ID and entity name from org-prefixed entity name
@@ -353,7 +353,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   // **NEW: Handle virtual entities with different API patterns**
   if (isVirtual) {
-    fileLog.info(`[Observable] Creating virtual entity observable: ${entityName}`, {
+    fileLog.debug(`[Observable] Creating virtual entity observable: ${entityName}`, {
       isVirtual,
       backendTables: schema._backendTables,
       originalName: schema._originalName
@@ -396,7 +396,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         actualOrgId = parts[0]
         actualEntityName = parts[1]
 
-        fileLog.info(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
+        fileLog.debug(`[Observable] Schema-driven entity creation: org=${actualOrgId}, entity=${actualEntityName} (from ${entityName})`)
 
         // Special case: User entity should load organization members
         if (actualEntityName === 'User') {
@@ -425,7 +425,7 @@ function createEntityObservable(entityName: string, schema?: any) {
   
   const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
 
-  fileLog.info(`[Observable] Creating entity observable for ${entityName} with Dexie cache`);
+  fileLog.debug(`[Observable] Creating entity observable for ${entityName} with Dexie cache`);
 
   // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
@@ -470,7 +470,7 @@ function createEntityObservable(entityName: string, schema?: any) {
           : await dexie.getAllRecords(actualEntityName)
 
         const syncType = lastSync ? 'differential' : 'full'
-        fileLog.info(`📦 [DEXIE-READ] ${entityName}: ${records.length} records (${syncType})`)
+        fileLog.debug(`📦 [DEXIE-READ] ${entityName}: ${records.length} records (${syncType})`)
 
         return records
 
@@ -736,7 +736,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         }
         (window as any).__elevra_entities_refresh_registry[entityName] = refresh
 
-        fileLog.info(`🔄 [REFRESH-REGISTRY] Registered refresh function for ${entityName}`)
+        fileLog.debug(`🔄 [REFRESH-REGISTRY] Registered refresh function for ${entityName}`)
       }
       // Create reactive subscription to sync notifications for this entity
       const notificationHandler = (notification: any) => {
@@ -816,7 +816,7 @@ function createEntityObservable(entityName: string, schema?: any) {
 
       // DEBUG: Log the entity notification subscription
       if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-        fileLog.info(`[Observable] ${entityName} notification subscription setup`, {
+        fileLog.debug(`[Observable] ${entityName} notification subscription setup`, {
           entityName,
           hasNotificationGetter: typeof entityNotification$ === 'function' || typeof entityNotification$.get === 'function'
         })
@@ -825,7 +825,7 @@ function createEntityObservable(entityName: string, schema?: any) {
       // Subscribe to notifications using Legend State's when() for reactive subscription
       const unsubscribe = when(entityNotification$, notificationHandler)
 
-      fileLog.info(`[Observable] ${entityName} subscribed to direct sync notifications`)
+      fileLog.debug(`[Observable] ${entityName} subscribed to direct sync notifications`)
 
       // ✅ ALSO listen for Dexie change events (from liveQuery)
       const dexieChangeHandler = (event: Event) => {
@@ -853,19 +853,19 @@ function createEntityObservable(entityName: string, schema?: any) {
         if (typeof window !== 'undefined') {
           if ((window as any).__elevra_entities_refresh_registry) {
             delete (window as any).__elevra_entities_refresh_registry[entityName]
-            fileLog.info(`🗑️ [REFRESH-REGISTRY] Unregistered refresh function for ${entityName}`)
+            fileLog.debug(`🗑️ [REFRESH-REGISTRY] Unregistered refresh function for ${entityName}`)
           }
           if (window.location?.hostname === 'localhost') {
-            fileLog.info(`[Observable] ${entityName} unsubscribed from sync notifications`)
+            fileLog.debug(`[Observable] ${entityName} unsubscribed from sync notifications`)
           }
         }
       }
     }
   }
-  
-  
+
+
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-    fileLog.info(`[Observable] Creating syncedCrud for ${entityName} with Dexie persistence`)
+    fileLog.debug(`[Observable] Creating syncedCrud for ${entityName} with Dexie persistence`)
   }
 
   // Create synced observable - Dexie handles all persistence via custom list() function
@@ -1011,7 +1011,7 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
 
     const successfulResults = results.filter(r => r.success).length
 
-    fileLog.info(`[Observable] Universe context loaded with ${successfulResults}/${organizationIds.length} organizations. Schema observables will load entity data reactively.`)
+    fileLog.info(`[Observable] Universe context loaded with ${successfulResults}/${organizationIds.length} organizations. Schema data is now available for dashboard rendering.`)
 
     // **NEW: Add virtual entities for options system (async, non-blocking)**
     addVirtualOptionsEntities(organizationIds).catch(error => {
@@ -1040,7 +1040,7 @@ async function doLoadUniverseContext(userId: string, organizationIds: string[], 
  */
 async function addVirtualOptionsEntities(organizationIds: string[]) {
   try {
-    fileLog.info(`[Observable] Adding virtual options entities for ${organizationIds.length} organizations`)
+    fileLog.debug(`[Observable] Adding virtual options entities for ${organizationIds.length} organizations`)
     
     const currentUniverse = universeContext$.peek()
     const existingOrganizations = { ...currentUniverse.organizations }
@@ -1142,8 +1142,8 @@ async function addVirtualOptionsEntities(organizationIds: string[]) {
         totalVirtualEntities += 2 + businessEntityCount // SystemOption + CustomOption + entity references
       }
     })
-    
-    fileLog.info(`[Observable] Added ${totalVirtualEntities} total virtual entities to universe schema`)
+
+    fileLog.debug(`[Observable] Added ${totalVirtualEntities} total virtual entities to universe schema`)
     
   } catch (error) {
     fileLog.error('[Observable] Failed to add virtual options entities:', error)
@@ -1374,18 +1374,18 @@ export function getEntity$(entityName: string) {
     
     // Check if we already have the observable cached
     if (globalEntityCache[cacheKey]) {
-      fileLog.info(`[Observable] Retrieved cached ${entityName} observable`)
+      fileLog.debug(`[Observable] Retrieved cached ${entityName} observable`)
       return globalEntityCache[cacheKey]
     }
-    
+
     // Create the observable directly if not cached
     try {
-      fileLog.info(`[Observable] Creating new observable for ${entityName}`)
+      fileLog.debug(`[Observable] Creating new observable for ${entityName}`)
       const observable = createEntityObservable(entityName, entitySchema)
       globalEntityCache[cacheKey] = observable
-      
+
       // DEBUG: Check what we created
-      fileLog.info(`[Observable] Created ${entityName} observable`, {
+      fileLog.debug(`[Observable] Created ${entityName} observable`, {
         type: typeof observable,
         isFunction: typeof observable === 'function',
         hasGet: typeof observable?.get === 'function',
@@ -1446,17 +1446,17 @@ export function getUniverseEntity$(entityIdentifier: string) {
       
       // Check cache first
       if (globalEntityCache[cacheKey]) {
-        fileLog.info(`[UniverseObservable] Retrieved cached org-prefixed ${entityIdentifier} observable`)
+        fileLog.debug(`[UniverseObservable] Retrieved cached org-prefixed ${entityIdentifier} observable`)
         return globalEntityCache[cacheKey]
       }
-      
+
       // Create observable for this specific organization's entity
       try {
-        fileLog.info(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
+        fileLog.debug(`[UniverseObservable] Creating new observable for org-prefixed ${entityIdentifier}`)
         const observable = createEntityObservable(entityIdentifier, currentOrgContext.schema.entities[schemaKey])
         globalEntityCache[cacheKey] = observable
-        
-        fileLog.info(`[UniverseObservable] Created ${entityIdentifier} observable`, {
+
+        fileLog.debug(`[UniverseObservable] Created ${entityIdentifier} observable`, {
           orgId,
           entityName,
           type: typeof observable,

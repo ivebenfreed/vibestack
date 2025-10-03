@@ -254,8 +254,8 @@ export function createSchemaObservable(orgId: string) {
     // LIST - Load organization schema from server
     list: async () => {
       try {
-        fileLog.info(`🔄 [SCHEMA-LOAD] Loading schema for org: ${orgId}`)
-        
+        fileLog.debug(`🔄 [SCHEMA-LOAD] Loading schema for org: ${orgId}`)
+
         const response = await fetch(`/api/dataforge/orgs/${orgId}/schema`, {
           method: 'GET',
           credentials: 'include',

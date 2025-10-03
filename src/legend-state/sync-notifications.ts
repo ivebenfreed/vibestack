@@ -63,7 +63,7 @@ export const syncNotifications$ = observable({
       return
     }
 
-    fileLog.info('📨 [SYNC-NOTIFY] Processing table change notification:', {
+    fileLog.debug('📨 [SYNC-NOTIFY] Processing table change notification:', {
       tables: notification.tables,
       messageId: notification.messageId,
       organizationId: notification.organizationId,
@@ -118,7 +118,7 @@ export const syncNotifications$ = observable({
 
       // DEBUG: Log the entity name mapping being created (only once per notification)
       if (typeof window !== 'undefined' && window.location?.hostname === 'localhost' && notification.tables.indexOf(tableName) === 0) {
-        fileLog.info('🗂️ [ENTITY-MAPPING]', {
+        fileLog.debug('🗂️ [ENTITY-MAPPING]', {
           tables: notification.tables,
           orgId,
           sampleMappings: potentialEntityNames.slice(0, 3) // Show fewer to reduce spam
@@ -141,7 +141,7 @@ export const syncNotifications$ = observable({
       lastNotificationTime: notification.timestamp
     })
 
-    fileLog.info('✅ Sync notification processed', {
+    fileLog.debug('✅ Sync notification processed', {
       messageId: notification.messageId,
       affectedEntities: notification.tables,
       totalNotifications: syncNotifications$.stats.totalNotifications.get()
@@ -177,7 +177,7 @@ export const syncNotifications$ = observable({
             const now = Date.now()
 
             if (now - lastRefresh > 100) {
-              fileLog.info(`🔄 [DIRECT-REFRESH] Triggering refresh for ${entityName}`)
+              fileLog.debug(`🔄 [DIRECT-REFRESH] Triggering refresh for ${entityName}`)
               refreshRegistry[entityName]()
               debounceRegistry.set(debounceKey, now)
             } else {
@@ -196,7 +196,7 @@ export const syncNotifications$ = observable({
   getNotificationFor(entityName: string) {
     // DEBUG: Log when notification getter is created
     if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-      fileLog.info('🎯 [NOTIFICATION-GETTER-CREATED]', { entityName })
+      fileLog.debug('🎯 [NOTIFICATION-GETTER-CREATED]', { entityName })
     }
 
     return computed(() => {
@@ -205,7 +205,7 @@ export const syncNotifications$ = observable({
 
       // DEBUG: Only log successful notification lookups to reduce spam
       if (notification && typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-        fileLog.info('✅ [NOTIFICATION-FOUND]', {
+        fileLog.debug('✅ [NOTIFICATION-FOUND]', {
           entityName,
           messageId: notification.messageId,
           tables: notification.tables

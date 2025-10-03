@@ -151,7 +151,7 @@ const appInitMethods = {
     try {
       const previousStage = appInitStage$.stage.get();
 
-      initLog.info(`🔄 Stage transition`, {
+      initLog.debug(`🔄 Stage transition`, {
         from: previousStage,
         to: targetStage,
         elapsed: Date.now() - appInitStage$.context.startTime.get()
@@ -288,7 +288,7 @@ const appInitMethods = {
       const user = unifiedAuth$.user.get();
       const userOrganizations = unifiedAuth$.userOrganizations.get();
 
-      initLog.info('🌌 Universe load debug - user and orgs:', {
+      initLog.debug('🌌 Universe load debug - user and orgs:', {
         hasUser: !!user,
         userEmail: user?.email,
         orgCount: userOrganizations?.length || 0
@@ -299,7 +299,7 @@ const appInitMethods = {
       }
 
       // FIXED: Actually call loadUniverseContext to populate universe context from auth organizations
-      initLog.info('🌌 Loading universe context from auth organizations');
+      initLog.debug('🌌 Loading universe context from auth organizations');
 
       const organizationIds = userOrganizations.map(org => org.id);
       const organizationData = userOrganizations.map(org => ({ id: org.id, name: org.name }));
@@ -314,7 +314,7 @@ const appInitMethods = {
 
       // ✅ Auto-advance to persistence stage after universe context is loaded
       if (this.canSetupPersistence) {
-        initLog.info(`🌌 Advancing to persistence stage...`);
+        initLog.debug(`🌌 Advancing to persistence stage...`);
         await this.advanceToStage('persistence');
       }
 
@@ -343,7 +343,7 @@ const appInitMethods = {
       const cachedSchemas = loadSchemaFromLocalStorage(user.id);
 
       if (cachedSchemas && Object.keys(cachedSchemas).length > 0) {
-        initLog.info(`💾 Warm start: ${Object.keys(cachedSchemas).length} entities from cache`);
+        initLog.debug(`💾 Warm start: ${Object.keys(cachedSchemas).length} entities from cache`);
 
         // Open Dexie with cached schema
         const dexie = initializeDexieDB(user.id, cachedSchemas);
@@ -361,7 +361,7 @@ const appInitMethods = {
         syncLayer.initializeSyncListeners(entityTypes);
 
       } else {
-        initLog.info('💾 Cold start: Loading schemas...');
+        initLog.debug('💾 Cold start: Loading schemas...');
 
         // Cold start - wait for schemas to create tables
         await when(() => {
@@ -454,7 +454,7 @@ const appInitMethods = {
       // Use the first organization for sync connection
       const primaryOrganization = userOrganizations[0];
 
-      initLog.info('🔗 Connecting sync to organization:', {
+      initLog.debug('🔗 Connecting sync to organization:', {
         orgId: primaryOrganization.id,
         orgName: primaryOrganization.name,
         userId: user.id

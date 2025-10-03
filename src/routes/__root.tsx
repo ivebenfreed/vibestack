@@ -143,19 +143,19 @@ function RootComponentInternal() {
 }
 
 function AppWithInitialization() {
-  rootLog.info('[APP-INIT] AppWithInitialization rendering at', Date.now());
+  rootLog.debug('[APP-INIT] AppWithInitialization rendering at', Date.now());
   const navigate = useNavigate()
   const router = useRouter()
 
   // Use unified auth
   const { isAuthenticated, loading: authLoading, isSystemReady: unifiedSystemReady } = useUnifiedAuth()
 
-  rootLog.info('[APP-INIT] Auth state before useAppInitialization:', { isAuthenticated, authLoading, unifiedSystemReady });
+  rootLog.debug('[APP-INIT] Auth state before useAppInitialization:', { isAuthenticated, authLoading, unifiedSystemReady });
 
   // Use app initialization to check if the app is fully loaded
   const appInit = useAppInitialization()
 
-  rootLog.info('[APP-INIT] AppInit state:', { stage: appInit.stage, isReady: appInit.isReady, hasError: appInit.hasError });
+  rootLog.debug('[APP-INIT] AppInit state:', { stage: appInit.stage, isReady: appInit.isReady, hasError: appInit.hasError });
 
   // Start staged app initialization when authenticated (only once)
   React.useEffect(() => {

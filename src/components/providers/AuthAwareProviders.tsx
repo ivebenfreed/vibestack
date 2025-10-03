@@ -12,7 +12,7 @@ const myLog = log('components/providers/AuthAwareProviders.tsx');
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading: isCheckingAuth } = useUnifiedAuth()
 
-  myLog.info('Auth state:', {
+  myLog.debug('Auth state:', {
     isAuthenticated,
     isCheckingAuth
   });
@@ -42,11 +42,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeUniverse = () => {
       try {
-        myLog.info('Setting authentication state for synced observables...');
+        myLog.debug('Setting authentication state for synced observables...');
         // Set authentication state to trigger synced data loading
         // This will automatically trigger the workspace API calls via syncedCrud
         universeHelpers.setAuthenticated(true, 'current-user-id');
-        myLog.info('Authentication state set - synced observables will load data automatically');
+        myLog.debug('Authentication state set - synced observables will load data automatically');
       } catch (error) {
         myLog.error('Failed to set authentication state:', error);
       }
