@@ -164,12 +164,13 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
           <>
             {/* Mobile Sidebar as Sheet */}
             <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-              <SheetContent side="left" className="p-0 w-[300px]">
+              <SheetContent side="left" className="p-0 w-[300px] [&>button]:hidden">
                 <SheetHeader className="sr-only">
                   <SheetTitle>Navigation Menu</SheetTitle>
                 </SheetHeader>
                 <ConditionalPowerSidebar
                   isCollapsed={false}
+                  onToggle={() => setMobileSidebarOpen(false)}
                 />
               </SheetContent>
             </Sheet>
@@ -230,6 +231,7 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
             {/* Desktop Sidebar */}
             <ConditionalPowerSidebar
               isCollapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
             
             {/* Desktop Main Content */}

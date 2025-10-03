@@ -4,9 +4,11 @@ import { currentOrgFeatureFlags$ } from '@/legend-state/observables/feature-flag
 import { UnifiedSidebar } from '@/components/layout/unified-sidebar'
 
 export const ConditionalPowerSidebar = observer(({
-  isCollapsed
+  isCollapsed,
+  onToggle
 }: {
   isCollapsed?: boolean
+  onToggle?: () => void
 }) => {
   const featureFlags = use$(currentOrgFeatureFlags$)
   const isUniverseMode = featureFlags?.universe_mode === true
@@ -21,5 +23,5 @@ export const ConditionalPowerSidebar = observer(({
   // Use universe navigation only when on universe routes, regardless of feature flags
   const shouldShowUniverseNav = isUniverseMode && isOnUniverseRoute
 
-  return <UnifiedSidebar isCollapsed={isCollapsed} isUniverseMode={shouldShowUniverseNav} />
+  return <UnifiedSidebar isCollapsed={isCollapsed} isUniverseMode={shouldShowUniverseNav} onToggle={onToggle} />
 })
