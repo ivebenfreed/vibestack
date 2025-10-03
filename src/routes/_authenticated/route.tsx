@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, useLocation, useNavigate } from '@tanstack/react-router'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { observer } from '@legendapp/state/react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
@@ -7,6 +7,7 @@ import { PostAuthOrganizationSetup } from '@/features/auth/components/PostAuthOr
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { TrialExpiredGuard } from '@/components/guards/TrialExpiredGuard'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
+import { UniversalChatPanel } from '@/components/chat/UniversalChatPanel'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
@@ -36,6 +37,14 @@ function RouteComponent() {
 const AuthenticatedContent = observer(function AuthenticatedContent() {
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Chat panel state
+  const [isChatOpen, setIsChatOpen] = useState(false)
+
+  // Get current route context for chat
+  const currentRoute = location.pathname
+  const orgIdMatch = currentRoute.match(/\/org\/([^\/]+)/)
+  const chatOrgId = orgIdMatch ? orgIdMatch[1] : 'unknown'
 
   // Signal route readiness
   useRouteReady();
@@ -115,7 +124,18 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
     <TrialExpiredGuard>
       <div data-testid="authenticated-content" className="min-h-screen bg-background">
         {/* <SkipToMain /> - Disabled: phantom component issue */}
-        <UnifiedLayout />
+        <UnifiedLayout
+          isChatOpen={isChatOpen}
+          onChatToggle={() => setIsChatOpen(!isChatOpen)}
+        />
+
+        {/* Universal Chat Panel */}
+        <UniversalChatPanel
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          orgId={chatOrgId}
+          currentRoute={currentRoute}
+        />
       </div>
     </TrialExpiredGuard>
   )

@@ -64,6 +64,10 @@ api.route('/generic', genericKysely) // Now using Kysely instead of Drizzle
 import processRouter from './process'
 api.route('/process', processRouter)
 
+// Chat API
+import chatRouter from './chat'
+api.route('/chat', chatRouter)
+
 // File Import API
 import fileImportApi from '../routes/file-import-api'
 api.route('/file-import', fileImportApi)

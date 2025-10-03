@@ -441,43 +441,53 @@ function createEntityObservable(entityName: string, schema?: any) {
     // Initial value - required for syncedCrud
     initial: {},
 
+    // ⚡ PERFORMANCE: Don't auto-load on creation - let Dexie sync populate data
+    mode: 'assign' as const,
+
     // ✅ NO Legend State persist config - Dexie handles all persistence
     // Custom list() below reads directly from Dexie cache for instant warm start
     // DexieSyncLayer manages differential sync in background
 
     // ✅ LIST - Read from Dexie cache (instant, cache-first)
     list: async ({ lastSync }: { lastSync?: number } = {}) => {
+      const startTime = performance.now()
+      fileLog.debug(`🔍 [LIST-START] ${entityName}: list() called, lastSync=${lastSync}`)
+
       try {
-        // Check if Dexie is rebuilding - use API fallback
+        // Check if Dexie is rebuilding - return empty, background sync will populate
         const { getSyncLayer } = await import('./persistence/DexieSyncLayer')
         const syncLayer = getSyncLayer()
         if (syncLayer?.isCurrentlyRebuilding()) {
-          fileLog.debug(`🔄 [REBUILD] ${entityName}: DB rebuilding, using API`)
-          return fetchDirectFromAPI(baseUrl)
+          fileLog.debug(`🔄 [REBUILD] ${entityName}: DB rebuilding, returning empty (sync will populate)`)
+          return []
         }
 
         const dexie = getDexieDB()
 
-        // Fallback to direct API if Dexie not initialized
+        // Return empty array if Dexie not initialized - background sync will populate later
         if (!dexie) {
-          fileLog.warn(`🔄 [DEXIE-FALLBACK] ${entityName}: Dexie not available, using API`)
-          return fetchDirectFromAPI(baseUrl)
+          fileLog.warn(`⏳ [DEXIE-PENDING] ${entityName}: Dexie not ready yet, returning empty (sync will populate)`)
+          return []
         }
 
         // ✅ Read from Dexie cache (differential if lastSync provided)
         // FIXED: Pass full entityName (with org prefix) to match Dexie table names
+        fileLog.debug(`📖 [DEXIE-READ-ATTEMPT] ${entityName}: Reading from Dexie...`)
         const records = lastSync
           ? await dexie.getChangedSince(entityName, lastSync)
           : await dexie.getAllRecords(entityName)
 
+        const duration = performance.now() - startTime
         const syncType = lastSync ? 'differential' : 'full'
-        fileLog.debug(`📦 [DEXIE-READ] ${entityName}: ${records.length} records (${syncType})`)
+        fileLog.debug(`📦 [DEXIE-READ] ${entityName}: ${records.length} records (${syncType}) in ${duration.toFixed(0)}ms`)
 
         return records
 
       } catch (error) {
-        fileLog.error(`❌ [DEXIE-READ] ${entityName}: Error, falling back to API`, error)
-        return fetchDirectFromAPI(baseUrl)
+        const duration = performance.now() - startTime
+        fileLog.error(`❌ [DEXIE-READ] ${entityName}: Error reading from cache after ${duration.toFixed(0)}ms, returning empty`, error)
+        // Return empty instead of API fallback - avoids blocking UI
+        return []
       }
     },
 

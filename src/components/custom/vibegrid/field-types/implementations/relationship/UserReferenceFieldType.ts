@@ -167,10 +167,15 @@ export class UserReferenceRenderer implements CellRenderer {
       return container;
     }
 
-    // If it's a UUID, show loading and try to resolve
+    // If it's a UUID, show loading and try to resolve asynchronously
     container.textContent = 'Loading...';
     container.style.opacity = '0.7';
-    this.loadAndRenderUser(container, value, column);
+
+    // ⚡ PERFORMANCE: Don't await - let it load async without blocking
+    this.loadAndRenderUser(container, value, column).catch(err => {
+      console.error('Failed to load user', err);
+      container.textContent = `User ${value.slice(-4)}`;
+    });
 
     return container;
   }
@@ -265,6 +270,9 @@ export class UserReferenceRenderer implements CellRenderer {
 
   private async loadAndRenderUser(container: HTMLElement, userId: string, column: EnhancedColumn) {
     try {
+      // ⚡ PERFORMANCE: Use setTimeout to defer observable access off the main thread
+      await new Promise(resolve => setTimeout(resolve, 0));
+
       // Use existing observables to get user data
       const orgId = universeOrgId$.peek() || window.location.pathname.match(/\/org\/([^\/]+)/)?.[1] || '';
       const userEntityName = `${orgId}_User`;

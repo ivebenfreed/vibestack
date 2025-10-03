@@ -16,13 +16,15 @@ import SyncStatusIcon from '@/features/sync/components/SyncStatusIcon'
 import { TrialBanner } from '@/components/trial-banner'
 import { useOrgTrialStatus } from '@/contexts/AbilityContext'
 import { useUnifiedAuth } from '@/legend-state/hooks/use-unified-auth'
-import { RotateCcw, Menu } from 'lucide-react'
+import { RotateCcw, Menu, MessageSquare } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useIsMobile } from '@/hooks/use-mobile'
 
 interface UnifiedLayoutProps {
   children?: React.ReactNode
+  isChatOpen: boolean
+  onChatToggle: () => void
 }
 
 // PWA-aware refresh button component
@@ -99,7 +101,7 @@ const RefreshButton = () => {
   )
 }
 
-export function UnifiedLayout({ children }: UnifiedLayoutProps) {
+export function UnifiedLayout({ children, isChatOpen, onChatToggle }: UnifiedLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false)
   const location = useLocation()
@@ -197,6 +199,17 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                   
                   {/* Right side buttons - compact on mobile */}
                   <div className="flex items-center gap-0">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={onChatToggle} className="h-8 w-8">
+                            <MessageSquare className="h-4 w-4" />
+                            <span className="sr-only">AI Assistant</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>AI Assistant</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <ThemeSwitch />
                     <SyncStatusIcon />
                     <ProfileDropdown />
@@ -243,9 +256,20 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                   <div className="flex-1 flex justify-center">
                     <Search />
                   </div>
-                  
+
                   {/* Right side buttons */}
                   <div className="flex items-center gap-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={onChatToggle} className="h-8 w-8">
+                            <MessageSquare className="h-4 w-4" />
+                            <span className="sr-only">AI Assistant</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>AI Assistant</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <RefreshButton />
                     <ThemeSwitch />
                     <SyncStatusIcon />

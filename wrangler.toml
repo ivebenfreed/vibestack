@@ -46,6 +46,10 @@ class_name = "OrganizationActor"
 name = "EMBEDDING_GENERATOR"
 class_name = "EmbeddingGeneratorDO"
 
+[[durable_objects.bindings]]
+name = "CHAT_AGENT"
+class_name = "ChatAgentDO"
+
 
 
 # Durable Objects migrations
@@ -56,6 +60,10 @@ new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrganizationActor"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["EmbeddingGeneratorDO"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["ChatAgentDO"]
 
 
 

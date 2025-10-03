@@ -60,10 +60,15 @@ export interface Env {
   POLAR_ENVIRONMENT: string;
   
   // Durable Object bindings (from wrangler.toml)
-  SYNC: DurableObjectNamespace; 
+  SYNC: DurableObjectNamespace;
   REPLICATION: DurableObjectNamespace;
   ORGANIZATION_ACTOR: DurableObjectNamespace;
-  
+  EMBEDDING_GENERATOR: DurableObjectNamespace;
+  CHAT_AGENT: DurableObjectNamespace;
+
+  // AI binding for Cloudflare Workers AI
+  AI: any;
+
   // KV namespace bindings (from wrangler.toml)
   CLIENT_REGISTRY: KVNamespace;
   SESSIONS: KVNamespace;

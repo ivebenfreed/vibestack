@@ -57,7 +57,7 @@ export class OrganizationActor extends DurableObject {
 export class EmbeddingGeneratorDO extends DurableObject {
   private state: DurableObjectState;
   private env: any;
-  
+
   constructor(state: DurableObjectState, env: any) {
     super(state, env);
     this.state = state;
@@ -67,6 +67,23 @@ export class EmbeddingGeneratorDO extends DurableObject {
   async fetch(request: Request): Promise<Response> {
     const { EmbeddingGeneratorDO: EmbeddingGeneratorDOImpl } = await import('./src/server/actors/EmbeddingGeneratorDO');
     const impl = new EmbeddingGeneratorDOImpl(this.state, this.env);
+    return impl.fetch(request);
+  }
+}
+
+export class ChatAgentDO extends DurableObject {
+  private state: DurableObjectState;
+  private env: any;
+
+  constructor(state: DurableObjectState, env: any) {
+    super(state, env);
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const { ChatAgentDO: ChatAgentDOImpl } = await import('./src/server/actors/ChatAgentDO');
+    const impl = new ChatAgentDOImpl(this.state, this.env);
     return impl.fetch(request);
   }
 }
