@@ -93,12 +93,16 @@ export class ChatAgentDO extends DurableObject {
       // maxSteps: 15,
     });
 
-    // Return streaming response
-    return result.toTextStreamResponse({
+    // Create a Response with the text stream
+    // Using textStream for simple streaming (will add data stream protocol later for tools)
+    const stream = result.textStream;
+
+    return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
+        'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'Transfer-Encoding': 'chunked',
       },
     });
   }

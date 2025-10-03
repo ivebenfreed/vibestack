@@ -72,7 +72,7 @@ export function UniversalChatPanel({ isOpen, onClose, orgId, currentRoute }: Uni
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
+          const chunk = decoder.decode(value, { stream: true });
           assistantMessage += chunk;
 
           setMessages((prev) => {
