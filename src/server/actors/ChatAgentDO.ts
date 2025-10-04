@@ -31,8 +31,8 @@ export class ChatAgentDO extends DurableObject {
         return new Response(JSON.stringify({
           status: 'active',
           service: 'ChatAgentDO',
-          model: '@cf/meta/llama-3.1-8b-instruct',
-          capabilities: ['process-modeling', 'dataforge', 'analytics'],
+          model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          capabilities: ['process-modeling', 'dataforge', 'analytics', 'tool-calling'],
         }), {
           headers: { 'Content-Type': 'application/json' },
         });
@@ -51,6 +51,8 @@ export class ChatAgentDO extends DurableObject {
   }
 
   private async handleChat(request: Request): Promise<Response> {
+    console.log('[ChatAgentDO] handleChat called - version: v3.3-70b-fp8-fast');
+
     const body = await request.json() as {
       messages: Array<{ role: string; content: string }>;
       context: {
@@ -61,6 +63,7 @@ export class ChatAgentDO extends DurableObject {
     };
 
     const { messages, context } = body;
+    console.log('[ChatAgentDO] Request context:', { orgId: context.orgId, route: context.route, messageCount: messages.length });
 
     // Get context function for tools
     const getContext = () => ({
@@ -77,21 +80,28 @@ export class ChatAgentDO extends DurableObject {
 
     // Create Cloudflare AI provider (official v2-compatible provider)
     const workersai = createWorkersAI({ binding: this.env.AI });
-    const model = workersai('@cf/meta/llama-3.1-8b-instruct');
+    // Use llama-3.3-70b-instruct-fp8-fast - supports tool calling and is v2-compatible
+    const modelName = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+    console.log('[ChatAgentDO] Using model:', modelName);
+    const model = workersai(modelName);
 
     // Stream response - simplified without tools for now
     const systemPrompt = context.route.includes('/process-studio')
       ? processAgentSystemPrompt
       : 'You are a helpful assistant for the Elevra platform.';
 
+    console.log('[ChatAgentDO] Calling streamText with model...');
+
+    // Test without tools first to verify model works
     const result = await streamText({
       model,
       messages,
       system: systemPrompt,
-      // TODO: Add tools back once Cloudflare AI tool format is resolved
       // tools: allTools,
       // maxSteps: 15,
     });
+
+    console.log('[ChatAgentDO] streamText completed, creating response...');
 
     // Create a Response with the text stream
     // Using textStream for simple streaming (will add data stream protocol later for tools)

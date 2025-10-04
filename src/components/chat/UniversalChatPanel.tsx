@@ -45,6 +45,8 @@ export function UniversalChatPanel({ isOpen, onClose, orgId, currentRoute }: Uni
     setIsLoading(true);
 
     try {
+      console.log('[Chat] Sending message:', userMessage.content);
+
       const response = await fetch('/api/chat/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -58,21 +60,31 @@ export function UniversalChatPanel({ isOpen, onClose, orgId, currentRoute }: Uni
         }),
       });
 
+      console.log('[Chat] Response status:', response.status, response.statusText);
+      console.log('[Chat] Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         throw new Error('Chat request failed');
       }
 
       // Handle streaming response (plain text stream)
       const reader = response.body?.getReader();
+      console.log('[Chat] Got reader:', !!reader);
+
       const decoder = new TextDecoder();
       let assistantMessage = '';
+      let chunkCount = 0;
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
+          chunkCount++;
+          console.log('[Chat] Chunk', chunkCount, '- done:', done, 'bytes:', value?.length);
+
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
+          console.log('[Chat] Decoded chunk:', chunk.substring(0, 100));
           assistantMessage += chunk;
 
           setMessages((prev) => {
@@ -88,6 +100,8 @@ export function UniversalChatPanel({ isOpen, onClose, orgId, currentRoute }: Uni
             return newMessages;
           });
         }
+
+        console.log('[Chat] Stream completed. Total chunks:', chunkCount, 'Total length:', assistantMessage.length);
       }
     } catch (error) {
       console.error('Chat error:', error);
