@@ -36,13 +36,62 @@ export const organizationMembers = pgTable('organization_members', {
   role: varchar('role', { length: 50 }).notNull(),
 });
 
-// Users table (for auth operations)
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey(),
-  email: varchar('email', { length: 255 }).notNull(),
-  name: varchar('name', { length: 255 }),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at').defaultNow(),
+// Better Auth tables (match actual database structure with camelCase columns)
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name'),
+  email: text('email').notNull(),
+  emailVerified: varchar('emailVerified', { length: 10 }),  // Better Auth uses 'true'/'false' strings
+  image: text('image'),
+  role: text('role'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).defaultNow(),
+  banned: varchar('banned', { length: 10 }),  // Better Auth uses 'true'/'false' strings
+  banReason: text('banReason'),
+  banExpires: timestamp('banExpires', { withTimezone: true }),
+  password: text('password'),
+  default_organization_id: text('default_organization_id'),
+  last_used_organization_id: text('last_used_organization_id'),
+  last_org_access_at: timestamp('last_org_access_at', { withTimezone: true }),
+  active_organization_id: text('active_organization_id'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+export const session = pgTable('session', {
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  expiresAt: timestamp('expiresAt').notNull(),
+  ipAddress: text('ipAddress'),
+  userAgent: text('userAgent'),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+  impersonatedBy: text('impersonatedBy'),
+  activeOrganizationId: text('activeOrganizationId'),
+});
+
+export const account = pgTable('account', {
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  accountId: text('accountId').notNull(),
+  providerId: text('providerId').notNull(),
+  accessToken: text('accessToken'),
+  refreshToken: text('refreshToken'),
+  idToken: text('idToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt'),
+  refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt'),
+  scope: text('scope'),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expiresAt').notNull(),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
 });
 
 // Platform feature flags table for global feature management

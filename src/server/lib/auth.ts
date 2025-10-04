@@ -14,6 +14,7 @@ import { uuidv7 } from 'uuidv7';
 import { createKyselyForPersistentUse, withKysely } from './database-manager';
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDB } from './database-manager-v2';
+import * as schema from '../schemas/drizzle-schema';
 
 // import { createKVSessionInterceptor } from './kv-session-adapter'; // Replaced with Better Auth native secondaryStorage
 
@@ -274,6 +275,7 @@ export function initializeAuth(env: Env, request?: Request) {
     // Database configuration (PostgreSQL via Drizzle + PgBouncer)
     database: drizzleAdapter(db, {
       provider: "pg",  // PostgreSQL with postgres.js
+      schema,  // Pass the Drizzle schema so Better Auth can find the user table
     }),
     // Native Better Auth secondaryStorage for KV sessions
     ...(env.USE_KV_SESSIONS && env.SESSIONS ? {
