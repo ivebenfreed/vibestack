@@ -12,9 +12,6 @@ import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
 import { uuidv7 } from 'uuidv7';
 import { createKyselyForPersistentUse, withKysely } from './database-manager';
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { getDB } from './database-manager-v2';
-import * as schema from '../schemas/drizzle-schema';
 
 // import { createKVSessionInterceptor } from './kv-session-adapter'; // Replaced with Better Auth native secondaryStorage
 
@@ -242,10 +239,10 @@ export const auth = (() => {
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env, request?: Request) {
-  // Use lightweight Drizzle connection via PgBouncer - zero setup overhead
-  const db = getDB(env);
+  // Get configured Kysely instance
+  const kyselyInstance = createKyselyForPersistentUse();
 
-  // PgBouncer handles all connection pooling automatically
+  // Database connection is already established by middleware
   if (env.USE_KV_SESSIONS && env.SESSIONS) {
     dbLogger.info('Using KV secondaryStorage for sessions', {}, 'auth');
   } else {
@@ -272,11 +269,12 @@ export function initializeAuth(env: Env, request?: Request) {
       : "https://app.getelevra.com";
   
   const runtimeAuthConfig = {
-    // Database configuration (PostgreSQL via Drizzle + PgBouncer)
-    database: drizzleAdapter(db, {
-      provider: "pg",  // PostgreSQL with postgres.js
-      schema,  // Pass the Drizzle schema so Better Auth can find the user table
-    }),
+    // Database configuration (PostgreSQL via Kysely)
+    database: {
+      db: kyselyInstance,
+      type: "postgres" as const
+      // Remove custom casing - let Better Auth use defaults
+    },
     // Native Better Auth secondaryStorage for KV sessions
     ...(env.USE_KV_SESSIONS && env.SESSIONS ? {
       secondaryStorage: {
@@ -605,14 +603,8 @@ export function initializeAuth(env: Env, request?: Request) {
         }
 
         try {
-          // Use the database instance from Better Auth context, avoiding shared connections
-          const db = ctx.context.env?.database?.db;
-
-          if (!db) {
-            // No database available in context - skip org enrichment to avoid connection sharing
-            console.warn('[Custom Session] No database available in context, skipping organization data');
-            return { user, session };
-          }
+          // Get Kysely instance from the auth instance
+          const db = ctx.context.env?.database?.db || kyselyInstance;
           
           // Get user's organization context, prioritizing last_used over default
           const userContext = await db
