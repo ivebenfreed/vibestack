@@ -26,17 +26,23 @@ export function createProcessTools(env: Env, getContext: () => { orgId: string; 
       execute: async ({ includeUnpublished = true }) => {
         const { orgId } = getContext();
         const query = includeUnpublished ? '?includeUnpublished=true' : '?includeUnpublished=false';
+        const url = `${baseUrl(orgId)}/processes${query}`;
 
-        const response = await fetch(`${baseUrl(orgId)}/processes${query}`, {
+        console.log('[process.list] Fetching processes for org:', orgId, 'includeUnpublished:', includeUnpublished);
+        console.log('[process.list] URL:', url);
+
+        const response = await fetch(url, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
 
         if (!response.ok) {
+          console.error('[process.list] Failed:', response.status, response.statusText);
           throw new Error(`Failed to list processes: ${response.statusText}`);
         }
 
         const result = await response.json();
+        console.log('[process.list] Success:', result.data?.length || 0, 'processes returned');
         return result.data || [];
       },
     }),
@@ -75,18 +81,26 @@ export function createProcessTools(env: Env, getContext: () => { orgId: string; 
       }),
       execute: async ({ name, description, category }) => {
         const { orgId } = getContext();
+        const url = `${baseUrl(orgId)}/processes`;
 
-        const response = await fetch(`${baseUrl(orgId)}/processes`, {
+        console.log('[process.create] Creating process:', { name, description, category, orgId });
+        console.log('[process.create] URL:', url);
+
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, description, category }),
         });
 
         if (!response.ok) {
+          console.error('[process.create] Failed:', response.status, response.statusText);
+          const errorBody = await response.text();
+          console.error('[process.create] Error body:', errorBody);
           throw new Error(`Failed to create process: ${response.statusText}`);
         }
 
         const result = await response.json();
+        console.log('[process.create] Success, process ID:', result.data?.id);
         return result.data;
       },
     }),
@@ -202,18 +216,26 @@ export function createProcessTools(env: Env, getContext: () => { orgId: string; 
       }),
       execute: async ({ processId, ...nodeData }) => {
         const { orgId } = getContext();
+        const url = `${baseUrl(orgId)}/processes/${processId}/nodes`;
 
-        const response = await fetch(`${baseUrl(orgId)}/processes/${processId}/nodes`, {
+        console.log('[node.create] Creating node:', { processId, nodeData, orgId });
+        console.log('[node.create] URL:', url);
+
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(nodeData),
         });
 
         if (!response.ok) {
+          console.error('[node.create] Failed:', response.status, response.statusText);
+          const errorBody = await response.text();
+          console.error('[node.create] Error body:', errorBody);
           throw new Error(`Failed to create node: ${response.statusText}`);
         }
 
         const result = await response.json();
+        console.log('[node.create] Success, node ID:', result.data?.id);
         return result.data;
       },
     }),

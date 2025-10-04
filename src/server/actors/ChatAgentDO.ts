@@ -51,6 +51,8 @@ export class ChatAgentDO extends DurableObject {
   }
 
   private async handleChat(request: Request): Promise<Response> {
+    const startTime = Date.now();
+    console.log('[ChatAgentDO] ===== NEW CHAT REQUEST =====');
     console.log('[ChatAgentDO] handleChat called - version: v3.3-70b-fp8-fast');
 
     const body = await request.json() as {
@@ -63,7 +65,13 @@ export class ChatAgentDO extends DurableObject {
     };
 
     const { messages, context } = body;
-    console.log('[ChatAgentDO] Request context:', { orgId: context.orgId, route: context.route, messageCount: messages.length });
+    console.log('[ChatAgentDO] Request context:', {
+      orgId: context.orgId,
+      route: context.route,
+      userId: context.userId,
+      messageCount: messages.length,
+      lastMessage: messages[messages.length - 1]?.content.substring(0, 100)
+    });
 
     // Get context function for tools
     const getContext = () => ({
@@ -72,48 +80,89 @@ export class ChatAgentDO extends DurableObject {
     });
 
     // Create all tools
+    console.log('[ChatAgentDO] Creating process tools...');
     const processTools = createProcessTools(this.env, getContext);
     const allTools = {
       ...orchestratorTools,
       ...processTools,
     };
+    console.log('[ChatAgentDO] Tools created:', Object.keys(allTools).length, 'tools available');
+    console.log('[ChatAgentDO] Tool list:', Object.keys(allTools).join(', '));
 
     // Create Cloudflare AI provider (official v2-compatible provider)
+    console.log('[ChatAgentDO] Initializing Workers AI provider...');
+    console.log('[ChatAgentDO] AI binding available?:', !!this.env.AI);
+    console.log('[ChatAgentDO] AI binding type:', typeof this.env.AI);
+
     const workersai = createWorkersAI({ binding: this.env.AI });
+    console.log('[ChatAgentDO] WorkersAI provider created:', typeof workersai);
+    console.log('[ChatAgentDO] Has .chat() method?:', typeof workersai.chat);
+
     // Use llama-3.3-70b-instruct-fp8-fast - supports tool calling and is v2-compatible
     const modelName = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
     console.log('[ChatAgentDO] Using model:', modelName);
-    const model = workersai(modelName);
+    // IMPORTANT: Use .chat() method for AI SDK v5 compatibility
+    const model = workersai.chat(modelName);
+    console.log('[ChatAgentDO] Model created:', typeof model);
+    console.log('[ChatAgentDO] Model specificationVersion:', model.specificationVersion);
+    console.log('[ChatAgentDO] Model provider:', model.provider);
 
     // Stream response - simplified without tools for now
     const systemPrompt = context.route.includes('/process-studio')
       ? processAgentSystemPrompt
       : 'You are a helpful assistant for the Elevra platform.';
 
+    console.log('[ChatAgentDO] System prompt selected:', systemPrompt.substring(0, 100) + '...');
     console.log('[ChatAgentDO] Calling streamText with model...');
+    console.log('[ChatAgentDO] Tool calling: ENABLED with', Object.keys(allTools).length, 'tools');
 
-    // Test without tools first to verify model works
-    const result = await streamText({
-      model,
-      messages,
-      system: systemPrompt,
-      // tools: allTools,
-      // maxSteps: 15,
-    });
+    try {
+      // Enable tools for AI agent functionality
+      console.log('[ChatAgentDO] About to call streamText...');
+      const result = await streamText({
+        model,
+        messages,
+        system: systemPrompt,
+        tools: allTools,
+        maxSteps: 15,
+      });
 
-    console.log('[ChatAgentDO] streamText completed, creating response...');
+      console.log('[ChatAgentDO] streamText completed successfully');
+      console.log('[ChatAgentDO] Result keys:', Object.keys(result));
+      console.log('[ChatAgentDO] Has toTextStreamResponse?:', typeof result.toTextStreamResponse);
+      console.log('[ChatAgentDO] Creating stream response...');
 
-    // Create a Response with the text stream
-    // Using textStream for simple streaming (will add data stream protocol later for tools)
-    const stream = result.textStream;
+      // Use AI SDK text stream response for streaming
+      const response = result.toTextStreamResponse({
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Transfer-Encoding': 'chunked',
-      },
-    });
+      console.log('[ChatAgentDO] Response created:', response.constructor.name);
+      console.log('[ChatAgentDO] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const elapsed = Date.now() - startTime;
+      console.log('[ChatAgentDO] Request completed in', elapsed, 'ms');
+      console.log('[ChatAgentDO] ===== RESPONSE STREAMING (with tools) =====');
+
+      return response;
+    } catch (error) {
+      console.error('[ChatAgentDO] ERROR in streamText:', error);
+      console.error('[ChatAgentDO] Error type:', error?.constructor?.name);
+      console.error('[ChatAgentDO] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[ChatAgentDO] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+      // Return error as JSON
+      return new Response(JSON.stringify({
+        error: 'AI processing failed',
+        message: error instanceof Error ? error.message : String(error),
+        type: error?.constructor?.name || 'UnknownError'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
   }
 }

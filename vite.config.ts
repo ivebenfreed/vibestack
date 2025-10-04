@@ -18,9 +18,8 @@ export default defineConfig({
     cloudflare({
       inspectorPort: false,
       persistState: true,
-      // PERFORMANCE: Only handle API requests through worker in dev mode
-      // Let Vite serve static HTML directly (much faster)
-      configPath: process.env.NODE_ENV === 'production' ? './wrangler.toml' : false,
+      // Enable wrangler.toml in dev mode for AI binding and Durable Objects
+      configPath: './wrangler.toml',
     }),
   ],
   resolve: {
