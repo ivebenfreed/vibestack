@@ -5,9 +5,10 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import { streamText } from 'ai';
+import { streamText, generateText, tool } from 'ai';
+import { z } from 'zod';
 import type { Env } from '../types/env';
-import { createWorkersAI } from 'workers-ai-provider';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { orchestratorTools, orchestratorSystemPrompt } from '../ai/agents/orchestrator';
 import { processAgentSystemPrompt, processToolKeys } from '../ai/agents/process-agent';
 import { createProcessTools } from '../ai/tools/process-tools';
@@ -79,33 +80,42 @@ export class ChatAgentDO extends DurableObject {
       userId: context.userId,
     });
 
-    // Create all tools
-    console.log('[ChatAgentDO] Creating process tools...');
-    const processTools = createProcessTools(this.env, getContext);
-    const allTools = {
-      ...orchestratorTools,
-      ...processTools,
-    };
-    console.log('[ChatAgentDO] Tools created:', Object.keys(allTools).length, 'tools available');
-    console.log('[ChatAgentDO] Tool list:', Object.keys(allTools).join(', '));
+    // Capture tool execution results outside AI SDK (workaround for Gemini)
+    const toolExecutionLog: Array<{ tool: string; args: any; result: any }> = [];
 
-    // Create Cloudflare AI provider (official v2-compatible provider)
-    console.log('[ChatAgentDO] Initializing Workers AI provider...');
-    console.log('[ChatAgentDO] AI binding available?:', !!this.env.AI);
-    console.log('[ChatAgentDO] AI binding type:', typeof this.env.AI);
+    // Create process tools without wrapper for now - test if they work
+    console.log('[ChatAgentDO] Creating process tools (no wrapper)...');
+    const rawProcessTools = createProcessTools(this.env, getContext);
 
-    const workersai = createWorkersAI({ binding: this.env.AI });
-    console.log('[ChatAgentDO] WorkersAI provider created:', typeof workersai);
-    console.log('[ChatAgentDO] Has .chat() method?:', typeof workersai.chat);
+    const essentialToolNames = ['process.list', 'process.create'];
+    const allTools: Record<string, any> = {};
+    for (const toolName of essentialToolNames) {
+      if (rawProcessTools[toolName]) {
+        allTools[toolName] = rawProcessTools[toolName];
+      }
+    }
 
-    // Use llama-3.3-70b-instruct-fp8-fast - supports tool calling and is v2-compatible
-    const modelName = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+    console.log('[ChatAgentDO] Tools created:', Object.keys(allTools).length, 'process tools');
+
+
+    // Create Google Gemini provider
+    console.log('[ChatAgentDO] Initializing Google Gemini provider...');
+    console.log('[ChatAgentDO] API key available?:', !!this.env.GOOGLE_GENERATIVE_AI_API_KEY);
+    console.log('[ChatAgentDO] API key length:', this.env.GOOGLE_GENERATIVE_AI_API_KEY?.length || 0);
+
+    if (!this.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not configured');
+    }
+
+    const google = createGoogleGenerativeAI({
+      apiKey: this.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    });
+
+    // Use Gemini 2.5 Flash - better tool calling than Lite version
+    const modelName = 'gemini-2.5-flash-preview-09-2025';
     console.log('[ChatAgentDO] Using model:', modelName);
-    // IMPORTANT: Use .chat() method for AI SDK v5 compatibility
-    const model = workersai.chat(modelName);
+    const model = google(modelName);
     console.log('[ChatAgentDO] Model created:', typeof model);
-    console.log('[ChatAgentDO] Model specificationVersion:', model.specificationVersion);
-    console.log('[ChatAgentDO] Model provider:', model.provider);
 
     // Stream response - simplified without tools for now
     const systemPrompt = context.route.includes('/process-studio')
@@ -117,37 +127,62 @@ export class ChatAgentDO extends DurableObject {
     console.log('[ChatAgentDO] Tool calling: ENABLED with', Object.keys(allTools).length, 'tools');
 
     try {
-      // Enable tools for AI agent functionality
-      console.log('[ChatAgentDO] About to call streamText...');
-      const result = await streamText({
+      // Enable tools for AI agent functionality with Gemini
+      console.log('[ChatAgentDO] About to call streamText with tools...');
+      console.log('[ChatAgentDO] Messages:', messages.length, 'messages');
+      console.log('[ChatAgentDO] System prompt length:', systemPrompt.length);
+
+      // Use generateText with tool calling
+      const result = await generateText({
         model,
         messages,
         system: systemPrompt,
         tools: allTools,
-        maxSteps: 15,
+        maxSteps: 5,
       });
 
-      console.log('[ChatAgentDO] streamText completed successfully');
-      console.log('[ChatAgentDO] Result keys:', Object.keys(result));
-      console.log('[ChatAgentDO] Has toTextStreamResponse?:', typeof result.toTextStreamResponse);
-      console.log('[ChatAgentDO] Creating stream response...');
+      console.log('[ChatAgentDO] generateText completed');
+      console.log('[ChatAgentDO] result.text length:', result.text?.length || 0);
+      console.log('[ChatAgentDO] result.toolCalls:', result.toolCalls?.length || 0);
+      console.log('[ChatAgentDO] result.toolResults:', result.toolResults?.length || 0);
+      console.log('[ChatAgentDO] result.steps:', result.steps?.length || 0);
 
-      // Use AI SDK text stream response for streaming
-      const response = result.toTextStreamResponse({
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
+      // Log steps since top-level calls/results are empty
+      if (result.steps) {
+        result.steps.forEach((step, i) => {
+          console.log(`[ChatAgentDO] Step ${i}: toolCalls=${step.toolCalls?.length || 0}, toolResults=${step.toolResults?.length || 0}, text=${step.text?.length || 0}`);
+
+          if (step.toolCalls) {
+            step.toolCalls.forEach((call, j) => {
+              console.log(`[ChatAgentDO] Step ${i} tool ${j}:`, call.toolName, 'args:', call.args);
+            });
+          }
+          if (step.toolResults) {
+            step.toolResults.forEach((res, j) => {
+              console.log(`[ChatAgentDO] Step ${i} result ${j}:`, res.result);
+            });
+          }
+        });
+      }
+
+      // Use our execution log since AI SDK doesn't preserve data properly
+      let responseText = result.text || '';
+
+      if (!responseText && toolExecutionLog.length > 0) {
+        responseText = '✅ Tool Execution Complete!\n\n';
+
+        toolExecutionLog.forEach((execution, i) => {
+          responseText += `**Tool ${i + 1}:** \`${execution.tool}\`\n`;
+          responseText += `**Arguments:**\n\`\`\`json\n${JSON.stringify(execution.args, null, 2)}\n\`\`\`\n\n`;
+          responseText += `**Result:**\n\`\`\`json\n${JSON.stringify(execution.result, null, 2)}\n\`\`\`\n\n`;
+        });
+
+        responseText += `_${toolExecutionLog.length} tool(s) executed successfully_\n`;
+      }
+
+      return new Response(responseText || 'No response generated', {
+        headers: { 'Content-Type': 'text/plain' },
       });
-
-      console.log('[ChatAgentDO] Response created:', response.constructor.name);
-      console.log('[ChatAgentDO] Response headers:', Object.fromEntries(response.headers.entries()));
-
-      const elapsed = Date.now() - startTime;
-      console.log('[ChatAgentDO] Request completed in', elapsed, 'ms');
-      console.log('[ChatAgentDO] ===== RESPONSE STREAMING (with tools) =====');
-
-      return response;
     } catch (error) {
       console.error('[ChatAgentDO] ERROR in streamText:', error);
       console.error('[ChatAgentDO] Error type:', error?.constructor?.name);

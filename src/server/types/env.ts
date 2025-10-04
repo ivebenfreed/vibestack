@@ -69,6 +69,9 @@ export interface Env {
   // AI binding for Cloudflare Workers AI
   AI: any;
 
+  // Google Gemini API
+  GOOGLE_GENERATIVE_AI_API_KEY: string;
+
   // KV namespace bindings (from wrangler.toml)
   CLIENT_REGISTRY: KVNamespace;
   SESSIONS: KVNamespace;

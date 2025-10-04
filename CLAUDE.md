@@ -119,13 +119,17 @@ psql postgres://postgres:postgres@localhost:5432/elevra_dev -c "SELECT * FROM or
 
 ### Authentication
 ```bash
+# Create login credentials
 cat > /tmp/login.json << 'EOF'
 {"email": "ceo@widecorp.com", "password": "WideCorp2024!CEO"}
 EOF
-curl -X POST "http://localhost:4000/api/auth/sign-in/email" -H "Content-Type: application/json" -d @/tmp/login.json -c cookies.txt
 
-# Test protected endpoint
-curl -X GET "http://localhost:4000/api/organizations" -b cookies.txt
+# Sign in and save session cookie
+curl -d @/tmp/login.json -H "Content-Type: application/json" \
+  "http://localhost:4000/api/auth/sign-in/email" -c /tmp/cookies.txt
+
+# Test protected endpoint (returns organizations)
+curl "http://localhost:4000/api/organizations" -b /tmp/cookies.txt
 ```
 
 ## Test Credentials

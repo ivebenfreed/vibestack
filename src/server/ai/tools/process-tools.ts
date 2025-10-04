@@ -8,9 +8,10 @@ import { z } from 'zod';
 import type { Env } from '@/server/types/env';
 
 // Validation schemas matching API
-const ProcessCategorySchema = z.enum(['operational', 'management', 'support', 'custom']);
-const BPMNNodeTypeSchema = z.string(); // Full BPMN type validation
-const ConnectionTypeSchema = z.enum(['sequence_flow', 'message_flow', 'association']);
+// Using z.string() instead of z.enum() for Gemini compatibility
+const ProcessCategorySchema = z.string().describe('One of: operational, management, support, custom');
+const BPMNNodeTypeSchema = z.string().describe('BPMN node type (e.g., start_event, task, exclusive_gateway, end_event)');
+const ConnectionTypeSchema = z.string().describe('One of: sequence_flow, message_flow, association');
 
 export function createProcessTools(env: Env, getContext: () => { orgId: string; userId?: string }) {
   const baseUrl = (orgId: string) => `/api/process/orgs/${orgId}`;
@@ -21,11 +22,12 @@ export function createProcessTools(env: Env, getContext: () => { orgId: string; 
     'process.list': tool({
       description: 'List all process definitions for the organization. Use this to show available processes or find a process by name.',
       parameters: z.object({
-        includeUnpublished: z.boolean().optional().describe('Include draft/unpublished processes (default: true)'),
+        includeUnpublished: z.boolean().describe('Include draft/unpublished processes (set to true to include drafts)'),
       }),
-      execute: async ({ includeUnpublished = true }) => {
+      execute: async ({ includeUnpublished }) => {
         const { orgId } = getContext();
-        const query = includeUnpublished ? '?includeUnpublished=true' : '?includeUnpublished=false';
+        const include = includeUnpublished !== undefined ? includeUnpublished : true;
+        const query = include ? '?includeUnpublished=true' : '?includeUnpublished=false';
         const url = `${baseUrl(orgId)}/processes${query}`;
 
         console.log('[process.list] Fetching processes for org:', orgId, 'includeUnpublished:', includeUnpublished);
@@ -75,9 +77,9 @@ export function createProcessTools(env: Env, getContext: () => { orgId: string; 
     'process.create': tool({
       description: 'Create a new BPMN process definition. Use this when user wants to create a new workflow or business process.',
       parameters: z.object({
-        name: z.string().min(1).max(255).describe('Name of the process (e.g., "Customer Onboarding")'),
-        description: z.string().optional().describe('Optional detailed description of what this process does'),
-        category: ProcessCategorySchema.optional().describe('Process category: operational, management, support, or custom'),
+        name: z.string().describe('Name of the process (e.g., "Customer Onboarding")'),
+        description: z.string().describe('Description of what this process does'),
+        category: ProcessCategorySchema.describe('Process category: operational, management, support, or custom'),
       }),
       execute: async ({ name, description, category }) => {
         const { orgId } = getContext();

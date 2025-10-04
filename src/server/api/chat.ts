@@ -43,14 +43,8 @@ app.post('/chat', async (c) => {
       }),
     });
 
-    // Return streaming response
-    return new Response(response.body, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+    // Return streaming response directly from DO (preserves stream better)
+    return response;
   } catch (error) {
     console.error('[Chat API] Error:', error);
     return c.json({
