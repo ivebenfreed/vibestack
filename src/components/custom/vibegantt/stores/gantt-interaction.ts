@@ -30,44 +30,44 @@ export function createGanttInteraction$(ganttCore$: any) {
     selectTask: (taskId: string | undefined, isMulti: boolean = false) => {
       batch(() => {
         if (isMulti && taskId) {
-          const current = ganttInteraction$.selectedTaskIds.get();
+          const current = ganttInteraction$.selectedTaskIds.peek();
           const newSelection = new Set(current);
           if (newSelection.has(taskId)) {
             newSelection.delete(taskId);
           } else {
             newSelection.add(taskId);
           }
-          ganttInteraction$.selectedTaskIds.set(newSelection);
+          ganttInteraction$.selectedTaskIds.set(newSelection as any);
         } else {
           ganttInteraction$.selectedTaskId.set(taskId);
-          ganttInteraction$.selectedTaskIds.set(taskId ? new Set([taskId]) : new Set());
+          ganttInteraction$.selectedTaskIds.set((taskId ? new Set([taskId]) : new Set()) as any);
         }
 
         // Clear other selections
         ganttInteraction$.selectedDependencyId.set(undefined);
-        ganttInteraction$.selectedDependencyIds.set(new Set());
+        ganttInteraction$.selectedDependencyIds.set(new Set() as any);
       });
     },
 
     selectDependency: (dependencyId: string | undefined, isMulti: boolean = false) => {
       batch(() => {
         if (isMulti && dependencyId) {
-          const current = ganttInteraction$.selectedDependencyIds.get();
+          const current = ganttInteraction$.selectedDependencyIds.peek();
           const newSelection = new Set(current);
           if (newSelection.has(dependencyId)) {
             newSelection.delete(dependencyId);
           } else {
             newSelection.add(dependencyId);
           }
-          ganttInteraction$.selectedDependencyIds.set(newSelection);
+          ganttInteraction$.selectedDependencyIds.set(newSelection as any);
         } else {
           ganttInteraction$.selectedDependencyId.set(dependencyId);
-          ganttInteraction$.selectedDependencyIds.set(dependencyId ? new Set([dependencyId]) : new Set());
+          ganttInteraction$.selectedDependencyIds.set((dependencyId ? new Set([dependencyId]) : new Set()) as any);
         }
 
         // Clear other selections
         ganttInteraction$.selectedTaskId.set(undefined);
-        ganttInteraction$.selectedTaskIds.set(new Set());
+        ganttInteraction$.selectedTaskIds.set(new Set() as any);
       });
     },
 
@@ -75,8 +75,8 @@ export function createGanttInteraction$(ganttCore$: any) {
       batch(() => {
         ganttInteraction$.selectedTaskId.set(undefined);
         ganttInteraction$.selectedDependencyId.set(undefined);
-        ganttInteraction$.selectedTaskIds.set(new Set());
-        ganttInteraction$.selectedDependencyIds.set(new Set());
+        ganttInteraction$.selectedTaskIds.set(new Set() as any);
+        ganttInteraction$.selectedDependencyIds.set(new Set() as any);
         ganttInteraction$.hoveredTaskId.set(undefined);
         ganttInteraction$.hoveredDependencyId.set(undefined);
       });

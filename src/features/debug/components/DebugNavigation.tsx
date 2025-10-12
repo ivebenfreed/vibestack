@@ -6,7 +6,6 @@ export function DebugNavigation() {
   const debugRoutes = [
     { path: '/debug/sync', label: 'Sync' },
     { path: '/debug/integrity', label: 'Integrity' },
-    { path: '/debug/state-machine-test', label: 'State Machine Test' },
     { path: '/debug/query-test', label: 'Query Test' },
     { path: '/debug/vibegantt', label: 'VibeGantt' },
     { path: '/debug/gantt-test-data', label: 'Gantt Test Data' },

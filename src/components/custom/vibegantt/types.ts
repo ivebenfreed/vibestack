@@ -9,6 +9,7 @@ export interface GanttTask {
   priority: 'low' | 'medium' | 'high';
   description?: string;
   parentId?: string; // For subtasks
+  color?: string; // Optional color for task visualization
 }
 
 export interface TaskDependency {

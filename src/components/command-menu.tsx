@@ -29,9 +29,18 @@ import { universeSchema$, universeLoading$, createEntityGroups } from '@/legend-
 import { useCommandSearch } from '@/context/search-context'
 import { EntityNameUtils } from '@/lib/entity-name-utils'
 
+// Navigation item type
+interface NavigationItem {
+  id: string;
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  orgName?: string; // Optional organization name for entity items
+}
+
 // Base navigation items that match the unified sidebar structure
-const getBaseNavigationItems = (isAdmin: boolean, isSuperAdmin: boolean, currentOrgId?: string) => {
-  const items = [
+const getBaseNavigationItems = (isAdmin: boolean, isSuperAdmin: boolean, currentOrgId?: string): NavigationItem[] => {
+  const items: NavigationItem[] = [
     // Universe-level navigation (matches unified sidebar)
     { id: 'universe', label: 'Universe Dashboard', href: '/universe', icon: Globe },
     { id: 'universe-analytics', label: 'Analytics', href: '/universe/analytics', icon: Activity },
