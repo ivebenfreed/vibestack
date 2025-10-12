@@ -6,7 +6,7 @@
  * Updated to fix HMR reload issues - Force timestamp update.
  */
 
-import { observable, syncState, when, batch, whenReady } from '@legendapp/state'
+import { observable, when, batch } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { configureSynced } from '@legendapp/state/sync'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
@@ -15,6 +15,7 @@ import { EntityNameUtils } from '@/lib/entity-name-utils'
 import { clearSchemaObservables, getSchemaObservable$, peekSchemaData$ } from './schema-observable'
 import { setPersistenceManagerReference, setPersistenceConfigSetter, setupFullPersistenceConfig } from './persistence-utils'
 import { syncNotifications$ } from './sync-notifications'
+import { routeReadiness$ } from './route-readiness'
 import { getDexieDB } from './persistence/DexieEntityDB'
 import { log } from '@/logger';
 const fileLog = log('legend-state/observables.ts');
@@ -227,18 +228,17 @@ export const universeSchema$ = observable(() => {
  * Replaces: orgContext$.orgId
  */
 export const universeOrgId$ = observable(() => {
-  const universeContext = universeContext$.get()
+  const currentRoute = routeReadiness$.currentRoute.get()
 
-  // Try to get org ID from current URL path
-  if (typeof window !== 'undefined') {
-    const path = window.location.pathname
-    const orgMatch = path.match(/^\/org\/([^\/]+)/)
-    if (orgMatch) {
-      const orgId = orgMatch[1]
-      // Return the extracted orgId regardless of verification
-      // The API endpoints exist and work, so trust the URL
-      return orgId
-    }
+  const path = typeof currentRoute === 'string'
+    ? currentRoute
+    : typeof window !== 'undefined'
+      ? window.location.pathname
+      : ''
+
+  const orgMatch = path.match(/^\/org\/([^\/]+)/)
+  if (orgMatch) {
+    return orgMatch[1]
   }
 
   // Fallback: return 'universe' only if no org ID in URL
@@ -423,8 +423,6 @@ function createEntityObservable(entityName: string, schema?: any) {
     }
   }
   
-  const syncUrl = `/api/dataforge/orgs/${actualOrgId}/sync/${actualEntityName}`
-
   fileLog.debug(`[Observable] Creating entity observable for ${entityName} with Dexie cache`);
 
   // Create the syncedCrud configuration with proper differential sync
@@ -437,9 +435,6 @@ function createEntityObservable(entityName: string, schema?: any) {
     fieldCreatedAt: 'created_at',
     fieldUpdatedAt: 'updated_at',
     fieldDeleted: 'deleted',
-
-    // Initial value - required for syncedCrud
-    initial: {},
 
     // ⚡ PERFORMANCE: Don't auto-load on creation - let Dexie sync populate data
     mode: 'assign' as const,
@@ -498,7 +493,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         // Optional: Validate before creating - disabled for now since validation endpoint doesn't exist
         if (false && schema?.validation !== false) {
           try {
-            await validateItem(orgId, entityName, item, 'create')
+            await validateItem(actualOrgId, entityName, item, 'create')
           } catch (validationError) {
             fileLog.error(`[Observable] Validation failed for ${entityName}:`, validationError.message)
             throw validationError
@@ -547,7 +542,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         fileLog.error(`[Observable] Create error for ${entityName}:`, {
           error: error.message,
           item: item ? { id: item.id, ...Object.keys(item).slice(0, 3) } : 'null', // Avoid logging sensitive data
-          orgId,
+          orgId: actualOrgId,
           entityName
         })
         throw error
@@ -560,7 +555,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         // Optional: Validate before updating - disabled for now since validation endpoint doesn't exist
         if (false && schema?.validation !== false) {
           try {
-            await validateItem(orgId, entityName, item, 'update')
+            await validateItem(actualOrgId, entityName, item, 'update')
           } catch (validationError) {
             fileLog.error(`[Observable] Validation failed for ${entityName} update:`, validationError.message)
             throw validationError
@@ -612,7 +607,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         fileLog.error(`[Observable] Update error for ${entityName}:`, {
           error: error.message,
           itemId: item?.id || 'unknown',
-          orgId,
+          orgId: actualOrgId,
           entityName
         })
         throw error
@@ -659,7 +654,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         fileLog.error(`[Observable] Delete error for ${entityName}:`, {
           error: error.message,
           itemId: item?.id || 'unknown',
-          orgId,
+          orgId: actualOrgId,
           entityName
         })
         throw error
@@ -714,7 +709,7 @@ function createEntityObservable(entityName: string, schema?: any) {
         fileLog.error(`[Observable] Batch update error for ${entityName}:`, {
           error: error.message,
           itemCount: items?.length || 0,
-          orgId,
+          orgId: actualOrgId,
           entityName
         })
         throw error
@@ -1528,7 +1523,14 @@ export function clearContext() {
   
   // Clear schema observables as well
   clearSchemaObservables()
-  
+
+  // Reset cached entity observables to avoid leaking data across sessions
+  Object.keys(globalEntityCache).forEach((key) => {
+    delete globalEntityCache[key]
+  })
+
+  fileLog.info('[Observable] Cleared cached entity observables')
+
   fileLog.info('[Observable] ✅ Context cleared successfully')
 }
 
