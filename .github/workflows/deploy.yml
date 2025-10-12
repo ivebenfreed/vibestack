@@ -110,12 +110,14 @@ jobs:
         
       - name: Install dependencies (cache-free)
         run: |
-          echo "🧹 Completely fresh install to avoid esbuild conflicts"
-          rm -rf node_modules .pnpm-store pnpm-lock.yaml || true
-          # Fresh install with latest versions to avoid version conflicts
-          pnpm install --no-frozen-lockfile
+          echo "🧹 Fresh install with lockfile to avoid esbuild conflicts"
+          rm -rf node_modules .pnpm-store || true
+          # Install with frozen lockfile to ensure consistent versions
+          pnpm install --frozen-lockfile --ignore-scripts
           # Ensure all native bindings are properly installed for Linux
           pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 lightningcss-linux-x64-gnu
+          # Run postinstall scripts after native bindings are installed
+          pnpm install --frozen-lockfile
           # Verify esbuild installation
           echo "🔍 Verifying esbuild installation..."
           npx esbuild --version
