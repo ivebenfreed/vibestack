@@ -32,6 +32,12 @@ export default {
 
     // Handle static assets and SPA routing
     // Use the ASSETS binding to serve static files and handle SPA routing
+    if (!env.ASSETS) {
+      return new Response(
+        "Static assets not available — ASSETS binding is missing. Run `npm run build` before deploying.",
+        { status: 503, headers: { "Content-Type": "text/plain" } },
+      );
+    }
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>; 
