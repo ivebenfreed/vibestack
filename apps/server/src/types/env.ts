@@ -36,6 +36,8 @@ export interface Env {
   BETTER_AUTH_URL: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
   RESEND_API_KEY: string;
   
   // Durable Object bindings (from wrangler.toml)

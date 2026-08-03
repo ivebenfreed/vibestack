@@ -93,12 +93,14 @@ export const auth = betterAuth({
         }
       }
     },
-    // socialProviders: {
-    //   google: {
-    //     clientId: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_ID : undefined) || '',
-    //     clientSecret: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_SECRET : undefined) || '',
-    //   },
-    // },
+    socialProviders: {
+      ...(typeof process !== 'undefined' && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        },
+      } : {}),
+    },
     emailVerification: {
       enabled: false, // Completely disable link-based email verification
       sendOnSignUp: false, // Disabled - we use OTP instead
@@ -288,17 +290,25 @@ export function initializeAuth(env: Env) {
         }
       }
     },
-    // socialProviders: {
-    //   google: {
-    //     clientId: env.GOOGLE_CLIENT_ID,
-    //     clientSecret: env.GOOGLE_CLIENT_SECRET,
-    //     redirectURI: `${env.ENVIRONMENT === "development" 
-    //       ? "http://localhost:5173"  
-    //       : env.ENVIRONMENT === "staging" 
-    //         ? "https://dev.codevibesmatter.com" 
-    //         : "https://app.codevibesmatter.com"}/api/auth/callback/google`,
-    //   },
-    // },
+    socialProviders: {
+      ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? {
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          redirectURI: `${env.ENVIRONMENT === "development"
+            ? "http://localhost:5173"
+            : env.ENVIRONMENT === "staging"
+              ? "https://dev.codevibesmatter.com"
+              : "https://app.codevibesmatter.com"}/api/auth/callback/google`,
+        },
+      } : {}),
+      ...(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET ? {
+        microsoft: {
+          clientId: env.MICROSOFT_CLIENT_ID,
+          clientSecret: env.MICROSOFT_CLIENT_SECRET,
+        },
+      } : {}),
+    },
     emailVerification: {
       enabled: false, // Completely disable link-based email verification
       sendOnSignUp: false, // Disabled - we use OTP instead
