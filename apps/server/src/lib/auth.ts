@@ -154,6 +154,12 @@ export function initializeAuth(env: Env) {
     };
   }
 
+  if (!env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is not set. Provision it via `wrangler secret put DATABASE_URL`."
+    );
+  }
+
   const neonDialect = new NeonHTTPDialect({
     connectionString: env.DATABASE_URL,
   });

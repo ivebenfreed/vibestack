@@ -21,6 +21,11 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     throw new HTTPException(403, { message: 'Invalid bootstrap key.' });
   }
 
+  if (!DATABASE_URL) {
+    console.error('[Bootstrap] DATABASE_URL not set.');
+    throw new HTTPException(500, { message: 'Database not configured. Set DATABASE_URL secret.' });
+  }
+
   const neonDialect = new NeonHTTPDialect({ connectionString: DATABASE_URL });
   // Specify the database schema type if available, otherwise use 'any'
   // For example, if you have a DB type from Kysely codegen: import type { DB } from '@repo/dataforge/generated-types';
